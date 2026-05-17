@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 0 / 项目准备
-当前目标：创建仓库、放入文档、建立 AGENTS.md、会话协作流程和后端骨架
-下一步：完成本地初始提交后，进入 M1 后端 FastAPI 骨架
+当前阶段：阶段 2 / 时间上下文与父亲策略准备
+当前目标：在后端骨架上实现 TimeContextService、ParentPolicyService 和父亲策略 API
+下一步：启动 S02 时间与父亲策略会话
 ```
 
 ---
@@ -21,7 +21,7 @@
 | ID | 阶段 | 目标 | 状态 | 依赖 | 验收摘要 |
 |---|---|---|---|---|---|
 | C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程后置 |
-| M1 | 后端骨架 | FastAPI + health + conversation mock | todo | C0 | pytest 通过，mock 会话可用 |
+| M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | todo | M1 | time_period 和父亲目标注入会话 |
 | M3 | 模型抽象 | ModelRegistry + MockProvider | todo | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | todo | M3 | 场景 prompt 可组合 |
@@ -60,13 +60,13 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M1-01 初始化 backend pyproject | todo |  | 依赖可安装 |
-| M1-02 创建 app/main.py | todo |  | FastAPI 可启动 |
-| M1-03 实现 /api/v1/health | todo |  | 返回 ok |
-| M1-04 定义 conversation schema | todo |  | request/response 可校验 |
-| M1-05 实现 conversation mock service | todo |  | 返回小狐狸回复 |
-| M1-06 添加 pytest | todo |  | health/conversation 测试通过 |
-| M1-07 添加 backend README | todo |  | 本地启动说明可用 |
+| M1-01 初始化 backend pyproject | done |  | 依赖可安装 |
+| M1-02 创建 app/main.py | done |  | FastAPI 可启动 |
+| M1-03 实现 /api/v1/health | done |  | 返回 ok |
+| M1-04 定义 conversation schema | done |  | request/response 可校验 |
+| M1-05 实现 conversation mock service | done |  | 返回小狐狸回复 |
+| M1-06 添加 pytest | done |  | health/conversation 测试通过 |
+| M1-07 添加 backend README | done |  | 本地启动说明可用 |
 
 ### M2：时间与父亲策略
 

@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 2 / 时间上下文与父亲策略准备
-当前目标：在后端骨架上实现 TimeContextService、ParentPolicyService 和父亲策略 API
-下一步：启动 S02 时间与父亲策略会话
+当前阶段：阶段 3 / 模型抽象准备
+当前目标：实现 ModelRegistry、MockModelProvider 和真实 provider 骨架
+下一步：启动 S03 模型注册与 Mock Provider 会话
 ```
 
 ---
@@ -22,7 +22,7 @@
 |---|---|---|---|---|---|
 | C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程后置 |
 | M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
-| M2 | 时间与父亲策略 | TimeContext + ParentPolicy | todo | M1 | time_period 和父亲目标注入会话 |
+| M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
 | M3 | 模型抽象 | ModelRegistry + MockProvider | todo | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | todo | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | todo | M2 | 高风险优先，意图识别可测 |
@@ -72,12 +72,12 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M2-01 TimePeriod 枚举 | todo |  | 枚举可导入 |
-| M2-02 TimeContextService | todo |  | 16:30 -> after_school |
-| M2-03 ParentPolicy schema | todo |  | goals/preferences/schedule |
-| M2-04 ParentPolicyService | todo |  | 可读写默认策略 |
-| M2-05 /api/v1/parent/policy | todo |  | GET/POST 可用 |
-| M2-06 conversation 注入 context | todo |  | debug 含 time_context |
+| M2-01 TimePeriod 枚举 | done |  | 枚举可导入 |
+| M2-02 TimeContextService | done |  | 16:30 -> after_school |
+| M2-03 ParentPolicy schema | done |  | goals/preferences/schedule |
+| M2-04 ParentPolicyService | done |  | 可读写默认策略 |
+| M2-05 /api/v1/parent/policy | done |  | GET/POST 可用 |
+| M2-06 conversation 注入 context | done |  | debug 含 time_context |
 
 ### M3：模型抽象
 

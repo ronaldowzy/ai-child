@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from app.domain.time import TimeContext
 
 
 class ConversationInput(BaseModel):
@@ -46,7 +49,19 @@ class SessionState(BaseModel):
     needs_input: str | None = None
 
 
+class ParentPolicyDebug(BaseModel):
+    goals: list[str]
+    communication_preferences: dict[str, Any]
+    safety_rules: dict[str, Any]
+
+
+class ConversationDebug(BaseModel):
+    time_context: TimeContext
+    parent_policy: ParentPolicyDebug
+
+
 class ConversationMessageResponse(BaseModel):
     reply: Reply
     ui_actions: list[UiAction]
     session_state: SessionState
+    debug: ConversationDebug | None = None

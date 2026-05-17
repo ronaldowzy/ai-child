@@ -1,23 +1,64 @@
 from app.domain.schemas.conversation import (
+    ConversationDebug,
     ConversationMessageRequest,
     ConversationMessageResponse,
+    ParentPolicyDebug,
     QuickAction,
     Reply,
     SessionState,
     UiAction,
+)
+from app.services.parent_policy_service import (
+    ParentPolicyService,
+    get_parent_policy_service,
+)
+from app.services.time_context_service import (
+    TimeContextService,
+    get_time_context_service,
 )
 
 
 class ConversationService:
     """Temporary mock conversation flow for the S01 backend skeleton."""
 
+    def __init__(
+        self,
+        *,
+        time_context_service: TimeContextService | None = None,
+        parent_policy_service: ParentPolicyService | None = None,
+        debug_enabled: bool = True,
+    ) -> None:
+        self._time_context_service = time_context_service or get_time_context_service()
+        self._parent_policy_service = (
+            parent_policy_service or get_parent_policy_service()
+        )
+        self._debug_enabled = debug_enabled
+
     def handle_message(
         self, request: ConversationMessageRequest
     ) -> ConversationMessageResponse:
-        if self._is_learning_help_mock(request.input.text):
-            return self._learning_help_response()
+        parent_policy = self._parent_policy_service.get_policy(request.child_id)
+        time_context = self._time_context_service.build_context(
+            device_time=request.client_context.device_time,
+            timezone=request.client_context.timezone,
+            schedule=parent_policy.schedule,
+        )
 
-        return self._general_checkin_response()
+        if self._is_learning_help_mock(request.input.text):
+            response = self._learning_help_response()
+        else:
+            response = self._general_checkin_response()
+
+        if self._debug_enabled:
+            response.debug = ConversationDebug(
+                time_context=time_context,
+                parent_policy=ParentPolicyDebug(
+                    goals=parent_policy.goals,
+                    communication_preferences=parent_policy.communication_preferences,
+                    safety_rules=parent_policy.safety_rules,
+                ),
+            )
+        return response
 
     def _is_learning_help_mock(self, text: str) -> bool:
         learning_keywords = ("题", "作业", "不会", "数学", "语文", "英语")

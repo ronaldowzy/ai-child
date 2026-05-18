@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 11 / Android 壳准备
-当前目标：启动 Android MVP 前的后端验收已完成
-下一步：启动 S11 Android 壳会话
+当前阶段：阶段 11 / Android 构建环境准备
+当前目标：安装 JDK 17 和 Android SDK 后复验 S11 Android 壳项目
+下一步：配置本机 Android 开发环境并运行 cd android && ./gradlew assembleDebug
 ```
 
 ---
@@ -31,7 +31,7 @@
 | M8 | 父亲日报 | ParentReportService | done | M7 | 今日摘要可生成，pytest/ruff 通过 |
 | M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
-| A1 | Android 壳 | Compose 静态聊天 UI | todo | C0 | Android 可编译 |
+| A1 | Android 壳 | Compose 静态聊天 UI | blocked | C0 | 代码已完成，等待 JDK 17 + Android SDK 后编译验证 |
 | A2 | Android API | 接入 conversation API | todo | Q1/A1 | 能收发消息 |
 | A3 | Android 拍题 | Mock 拍题流程 | todo | A2/M9 | 学习求助可跑通 |
 | A4 | 父亲设置 | 设置目标和作息 | todo | A2/M2 | policy 可修改 |
@@ -142,8 +142,8 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| A1-01 Android 初始化 | todo |  | 可编译 |
-| A1-02 ChildChatScreen | todo |  | 静态 UI |
+| A1-01 Android 初始化 | blocked |  | 项目已创建，本机缺少 JDK 17 / Android SDK，暂无法编译 |
+| A1-02 ChildChatScreen | review |  | 静态 UI 已创建，等待编译验证 |
 | A2-01 ConversationApiClient | todo |  | 可请求后端 |
 | A2-02 ui_actions 渲染 | todo |  | 按钮显示 |
 | A3-01 Mock 拍题 | todo |  | 题目流程跑通 |
@@ -157,12 +157,12 @@
 ### 日期：2026-05-18
 
 ```text
-今日目标：完成 S10 后端质量与演示验收。
-完成任务：补齐 Q1 场景测试，覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘、父亲目标影响回复、模型 fallback；更新 test/lint/dev/demo 后端脚本；更新 backend README；本地 pytest、ruff、demo 通过。
-阻塞问题：无。
+今日目标：完成 S10 后端质量与演示验收，并接收 S11 Android 壳项目交接。
+完成任务：补齐 Q1 场景测试，覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘、父亲目标影响回复、模型 fallback；更新 test/lint/dev/demo 后端脚本；更新 backend README；本地 pytest、ruff、demo 通过；Android 壳项目代码已创建。
+阻塞问题：本机缺少 Java Runtime，且 ANDROID_HOME / ANDROID_SDK_ROOT 未配置，S11 暂无法完成 assembleDebug / test 编译验证。
 Codex 偏差：未新增 GitHub Actions，因为当前任务约束要求没有远端 GitHub 时优先保证本地脚本和 README。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：启动 S11 Android 壳会话。
+明日第一任务：安装 JDK 17 和 Android SDK 后复验 S11。
 ```
 
 ### 日期：YYYY-MM-DD

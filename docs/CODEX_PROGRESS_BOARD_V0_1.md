@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 9 / 附件与 Mock OCR 准备
-当前目标：实现 Attachment API、Mock OCR Provider 和拍题占位流程
-下一步：启动 S09 附件与 Mock OCR 会话
+当前阶段：阶段 10 / 后端质量与演示准备
+当前目标：补齐后端核心场景测试、演示脚本和本地质量检查
+下一步：启动 S10 后端质量与演示会话
 ```
 
 ---
@@ -29,7 +29,7 @@
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | done | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | done | M6 | 结构化记忆可写可查，pytest/ruff 通过 |
 | M8 | 父亲日报 | ParentReportService | done | M7 | 今日摘要可生成，pytest/ruff 通过 |
-| M9 | 附件/OCR | Attachment + Mock OCR | todo | M6 | 拍题流程可演示 |
+| M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + CI + demo scripts | todo | M1-M9 | 后端 MVP 稳定 |
 | A1 | Android 壳 | Compose 静态聊天 UI | todo | C0 | Android 可编译 |
 | A2 | Android API | 接入 conversation API | todo | Q1/A1 | 能收发消息 |
@@ -134,9 +134,9 @@
 | M8-01 ParentReport schema | done |  | 字段完整 |
 | M8-02 ParentReportService | done |  | 今日摘要可生成，不返回逐字聊天记录 |
 | M8-03 report API | done |  | /reports/{child_id} 和 /report/today 可用 |
-| M9-01 Attachment schema | todo |  | image/text 可表达 |
-| M9-02 MockOCRProvider | todo |  | mock 识别题目 |
-| M9-03 attachment API | todo |  | 上传 mock 题目 |
+| M9-01 Attachment schema | done |  | homework_photo 和 recognized_content 可表达 |
+| M9-02 MockOCRProvider | done |  | mock 识别题目，支持低置信度 |
+| M9-03 attachment API | done |  | 上传 mock 题目并接入学习求助 |
 
 ### Android 与联调
 
@@ -157,12 +157,12 @@
 ### 日期：2026-05-18
 
 ```text
-今日目标：完成 S07 记忆系统和 S08 父亲日报交接验收。
-完成任务：MemoryItem、MemoryRepository、MemoryService、MemoryExtractor mock、memories API、ParentReport schema、ParentReportService、parent report API 已实现并通过主控会话复验。
+今日目标：完成 S07 记忆系统、S08 父亲日报、S09 附件与 Mock OCR 交接验收。
+完成任务：MemoryItem、MemoryRepository、MemoryService、MemoryExtractor mock、memories API、ParentReport schema、ParentReportService、parent report API、Attachment schema、MockOCRProvider、attachment API、学习求助附件接入已实现并通过主控会话复验。
 阻塞问题：无。
 Codex 偏差：已同步 DEVELOPMENT_BACKLOG 与会话表/进度板的 M7-M10 定义。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：启动 S09 附件与 Mock OCR 会话。
+明日第一任务：启动 S10 后端质量与演示会话。
 ```
 
 ### 日期：YYYY-MM-DD

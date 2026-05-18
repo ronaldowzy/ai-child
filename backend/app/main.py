@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.v1.conversation_attachment import router as conversation_attachment_router
 from app.api.v1.conversation import router as conversation_router
 from app.api.v1.health import router as health_router
 from app.api.v1.memories import router as memories_router
@@ -15,6 +16,7 @@ app = FastAPI(title=settings.app_name)
 
 app.include_router(health_router, prefix=settings.api_v1_prefix, tags=["health"])
 app.include_router(conversation_router, prefix=settings.api_v1_prefix)
+app.include_router(conversation_attachment_router, prefix=settings.api_v1_prefix)
 app.include_router(parent_policy_router, prefix=settings.api_v1_prefix)
 app.include_router(parent_report_router, prefix=settings.api_v1_prefix)
 app.include_router(memories_router, prefix=settings.api_v1_prefix)

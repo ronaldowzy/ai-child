@@ -162,6 +162,33 @@ class SceneOrchestrator:
             transition = SceneTransitionType.PUSH
             next_stack = [*base_stack, scene_id]
 
+        has_clear_problem = (
+            bool(request.homework_problem_text)
+            and request.homework_problem_confidence is not None
+            and request.homework_problem_confidence >= 0.75
+        )
+        if has_clear_problem:
+            return SceneRouteDecision(
+                message_id=request.message_id,
+                session_id=request.session_id,
+                primary_intent=request.intent,
+                base_scene=next_stack[0],
+                active_scene=scene_id,
+                transition=transition,
+                scene_stack=next_stack,
+                risk_level=request.risk_level,
+                confidence=max(request.intent_confidence, 0.96),
+                reason="homework_attachment_ready",
+                sub_scene="ask_problem_understanding",
+                needs_input="problem_understanding",
+                reply_text=(
+                    "我看清楚了。我们先不急着算。"
+                    "你能告诉我：这道题是在问什么吗？"
+                ),
+                quick_actions=[],
+                signals=self._signals(request, transition=transition),
+            )
+
         return SceneRouteDecision(
             message_id=request.message_id,
             session_id=request.session_id,
@@ -319,6 +346,8 @@ class SceneOrchestrator:
                 request.safety_requires_parent_attention
             ),
             "safety_evidence": request.safety_evidence,
+            "has_homework_attachment": bool(request.homework_problem_text),
+            "homework_problem_confidence": request.homework_problem_confidence,
             "transition": transition.value,
         }
 

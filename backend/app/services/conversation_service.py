@@ -10,8 +10,14 @@ from app.domain.schemas.conversation import (
     SessionState,
     UiAction,
 )
+from app.domain.enums import IntentType, RiskLevel
 from app.domain.scene import SceneRouteDecision, SceneRouteRequest
+from app.services.attachment_service import (
+    AttachmentService,
+    get_attachment_service,
+)
 from app.services.intent_classifier import (
+    IntentClassification,
     IntentClassifier,
     get_intent_classifier,
 )
@@ -41,6 +47,7 @@ class ConversationService:
         safety_engine: SafetyEngine | None = None,
         intent_classifier: IntentClassifier | None = None,
         scene_orchestrator: SceneOrchestrator | None = None,
+        attachment_service: AttachmentService | None = None,
         debug_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
@@ -50,6 +57,7 @@ class ConversationService:
         self._safety_engine = safety_engine or get_safety_engine()
         self._intent_classifier = intent_classifier or get_intent_classifier()
         self._scene_orchestrator = scene_orchestrator or get_scene_orchestrator()
+        self._attachment_service = attachment_service or get_attachment_service()
         self._debug_enabled = debug_enabled
 
     def handle_message(
@@ -62,11 +70,30 @@ class ConversationService:
             schedule=parent_policy.schedule,
         )
         safety = self._safety_engine.classify_input(request.input.text)
-        intent = self._intent_classifier.classify(
-            request.input.text,
-            time_context=time_context,
-            safety=safety,
+        homework_context = self._attachment_service.get_ready_homework_context(
+            request.input.attachments,
+            child_id=request.child_id,
+            session_id=request.session_id,
         )
+        use_homework_attachment = (
+            homework_context is not None and safety.risk_level == RiskLevel.NONE
+        )
+        if use_homework_attachment:
+            intent = IntentClassification(
+                intent=IntentType.LEARNING_HELP,
+                sub_intent="homework_problem_with_attachment",
+                risk_level=safety.risk_level,
+                needs_modality=False,
+                suggested_modalities=[],
+                confidence=0.96,
+                evidence=["attachment_id_ready"],
+            )
+        else:
+            intent = self._intent_classifier.classify(
+                request.input.text,
+                time_context=time_context,
+                safety=safety,
+            )
         route_decision = self._scene_orchestrator.route(
             SceneRouteRequest(
                 child_id=request.child_id,
@@ -82,6 +109,16 @@ class ConversationService:
                 risk_level=safety.risk_level,
                 safety_requires_parent_attention=safety.requires_parent_attention,
                 safety_evidence=safety.evidence,
+                homework_problem_text=(
+                    homework_context.recognized_content.text
+                    if use_homework_attachment and homework_context
+                    else None
+                ),
+                homework_problem_confidence=(
+                    homework_context.recognized_content.confidence
+                    if use_homework_attachment and homework_context
+                    else None
+                ),
             )
         )
         response = self._response_from_route_decision(route_decision)

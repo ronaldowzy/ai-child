@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 6 / 场景编排准备
-当前目标：实现 SceneOrchestrator 和四类基础场景路由
-下一步：启动 S06 场景编排会话
+当前阶段：阶段 7 / 记忆系统准备
+当前目标：实现结构化 MemoryService、内存 Repository 和 MemoryExtractor mock
+下一步：启动 S07 记忆系统会话
 ```
 
 ---
@@ -26,7 +26,7 @@
 | M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | done | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | done | M2 | 高风险优先，意图识别可测 |
-| M6 | 场景编排 | SceneOrchestrator + 四类场景 | todo | M5 | 动态场景切换可用 |
+| M6 | 场景编排 | SceneOrchestrator + 四类场景 | done | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | todo | M6 | 结构化记忆可写可查 |
 | M8 | 父亲日报 | ParentReportService | todo | M7 | 今日摘要可生成 |
 | M9 | 附件/OCR | Attachment + Mock OCR | todo | M6 | 拍题流程可演示 |
@@ -115,13 +115,13 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M6-01 SceneId / SceneState | todo |  | 场景类型清晰 |
-| M6-02 SceneOrchestrator.route | todo |  | 根据 context 路由 |
-| M6-03 after_school scene | todo |  | 低压力选择题 |
-| M6-04 learning_help scene | todo |  | 拍照/口述 action |
-| M6-05 bedtime scene | todo |  | 三问复盘 |
-| M6-06 safety scene | todo |  | 父亲提醒 |
-| M6-07 routing_decision | todo |  | 可记录或 debug |
+| M6-01 SceneId / SceneState | done |  | 场景类型清晰 |
+| M6-02 SceneOrchestrator.route | done |  | 根据 context 路由 |
+| M6-03 after_school scene | done |  | 低压力选择题 |
+| M6-04 learning_help scene | done |  | 拍照/口述 action |
+| M6-05 bedtime scene | done |  | 三问复盘 |
+| M6-06 safety scene | done |  | 父亲提醒 |
+| M6-07 routing_decision | done |  | 可记录或 debug |
 
 ### M7-M9：记忆、日报、多模态占位
 

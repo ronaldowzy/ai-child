@@ -462,7 +462,7 @@ Goal:
 Context:
 请阅读：
 - docs/SYSTEM_DESIGN_V0_1.md 的记忆系统、RAG、记忆数据结构。
-- docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Milestone 7。
+- docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Milestone 7：基础记忆系统。
 
 Implementation details:
 新增：
@@ -524,7 +524,7 @@ Goal:
 Context:
 请阅读：
 - docs/SYSTEM_DESIGN_V0_1.md 的父亲端和父亲日报。
-- docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Milestone 8。
+- docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Milestone 8：父亲日报。
 - MemoryService 当前实现。
 
 Implementation details:
@@ -571,7 +571,7 @@ Goal:
 Context:
 请阅读：
 - docs/SYSTEM_DESIGN_V0_1.md 的多模态、拍照题目、Modality Manager 部分。
-- docs/DEVELOPMENT_BACKLOG_V0_1.md 的附件/OCR 相关任务。
+- docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Milestone 9：多模态占位和附件流程。
 
 Implementation details:
 新增：

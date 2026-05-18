@@ -189,47 +189,79 @@ M6-10 写入 routing_decision。
 
 ---
 
-### Milestone 7：会话回复生成
+说明：早期草案曾把“会话回复生成”单独列为 Milestone 7。当前执行版已把最小 child-facing reply、ui_actions、学习不直接给答案、放学后低压力选择题、睡前三问复盘拆入 Milestone 4-6 的 PromptManager、Safety/Intent 和 SceneOrchestrator 交付中；后续回复质量统一在 Q1 后端硬化中补场景测试和演示脚本。
 
-目标：根据场景、上下文和 Prompt 生成面向孩子的自然回复。
+### Milestone 7：基础记忆系统
+
+目标：会话结束后能抽取结构化记忆，并在下一轮对话检索。
 
 任务：
 
 ```text
-M7-01 实现 AgentRuntime。
-M7-02 接入 PromptManager。
-M7-03 接入 ModelRegistry。
-M7-04 实现 OutputSafetyCheck 雏形。
-M7-05 支持 reply + ui_actions 响应结构。
-M7-06 学习求助时返回“拍题目 / 读题目”快捷动作。
-M7-07 放学后场景返回低压力选择题。
-M7-08 睡前场景返回三问复盘。
+M7-01 定义 MemoryItem schema。
+M7-02 实现内存版 MemoryRepository。
+M7-03 实现 MemoryService.create/list/retrieve/update/delete。
+M7-04 实现 MemoryExtractor mock。
+M7-05 支持 interest / learning_pattern / expression_pattern / emotion_observation / strategy / safety 记忆。
+M7-06 记忆写入包含 evidence/confidence/expires_at/sensitivity。
+M7-07 实现简单关键词检索和过期过滤。
+M7-08 实现 /api/v1/memories/{child_id}。
 ```
 
 验收：
 
 ```text
-1. conversation/message 返回 child-facing reply。
-2. 学习求助场景返回 quick_actions。
-3. 输出不会要求孩子保密，不会直接给答案。
+1. MemoryService 可写入、读取、检索、更新和删除结构化记忆。
+2. 过期记忆不会进入普通检索。
+3. 父亲可以删除错误记忆。
+4. 不长期保存原始音频、原始照片或完整长聊天。
 ```
 
 ---
 
-### Milestone 8：多模态占位和附件流程
+### Milestone 8：父亲日报
+
+目标：生成每日父亲可读摘要。
+
+任务：
+
+```text
+M8-01 定义 ParentReport schema。
+M8-02 实现 ParentReportService。
+M8-03 支持按 child_id 和 date 生成日报。
+M8-04 生成 learning_observations。
+M8-05 生成 expression_observations。
+M8-06 生成 emotion_observations。
+M8-07 生成 safety_alerts 和 suggested_parent_actions。
+M8-08 实现 /api/v1/parent/reports/{child_id} 和 /api/v1/parent/report/today。
+```
+
+验收：
+
+```text
+1. 当天存在结构化记忆后能生成日报。
+2. 日报不贴负面人格标签。
+3. 日报包含父亲可执行建议。
+4. 日报不输出完整逐字聊天记录或 evidence.quote_summary。
+```
+
+---
+
+### Milestone 9：多模态占位和附件流程
 
 目标：实现拍照上传接口和 OCR 占位流程。
 
 任务：
 
 ```text
-M8-01 定义 attachment 表。
-M8-02 实现 /api/v1/conversation/attachment。
-M8-03 支持 homework_photo attachment_type。
-M8-04 实现 MockOCRService。
-M8-05 接入 ModalityManager。
-M8-06 图片识别低置信度时请求重拍。
-M8-07 图片识别高置信度时进入题意确认。
+M9-01 定义 Attachment schema。
+M9-02 实现 /api/v1/conversation/attachment。
+M9-03 支持 homework_photo attachment_type。
+M9-04 实现 MockOCRProvider。
+M9-05 接入 AttachmentService / ModalityManager。
+M9-06 图片识别低置信度时请求重拍。
+M9-07 图片识别高置信度时进入题意确认。
+M9-08 conversation/message 支持 attachment_ids 或等价 mock 数据继续学习引导。
 ```
 
 验收：
@@ -238,60 +270,33 @@ M8-07 图片识别高置信度时进入题意确认。
 1. 上传 homework_photo 后返回 recognized_content。
 2. 系统不直接解题，而是问“这道题在问什么”。
 3. 低置信度时返回重拍或口述建议。
+4. v0.1 不长期保存真实图片。
 ```
 
 ---
 
-### Milestone 9：基础记忆系统
+### Milestone 10：后端质量与演示
 
-目标：会话结束后能抽取结构化记忆，并在下一轮对话检索。
+目标：补齐后端核心场景测试、演示脚本和本地质量检查，让后端 MVP 可稳定验收。
 
 任务：
 
 ```text
-M9-01 定义 memory_item 表。
-M9-02 实现 MemoryService.create/list/update/delete。
-M9-03 实现 MemoryExtractor。
-M9-04 支持 interest / learning / expression / emotion / strategy 记忆。
-M9-05 记忆写入包含 evidence/confidence/expires_at。
-M9-06 实现简单关键词检索。
-M9-07 Context Builder 注入相关记忆。
-M9-08 实现 /api/v1/memories/{child_id}。
+M10-01 补齐 v0.1 场景测试。
+M10-02 覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘。
+M10-03 覆盖父亲目标影响回复。
+M10-04 覆盖模型 fallback。
+M10-05 更新 scripts/test_backend.sh 和 scripts/lint_backend.sh。
+M10-06 更新 scripts/demo_backend_scenarios.sh。
+M10-07 更新 backend/README.md 本地运行和验证说明。
 ```
 
 验收：
 
 ```text
-1. 会话结束后能生成结构化记忆。
-2. 第二次对话能检索到孩子兴趣或学习卡点。
-3. 父亲可以删除错误记忆。
-```
-
----
-
-### Milestone 10：父亲日报
-
-目标：生成每日父亲可读摘要。
-
-任务：
-
-```text
-M10-01 定义 parent_report 表。
-M10-02 实现 ParentReportService。
-M10-03 支持按日期聚合会话摘要。
-M10-04 生成 learning_observations。
-M10-05 生成 expression_observations。
-M10-06 生成 emotion_observations。
-M10-07 生成 suggested_parent_actions。
-M10-08 实现 /api/v1/parent/reports/{child_id}。
-```
-
-验收：
-
-```text
-1. 当天至少一次会话后能生成日报。
-2. 日报不贴负面人格标签。
-3. 日报包含父亲可执行建议。
+1. 本地 pytest 和 ruff 通过。
+2. demo 脚本可演示核心 API 行为。
+3. 测试和 demo 不依赖真实模型、真实 OCR 或真实外部网络。
 ```
 
 ---

@@ -160,7 +160,7 @@
 今日目标：完成 S07 记忆系统和 S08 父亲日报交接验收。
 完成任务：MemoryItem、MemoryRepository、MemoryService、MemoryExtractor mock、memories API、ParentReport schema、ParentReportService、parent report API 已实现并通过主控会话复验。
 阻塞问题：无。
-Codex 偏差：DEVELOPMENT_BACKLOG 的旧 Milestone 编号仍与会话表/进度板不一致，本次未修改该文档。
+Codex 偏差：已同步 DEVELOPMENT_BACKLOG 与会话表/进度板的 M7-M10 定义。
 需要补充到 AGENTS.md 的规则：暂无。
 明日第一任务：启动 S09 附件与 Mock OCR 会话。
 ```

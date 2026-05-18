@@ -8,8 +8,6 @@
 先不要写代码。先阅读指定文档和相关文件，输出计划，等待确认后再实现。
 ```
 
-注意：`docs/session_process/README.md` 和 `docs/CODEX_PROGRESS_BOARD_V0_1.md` 中，S07-S10 以后按当前执行顺序命名；如果与 `docs/DEVELOPMENT_BACKLOG_V0_1.md` 的 Milestone 编号存在不一致，子会话必须先指出差异，再以本启动提示词的 Goal / Scope / Done when 作为当前任务边界。
-
 ---
 
 ## S00：仓库初始化会话
@@ -330,8 +328,6 @@ Context:
 - docs/session_process/README.md
 - backend 当前代码
 
-如果发现 DEVELOPMENT_BACKLOG 的 Milestone 编号与当前会话表不一致，请在计划中说明，不要擅自扩大范围。
-
 Scope:
 允许创建或修改：
 - backend/app/domain/memory.py 或对应 memory schema 文件
@@ -385,8 +381,6 @@ Context:
 - docs/session_process/README.md
 - backend 当前代码，尤其是 MemoryService 当前实现
 
-如果发现 DEVELOPMENT_BACKLOG 的 Milestone 编号与当前会话表不一致，请在计划中说明，不要擅自扩大范围。
-
 Scope:
 允许创建或修改：
 - backend/app/domain/parent_report.py 或对应 parent report schema 文件
@@ -434,8 +428,6 @@ Context:
 - docs/CODEX_TASK_PROMPTS_V0_1.md 的 M9：Attachment 和 Mock OCR
 - docs/session_process/README.md
 - backend 当前代码，尤其是 SceneOrchestrator、conversation schema、learning.homework_help
-
-如果发现 DEVELOPMENT_BACKLOG 的 Milestone 编号与当前会话表不一致，请在计划中说明，不要擅自扩大范围。
 
 Scope:
 允许创建或修改：

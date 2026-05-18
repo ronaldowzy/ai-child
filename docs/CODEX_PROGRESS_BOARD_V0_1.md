@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 7 / 记忆系统准备
-当前目标：实现结构化 MemoryService、内存 Repository 和 MemoryExtractor mock
-下一步：启动 S07 记忆系统会话
+当前阶段：阶段 8 / 父亲日报准备
+当前目标：实现 ParentReportService 和父亲日报 API
+下一步：启动 S08 父亲日报会话
 ```
 
 ---
@@ -27,7 +27,7 @@
 | M4 | Prompt 管理 | PromptManager + 分层模板 | done | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | done | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | done | M5 | 动态场景切换可用 |
-| M7 | 记忆系统 | MemoryService + MemoryExtractor mock | todo | M6 | 结构化记忆可写可查 |
+| M7 | 记忆系统 | MemoryService + MemoryExtractor mock | done | M6 | 结构化记忆可写可查，pytest/ruff 通过 |
 | M8 | 父亲日报 | ParentReportService | todo | M7 | 今日摘要可生成 |
 | M9 | 附件/OCR | Attachment + Mock OCR | todo | M6 | 拍题流程可演示 |
 | Q1 | 后端硬化 | scenario tests + CI + demo scripts | todo | M1-M9 | 后端 MVP 稳定 |
@@ -127,10 +127,10 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M7-01 MemoryItem | todo |  | 字段完整 |
-| M7-02 MemoryRepository | todo |  | 可写可查 |
-| M7-03 MemoryService | todo |  | 过滤过期/敏感 |
-| M7-04 MemoryExtractor mock | todo |  | 输出结构化记忆 |
+| M7-01 MemoryItem | done |  | 字段完整，含 evidence/confidence/expires_at/sensitivity |
+| M7-02 MemoryRepository | done |  | 内存版可写可查 |
+| M7-03 MemoryService | done |  | 过滤过期记忆，普通检索默认隔离 safety |
+| M7-04 MemoryExtractor mock | done |  | 输出结构化记忆 |
 | M8-01 ParentReport schema | todo |  | 字段完整 |
 | M8-02 ParentReportService | todo |  | 今日摘要可生成 |
 | M8-03 report API | todo |  | /today 可用 |
@@ -153,6 +153,17 @@
 ---
 
 ## 3. 当天记录
+
+### 日期：2026-05-18
+
+```text
+今日目标：完成 S07 记忆系统交接验收。
+完成任务：MemoryItem、MemoryRepository、MemoryService、MemoryExtractor mock、memories API 已实现并通过主控会话复验。
+阻塞问题：无。
+Codex 偏差：DEVELOPMENT_BACKLOG 的旧 Milestone 编号仍与会话表/进度板不一致，本次未修改该文档。
+需要补充到 AGENTS.md 的规则：暂无。
+明日第一任务：启动 S08 父亲日报会话。
+```
 
 ### 日期：YYYY-MM-DD
 

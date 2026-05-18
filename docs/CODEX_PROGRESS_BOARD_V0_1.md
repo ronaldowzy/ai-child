@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 4 / Prompt 管理准备
-当前目标：实现分层 Prompt 模板和 PromptManager.compose()
-下一步：启动 S04 Prompt 管理会话
+当前阶段：阶段 5 / 安全与意图识别准备
+当前目标：实现规则优先 SafetyEngine 和基础 IntentClassifier
+下一步：启动 S05 安全与意图识别会话
 ```
 
 ---
@@ -24,7 +24,7 @@
 | M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
 | M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
-| M4 | Prompt 管理 | PromptManager + 分层模板 | todo | M3 | 场景 prompt 可组合 |
+| M4 | Prompt 管理 | PromptManager + 分层模板 | done | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | todo | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | todo | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | todo | M6 | 结构化记忆可写可查 |
@@ -94,12 +94,12 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M4-01 PromptTemplate schema | todo |  | 有版本/scene_id |
-| M4-02 global_system prompt | todo |  | 儿童安全规则完整 |
-| M4-03 persona_fox prompt | todo |  | 温和不依赖 |
-| M4-04 scene prompts | todo |  | 三大场景可用 |
-| M4-05 PromptManager.compose | todo |  | 可组合上下文 |
-| M4-06 prompt tests | todo |  | 缺失模板有错误 |
+| M4-01 PromptTemplate schema | done |  | 有版本/scene_id |
+| M4-02 global_system prompt | done |  | 儿童安全规则完整 |
+| M4-03 persona_fox prompt | done |  | 温和不依赖 |
+| M4-04 scene prompts | done |  | 三大场景可用 |
+| M4-05 PromptManager.compose | done |  | 可组合上下文 |
+| M4-06 prompt tests | done |  | 缺失模板有错误 |
 
 ### M5：安全与意图
 

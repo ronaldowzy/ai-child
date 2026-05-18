@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 3 / 模型抽象准备
-当前目标：实现 ModelRegistry、MockModelProvider 和真实 provider 骨架
-下一步：启动 S03 模型注册与 Mock Provider 会话
+当前阶段：阶段 4 / Prompt 管理准备
+当前目标：实现分层 Prompt 模板和 PromptManager.compose()
+下一步：启动 S04 Prompt 管理会话
 ```
 
 ---
@@ -23,7 +23,7 @@
 | C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程后置 |
 | M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
-| M3 | 模型抽象 | ModelRegistry + MockProvider | todo | M1 | 业务不绑定具体模型 |
+| M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | todo | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | todo | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | todo | M5 | 动态场景切换可用 |
@@ -83,12 +83,12 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M3-01 ModelTaskType | todo |  | 类型完整 |
-| M3-02 BaseModelProvider | todo |  | 抽象接口清晰 |
-| M3-03 MockModelProvider | todo |  | 不调外网 |
-| M3-04 OpenAICompatibleProvider skeleton | todo |  | 默认 disabled |
-| M3-05 ModelRegistry | todo |  | task_type 选择 provider |
-| M3-06 fallback 测试 | todo |  | provider 异常可降级 |
+| M3-01 ModelTaskType | done |  | 类型完整 |
+| M3-02 BaseModelProvider | done |  | 抽象接口清晰 |
+| M3-03 MockModelProvider | done |  | 不调外网 |
+| M3-04 OpenAICompatibleProvider skeleton | done |  | 默认 disabled |
+| M3-05 ModelRegistry | done |  | task_type 选择 provider |
+| M3-06 fallback 测试 | done |  | provider 异常可降级 |
 
 ### M4：Prompt Manager
 

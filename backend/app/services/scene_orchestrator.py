@@ -167,6 +167,31 @@ class SceneOrchestrator:
             and request.homework_problem_confidence is not None
             and request.homework_problem_confidence >= 0.75
         )
+        if request.sub_intent == "direct_answer_request":
+            return SceneRouteDecision(
+                message_id=request.message_id,
+                session_id=request.session_id,
+                primary_intent=request.intent,
+                base_scene=next_stack[0],
+                active_scene=scene_id,
+                transition=transition,
+                scene_stack=next_stack,
+                risk_level=request.risk_level,
+                confidence=max(request.intent_confidence, 0.9),
+                reason="learning_direct_answer_request",
+                sub_scene="scaffold_before_answer",
+                needs_input="problem_understanding",
+                reply_text=(
+                    "我不会直接告诉你最终答案。我们先把题目拆开："
+                    "这道题是在问什么？你觉得第一步可以先看哪个条件？"
+                ),
+                quick_actions=[
+                    SceneAction(id="describe_problem", label="说题意"),
+                    SceneAction(id="first_step", label="说第一步"),
+                ],
+                signals=self._signals(request, transition=transition),
+            )
+
         if has_clear_problem:
             return SceneRouteDecision(
                 message_id=request.message_id,
@@ -203,7 +228,7 @@ class SceneOrchestrator:
             sub_scene="homework_problem_intake",
             needs_input=self._scene_registry.get(scene_id).default_needs_input,
             reply_text=(
-                "可以，我们一起拆开它。你先不用急着要答案，"
+                "可以，我们一起一步一步拆开它。你先不用急着要答案，"
                 "可以拍一张题目的照片，或者先把题目读给我听。"
             ),
             quick_actions=[
@@ -308,16 +333,31 @@ class SceneOrchestrator:
             reason=reason,
             needs_input=self._scene_registry.get(scene_id).default_needs_input,
             reply_text=reply_text
-            or (
-                "我在这里。你可以先选一个最想说的小事情："
-                "今天开心的事、遇到的难题，或者想安静一会儿。"
-            ),
+            or self._checkin_reply_text(request),
             quick_actions=[
                 SceneAction(id="happy_moment", label="开心的事"),
                 SceneAction(id="hard_thing", label="遇到的难题"),
                 SceneAction(id="quiet_time", label="想安静一会儿"),
             ],
             signals=self._signals(request, transition=transition),
+        )
+
+    def _checkin_reply_text(self, request: SceneRouteRequest) -> str:
+        goal_text = "，".join(request.parent_goals)
+        if "小困难" in goal_text:
+            return (
+                "我在这里。今天如果愿意，可以只说一个小困难；"
+                "也可以先选一个轻松选项：开心的事、遇到的难题，"
+                "或者想安静一会儿。"
+            )
+        if "学校小事" in goal_text:
+            return (
+                "我在这里。你可以只说一件学校小事，不用说很多；"
+                "也可以选今天开心的事、遇到的难题，或者想安静一会儿。"
+            )
+        return (
+            "我在这里。你可以先选一个最想说的小事情："
+            "今天开心的事、遇到的难题，或者想安静一会儿。"
         )
 
     def _base_scene_from_stack_or_time(
@@ -346,6 +386,7 @@ class SceneOrchestrator:
                 request.safety_requires_parent_attention
             ),
             "safety_evidence": request.safety_evidence,
+            "parent_goal_count": len(request.parent_goals),
             "has_homework_attachment": bool(request.homework_problem_text),
             "homework_problem_confidence": request.homework_problem_confidence,
             "transition": transition.value,

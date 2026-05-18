@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 10 / 后端质量与演示准备
-当前目标：补齐后端核心场景测试、演示脚本和本地质量检查
-下一步：启动 S10 后端质量与演示会话
+当前阶段：阶段 11 / Android 壳准备
+当前目标：启动 Android MVP 前的后端验收已完成
+下一步：启动 S11 Android 壳会话
 ```
 
 ---
@@ -30,7 +30,7 @@
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | done | M6 | 结构化记忆可写可查，pytest/ruff 通过 |
 | M8 | 父亲日报 | ParentReportService | done | M7 | 今日摘要可生成，pytest/ruff 通过 |
 | M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
-| Q1 | 后端硬化 | scenario tests + CI + demo scripts | todo | M1-M9 | 后端 MVP 稳定 |
+| Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | todo | C0 | Android 可编译 |
 | A2 | Android API | 接入 conversation API | todo | Q1/A1 | 能收发消息 |
 | A3 | Android 拍题 | Mock 拍题流程 | todo | A2/M9 | 学习求助可跑通 |
@@ -157,12 +157,12 @@
 ### 日期：2026-05-18
 
 ```text
-今日目标：完成 S07 记忆系统、S08 父亲日报、S09 附件与 Mock OCR 交接验收。
-完成任务：MemoryItem、MemoryRepository、MemoryService、MemoryExtractor mock、memories API、ParentReport schema、ParentReportService、parent report API、Attachment schema、MockOCRProvider、attachment API、学习求助附件接入已实现并通过主控会话复验。
+今日目标：完成 S10 后端质量与演示验收。
+完成任务：补齐 Q1 场景测试，覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘、父亲目标影响回复、模型 fallback；更新 test/lint/dev/demo 后端脚本；更新 backend README；本地 pytest、ruff、demo 通过。
 阻塞问题：无。
-Codex 偏差：已同步 DEVELOPMENT_BACKLOG 与会话表/进度板的 M7-M10 定义。
+Codex 偏差：未新增 GitHub Actions，因为当前任务约束要求没有远端 GitHub 时优先保证本地脚本和 README。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：启动 S10 后端质量与演示会话。
+明日第一任务：启动 S11 Android 壳会话。
 ```
 
 ### 日期：YYYY-MM-DD

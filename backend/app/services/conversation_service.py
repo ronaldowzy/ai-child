@@ -109,6 +109,7 @@ class ConversationService:
                 risk_level=safety.risk_level,
                 safety_requires_parent_attention=safety.requires_parent_attention,
                 safety_evidence=safety.evidence,
+                parent_goals=parent_policy.goals,
                 homework_problem_text=(
                     homework_context.recognized_content.text
                     if use_homework_attachment and homework_context

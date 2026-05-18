@@ -55,6 +55,25 @@ class IntentClassifier:
                 evidence=["privacy_rule"],
             )
 
+        direct_answer_markers = (
+            "直接告诉我答案",
+            "告诉我答案",
+            "给我答案",
+            "直接说答案",
+            "答案吧",
+            "最终答案",
+        )
+        if self._contains_any(normalized, direct_answer_markers):
+            return IntentClassification(
+                intent=IntentType.LEARNING_HELP,
+                sub_intent="direct_answer_request",
+                risk_level=safety.risk_level if safety else RiskLevel.NONE,
+                needs_modality=False,
+                suggested_modalities=["text"],
+                confidence=0.9,
+                evidence=["direct_answer_request_keyword"],
+            )
+
         bedtime_markers = ("晚安", "睡觉", "困了", "要睡")
         if (
             time_context

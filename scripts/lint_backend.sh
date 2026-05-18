@@ -3,11 +3,39 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="${ROOT_DIR}/backend"
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-child-ai}"
 
 if [[ ! -d "${BACKEND_DIR}" ]]; then
   echo "backend/ has not been initialized yet. Run S01 backend skeleton before backend linting." >&2
   exit 1
 fi
 
+resolve_python_cmd() {
+  if [[ -n "${PYTHON_BIN:-}" ]]; then
+    read -r -a PYTHON_CMD <<< "${PYTHON_BIN}"
+    return
+  fi
+
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_CMD=(python)
+    return
+  fi
+
+  if command -v conda >/dev/null 2>&1 && conda env list | awk '{print $1}' | grep -qx "${CONDA_ENV_NAME}"; then
+    PYTHON_CMD=(conda run --no-capture-output -n "${CONDA_ENV_NAME}" python)
+    return
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD=(python3)
+    return
+  fi
+
+  echo "No Python interpreter found. Set PYTHON_BIN or install/activate the ${CONDA_ENV_NAME} environment." >&2
+  exit 1
+}
+
+resolve_python_cmd
 cd "${BACKEND_DIR}"
-python -m ruff check . "$@"
+echo "Running backend lint with: ${PYTHON_CMD[*]}"
+"${PYTHON_CMD[@]}" -m ruff check . "$@"

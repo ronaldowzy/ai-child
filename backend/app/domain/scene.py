@@ -53,6 +53,7 @@ class SceneRouteRequest(BaseModel):
     risk_level: RiskLevel = RiskLevel.NONE
     safety_requires_parent_attention: bool = False
     safety_evidence: list[str] = Field(default_factory=list)
+    parent_goals: list[str] = Field(default_factory=list)
     current_stack: list[SceneId] = Field(default_factory=list)
     homework_problem_text: str | None = None
     homework_problem_confidence: float | None = Field(default=None, ge=0.0, le=1.0)

@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 12 / Android API 接入准备
-当前目标：接入后端 /api/v1/conversation/message 并渲染 reply、ui_actions、session_state
-下一步：启动 S12 Android API 接入会话
+当前阶段：阶段 13 / Android 拍题与父亲页准备
+当前目标：实现 Android mock 拍题流程、父亲设置页和父亲日报页
+下一步：启动 S13 Android 拍题与父亲页会话
 ```
 
 ---
@@ -32,7 +32,7 @@
 | M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | done | C0 | Android 可编译，单元测试通过 |
-| A2 | Android API | 接入 conversation API | todo | Q1/A1 | 能收发消息 |
+| A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions/session_state |
 | A3 | Android 拍题 | Mock 拍题流程 | todo | A2/M9 | 学习求助可跑通 |
 | A4 | 父亲设置 | 设置目标和作息 | todo | A2/M2 | policy 可修改 |
 | E2E | 联调 | 后端 + Android 家庭内测流程 | todo | Q1/A1-A4 | 核心场景可手动跑通 |
@@ -144,8 +144,8 @@
 |---|---|---|---|
 | A1-01 Android 初始化 | done |  | 项目已创建，assembleDebug 通过 |
 | A1-02 ChildChatScreen | done |  | 静态 UI 已创建，test 通过 |
-| A2-01 ConversationApiClient | todo |  | 可请求后端 |
-| A2-02 ui_actions 渲染 | todo |  | 按钮显示 |
+| A2-01 ConversationApiClient | done |  | 可请求后端 conversation API |
+| A2-02 ui_actions 渲染 | done |  | 快捷按钮和 session_state 可显示 |
 | A3-01 Mock 拍题 | todo |  | 题目流程跑通 |
 | A4-01 ParentSettingsScreen | todo |  | policy 可修改 |
 | E2E-01 手动 QA | todo |  | MANUAL_QA_V0_1.md |
@@ -157,12 +157,12 @@
 ### 日期：2026-05-18
 
 ```text
-今日目标：完成 S10 后端质量与演示验收，并完成 S11 Android 壳项目复验。
-完成任务：补齐 Q1 场景测试，覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘、父亲目标影响回复、模型 fallback；更新 test/lint/dev/demo 后端脚本；更新 backend README；本地 pytest、ruff、demo 通过；Android 壳项目已创建并通过 assembleDebug / test。
+今日目标：完成 S10 后端质量与演示验收，完成 S11 Android 壳项目复验，并完成 S12 Android API 接入验收。
+完成任务：补齐 Q1 场景测试，覆盖放学后、学习求助、直接要答案、不想说话、高风险安全、睡前复盘、父亲目标影响回复、模型 fallback；更新 test/lint/dev/demo 后端脚本；更新 backend README；本地 pytest、ruff、demo 通过；Android 壳项目已创建并通过 assembleDebug / test；Android 已接入 conversation API 并渲染 reply、ui_actions、session_state。
 阻塞问题：无。
 Codex 偏差：未新增 GitHub Actions，因为当前任务约束要求没有远端 GitHub 时优先保证本地脚本和 README。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：启动 S12 Android API 接入会话。
+明日第一任务：启动 S13 Android 拍题与父亲页会话。
 ```
 
 ### 日期：YYYY-MM-DD

@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val conversationApiBaseUrl: String =
+    providers.gradleProperty("conversationApiBaseUrl").orNull ?: "http://10.0.2.2:8000/"
+
 android {
     namespace = "com.childai.companion"
     compileSdk = 35
@@ -16,10 +19,16 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "CONVERSATION_API_BASE_URL",
+            "\"$conversationApiBaseUrl\"",
+        )
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -35,6 +44,8 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
 
     implementation(platform("androidx.compose:compose-bom:2024.10.00"))

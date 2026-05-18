@@ -24,12 +24,13 @@ import androidx.compose.ui.unit.dp
 fun InputBar(
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val trimmedDraft = draft.trim()
 
     fun sendDraft() {
-        if (trimmedDraft.isNotEmpty()) {
+        if (enabled && trimmedDraft.isNotEmpty()) {
             onSend(trimmedDraft)
             draft = ""
         }
@@ -43,6 +44,7 @@ fun InputBar(
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it },
+            enabled = enabled,
             modifier = Modifier.weight(1f),
             placeholder = {
                 Text(text = "说点什么")
@@ -54,10 +56,10 @@ fun InputBar(
         )
         Button(
             onClick = { sendDraft() },
-            enabled = trimmedDraft.isNotEmpty(),
+            enabled = enabled && trimmedDraft.isNotEmpty(),
             modifier = Modifier.widthIn(min = 88.dp),
         ) {
-            Text(text = "发送")
+            Text(text = if (enabled) "发送" else "发送中")
         }
     }
 }

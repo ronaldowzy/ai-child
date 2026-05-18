@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.domain.enums import IntentType, RiskCategory, RiskLevel
 from app.domain.time import TimeContext
 
 
@@ -47,6 +48,27 @@ class SessionState(BaseModel):
     base_scene: str
     active_scene: str
     needs_input: str | None = None
+    requires_parent_attention: bool | None = None
+
+
+class SafetyDebug(BaseModel):
+    risk_level: RiskLevel
+    primary_category: RiskCategory
+    categories: list[RiskCategory]
+    requires_parent_attention: bool
+    evidence: list[str]
+    safe_response_hint: str
+
+
+class IntentDebug(BaseModel):
+    intent: IntentType
+    sub_intent: str | None = None
+    emotion: str
+    risk_level: RiskLevel
+    needs_modality: bool
+    suggested_modalities: list[str]
+    confidence: float
+    evidence: list[str]
 
 
 class ParentPolicyDebug(BaseModel):
@@ -58,6 +80,8 @@ class ParentPolicyDebug(BaseModel):
 class ConversationDebug(BaseModel):
     time_context: TimeContext
     parent_policy: ParentPolicyDebug
+    safety: SafetyDebug | None = None
+    intent: IntentDebug | None = None
 
 
 class ConversationMessageResponse(BaseModel):

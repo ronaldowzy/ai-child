@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 5 / 安全与意图识别准备
-当前目标：实现规则优先 SafetyEngine 和基础 IntentClassifier
-下一步：启动 S05 安全与意图识别会话
+当前阶段：阶段 6 / 场景编排准备
+当前目标：实现 SceneOrchestrator 和四类基础场景路由
+下一步：启动 S06 场景编排会话
 ```
 
 ---
@@ -25,7 +25,7 @@
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
 | M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | done | M3 | 场景 prompt 可组合 |
-| M5 | 安全与意图 | SafetyEngine + IntentClassifier | todo | M2 | 高风险优先，意图识别可测 |
+| M5 | 安全与意图 | SafetyEngine + IntentClassifier | done | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | todo | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | todo | M6 | 结构化记忆可写可查 |
 | M8 | 父亲日报 | ParentReportService | todo | M7 | 今日摘要可生成 |
@@ -105,11 +105,11 @@
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| M5-01 Risk enums | todo |  | risk 类型完整 |
-| M5-02 Intent enums | todo |  | intent 类型完整 |
-| M5-03 SafetyEngine | todo |  | 高风险规则可测 |
-| M5-04 IntentClassifier | todo |  | 学习/放学/睡前可测 |
-| M5-05 conversation debug | todo |  | 返回 risk/intent |
+| M5-01 Risk enums | done |  | risk 类型完整 |
+| M5-02 Intent enums | done |  | intent 类型完整 |
+| M5-03 SafetyEngine | done |  | 高风险规则可测 |
+| M5-04 IntentClassifier | done |  | 学习/放学/睡前可测 |
+| M5-05 conversation debug | done |  | 返回 risk/intent |
 
 ### M6：场景编排
 

@@ -1,0 +1,162 @@
+from datetime import date, datetime, timezone
+
+from app.domain.memory import (
+    MemoryCreateRequest,
+    MemoryEvidence,
+    MemorySensitivity,
+    MemoryType,
+)
+from app.repositories.memory_repository import InMemoryMemoryRepository
+from app.services.memory_service import MemoryService
+from app.services.parent_report_service import ParentReportService
+
+
+def _fixed_now() -> datetime:
+    return datetime(2026, 5, 18, 10, 0, tzinfo=timezone.utc)
+
+
+def _memory_request(
+    *,
+    child_id: str = "child_parent_report_service_test",
+    memory_type: MemoryType,
+    content: str,
+    tags: list[str],
+    sensitivity: MemorySensitivity = MemorySensitivity.LOW,
+    requires_parent_attention: bool = False,
+) -> MemoryCreateRequest:
+    return MemoryCreateRequest(
+        child_id=child_id,
+        memory_type=memory_type,
+        content=content,
+        tags=tags,
+        evidence=[
+            MemoryEvidence(
+                source="chat_summary",
+                session_id="session_parent_report_service_test",
+                quote_summary="这里是结构化摘要来源，不应在父亲日报中逐字返回。",
+            )
+        ],
+        confidence=0.82,
+        importance=0.7,
+        sensitivity=sensitivity,
+        visible_to_parent=True,
+        visible_to_child=False,
+        requires_parent_attention=requires_parent_attention,
+    )
+
+
+def _services() -> tuple[
+    InMemoryMemoryRepository,
+    MemoryService,
+    ParentReportService,
+]:
+    repository = InMemoryMemoryRepository()
+    memory_service = MemoryService(
+        repository=repository,
+        now_provider=_fixed_now,
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        now_provider=_fixed_now,
+    )
+    return repository, memory_service, report_service
+
+
+def test_parent_report_service_generates_normal_daily_report() -> None:
+    _, memory_service, report_service = _services()
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="孩子在学习求助时需要先确认题意，再一步一步说出已知条件。",
+            tags=["学习求助", "题意确认"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.EXPRESSION_PATTERN,
+            content="孩子在开放提问下回答较短，使用选择题式引导时更容易开始表达。",
+            tags=["表达", "选择题有效"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.EMOTION_OBSERVATION,
+            content="孩子本次表达了低落或紧张情绪，后续适合先接住感受再进入问题解决。",
+            tags=["情绪观察", "先共情"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.child_id == "child_parent_report_service_test"
+    assert report.date == date(2026, 5, 18)
+    assert "学习支持" in report.summary
+    assert report.learning_observations == [
+        "孩子在学习求助时需要先确认题意，再一步一步说出已知条件。"
+    ]
+    assert report.expression_observations == [
+        "孩子在开放提问下回答较短，使用选择题式引导时更容易开始表达。"
+    ]
+    assert report.emotion_observations == [
+        "孩子本次表达了低落或紧张情绪，后续适合先接住感受再进入问题解决。"
+    ]
+    assert report.safety_alerts == []
+    assert any("不直接给最终答案" in action for action in report.suggested_parent_actions)
+    assert "逐字返回" not in report.model_dump_json()
+
+
+def test_parent_report_service_generates_high_risk_report_without_raw_detail() -> None:
+    _, memory_service, report_service = _services()
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.SAFETY,
+            content="本次会话出现需要父亲关注的安全信号，应由父亲进一步了解情况。",
+            tags=["安全提醒", "父亲关注"],
+            sensitivity=MemorySensitivity.CRITICAL,
+            requires_parent_attention=True,
+        )
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert "安全信号" in report.summary
+    assert report.safety_alerts
+    assert any("安全确认" in action for action in report.suggested_parent_actions)
+    assert "逐字返回" not in report_json
+    assert "胆小" not in report_json
+    assert "不合群" not in report_json
+    assert "懒" not in report_json
+    assert "不聪明" not in report_json
+
+
+def test_parent_report_service_sanitizes_fixed_negative_labels() -> None:
+    repository, memory_service, report_service = _services()
+    repository.save(
+        memory_service.create(
+            _memory_request(
+                memory_type=MemoryType.EXPRESSION_PATTERN,
+                content="孩子在开放提问下回答较短。",
+                tags=["表达"],
+            )
+        ).model_copy(update={"content": "孩子胆小、不合群。"}, deep=True)
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert "胆小" not in report_json
+    assert "不合群" not in report_json
+    assert "需要更多安全感" in report_json

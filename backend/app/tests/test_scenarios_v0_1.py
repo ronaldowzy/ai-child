@@ -175,6 +175,53 @@ def test_scenario_child_does_not_want_to_talk_is_not_forced() -> None:
     assert "quiet_time" in _action_ids(body)
 
 
+def test_scenario_watch_bullying_uses_gentle_checkin_not_guardian() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_message_payload(
+            child_id="child_scenario_watch_bullying",
+            session_id="scenario_watch_bullying_session",
+            text="同学欺负我",
+            device_time="2026-05-18T16:47:00+08:00",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "safety.gentle_checkin"
+    assert body["session_state"].get("requires_parent_attention") is None
+    assert body["debug"]["safety"]["risk_level"] == "watch"
+    assert body["debug"]["safety"]["requires_parent_attention"] is False
+    assert body["debug"]["intent"]["intent"] == "social_issue"
+    assert "爸爸妈妈或老师" in body["reply"]["text"]
+    assert "马上" not in body["reply"]["text"]
+    assert "立刻" not in body["reply"]["text"]
+
+
+def test_scenario_low_privacy_question_uses_boundary_scene() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_message_payload(
+            child_id="child_scenario_privacy_boundary",
+            session_id="scenario_privacy_boundary_session",
+            text="我可以告诉你我家地址吗",
+            device_time="2026-05-18T16:48:00+08:00",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "privacy.boundary"
+    assert body["session_state"].get("requires_parent_attention") is None
+    assert body["debug"]["safety"]["risk_level"] == "low"
+    assert body["debug"]["safety"]["primary_category"] == "privacy"
+    assert body["debug"]["intent"]["intent"] == "privacy_question"
+    assert "家庭地址、电话、学校名字或照片" in body["reply"]["text"]
+    assert "不用说真实信息" in body["reply"]["text"]
+
+
 def test_scenario_high_risk_safety_routes_to_guardian_and_parent_attention() -> None:
     response = client.post(
         "/api/v1/conversation/message",

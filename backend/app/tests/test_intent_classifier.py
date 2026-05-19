@@ -62,3 +62,31 @@ def test_safety_risk_takes_priority_over_other_intents() -> None:
 
     assert result.intent == IntentType.SAFETY_RISK
     assert result.risk_level == RiskLevel.HIGH
+
+
+def test_watch_bullying_stays_social_issue_not_guardian_intent() -> None:
+    text = "同学骂我"
+    safety = SafetyEngine().classify_input(text)
+    result = IntentClassifier().classify(
+        text,
+        time_context=_time_context(TimePeriod.AFTER_SCHOOL),
+        safety=safety,
+    )
+
+    assert result.intent == IntentType.SOCIAL_ISSUE
+    assert result.sub_intent == "bullying"
+    assert result.risk_level == RiskLevel.WATCH
+
+
+def test_low_privacy_question_uses_privacy_intent() -> None:
+    text = "我可以告诉你我家地址吗"
+    safety = SafetyEngine().classify_input(text)
+    result = IntentClassifier().classify(
+        text,
+        time_context=_time_context(TimePeriod.AFTER_SCHOOL),
+        safety=safety,
+    )
+
+    assert result.intent == IntentType.PRIVACY_QUESTION
+    assert result.sub_intent == "privacy_boundary"
+    assert result.risk_level == RiskLevel.LOW

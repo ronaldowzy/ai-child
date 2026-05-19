@@ -259,6 +259,24 @@ class PromptManager:
                 version="v0.1",
                 filename="scenes/daily_bedtime_reflection_v0_1.txt",
             ),
+            "scene_safety_guardian_v0_1": PromptTemplateSpec(
+                id="scene_safety_guardian_v0_1",
+                layer=PromptLayer.SCENE,
+                version="v0.1",
+                filename="scenes/safety_guardian_v0_1.txt",
+            ),
+            "scene_safety_gentle_checkin_v0_1": PromptTemplateSpec(
+                id="scene_safety_gentle_checkin_v0_1",
+                layer=PromptLayer.SCENE,
+                version="v0.1",
+                filename="scenes/safety_gentle_checkin_v0_1.txt",
+            ),
+            "scene_privacy_boundary_v0_1": PromptTemplateSpec(
+                id="scene_privacy_boundary_v0_1",
+                layer=PromptLayer.SCENE,
+                version="v0.1",
+                filename="scenes/privacy_boundary_v0_1.txt",
+            ),
             "output_contract_child_chat_v0_1": PromptTemplateSpec(
                 id="output_contract_child_chat_v0_1",
                 layer=PromptLayer.OUTPUT_CONTRACT,
@@ -272,6 +290,9 @@ class PromptManager:
             "daily.after_school_checkin": "scene_daily_after_school_checkin_v0_1",
             "learning.homework_help": "scene_learning_homework_help_v0_1",
             "daily.bedtime_reflection": "scene_daily_bedtime_reflection_v0_1",
+            "safety.guardian": "scene_safety_guardian_v0_1",
+            "safety.gentle_checkin": "scene_safety_gentle_checkin_v0_1",
+            "privacy.boundary": "scene_privacy_boundary_v0_1",
         }
 
 

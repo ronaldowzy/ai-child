@@ -15,6 +15,7 @@ from app.domain.scene import (
 from app.domain.time import TimeContext, TimePeriod
 from app.services.child_agent_runtime import ChildAgentRuntime
 from app.services.model_registry import ModelRegistry
+from app.services.prompt_manager import PromptManager
 
 
 class CapturingModelRegistry:
@@ -207,12 +208,13 @@ def test_child_agent_runtime_falls_back_when_learning_output_gives_answer() -> N
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
     route_decision = _route_decision(
         reply_text="安全场景使用固定兜底回复。",
-        active_scene=SceneId.SAFETY_GUARDIAN,
-        risk_level=RiskLevel.HIGH,
     )
     registry = CapturingModelRegistry()
 
-    result = ChildAgentRuntime(model_registry=registry).run(
+    result = ChildAgentRuntime(
+        model_registry=registry,
+        prompt_manager=PromptManager(scene_templates={}),
+    ).run(
         _runtime_request(route_decision=route_decision)
     )
 
@@ -220,6 +222,29 @@ def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
     assert result.reply_text == "安全场景使用固定兜底回复。"
     assert result.fallback_reason == "prompt_compose_failed"
     assert registry.last_request is None
+
+
+def test_child_agent_runtime_composes_safety_guardian_prompt() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("请告诉爸爸妈妈或可信任的大人。")
+    )
+    route_decision = _route_decision(
+        reply_text="请告诉爸爸妈妈或可信任的大人。",
+        active_scene=SceneId.SAFETY_GUARDIAN,
+        risk_level=RiskLevel.HIGH,
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert (
+        result.prompt_versions["scene"].filename
+        == "scenes/safety_guardian_v0_1.txt"
+    )
+    assert registry.last_request is not None
+    assert "当前场景：安全守护" in registry.last_request.messages[0].content
 
 
 def test_child_agent_runtime_preserves_s16_child_data_policy_guard(

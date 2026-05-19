@@ -13,6 +13,8 @@ class SceneId(StrEnum):
     LEARNING_HOMEWORK_HELP = "learning.homework_help"
     DAILY_BEDTIME_REFLECTION = "daily.bedtime_reflection"
     SAFETY_GUARDIAN = "safety.guardian"
+    SAFETY_GENTLE_CHECKIN = "safety.gentle_checkin"
+    PRIVACY_BOUNDARY = "privacy.boundary"
 
 
 class SceneTransitionType(StrEnum):

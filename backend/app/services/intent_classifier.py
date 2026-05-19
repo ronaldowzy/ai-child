@@ -35,7 +35,7 @@ class IntentClassifier:
 
         if safety and (
             safety.requires_parent_attention
-            or safety.is_at_least(RiskLevel.WATCH)
+            or safety.is_at_least(RiskLevel.HIGH)
         ):
             return IntentClassification(
                 intent=IntentType.SAFETY_RISK,
@@ -54,6 +54,9 @@ class IntentClassifier:
                 confidence=0.86,
                 evidence=["privacy_rule"],
             )
+
+        if safety and safety.risk_level == RiskLevel.WATCH:
+            return self._watch_intent(safety)
 
         direct_answer_markers = (
             "直接告诉我答案",
@@ -170,6 +173,34 @@ class IntentClassifier:
             risk_level=safety.risk_level if safety else RiskLevel.NONE,
             confidence=float(response.structured_output.get("confidence", 0.5)),
             evidence=["mock_model_fallback"],
+        )
+
+    def _watch_intent(self, safety: SafetyClassification) -> IntentClassification:
+        if safety.primary_category == RiskCategory.BULLYING:
+            return IntentClassification(
+                intent=IntentType.SOCIAL_ISSUE,
+                sub_intent=RiskCategory.BULLYING.value,
+                emotion="concerned",
+                risk_level=safety.risk_level,
+                confidence=0.88,
+                evidence=["safety_watch", *safety.evidence],
+            )
+        if safety.primary_category == RiskCategory.MENTAL_DISTRESS:
+            return IntentClassification(
+                intent=IntentType.EMOTION_EXPRESSION,
+                sub_intent=RiskCategory.MENTAL_DISTRESS.value,
+                emotion="sad",
+                risk_level=safety.risk_level,
+                confidence=0.84,
+                evidence=["safety_watch", *safety.evidence],
+            )
+        return IntentClassification(
+            intent=IntentType.SAFETY_RISK,
+            sub_intent=safety.primary_category.value,
+            emotion="concerned",
+            risk_level=safety.risk_level,
+            confidence=0.82,
+            evidence=["safety_watch", *safety.evidence],
         )
 
     def _normalize_model_intent(self, raw_intent: object) -> IntentType:

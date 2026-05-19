@@ -95,7 +95,9 @@ They cover:
 - learning help
 - direct-answer request handling
 - child does not want to talk
-- high-risk safety guardian routing
+- watch-level peer trouble routing to `safety.gentle_checkin`
+- low privacy boundary routing to `privacy.boundary`
+- high-risk safety guardian routing with parent attention
 - bedtime reflection
 - parent goal influencing reply wording
 - model fallback
@@ -190,7 +192,16 @@ The Android app never stores model API keys. All model configuration belongs on 
 
 ## Safety Notes
 
-- High-risk input routes before normal scene handling.
+- `high` / `critical` input routes to `safety.guardian` with
+  `requires_parent_attention=true`.
+- `watch` input, such as fictional peer bullying test text, routes to
+  `safety.gentle_checkin` by default. It uses calm wording, encourages telling
+  a parent or teacher, and does not force parent attention.
+- Low-risk privacy questions route to `privacy.boundary` and remind the child
+  not to share addresses, phone numbers, school names, or photos with AI or
+  strangers.
+- Low-energy emotion expressions, such as not wanting to talk, remain in normal
+  check-in/emotion support instead of `safety.guardian`.
 - Learning help refuses direct final answers and asks for problem understanding or first-step thinking.
 - Parent goals may influence wording, but they do not override child safety rules.
 - Tests and demos must use fake child IDs and safe mock content only.

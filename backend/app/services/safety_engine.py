@@ -121,7 +121,25 @@ class SafetyEngine:
                 (RiskLevel.LOW, RiskCategory.MENTAL_DISTRESS, "mild_distress")
             )
 
-        privacy_markers = ("家庭住址", "手机号", "电话号码", "学校名字", "发照片")
+        privacy_markers = (
+            "家庭住址",
+            "我家地址",
+            "家里地址",
+            "家住哪里",
+            "住在哪里",
+            "手机号",
+            "手机号码",
+            "电话号码",
+            "电话",
+            "学校名字",
+            "学校名称",
+            "哪个学校",
+            "学校地址",
+            "发照片",
+            "照片发给",
+            "我的照片",
+            "拍照给你",
+        )
         if self._contains_any(normalized, privacy_markers):
             hits.append((RiskLevel.LOW, RiskCategory.PRIVACY, "privacy"))
 

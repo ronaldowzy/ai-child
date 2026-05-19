@@ -27,6 +27,7 @@ def _request(
     risk_level: RiskLevel = RiskLevel.NONE,
     requires_parent_attention: bool = False,
     confidence: float = 0.9,
+    sub_intent: str | None = None,
 ) -> SceneRouteRequest:
     return SceneRouteRequest(
         child_id="scene_orchestrator_child",
@@ -34,6 +35,7 @@ def _request(
         text=text,
         time_context=_time_context(period),
         intent=intent,
+        sub_intent=sub_intent,
         intent_confidence=confidence,
         intent_evidence=[intent.value],
         risk_level=risk_level,
@@ -129,6 +131,50 @@ def test_high_risk_safety_overrides_learning_intent() -> None:
     assert decision.transition == SceneTransitionType.REPLACE
     assert decision.requires_parent_attention is True
     assert "可信任的大人" in decision.reply_text
+
+
+def test_watch_bullying_routes_to_gentle_checkin_without_parent_attention() -> None:
+    repository = InMemoryRoutingDecisionRepository()
+    orchestrator = SceneOrchestrator(routing_decision_repository=repository)
+
+    decision = orchestrator.route(
+        _request(
+            text="同学欺负我",
+            intent=IntentType.SOCIAL_ISSUE,
+            sub_intent="bullying",
+            risk_level=RiskLevel.WATCH,
+            confidence=0.88,
+        )
+    )
+
+    assert decision.active_scene == SceneId.SAFETY_GENTLE_CHECKIN
+    assert decision.transition == SceneTransitionType.MERGE
+    assert decision.requires_parent_attention is False
+    assert decision.side_context == ["watch_observation"]
+    assert "爸爸妈妈或老师" in decision.reply_text
+    assert "马上" not in decision.reply_text
+    assert "立刻" not in decision.reply_text
+
+
+def test_low_privacy_routes_to_boundary_scene() -> None:
+    repository = InMemoryRoutingDecisionRepository()
+    orchestrator = SceneOrchestrator(routing_decision_repository=repository)
+
+    decision = orchestrator.route(
+        _request(
+            text="我可以告诉你我家地址吗",
+            intent=IntentType.PRIVACY_QUESTION,
+            sub_intent="privacy_boundary",
+            risk_level=RiskLevel.LOW,
+            confidence=0.86,
+        )
+    )
+
+    assert decision.active_scene == SceneId.PRIVACY_BOUNDARY
+    assert decision.requires_parent_attention is False
+    assert decision.needs_input == "privacy_boundary_ack"
+    assert "家庭地址、电话、学校名字或照片" in decision.reply_text
+    assert "不用说真实信息" in decision.reply_text
 
 
 def test_learning_completion_pops_back_to_after_school() -> None:

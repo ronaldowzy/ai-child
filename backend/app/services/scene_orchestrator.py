@@ -50,6 +50,23 @@ class SceneRegistry:
                 priority=100,
                 is_safety_scene=True,
             ),
+            SceneId.SAFETY_GENTLE_CHECKIN: SceneDefinition(
+                scene_id=SceneId.SAFETY_GENTLE_CHECKIN,
+                display_name="安全温和确认",
+                prompt_template="safety_gentle_checkin_v0_1",
+                default_transition=SceneTransitionType.MERGE,
+                default_needs_input="gentle_checkin",
+                priority=80,
+                is_safety_scene=True,
+            ),
+            SceneId.PRIVACY_BOUNDARY: SceneDefinition(
+                scene_id=SceneId.PRIVACY_BOUNDARY,
+                display_name="隐私边界提醒",
+                prompt_template="privacy_boundary_v0_1",
+                default_transition=SceneTransitionType.MERGE,
+                default_needs_input="privacy_boundary_ack",
+                priority=70,
+            ),
         }
 
     def get(self, scene_id: SceneId) -> SceneDefinition:
@@ -81,6 +98,10 @@ class SceneOrchestrator:
 
         if self._requires_safety_guardian(request):
             decision = self._safety_guardian(request)
+        elif self._requires_privacy_boundary(request):
+            decision = self._privacy_boundary(request, current_stack)
+        elif request.risk_level == RiskLevel.WATCH:
+            decision = self._safety_gentle_checkin(request, current_stack)
         elif self._should_pop_learning_scene(request, current_stack):
             decision = self._pop_to_previous_scene(request, current_stack)
         elif request.intent == IntentType.LEARNING_HELP:
@@ -104,9 +125,14 @@ class SceneOrchestrator:
 
     def _requires_safety_guardian(self, request: SceneRouteRequest) -> bool:
         return (
-            request.intent == IntentType.SAFETY_RISK
-            or request.safety_requires_parent_attention
+            request.safety_requires_parent_attention
             or request.risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}
+        )
+
+    def _requires_privacy_boundary(self, request: SceneRouteRequest) -> bool:
+        return (
+            request.intent == IntentType.PRIVACY_QUESTION
+            or request.sub_intent == "privacy_boundary"
         )
 
     def _should_pop_learning_scene(
@@ -147,6 +173,77 @@ class SceneOrchestrator:
                 SceneAction(id="find_trusted_adult", label="找可信任的大人"),
             ],
             signals=self._signals(request, transition=SceneTransitionType.REPLACE),
+        )
+
+    def _safety_gentle_checkin(
+        self, request: SceneRouteRequest, current_stack: list[SceneId]
+    ) -> SceneRouteDecision:
+        scene_id = SceneId.SAFETY_GENTLE_CHECKIN
+        base_scene = self._base_scene_from_stack_or_time(request, current_stack)
+        stack = [base_scene] if base_scene == scene_id else [base_scene, scene_id]
+        transition = self._scene_registry.get(scene_id).default_transition
+        return SceneRouteDecision(
+            message_id=request.message_id,
+            session_id=request.session_id,
+            primary_intent=request.intent,
+            base_scene=base_scene,
+            active_scene=scene_id,
+            transition=transition,
+            scene_stack=stack,
+            risk_level=request.risk_level,
+            confidence=max(request.intent_confidence, 0.86),
+            reason="watch_safety_gentle_checkin",
+            sub_scene=request.sub_intent,
+            side_context=["watch_observation"],
+            requires_parent_attention=False,
+            needs_input=self._scene_registry.get(scene_id).default_needs_input,
+            reply_text=(
+                "听起来这件事让你不舒服，谢谢你告诉我。"
+                "你可以把这件事告诉爸爸妈妈或老师，让他们一起帮你想办法。"
+                "现在你想先说一句发生了什么，还是先安静一下？"
+            ),
+            reply_emotion="gentle",
+            quick_actions=[
+                SceneAction(id="tell_parent_or_teacher", label="告诉大人"),
+                SceneAction(id="one_sentence", label="说一句"),
+                SceneAction(id="quiet_time", label="先安静一下"),
+            ],
+            signals=self._signals(request, transition=transition),
+        )
+
+    def _privacy_boundary(
+        self, request: SceneRouteRequest, current_stack: list[SceneId]
+    ) -> SceneRouteDecision:
+        scene_id = SceneId.PRIVACY_BOUNDARY
+        base_scene = self._base_scene_from_stack_or_time(request, current_stack)
+        transition = self._scene_registry.get(scene_id).default_transition
+        return SceneRouteDecision(
+            message_id=request.message_id,
+            session_id=request.session_id,
+            primary_intent=request.intent,
+            base_scene=base_scene,
+            active_scene=scene_id,
+            transition=transition,
+            scene_stack=(
+                [base_scene] if base_scene == scene_id else [base_scene, scene_id]
+            ),
+            risk_level=request.risk_level,
+            confidence=max(request.intent_confidence, 0.86),
+            reason="privacy_boundary",
+            sub_scene=request.sub_intent,
+            requires_parent_attention=False,
+            needs_input=self._scene_registry.get(scene_id).default_needs_input,
+            reply_text=(
+                "可以问我，但不要把家庭地址、电话、学校名字或照片"
+                "随便告诉 AI 或陌生人。需要填写这些信息时，先问爸爸妈妈。"
+                "你可以只说“我想问隐私问题”，不用说真实信息。"
+            ),
+            reply_emotion="steady",
+            quick_actions=[
+                SceneAction(id="understand_privacy", label="我知道了"),
+                SceneAction(id="ask_parent", label="问爸爸妈妈"),
+            ],
+            signals=self._signals(request, transition=transition),
         )
 
     def _learning_homework_help(
@@ -343,6 +440,11 @@ class SceneOrchestrator:
         )
 
     def _checkin_reply_text(self, request: SceneRouteRequest) -> str:
+        if request.intent == IntentType.EMOTION_EXPRESSION:
+            return (
+                "可以的，我们先不聊很多。你可以安静一会儿，"
+                "也可以选想安静一会儿；等你想说时再说。"
+            )
         goal_text = "，".join(request.parent_goals)
         if "小困难" in goal_text:
             return (
@@ -378,6 +480,7 @@ class SceneOrchestrator:
         return {
             "time_period": request.time_context.time_period.value,
             "intent": request.intent.value,
+            "sub_intent": request.sub_intent,
             "intent_evidence": request.intent_evidence,
             "needs_modality": request.needs_modality,
             "suggested_modalities": request.suggested_modalities,

@@ -55,6 +55,33 @@ def test_global_prompt_contains_no_secret_safety_rule() -> None:
     assert "不能鼓励孩子隐瞒父母" in prompt.prompt
 
 
+def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:
+    prompt = PromptManager().compose("safety.guardian")
+
+    assert "当前场景：安全守护" in prompt.prompt
+    assert "告诉爸爸妈妈、老师或可信任的大人" in prompt.prompt
+    assert "不让孩子保密" in prompt.prompt
+    assert "requires_parent_attention 应为 true" in prompt.prompt
+
+
+def test_watch_safety_prompt_is_gentle_without_forced_parent_attention() -> None:
+    prompt = PromptManager().compose("safety.gentle_checkin")
+
+    assert "当前场景：安全温和确认" in prompt.prompt
+    assert "默认不强制 requires_parent_attention" in prompt.prompt
+    assert "不使用“马上”“立刻”“危险”等过度紧急话术" in prompt.prompt
+    assert "不要求孩子保密" in prompt.prompt
+
+
+def test_privacy_boundary_prompt_blocks_private_detail_collection() -> None:
+    prompt = PromptManager().compose("privacy.boundary")
+
+    assert "当前场景：隐私边界提醒" in prompt.prompt
+    assert "家庭地址、电话、学校名字、照片" in prompt.prompt
+    assert "不索要真实地址、电话、学校、照片或身份信息" in prompt.prompt
+    assert "不要求孩子保密" in prompt.prompt
+
+
 def test_prompt_manager_raises_clear_error_for_unknown_scene() -> None:
     with pytest.raises(PromptSceneNotFoundError, match="scene_id=unknown.scene"):
         PromptManager().compose("unknown.scene")

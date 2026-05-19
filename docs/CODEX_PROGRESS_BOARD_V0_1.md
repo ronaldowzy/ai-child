@@ -10,8 +10,8 @@
 ```text
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
-当前目标：补齐自动记忆闭环、安全场景细分和完整设备 QA；AgentRuntime、模型外发安全闸门和父亲入口保护已完成代码级加固
-下一步：启动 S17 自动记忆闭环；窗口模式模拟器复跑 mock 拍题、父亲设置、父亲入口保护、睡前和高风险场景
+当前目标：补齐自动记忆闭环和完整设备 QA；AgentRuntime、模型外发安全闸门、父亲入口保护和安全场景细分已完成代码级加固
+下一步：启动 S17 自动记忆闭环；窗口模式模拟器复跑 mock 拍题、父亲设置、父亲入口保护、睡前和安全场景细分
 ```
 
 第一轮已完成能力快照：
@@ -49,7 +49,7 @@ Mock 拍题：done
 | R1 | AgentRuntime | 统一智能体执行链路和输出安全检查 | done | Q1/E2E/R2 | conversation 编排收敛到 runtime，模型调用、输出检查和安全 fallback 边界已落地 |
 | R2 | 模型外发安全闸门 | 真实模型接入前 child data gate | done | Q1 | 外发开关、数据最小化、审计和 fallback gate 可测 |
 | R3 | 自动记忆闭环 | conversation 后自动抽取结构化记忆并进入日报素材 | todo | M7/M8/R1 | 不保存长篇原文，记忆写入链路可测 |
-| R4 | 安全场景细分 | 细分高风险类别和父亲提醒策略 | todo | M5/M6/R1 | 高风险优先，固定安全回复不完全依赖模型 |
+| R4 | 安全场景细分 | 细分高风险类别和父亲提醒策略 | done | M5/M6/R1 | 高风险优先，WATCH/PRIVACY 分流可测，固定安全回复不完全依赖模型 |
 | R5 | 父亲入口保护 | Android 父亲页访问保护 | done | A4/E2E | 长按父亲入口 + dev PIN 轻量保护，避免儿童轻易进入父亲设置和日报 |
 | R6 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R5 | mock 拍题、父亲设置、睡前、高风险和断网状态待窗口模式复验 |
 
@@ -179,8 +179,8 @@ Mock 拍题：done
 | R2-02 Mock/真实 provider 切换验收 | done |  | 默认 Mock；真实 provider disabled 或受 gate 保护；测试不走真实外网 |
 | R3-01 自动记忆写入闭环 | todo |  | conversation 后自动抽取结构化记忆；不保存长篇逐字原文 |
 | R3-02 记忆到父亲日报素材闭环 | todo |  | 当天结构化记忆可稳定进入日报，不暴露 evidence 原文 |
-| R4-01 安全场景细分 | todo |  | adult_secret、stranger、privacy、self_harm 等风险类别有不同回复/提醒策略 |
-| R4-02 父亲提醒策略加固 | todo |  | 高风险 requires_parent_attention 可测，普通低风险不制造过度告警 |
+| R4-01 安全场景细分 | done |  | HIGH/CRITICAL -> safety.guardian；WATCH -> safety.gentle_checkin；LOW privacy -> privacy.boundary；低能量表达保留普通 check-in |
+| R4-02 父亲提醒策略加固 | done |  | 高风险 requires_parent_attention 可测，WATCH/LOW 默认不制造过度告警 |
 | R5-01 父亲入口保护 | done |  | Android 父亲设置/日报入口需长按并输入 dev PIN，不做账号系统但避免儿童误入 |
 | R6-01 完整设备 QA | in_progress |  | 窗口模式模拟器或真实平板跑完 MANUAL_QA_V0_1.md 全部核心场景 |
 
@@ -192,8 +192,8 @@ Mock 拍题：done
 
 ```text
 今日目标：完成 S13 Android 拍题与父亲页验收，推进 S14 本机/API 联调和 S20a 文档同步，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text。
-阻塞问题：无硬阻塞；完整设备侧手动 QA、自动记忆闭环和安全场景细分仍需继续执行；Mimo 真实网络 smoke 尚未执行。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian。
+阻塞问题：无硬阻塞；完整设备侧手动 QA 和自动记忆闭环仍需继续执行；Mimo 真实网络 smoke 尚未执行。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
 明日第一任务：启动 S17 自动记忆闭环，并用窗口模式模拟器复跑 S14/R6 完整设备侧手动 QA。

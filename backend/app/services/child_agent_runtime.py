@@ -185,6 +185,7 @@ class ChildAgentRuntime:
             "contains_audio": False,
             "task_type": ModelTaskType.CHILD_CHAT.value,
             "active_scene": request.route_decision.active_scene.value,
+            "reply_style": "voice_first_short_natural_one_question",
             "prompt_version_layers": sorted(prompt_versions.keys()),
         }
 
@@ -208,9 +209,14 @@ class ChildAgentRuntime:
             "所以答案",
             "结果是",
             "得数是",
-            "等于",
         )
-        return any(marker in normalized for marker in direct_answer_markers)
+        if any(marker in normalized for marker in direct_answer_markers):
+            return True
+        math_answer_patterns = (
+            r"\d+(?:\.\d+)?(?:\+|加|-|减|×|x|\*|乘|÷|/|除以)\d+(?:\.\d+)?(?:=|等于|是)\d+",
+            r"(?:=|等于)\d+(?:\.\d+)?(?:。|！|!|$)",
+        )
+        return any(re.search(pattern, normalized) for pattern in math_answer_patterns)
 
     def _normalize_model_reply(
         self, reply_text: str, request: AgentRuntimeRequest
@@ -219,9 +225,7 @@ class ChildAgentRuntime:
         if not text:
             return ""
 
-        text = re.sub(r"[\U00010000-\U0010ffff]", "", text)
-        text = re.sub(r"[*_`#>]+", "", text)
-        text = re.sub(r"(?m)^\s*[-•]\s*", "", text)
+        text = self._strip_markdown_for_voice(text)
         text = re.sub(r"\s+", " ", text).strip()
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
         text = self._keep_one_main_question(text)
@@ -232,6 +236,16 @@ class ChildAgentRuntime:
             else 90
         )
         return self._limit_to_sentence_boundary(text, max_chars=max_chars)
+
+    def _strip_markdown_for_voice(self, text: str) -> str:
+        text = re.sub(r"[\U00010000-\U0010ffff]", "", text)
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+        text = re.sub(r"(?m)^\s*(?:#{1,6}\s*)+", "", text)
+        text = re.sub(r"(?m)^\s*(?:[-*•]|\d+[.)、]|[一二三四五六七八九十]+[、.])\s*", "", text)
+        text = re.sub(r"[*_`#>|]+", "", text)
+        text = re.sub(r"^\s*(?:小狐狸|助手|AI|ai)\s*[：:]\s*", "", text)
+        return text
 
     def _keep_one_main_question(self, text: str) -> str:
         question_positions = [

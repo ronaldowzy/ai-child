@@ -1,6 +1,7 @@
 package com.childai.companion.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
@@ -10,6 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +27,7 @@ fun InputBar(
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    voice: VoiceUiState = VoiceUiState(),
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val trimmedDraft = draft.trim()
@@ -36,30 +39,47 @@ fun InputBar(
         }
     }
 
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            enabled = enabled,
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(text = "说点什么")
-            },
-            textStyle = MaterialTheme.typography.bodyLarge,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { sendDraft() }),
-        )
-        Button(
-            onClick = { sendDraft() },
-            enabled = enabled && trimmedDraft.isNotEmpty(),
-            modifier = Modifier.widthIn(min = 88.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = if (enabled) "发送" else "发送中")
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                enabled = enabled,
+                modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text(text = "说点什么")
+                },
+                textStyle = MaterialTheme.typography.bodyLarge,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { sendDraft() }),
+            )
+            TextButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.widthIn(min = 64.dp),
+            ) {
+                Text(text = "语音")
+            }
+            Button(
+                onClick = { sendDraft() },
+                enabled = enabled && trimmedDraft.isNotEmpty(),
+                modifier = Modifier.widthIn(min = 88.dp),
+            ) {
+                Text(text = if (enabled) "发送" else "发送中")
+            }
         }
+        Text(
+            text = voice.statusText,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

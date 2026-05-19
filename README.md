@@ -16,26 +16,28 @@
 
 ## 当前状态
 
-v0.1 第一轮后端和 Android MVP 已完成。当前项目已从基础闭环进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
+v0.1 第一轮后端和 Android MVP 已完成。当前项目已从基础闭环进入受控 AI 智能体运行时和家庭内测前体验加固阶段。
 
 已完成的第一轮能力：
 
 - 后端 FastAPI 骨架、health、conversation API、时间上下文、父亲策略、PromptManager、ModelRegistry、SafetyEngine、IntentClassifier、SceneOrchestrator。
 - 结构化记忆、父亲日报、mock 附件和 Mock OCR 拍题流程。
 - Android Compose MVP：统一聊天入口、conversation API 接入、ui_actions 渲染、mock 拍题、父亲设置页和父亲日报页。
+- ChildAgentRuntime 主回复链路、真实模型外发安全闸门、规则型自动记忆闭环、安全场景细分、父亲入口长按 + PIN 轻量保护。
+- 真实模型本机 smoke 已通过；默认仍保持 Mock 优先，真实外部 provider 只允许在后端临时环境变量和数据策略开关满足时使用。
 - 本地后端 test/lint/demo、Android build/test/lint、E2E API 检查和基础模拟器 smoke 记录。
 
 当前未完成或正在加固的能力：
 
-- AgentRuntime 统一执行链路和输出安全检查。
-- 自动记忆写入闭环和父亲日报素材稳定性。
-- 高风险安全场景细分。
 - 窗口模式模拟器或真实平板完整设备 QA。
+- Android 真实语音输入、TTS 播放和小白狐复杂动画。
+- 数据库持久化、账号系统、真实相机/OCR/图片存储和生产级父亲身份认证。
 
 已完成但仍需持续验证的加固能力：
 
 - 真实模型外发前的数据安全闸门：默认仍保持 Mock 优先，Mimo 等外部 provider 必须通过 child data、图片/音频和 retention policy 开关校验。
 - Android 父亲设置/日报入口轻量保护：长按父亲入口后输入开发 PIN 才进入；这不是账号系统或强安全机制。
+- 后端回复输出安全检查：模型回复会做语音化规整，并拦截秘密关系、隔离可信成人、直接给作业最终答案等风险输出。
 
 ## 文档入口
 

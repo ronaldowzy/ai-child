@@ -32,6 +32,7 @@ class ConversationDtosTest {
 
         assertTrue(response.reply.voiceEnabled)
         assertNull(response.reply.audioUrl)
+        assertEquals("warm", response.reply.emotion)
         assertEquals("listening_tail", response.reply.agentMotion)
     }
 

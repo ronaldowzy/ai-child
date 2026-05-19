@@ -10,8 +10,8 @@
 ```text
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
-当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护和安全场景细分已完成代码级加固
-下一步：窗口模式模拟器复跑 mock 拍题、父亲设置、父亲入口保护、睡前、自动记忆日报素材和安全场景细分
+当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
+下一步：窗口模式模拟器复跑自由聊天、学习求助、直接要答案、mock 拍题、父亲设置、父亲入口保护、睡前、高风险、隐私边界、后端断开提示、自动记忆日报素材和安全场景细分
 ```
 
 第一轮已完成能力快照：
@@ -30,7 +30,7 @@ Mock 拍题：done
 
 | ID | 阶段 | 目标 | 状态 | 依赖 | 验收摘要 |
 |---|---|---|---|---|---|
-| C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程后置 |
+| C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程已配置 |
 | M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
 | M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
@@ -42,7 +42,7 @@ Mock 拍题：done
 | M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | done | C0 | Android 可编译，单元测试通过 |
-| A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions/session_state |
+| A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions；session_state 内部保存，默认不展示给儿童 |
 | A3 | Android 拍题 | Mock 拍题流程 | done | A2/M9 | mock attachment + conversation 连续调用可用 |
 | A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
 | E2E | 联调 | 后端 + Android 家庭内测流程 | in_progress | Q1/A1-A4 | 本机/LAN API 已通过；模拟器基础 UI smoke 已通过，完整手动 QA 待跑 |
@@ -51,7 +51,8 @@ Mock 拍题：done
 | R3 | 自动记忆闭环 | conversation 后自动抽取结构化记忆并进入日报素材 | done | M7/M8/R1 | 规则型摘要记忆写入、日报可见和 safety 检索隔离已测 |
 | R4 | 安全场景细分 | 细分高风险类别和父亲提醒策略 | done | M5/M6/R1 | 高风险优先，WATCH/PRIVACY 分流可测，固定安全回复不完全依赖模型 |
 | R5 | 父亲入口保护 | Android 父亲页访问保护 | done | A4/E2E | 长按父亲入口 + dev PIN 轻量保护，避免儿童轻易进入父亲设置和日报 |
-| R6 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R5 | mock 拍题、父亲设置、睡前、高风险和断网状态待窗口模式复验 |
+| R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
+| R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | 自由聊天、学习求助、直接要答案、mock 拍题、父亲设置、父亲入口保护、高风险、隐私边界、后端断开和预留能力边界待窗口模式复验 |
 
 ---
 
@@ -61,7 +62,7 @@ Mock 拍题：done
 
 | Task | 状态 | PR | 验收 |
 |---|---|---|---|
-| C0-01 创建 GitHub 仓库 | deferred |  | 当前仅使用本地 Git，远程仓库后置 |
+| C0-01 创建 GitHub 仓库 | done |  | origin 已配置到 ronaldowzy/ai-child，可推送 main |
 | C0-02 复制 docs 文档包 | done |  | docs 文件完整 |
 | C0-03 复制 AGENTS_TEMPLATE 为 AGENTS.md | done |  | Codex 可读取规则 |
 | C0-04 创建 README.md | done |  | 指向核心文档 |
@@ -161,13 +162,14 @@ Mock 拍题：done
 | A1-01 Android 初始化 | done |  | 项目已创建，assembleDebug 通过 |
 | A1-02 ChildChatScreen | done |  | 静态 UI 已创建，test 通过 |
 | A2-01 ConversationApiClient | done |  | 可请求后端 conversation API |
-| A2-02 ui_actions 渲染 | done |  | 快捷按钮和 session_state 可显示 |
+| A2-02 ui_actions 渲染 | done |  | 快捷按钮可显示；session_state 用于续会话和开发排查，默认不在儿童界面展示 |
 | A3-01 Mock 拍题 | done |  | 题目流程跑通，不接真实 CameraX |
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
 | A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
 | E2E-02 Android 模拟器基础 smoke | done |  | AVD 启动、App 安装、聊天 API、父亲日报读取通过 |
 | E2E-03 Android 完整手动 QA | in_progress |  | mock 拍题、父亲设置、睡前、高风险、断网和父亲入口保护场景待窗口模式复验 |
+| E2E-04 Android 表达层 smoke | in_progress |  | 小白狐状态、语音占位和自由聊天设备侧展示待窗口模式复验 |
 
 ### 家庭内测前加固
 
@@ -182,7 +184,11 @@ Mock 拍题：done
 | R4-01 安全场景细分 | done |  | HIGH/CRITICAL -> safety.guardian；WATCH -> safety.gentle_checkin；LOW privacy -> privacy.boundary；低能量表达保留普通 check-in |
 | R4-02 父亲提醒策略加固 | done |  | 高风险 requires_parent_attention 可测，WATCH/LOW 默认不制造过度告警 |
 | R5-01 父亲入口保护 | done |  | Android 父亲设置/日报入口需长按并输入 dev PIN，不做账号系统但避免儿童误入 |
-| R6-01 完整设备 QA | in_progress |  | 窗口模式模拟器或真实平板跑完 MANUAL_QA_V0_1.md 全部核心场景 |
+| R6-01 真实模型输出质量加固 | done |  | Prompt 和 ChildAgentRuntime 输出规整改为 voice-first、短句、少 Markdown/列表、通常只保留一个主问题 |
+| R6-02 输出依赖/秘密关系拦截 | done |  | SafetyEngine.classify_output 会拦截“唯一朋友”“只有我懂你”“不要告诉可信成人”等风险话术并 fallback |
+| R6-03 Android 小白狐状态预留 | done |  | Android 将 `reply.emotion` / `reply.agent_motion` 映射为轻量状态；语音入口仍是文字阶段占位 |
+| R7-01 完整设备 QA | in_progress |  | 窗口模式模拟器或真实平板跑完 MANUAL_QA_V0_1.md 全部核心场景 |
+| R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；默认仍 Mock 优先 |
 
 ---
 
@@ -192,11 +198,11 @@ Mock 拍题：done
 
 ```text
 今日目标：完成 S13 Android 拍题与父亲页验收，推进 S14 本机/API 联调和 S20a 文档同步，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材。
-阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实网络 smoke 尚未执行。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI，不接真实录音或 TTS。
+阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实 provider 已用临时 env smoke 通过，后续不得重复使用错误模型 id `mimo-v2.5pro`。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：用窗口模式模拟器复跑 S14/R6 完整设备侧手动 QA，并补充自动记忆日报素材的设备侧验证记录。
+明日第一任务：用窗口模式模拟器复跑 R7 完整设备侧手动 QA，覆盖自由聊天、学习求助、直接要答案、高风险、隐私边界、父亲入口保护、mock 拍题、后端断开提示，以及语音/小白狐动画预留边界，并补充自动记忆日报素材的设备侧验证记录。
 ```
 
 ### 日期：2026-05-18

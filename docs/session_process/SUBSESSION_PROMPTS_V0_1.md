@@ -986,3 +986,61 @@ Safety note:
 Output:
 先输出文档同步计划，列出会修改的文件、不会修改的文件、验证方式和风险。计划确认或主控授权后执行。
 ```
+
+---
+
+## S26：QA 与协作机制同步会话
+
+```text
+你是 ai-child 项目的“S26 QA 与协作机制同步子会话”。
+
+目标:
+同步多会话共享上下文和手动 QA，使后续子会话知道当前环境事实、Mimo provider smoke 结论、下一阶段设备 QA 清单和并行协作规则。
+
+允许文件:
+- docs/session_process/SHARED_CONTEXT_V0_1.md
+- docs/MANUAL_QA_V0_1.md
+- docs/CODEX_PROGRESS_BOARD_V0_1.md
+- docs/session_process/SUBSESSION_PROMPTS_V0_1.md
+
+禁止文件:
+- backend/app/**
+- android/app/**
+- README.md、backend/README.md、android/README.md，除非主控明确授权最终收口
+- .env、.env.example 中写入真实 key
+- 任何真实儿童身份、真实家庭信息、真实照片或真实音频
+
+必须同步的事实:
+- Mimo 已用临时 env smoke 通过。
+- Mimo 模型 id 必须是 mimo-v2.5-pro，不能使用 mimo-v2.5pro。
+- 真实 key 只能放在当前 shell 临时 env，不进仓库、不进 Android、不进文档。
+- JDK 17、child-ai conda、Android SDK、adb、child_ai_tablet_api35 AVD 已配置；不得重复报告为缺失。
+- 模拟器中文输入已有处理方式：手动用 Gboard 中文拼音，自动化用 emulator 内 ADBKeyBoard。
+
+下一阶段 QA 清单:
+- 自由聊天。
+- 学习求助。
+- 直接要答案。
+- 高风险。
+- 隐私边界。
+- 父亲入口保护。
+- mock 拍题。
+- Android 后端断开提示。
+- 语音和小白狐动画只是预留能力。
+
+协作机制:
+- 修改前后运行 git status --short。
+- 不回退、覆盖或格式化别人负责的文件。
+- 文档只同步事实和待验收项，不抢写代码 worker 的结果。
+- 合并前运行 git diff --check。
+- 扫描明显 secret 和过期环境误报表述。
+
+验证:
+- 先阅读 AGENTS.md 和 docs/session_process/SHARED_CONTEXT_V0_1.md。
+- 运行 bash scripts/doctor_local_env.sh。
+- 文档修改后运行 git diff --check。
+- 运行主控指定的 secret 和过期环境误报表述扫描命令，范围覆盖 README.md、backend、android、docs 和 .env.example。
+
+Output:
+完成后输出 Summary、Files changed、Tests、Safety、Docs、Known issues，并说明哪些文档需要等代码 worker 完成后由主会话最终同步。
+```

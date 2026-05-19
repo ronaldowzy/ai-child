@@ -51,6 +51,7 @@
 | `backend/app/services/memory*`、`backend/app/repositories/memory*`、日报素材接入 tests | S17 自动记忆闭环会话 | 不保存长篇逐字原文，不把 safety 记忆混入普通检索 |
 | `backend/app/services/safety_engine.py`、`scene_orchestrator.py`、安全场景 tests | S18 安全场景细分会话 | 高风险优先；不得放宽儿童安全原则 |
 | `android/` 父亲入口保护相关 UI / ViewModel / tests | S19 Android 父亲入口保护会话 | 不做账号系统，不在客户端加入模型 key |
+| `docs/session_process/SHARED_CONTEXT_V0_1.md`、`docs/MANUAL_QA_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`docs/session_process/SUBSESSION_PROMPTS_V0_1.md` | S26 QA 与协作机制同步会话 | 只同步 QA、环境和协作事实；不得抢写代码 worker 结果 |
 | `README.md`、`docs/`、`docs/session_process/` | 主控或文档同步会话 | 只同步事实，不夸大未完成能力 |
 
 如果必须修改不属于自己的文件，子会话必须在计划中说明原因，并在交接中标记冲突风险。发现其他会话的并行改动时，先读取 diff 并适配，不要回退。
@@ -66,6 +67,16 @@
 4. 相关标准入口测试或手动验证已运行；不能运行时说明真实阻塞。
 5. 文档 PR 至少运行 git diff --check，并扫描明显过期表述。
 6. 并行工作中发现的共性坑必须写进交接摘要，交给主控会话决定是否更新本文件。
+```
+
+并行 worker 合并前额外检查：
+
+```text
+1. 先运行 git status --short，确认没有误碰非授权文件。
+2. 修改前后都不要格式化、重排或回退其他 worker 负责的文件。
+3. 如果同一文件已有他人改动，先读 diff 并只做最小补丁；不能确认时交给主控合并。
+4. 文档同步会话只能写已发生事实、待验收项和协作规则，不把代码 worker 的 todo 提前写成 done。
+5. 不得重复报告已解决的 JDK、conda、AVD 或模拟器中文输入问题；先引用本文件标准处理方式。
 ```
 
 ---
@@ -231,6 +242,33 @@ export CHILD_AI_MIMO_ALLOW_AUDIO=false
 
 当前结论：在允许 child data 和 retention checked 均为 true 时，`ChildAgentRuntime`
 可以走到 Mimo 并返回 `source=model`。运行时会清理模型输出中的 emoji/Markdown/过长内容；如果模型输出出现“悄悄告诉我”“只告诉我”“我们的小秘密”等秘密关系话术，会触发 fallback。
+
+Mimo 相关协作规则：
+
+```text
+1. 默认仍是 MockModelProvider，真实 Mimo 只用于人工 smoke 或主控明确要求的临时验证。
+2. 模型 id 必须是 mimo-v2.5-pro。
+3. 真实 key 只能放在当前 shell 临时 env；不得写入 .env、.env.example、README、docs、测试、Android 或提交记录。
+4. Android 端永远不放模型 key；所有真实模型调用只允许后端通过 ModelRegistry 和 provider gate。
+5. QA 记录可以写“临时 env smoke 通过”，不能写出真实 token、账号、计费信息或请求正文中的真实儿童数据。
+```
+
+### 下一阶段 QA 清单
+
+家庭内测前，后续 QA 子会话至少覆盖以下设备侧场景。全部使用虚构 child_id、虚构输入和 mock 题目，不使用真实儿童身份、照片或音频：
+
+| 场景 | 核心期望 |
+|---|---|
+| 自由聊天 | 孩子输入普通兴趣话题时，不被固定按钮流程覆盖；回复保持温和、短句、不过度拟人依赖 |
+| 学习求助 | 先引导读题、拆题、说思路；提供 `take_photo` / `speak_problem` 等动作；不直接给最终答案 |
+| 直接要答案 | 明确拒绝直接给答案，改为分步提示和选择式引导 |
+| 高风险 | 进入 `safety.guardian`，鼓励告诉父母/老师/可信成人，并触发父亲提醒 |
+| 隐私边界 | 不索要或保存地址、电话、学校、照片等隐私；提醒不要告诉 AI 或陌生人 |
+| 父亲入口保护 | 点击不直接进入父亲页；长按后输 dev PIN；错误 PIN 温和提示；正确 PIN 才进入 |
+| Mock 拍题 | 点击拍题走 mock attachment + conversation 连续调用；不接真实 CameraX；不保存真实照片 |
+| Android 后端断开提示 | 停止后端后，Android 显示温和错误和稍后再试，不诱导孩子反复刷请求或自责 |
+| 语音预留 | `speak_problem` 只是占位或 mock，不接真实录音作为必需流程，不保存原始音频 |
+| 小白狐动画预留 | 第一版只保留轻量视觉或占位，不做复杂动画或上瘾式反馈 |
 
 ---
 

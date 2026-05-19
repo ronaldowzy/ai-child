@@ -249,6 +249,62 @@ def test_child_agent_runtime_normalizes_model_reply_for_voice() -> None:
     assert result.model_metadata["reply_normalized"] is True
 
 
+def test_child_agent_runtime_strips_numbered_markdown_for_tts() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "小狐狸：\n"
+            "1. 我听见你喜欢画飞船。\n"
+            "2. 这个想法很有意思。\n"
+            "你想先画圆圆的窗户吗？"
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        reply_text="可以，我们先聊飞船。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == (
+        "我听见你喜欢画飞船。这个想法很有意思。你想先画圆圆的窗户吗？"
+    )
+    assert "1." not in result.reply_text
+    assert "小狐狸：" not in result.reply_text
+    assert result.reply_text.count("？") == 1
+    assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_does_not_treat_thinking_hint_as_direct_answer() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("我们先想想这一步表示什么，再看它等于几个一组。")
+    )
+    route_decision = _route_decision(
+        reply_text="我不会直接告诉你最终答案。我们先说题意和第一步。"
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "我们先想想这一步表示什么，再看它等于几个一组。"
+
+
+def test_child_agent_runtime_metadata_marks_voice_first_reply_style() -> None:
+    registry = CapturingModelRegistry(response=_model_response("我听见了。"))
+
+    ChildAgentRuntime(model_registry=registry).run(_runtime_request())
+
+    assert registry.last_request is not None
+    assert (
+        registry.last_request.metadata["reply_style"]
+        == "voice_first_short_natural_one_question"
+    )
+
+
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
     route_decision = _route_decision(
         reply_text="安全场景使用固定兜底回复。",

@@ -1,11 +1,14 @@
 package com.childai.companion.ui.chat
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -16,7 +19,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun CartoonAgentView(modifier: Modifier = Modifier) {
+fun CartoonAgentView(
+    agent: FoxAgentUiState,
+    modifier: Modifier = Modifier,
+) {
+    val lift by animateFloatAsState(
+        targetValue = if (agent.motion == FoxMotion.CelebrateSmall) -10f else 0f,
+        animationSpec = tween(durationMillis = 360),
+        label = "foxLift",
+    )
     Box(
         modifier = modifier
             .fillMaxWidth(0.72f)
@@ -24,18 +35,40 @@ fun CartoonAgentView(modifier: Modifier = Modifier) {
             .aspectRatio(1f),
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            drawFoxAgent()
+            drawFoxAgent(agent = agent, verticalOffset = lift)
         }
     }
 }
 
-private fun DrawScope.drawFoxAgent() {
-    val center = Offset(size.width / 2f, size.height / 2f)
-    val foxOrange = Color(0xFFD88945)
+private fun DrawScope.drawFoxAgent(
+    agent: FoxAgentUiState,
+    verticalOffset: Float,
+) {
+    val center = Offset(size.width / 2f, size.height / 2f + verticalOffset)
+    val foxOrange = when (agent.mood) {
+        FoxMood.Calm -> Color(0xFFD49A68)
+        FoxMood.Thinking -> Color(0xFFD88945)
+        FoxMood.Listening -> Color(0xFFE0964F)
+        FoxMood.Encouraging -> Color(0xFFE28C3D)
+        FoxMood.Warm -> Color(0xFFD88945)
+    }
     val foxCream = Color(0xFFFFF1DD)
     val foxBrown = Color(0xFF604230)
-    val leafGreen = Color(0xFF5B7C5A)
+    val leafGreen = when (agent.mood) {
+        FoxMood.Calm -> Color(0xFF66816B)
+        FoxMood.Thinking -> Color(0xFF536F77)
+        FoxMood.Listening -> Color(0xFF5B7C5A)
+        FoxMood.Encouraging -> Color(0xFF6D7F43)
+        FoxMood.Warm -> Color(0xFF5B7C5A)
+    }
     val softShadow = Color(0x263E4D39)
+    val eyeHeight = if (agent.motion == FoxMotion.ThinkingBlink) {
+        size.minDimension * 0.010f
+    } else {
+        size.minDimension * 0.026f
+    }
+    val mouthSweep = if (agent.mood == FoxMood.Calm) 96f else 132f
+    val tailLift = if (agent.motion == FoxMotion.ListeningTail) -0.03f else 0f
 
     drawOval(
         color = softShadow,
@@ -46,63 +79,69 @@ private fun DrawScope.drawFoxAgent() {
     drawCircle(
         color = foxOrange,
         radius = size.minDimension * 0.31f,
-        center = Offset(center.x, size.height * 0.47f),
+        center = Offset(center.x, size.height * 0.47f + verticalOffset),
     )
 
     drawEar(
         outerColor = foxOrange,
         innerColor = foxCream,
         points = listOf(
-            Offset(size.width * 0.25f, size.height * 0.36f),
-            Offset(size.width * 0.33f, size.height * 0.12f),
-            Offset(size.width * 0.47f, size.height * 0.33f),
+            Offset(size.width * 0.25f, size.height * 0.36f + verticalOffset),
+            Offset(size.width * 0.33f, size.height * 0.12f + verticalOffset),
+            Offset(size.width * 0.47f, size.height * 0.33f + verticalOffset),
         ),
     )
     drawEar(
         outerColor = foxOrange,
         innerColor = foxCream,
         points = listOf(
-            Offset(size.width * 0.75f, size.height * 0.36f),
-            Offset(size.width * 0.67f, size.height * 0.12f),
-            Offset(size.width * 0.53f, size.height * 0.33f),
+            Offset(size.width * 0.75f, size.height * 0.36f + verticalOffset),
+            Offset(size.width * 0.67f, size.height * 0.12f + verticalOffset),
+            Offset(size.width * 0.53f, size.height * 0.33f + verticalOffset),
         ),
     )
 
     drawOval(
         color = foxCream,
-        topLeft = Offset(size.width * 0.31f, size.height * 0.45f),
+        topLeft = Offset(size.width * 0.31f, size.height * 0.45f + verticalOffset),
         size = Size(size.width * 0.38f, size.height * 0.28f),
     )
 
-    drawCircle(
+    drawOval(
         color = foxBrown,
-        radius = size.minDimension * 0.026f,
-        center = Offset(size.width * 0.41f, size.height * 0.44f),
+        topLeft = Offset(
+            size.width * 0.41f - size.minDimension * 0.026f,
+            size.height * 0.44f - eyeHeight / 2f + verticalOffset,
+        ),
+        size = Size(size.minDimension * 0.052f, eyeHeight),
     )
-    drawCircle(
+    drawOval(
         color = foxBrown,
-        radius = size.minDimension * 0.026f,
-        center = Offset(size.width * 0.59f, size.height * 0.44f),
+        topLeft = Offset(
+            size.width * 0.59f - size.minDimension * 0.026f,
+            size.height * 0.44f - eyeHeight / 2f + verticalOffset,
+        ),
+        size = Size(size.minDimension * 0.052f, eyeHeight),
     )
 
     drawCircle(
         color = foxBrown,
         radius = size.minDimension * 0.022f,
-        center = Offset(size.width * 0.50f, size.height * 0.53f),
+        center = Offset(size.width * 0.50f, size.height * 0.53f + verticalOffset),
     )
     drawArc(
         color = foxBrown,
         startAngle = 24f,
-        sweepAngle = 132f,
+        sweepAngle = mouthSweep,
         useCenter = false,
-        topLeft = Offset(size.width * 0.43f, size.height * 0.53f),
+        topLeft = Offset(size.width * 0.43f, size.height * 0.53f + verticalOffset),
         size = Size(size.width * 0.14f, size.height * 0.10f),
         style = Stroke(width = size.minDimension * 0.012f),
     )
 
     drawRoundRect(
         color = leafGreen,
-        topLeft = Offset(size.width * 0.37f, size.height * 0.68f),
+        topLeft = Offset(size.width * 0.37f, size.height * (0.68f + tailLift) + verticalOffset),
         size = Size(size.width * 0.26f, size.height * 0.10f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(
             x = size.minDimension * 0.04f,

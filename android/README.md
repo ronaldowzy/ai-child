@@ -5,13 +5,13 @@
 ## 当前范围
 
 - 单一儿童聊天入口。
-- 静态小狐狸智能体形象占位。
+- 小白狐/小狐狸智能体形象占位，会根据后端 `reply.emotion` 和
+  `reply.agent_motion` 做轻量状态变化。
 - 文本输入框和发送按钮。
 - 调用后端 `POST /api/v1/conversation/message`。
-- 渲染后端返回的 `reply.text`、`ui_actions` 快捷按钮和 `session_state`。
+- 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`，为后续语音播报和小白狐动画状态预留字段；当前 UI
-  仍以文字聊天为主。
+  `reply.agent_motion`；当前 UI 已做轻量状态映射，但语音输入、TTS 播放和复杂动画仍是后续能力。
 - 点击“拍题目”走 mock attachment 流程，不接真实 CameraX，不保存真实图片。
 - 父亲设置页可读取和保存目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
@@ -21,7 +21,7 @@
 ## 当前不做
 
 - 不接真实相机、语音或 TTS。
-- 不在当前版本生成或播放真实语音；语音字段只作为后续接口预留。
+- 不在当前版本录制、生成或播放真实语音；语音入口和字段只作为后续接口预留。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。
 - 不把父亲入口 PIN 当作强安全机制；它只是 v0.1 开发期的轻量误触保护。
@@ -171,8 +171,9 @@ bash scripts/dev_backend.sh
 6. 点击“父亲设置”不应直接进入；长按“父亲设置”后输入开发 PIN `0000`，读取当前 policy，修改目标、沟通偏好或时间段，保存后应显示成功提示。
 7. 回到聊天页再发送消息，后端应使用更新后的 parent policy。
 8. 点击“父亲日报”不应直接进入；长按“父亲日报”后输入开发 PIN `0000`，读取当天 summary；如果当天没有结构化记忆，后端会返回“暂无可汇总的结构化会话素材”类摘要。
-9. 页面底部应显示后端返回的 session_state。
+9. 页面不应默认显示 `base=... | active=...` 这类内部 session_state 调试文本。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。
+11. 小白狐状态应随后端 `emotion` / `agent_motion` 轻量变化；底部语音入口仍是占位，不应录音或播放音频。
 ```
 
 如果需要先排除后端 API 合约问题，可以在仓库根目录运行：

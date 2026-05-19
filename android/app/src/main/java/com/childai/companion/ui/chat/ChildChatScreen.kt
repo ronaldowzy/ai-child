@@ -161,6 +161,7 @@ private fun ChildChatScreenContent(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 onSend = onSend,
                 enabled = !uiState.isSending,
+                voice = uiState.voice,
             )
         },
     ) { innerPadding ->
@@ -179,6 +180,7 @@ private fun ChildChatScreenContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AgentPanel(
+                        agent = uiState.agent,
                         modifier = Modifier
                             .weight(0.42f)
                             .fillMaxWidth(),
@@ -197,7 +199,10 @@ private fun ChildChatScreenContent(
                         .padding(horizontal = 20.dp, vertical = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AgentPanel(modifier = Modifier.fillMaxWidth())
+                    AgentPanel(
+                        agent = uiState.agent,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Spacer(modifier = Modifier.height(18.dp))
                     ChatConversationPanel(
                         uiState = uiState,
@@ -282,7 +287,7 @@ private fun ChatConversationPanel(
                 onQuickAction = onQuickAction,
             )
         }
-        uiState.sessionState?.let { sessionState ->
+        if (DevSettings.SHOW_SESSION_STATE_DEBUG) uiState.sessionState?.let { sessionState ->
             Spacer(modifier = Modifier.height(10.dp))
             SessionStateStrip(sessionState = sessionState)
         }
@@ -417,15 +422,18 @@ private fun ParentEntryButton(
 }
 
 @Composable
-private fun AgentPanel(modifier: Modifier = Modifier) {
+private fun AgentPanel(
+    agent: FoxAgentUiState,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CartoonAgentView()
+        CartoonAgentView(agent = agent)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "慢慢说，一次说一件事就好。",
+            text = agent.statusText,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -452,6 +460,11 @@ private fun ChildChatScreenPreview() {
                     activeScene = "learning.homework_help",
                     needsInput = "problem_content",
                     requiresParentAttention = false,
+                ),
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Listening,
+                    motion = FoxMotion.ListeningTail,
+                    statusText = "我在听你说。",
                 ),
             ),
             onSend = {},

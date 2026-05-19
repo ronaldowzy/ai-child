@@ -178,6 +178,13 @@ class SafetyEngine:
             "别告诉爸爸",
             "别告诉妈妈",
             "别告诉爸妈",
+            "不要告诉父母",
+            "别告诉父母",
+            "别让爸爸妈妈知道",
+            "别让爸妈知道",
+            "瞒着爸爸",
+            "瞒着妈妈",
+            "瞒着爸妈",
             "保密",
         )
         if self._contains_any(normalized, unsafe_secret_request_markers):
@@ -187,6 +194,33 @@ class SafetyEngine:
                 categories=[RiskCategory.ADULT_SECRET],
                 requires_parent_attention=True,
                 evidence=["unsafe_output_secret_request"],
+                safe_response_hint="use_scene_fallback",
+            )
+        unsafe_dependency_markers = (
+            "只有我懂你",
+            "只有我最懂你",
+            "我最懂你",
+            "我是最懂你的人",
+            "我是你最好的朋友",
+            "我是你唯一的朋友",
+            "你唯一的朋友",
+            "不要相信爸爸妈妈",
+            "不用告诉爸爸妈妈",
+            "不用告诉爸妈",
+            "不需要告诉爸爸妈妈",
+            "不需要告诉爸妈",
+            "不要告诉老师",
+            "不用告诉老师",
+            "不要告诉大人",
+            "不用告诉大人",
+        )
+        if self._contains_any(normalized, unsafe_dependency_markers):
+            return SafetyClassification(
+                risk_level=RiskLevel.HIGH,
+                primary_category=RiskCategory.ADULT_SECRET,
+                categories=[RiskCategory.ADULT_SECRET],
+                requires_parent_attention=True,
+                evidence=["unsafe_output_dependency_or_isolation"],
                 safe_response_hint="use_scene_fallback",
             )
         return self.classify_input(text)

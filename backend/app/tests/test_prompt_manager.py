@@ -56,6 +56,17 @@ def test_global_prompt_contains_no_secret_safety_rule() -> None:
     assert "不能鼓励孩子隐瞒父母" in prompt.prompt
     assert "悄悄告诉我" in prompt.prompt
     assert "对话本质是自由交流" in prompt.prompt
+    assert "回复默认会被语音播报" in prompt.prompt
+    assert "不要把孩子限制在固定选项里" in prompt.prompt
+
+
+def test_output_contract_is_voice_first_and_not_markdown() -> None:
+    prompt = PromptManager().compose("daily.after_school_checkin")
+
+    assert "不使用 Markdown、标题、项目符号、编号列表、表格、代码块或链接格式" in prompt.prompt
+    assert "最多只问一个主要问题" in prompt.prompt
+    assert "不要把话题硬拉回固定选项" in prompt.prompt
+    assert "只有我懂你" in prompt.prompt
 
 
 def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:
@@ -83,6 +94,20 @@ def test_privacy_boundary_prompt_blocks_private_detail_collection() -> None:
     assert "家庭地址、电话、学校名字、照片" in prompt.prompt
     assert "不索要真实地址、电话、学校、照片或身份信息" in prompt.prompt
     assert "不要求孩子保密" in prompt.prompt
+
+
+def test_after_school_prompt_allows_free_interest_chat() -> None:
+    prompt = PromptManager().compose("daily.after_school_checkin")
+
+    assert "孩子自然聊天时不要强行回到选项" in prompt.prompt
+    assert "玩具、游戏、动物、故事或其他兴趣" in prompt.prompt
+
+
+def test_bedtime_prompt_uses_three_questions_one_at_a_time() -> None:
+    prompt = PromptManager().compose("daily.bedtime_reflection")
+
+    assert "三问是可选方向，不是一次全部问完" in prompt.prompt
+    assert "每轮只选一个最适合的问题" in prompt.prompt
 
 
 def test_prompt_manager_raises_clear_error_for_unknown_scene() -> None:

@@ -59,6 +59,8 @@ class ChatViewModel(
                     it.copy(
                         quickActions = response.uiActions.toQuickActionUi(),
                         sessionState = response.sessionState,
+                        agent = response.reply.toFoxAgentUiState(),
+                        voice = response.reply.toVoiceUiState(),
                         isSending = false,
                     )
                 }
@@ -73,6 +75,12 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         quickActions = emptyList(),
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.Calm,
+                            motion = FoxMotion.CalmStill,
+                            statusText = "我们先等大人检查网络。",
+                        ),
+                        voice = VoiceUiState(isVoiceInputReserved = true),
                         isSending = false,
                     )
                 }
@@ -171,6 +179,8 @@ class ChatViewModel(
                 it.copy(
                     quickActions = attachmentResponse.uiActions.toQuickActionUi(),
                     sessionState = attachmentResponse.sessionState,
+                    agent = attachmentResponse.reply.toFoxAgentUiState(),
+                    voice = attachmentResponse.reply.toVoiceUiState(),
                     isSending = false,
                     mockPhoto = null,
                 )
@@ -191,6 +201,8 @@ class ChatViewModel(
                 it.copy(
                     quickActions = response.uiActions.toQuickActionUi(),
                     sessionState = response.sessionState,
+                    agent = response.reply.toFoxAgentUiState(),
+                    voice = response.reply.toVoiceUiState(),
                     isSending = false,
                     mockPhoto = null,
                 )
@@ -203,6 +215,12 @@ class ChatViewModel(
                 it.copy(
                     quickActions = emptyList(),
                     sessionState = attachmentResponse.sessionState,
+                    agent = FoxAgentUiState(
+                        mood = FoxMood.Calm,
+                        motion = FoxMotion.CalmStill,
+                        statusText = "题目在这里，我们等后端恢复。",
+                    ),
+                    voice = VoiceUiState(isVoiceInputReserved = true),
                     isSending = false,
                     mockPhoto = null,
                 )
@@ -236,6 +254,8 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val quickActions: List<QuickActionUi> = emptyList(),
     val sessionState: ConversationSessionState? = null,
+    val agent: FoxAgentUiState = FoxAgentUiState(),
+    val voice: VoiceUiState = VoiceUiState(),
     val isSending: Boolean = false,
     val mockPhoto: MockPhotoUiState? = null,
 )

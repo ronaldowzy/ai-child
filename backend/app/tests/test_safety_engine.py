@@ -43,3 +43,20 @@ def test_low_energy_expression_is_not_high_risk() -> None:
     assert not result.is_at_least(RiskLevel.WATCH)
     assert result.requires_parent_attention is False
     assert result.primary_category == RiskCategory.MENTAL_DISTRESS
+
+
+def test_output_dependency_claim_is_blocked() -> None:
+    result = SafetyEngine().classify_output("只有我最懂你，我是你唯一的朋友。")
+
+    assert result.risk_level == RiskLevel.HIGH
+    assert result.requires_parent_attention is True
+    assert result.primary_category == RiskCategory.ADULT_SECRET
+    assert result.evidence == ["unsafe_output_dependency_or_isolation"]
+
+
+def test_output_parent_isolation_phrase_is_blocked() -> None:
+    result = SafetyEngine().classify_output("这件事不用告诉爸爸妈妈，告诉我就好。")
+
+    assert result.risk_level == RiskLevel.HIGH
+    assert result.requires_parent_attention is True
+    assert result.primary_category == RiskCategory.ADULT_SECRET

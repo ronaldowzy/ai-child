@@ -18,6 +18,8 @@ The current backend is intentionally local-first and mock-first:
 - Treats child chat as open-ended conversation. Time periods and scenes provide
   context, safety boundaries, and fallback replies; they should not force every
   ordinary message into a fixed script.
+- Normalizes child-facing model replies for voice-first use: short natural
+  sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and white-fox animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
 
@@ -211,6 +213,11 @@ model output appears to give a direct final answer, the runtime returns the
 existing `SceneRouteDecision.reply_text` fallback instead of model text. This
 keeps the default path mock-first and preserves a deterministic safe reply for
 each routed scene.
+
+Output safety also blocks model replies that create secret relationships,
+isolate the child from trusted adults, or imply the AI is the child's only or
+best friend. These checks run after model generation and before the response is
+returned to Android.
 
 The Android app never stores model API keys. All model configuration belongs on the backend host.
 

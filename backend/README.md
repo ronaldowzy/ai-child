@@ -130,6 +130,29 @@ E2E_BASE_URL=http://MAC_MINI_LAN_IP:8000 bash scripts/e2e_local_api_check.sh
 
 The check covers health, after-school, learning help, mock homework attachment, bedtime, high-risk safety, parent policy update, and parent report read. It uses fictional IDs and mock homework text only.
 
+## Optional Xiaomi Mimo Provider
+
+v0.1 remains mock-first. A Xiaomi Mimo OpenAI-compatible provider can be configured for controlled local testing, but it is disabled by default and falls back to mock on provider/configuration failure.
+
+Use environment variables only; never commit real API keys:
+
+```bash
+export CHILD_AI_MODEL_PROVIDER=mimo
+export CHILD_AI_MIMO_ENABLED=true
+export CHILD_AI_MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
+export CHILD_AI_MIMO_MODEL=mimo-v2.5pro
+export CHILD_AI_MIMO_API_KEY="..."
+```
+
+For child-facing traffic, do not enable real external transmission until the safety/data-retention review is complete:
+
+```bash
+export CHILD_AI_MIMO_ALLOW_CHILD_DATA=false
+export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=false
+```
+
+The Android app never stores model API keys. All model configuration belongs on the backend host.
+
 ## Current API Scope
 
 - `GET /api/v1/health`

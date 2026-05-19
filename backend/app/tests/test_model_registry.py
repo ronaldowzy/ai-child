@@ -1,3 +1,5 @@
+import pytest
+
 from app.domain.model_types import (
     ModelProfile,
     ModelProviderType,
@@ -157,3 +159,39 @@ def test_model_registry_uses_fallback_when_primary_provider_is_disabled() -> Non
     assert response.provider_name == "mock"
     assert response.metadata["fallback_used"] is True
     assert response.metadata["failed_provider"] == "openai_disabled"
+
+
+def test_model_registry_keeps_mimo_disabled_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
+    monkeypatch.delenv("CHILD_AI_MIMO_ENABLED", raising=False)
+
+    registry = ModelRegistry()
+    provider = registry.select(ModelTaskType.CHILD_CHAT)
+    response = registry.generate(ModelRequest(task_type=ModelTaskType.CHILD_CHAT))
+
+    assert isinstance(provider, MockModelProvider)
+    assert response.provider_name == "mock"
+    assert response.metadata["fallback_used"] is True
+    assert response.metadata["failed_provider"] == "mimo"
+
+
+def test_model_registry_can_register_enabled_mimo_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro")
+    monkeypatch.delenv("CHILD_AI_MIMO_API_KEY", raising=False)
+
+    registry = ModelRegistry()
+    profile = registry.select_profile(ModelTaskType.CHILD_CHAT)
+    response = registry.generate(ModelRequest(task_type=ModelTaskType.CHILD_CHAT))
+
+    assert profile.profile_name == "mimo_child_chat"
+    assert profile.model_name == "mimo-v2.5pro"
+    assert profile.fallback_profile_name == "child_chat_primary"
+    assert response.provider_name == "mock"
+    assert response.metadata["fallback_used"] is True
+    assert response.metadata["failure_type"] == "ModelProviderConfigurationError"

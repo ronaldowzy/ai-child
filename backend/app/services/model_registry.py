@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import os
 
 from app.domain.model_types import (
     ModelCapabilities,
@@ -16,6 +17,7 @@ from app.providers.model.base import (
     ModelProviderError,
 )
 from app.providers.model.mock_provider import MockModelProvider
+from app.providers.model.openai_compatible_provider import OpenAICompatibleProvider
 
 
 class ModelRegistryError(RuntimeError):
@@ -150,11 +152,26 @@ class ModelRegistry:
         }
 
     def _default_providers(self) -> dict[str, BaseModelProvider]:
-        return {"mock": MockModelProvider(provider_name="mock")}
+        return {
+            "mock": MockModelProvider(provider_name="mock"),
+            "mimo": OpenAICompatibleProvider(
+                provider_name="mimo",
+                base_url_env="CHILD_AI_MIMO_BASE_URL",
+                api_key_env="CHILD_AI_MIMO_API_KEY",
+                model_name_env="CHILD_AI_MIMO_MODEL",
+                default_base_url="https://token-plan-cn.xiaomimimo.com/v1",
+                default_model_name="mimo-v2.5pro",
+                enabled=self._env_bool("CHILD_AI_MIMO_ENABLED", default=False),
+            ),
+        }
 
     def _default_task_profile_map(self) -> dict[ModelTaskType, str]:
+        child_chat_profile = os.getenv("CHILD_AI_CHILD_CHAT_PROFILE")
+        if not child_chat_profile and os.getenv("CHILD_AI_MODEL_PROVIDER") == "mimo":
+            child_chat_profile = "mimo_child_chat"
+
         return {
-            ModelTaskType.CHILD_CHAT: "child_chat_primary",
+            ModelTaskType.CHILD_CHAT: child_chat_profile or "child_chat_primary",
             ModelTaskType.INTENT_CLASSIFICATION: "intent_classifier_mock",
             ModelTaskType.SAFETY_CLASSIFICATION: "safety_classifier_mock",
             ModelTaskType.MEMORY_EXTRACTION: "memory_extractor_mock",
@@ -168,6 +185,12 @@ class ModelRegistry:
             "child_chat_primary": self._mock_profile(
                 profile_name="child_chat_primary",
                 model_name="mock-child-chat-v0",
+                task_type=ModelTaskType.CHILD_CHAT,
+                temperature=0.4,
+            ),
+            "mimo_child_chat": self._mimo_profile(
+                profile_name="mimo_child_chat",
+                model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro"),
                 task_type=ModelTaskType.CHILD_CHAT,
                 temperature=0.4,
             ),
@@ -205,6 +228,42 @@ class ModelRegistry:
             ),
         }
 
+    def _mimo_profile(
+        self,
+        *,
+        profile_name: str,
+        model_name: str,
+        task_type: ModelTaskType,
+        temperature: float = 0.0,
+    ) -> ModelProfile:
+        return ModelProfile(
+            id=profile_name,
+            profile_name=profile_name,
+            provider_name="mimo",
+            provider_type=ModelProviderType.OPENAI_COMPATIBLE,
+            model_name=model_name,
+            task_type=task_type,
+            capabilities=ModelCapabilities(),
+            data_policy=ModelDataPolicy(
+                allow_child_data=self._env_bool(
+                    "CHILD_AI_MIMO_ALLOW_CHILD_DATA", default=False
+                ),
+                allow_image=False,
+                allow_audio=False,
+                external_transmission=True,
+                retention_policy_checked=self._env_bool(
+                    "CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", default=False
+                ),
+            ),
+            default_params=ModelDefaultParams(
+                temperature=temperature,
+                max_tokens=int(os.getenv("CHILD_AI_MIMO_MAX_TOKENS", "800")),
+                timeout_ms=int(os.getenv("CHILD_AI_MIMO_TIMEOUT_MS", "5000")),
+            ),
+            enabled=self._env_bool("CHILD_AI_MIMO_ENABLED", default=False),
+            fallback_profile_name="child_chat_primary",
+        )
+
     def _mock_profile(
         self,
         *,
@@ -235,6 +294,12 @@ class ModelRegistry:
                 timeout_ms=3000,
             ),
         )
+
+    def _env_bool(self, env_name: str, *, default: bool) -> bool:
+        raw_value = os.getenv(env_name)
+        if raw_value is None:
+            return default
+        return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 _model_registry = ModelRegistry()

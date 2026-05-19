@@ -43,6 +43,15 @@ resolve_python_cmd() {
 }
 
 resolve_python_cmd
+
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${ROOT_DIR}/.env"
+  set +a
+  echo "Loaded local .env for backend dev server."
+fi
+
 cd "${BACKEND_DIR}"
 echo "Starting backend dev server with: ${PYTHON_CMD[*]}"
 "${PYTHON_CMD[@]}" -m uvicorn app.main:app --reload "$@"

@@ -224,13 +224,21 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 日期：2026-05-19
 范围：Android 本地 TextToSpeech 诊断、UI 短状态、停止/静音可见性、speaking pending、小白狐新增状态图接入。未做 ASR、第三方 TTS、后端音频接口或实时 3D。
 
+Redmi K60 截图反馈：
+
+```text
+设备：Redmi K60 / Android 14 / 中国大陆 Android 环境
+上一版表现：完全无声；截图诊断为 speak=SKIPPED_UNAVAILABLE，failure=TextToSpeech is unavailable。
+结论：上一版在调用 speak 前已经判定 TextToSpeech 不可用，需优先复验 AndroidTtsController 初始化、TTS engine 可见性和系统朗读数据。
+```
+
 ### TTS-D1 命令结果
 
 | 命令 | 结果 |
 |---|---|
-| `bash scripts/android_gradle.sh test` | 通过：覆盖 TTS pending、不可用、speak false、停止恢复、静音、`reply.voice_enabled=false`、child message 不朗读、VoiceProfile 和诊断字段 |
-| `bash scripts/android_gradle.sh test assembleDebug lintDebug` | 通过：BUILD SUCCESSFUL |
-| `bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.0.118:8000/` | 通过：已生成真机 LAN debug APK |
+| `bash scripts/android_gradle.sh test` | 通过：覆盖 TTS pending、不可用、speak false、停止恢复、静音、`reply.voice_enabled=false`、child message 不朗读、VoiceProfile、诊断字段和系统设置提示判断 |
+| `bash scripts/android_gradle.sh assembleDebug lintDebug` | 通过：BUILD SUCCESSFUL |
+| `bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.0.118:8000/` | 通过：已生成真机 LAN debug APK，包含 TTS service 查询、初始化竞态修复和朗读设置入口 |
 | `git diff --check` | 通过 |
 
 真机复验 APK：
@@ -238,7 +246,7 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 大小：31M
-SHA256：f90b199149c8551bd58578496bddcce0d50b3b099263d240682d8286433fa9fb
+SHA256：febccc0bad9932744624affe3eb6658f627e1aa9fe0bd39fe209c3c9e1e02a1d
 base URL：http://192.168.0.118:8000/
 ```
 
@@ -256,16 +264,33 @@ Redmi K60 复验记录待补：
 
 | 检查项 | 期望 | 结果 |
 |---|---|---|
-| 自动朗读短状态 | 显示朗读已开启 / 正在准备朗读 / 不能朗读 | todo |
-| 停止 / 静音入口 | 可见且可点击 | todo |
+| 自动朗读短状态 | 显示朗读已开启 / 正在准备朗读 / 不能朗读 | 上一版已显示“不能朗读”；新 APK 待复验 |
+| 停止 / 静音入口 | 可见且可点击；不可用时出现检查朗读设置 / 安装语音数据 | 新 APK 待复验 |
 | speaking pending | 发言后小白狐立即进入 speaking pending / speaking | todo |
-| 诊断文本 | 可见 engine、locale、voice、lang、setVoice、speak、failure | todo |
+| 诊断文本 | 可见 engine、locale、voice、lang、setVoice、speak、failure | 上一版显示 `SKIPPED_UNAVAILABLE`；新 APK 待复验 |
 | 有声播放 | 若系统 TTS 可用应出声；若无声需记录 failure reason | todo |
 | 音色自然度 | 记录是否适合孩子 | todo |
 
 ## 下一阶段设备 QA 清单
 
 本清单用于 S26 之后的窗口模式模拟器或真实平板复验。全部测试必须使用虚构 child_id、虚构聊天内容和 mock 题目，不使用真实儿童身份、真实家庭信息、真实照片或真实音频。
+
+### Open Conversation Smoke
+
+日期：2026-05-19
+
+```text
+本机后端确认：旧 8000 进程未加载 Mimo 环境变量，因此手机看到的弱模板回复来自 mock fallback。
+已创建本地忽略的 `.env` 并通过 `scripts/dev_backend.sh` 加载，真实 key 不进 git。
+Mimo 初始 12 秒超时会 fallback mock；本地 dev 配置已调为 max_tokens=300、timeout=30000。
+```
+
+本机 API smoke：
+
+| 输入 | 结果 |
+|---|---|
+| “我想聊恐龙” | `conversation.open`；回复围绕恐龙，小白狐自称正常，不再是固定放学后三选项 |
+| “三角龙，它有什么厉害的地方” | 同 session 延续恐龙上下文，回复三角龙特征并继续一个问题 |
 
 | 场景 | 操作 | 期望 | 状态 |
 |---|---|---|---|

@@ -146,15 +146,6 @@ class IntentClassifier:
                 evidence=["after_school_keyword"],
             )
 
-        if time_context and time_context.time_period == TimePeriod.AFTER_SCHOOL:
-            return IntentClassification(
-                intent=IntentType.AFTER_SCHOOL_CHECKIN,
-                sub_intent="time_period_checkin",
-                risk_level=safety.risk_level if safety else RiskLevel.NONE,
-                confidence=0.72,
-                evidence=["after_school_context"],
-            )
-
         return self._mock_model_fallback(text, safety=safety)
 
     def _mock_model_fallback(

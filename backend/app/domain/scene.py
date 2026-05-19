@@ -9,6 +9,7 @@ from app.domain.time import TimeContext
 
 
 class SceneId(StrEnum):
+    OPEN_CONVERSATION = "conversation.open"
     DAILY_AFTER_SCHOOL_CHECKIN = "daily.after_school_checkin"
     LEARNING_HOMEWORK_HELP = "learning.homework_help"
     DAILY_BEDTIME_REFLECTION = "daily.bedtime_reflection"

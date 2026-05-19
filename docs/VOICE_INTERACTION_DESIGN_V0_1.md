@@ -132,6 +132,9 @@ v1 流程：
 7. 系统 TTS 不可用时显示“我现在不能朗读，但文字还在这里。”并降级为文字。
 8. 当前不生成、不保存任何音频文件，不接外部 TTS 服务。
 9. 真实设备听感、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
+10. Android Manifest 已声明 TTS service 查询，避免 Android 11+ package visibility 影响引擎发现。
+11. AndroidTtsController 已修复 TextToSpeech 初始化回调早于字段赋值时的误判风险。
+12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
 ```
 
 ### 4.0 Redmi K60 Real Device Feedback
@@ -142,6 +145,7 @@ v1 流程：
 1. 语音输入不可用：符合当前状态，ASR / SpeechRecognizer 尚未实现。
 2. TTS 播报不可用：没有声音、没有停止/静音提示、小白狐没有切 speaking。
 3. 手机系统里有 TTS / 文字转语音相关服务，但声音不好，不适合孩子作为最终产品音色。
+4. 截图中诊断为 `speak=SKIPPED_UNAVAILABLE`、`failure=TextToSpeech is unavailable`，说明上一版在调用 speak 前已经判定平台 TTS 不可用。
 ```
 
 判断：
@@ -151,6 +155,7 @@ v1 流程：
 2. 必须先确认 AndroidTtsController 是否 attach、reply.voice_enabled 是否为 true、AUTO_TTS 是否开启、speak() 是否被调用、onInit / setLanguage / setVoice / speak 返回什么。
 3. 小白狐 speaking 状态必须在请求被接受时先有反馈，不能只依赖系统 onStart。
 4. 修通可观测链路后，再决定是否继续依赖系统 TTS。
+5. 新 APK 复测时优先观察是否出现 engine、locale、lang、setVoice、speak 的具体值；如果仍是 SKIPPED_UNAVAILABLE，先进入系统朗读设置或安装语音数据。
 ```
 
 TTS-D1 诊断字段：

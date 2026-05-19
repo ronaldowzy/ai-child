@@ -113,9 +113,13 @@ def test_scenario_general_topic_stays_open_ended_not_fixed_flow() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
+    assert body["session_state"]["active_scene"] == "conversation.open"
     assert "恐龙" in body["reply"]["text"]
     assert "开心的事、遇到的难题" not in body["reply"]["text"]
+    assert {"happy_moment", "hard_thing", "quiet_time"}.isdisjoint(_action_ids(body))
+    assert {"talk_tyrannosaurus", "talk_triceratops", "dino_extinction"} <= _action_ids(
+        body
+    )
     assert body["reply"]["voice_enabled"] is True
     assert "audio_url" not in body["reply"]
     assert body["reply"]["agent_motion"] == "listening_tail"

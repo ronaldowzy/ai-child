@@ -177,6 +177,25 @@ def test_low_privacy_routes_to_boundary_scene() -> None:
     assert "不用说真实信息" in decision.reply_text
 
 
+def test_interest_chat_routes_to_open_conversation_not_after_school_menu() -> None:
+    repository = InMemoryRoutingDecisionRepository()
+    orchestrator = SceneOrchestrator(routing_decision_repository=repository)
+
+    decision = orchestrator.route(
+        _request(
+            text="我想聊恐龙",
+            intent=IntentType.CASUAL_CHAT,
+            confidence=0.76,
+        )
+    )
+
+    assert decision.active_scene == SceneId.OPEN_CONVERSATION
+    assert decision.base_scene == SceneId.OPEN_CONVERSATION
+    assert decision.transition == SceneTransitionType.REPLACE
+    assert decision.quick_actions == []
+    assert "我会顺着你的想法聊" in decision.reply_text
+
+
 def test_learning_completion_pops_back_to_after_school() -> None:
     repository = InMemoryRoutingDecisionRepository()
     orchestrator = SceneOrchestrator(routing_decision_repository=repository)

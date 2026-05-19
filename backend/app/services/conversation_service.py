@@ -12,7 +12,7 @@ from app.domain.schemas.conversation import (
 )
 from app.domain.enums import IntentType, RiskLevel
 from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
-from app.domain.scene import SceneRouteDecision, SceneRouteRequest
+from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest
 from app.services.attachment_service import (
     AttachmentService,
     get_attachment_service,
@@ -25,6 +25,10 @@ from app.services.conversation_memory_hooks import (
     ConversationMemoryHooks,
     get_conversation_memory_hooks,
 )
+from app.services.conversation_history_service import (
+    ConversationHistoryService,
+    get_conversation_history_service,
+)
 from app.services.intent_classifier import (
     IntentClassification,
     IntentClassifier,
@@ -33,6 +37,10 @@ from app.services.intent_classifier import (
 from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
+)
+from app.services.quick_action_service import (
+    QuickActionService,
+    get_quick_action_service,
 )
 from app.services.safety_engine import SafetyEngine, get_safety_engine
 from app.services.scene_orchestrator import (
@@ -59,6 +67,8 @@ class ConversationService:
         attachment_service: AttachmentService | None = None,
         child_agent_runtime: ChildAgentRuntime | None = None,
         memory_hooks: ConversationMemoryHooks | None = None,
+        conversation_history_service: ConversationHistoryService | None = None,
+        quick_action_service: QuickActionService | None = None,
         debug_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
@@ -71,6 +81,10 @@ class ConversationService:
         self._attachment_service = attachment_service or get_attachment_service()
         self._child_agent_runtime = child_agent_runtime or get_child_agent_runtime()
         self._memory_hooks = memory_hooks or get_conversation_memory_hooks()
+        self._conversation_history_service = (
+            conversation_history_service or get_conversation_history_service()
+        )
+        self._quick_action_service = quick_action_service or get_quick_action_service()
         self._debug_enabled = debug_enabled
 
     def handle_message(
@@ -140,6 +154,14 @@ class ConversationService:
             current_text=request.input.text,
             limit=5,
         )
+        conversation_history = []
+        if route_decision.active_scene == SceneId.OPEN_CONVERSATION:
+            conversation_history = (
+                self._conversation_history_service.get_recent_model_messages(
+                    session_id=request.session_id,
+                    limit=6,
+                )
+            )
         runtime_result = self._child_agent_runtime.run(
             AgentRuntimeRequest(
                 child_id=request.child_id,
@@ -149,6 +171,7 @@ class ConversationService:
                 time_context=time_context,
                 parent_policy=parent_policy,
                 memory_context=memory_context,
+                conversation_history=conversation_history,
                 conversation_metadata={
                     "app_mode": request.client_context.app_mode,
                     "input_type": request.input.type,
@@ -156,7 +179,11 @@ class ConversationService:
                 },
             )
         )
-        response = self._response_from_route_decision(route_decision, runtime_result)
+        response = self._response_from_route_decision(
+            route_decision,
+            runtime_result,
+            child_text=request.input.text,
+        )
 
         if self._debug_enabled:
             response.debug = ConversationDebug(
@@ -192,13 +219,25 @@ class ConversationService:
             intent=intent,
             route_decision=route_decision,
         )
+        self._conversation_history_service.record_turn(
+            session_id=request.session_id,
+            child_text=request.input.text,
+            agent_text=response.reply.text,
+        )
         return response
 
     def _response_from_route_decision(
         self,
         decision: SceneRouteDecision,
         runtime_result: AgentRuntimeResult,
+        *,
+        child_text: str,
     ) -> ConversationMessageResponse:
+        quick_actions = self._quick_action_service.actions_for(
+            decision=decision,
+            child_text=child_text,
+            reply_text=runtime_result.reply_text,
+        )
         return ConversationMessageResponse(
             reply=Reply(
                 text=runtime_result.reply_text,
@@ -209,11 +248,11 @@ class ConversationService:
                 UiAction(
                     actions=[
                         QuickAction(id=action.id, label=action.label)
-                        for action in decision.quick_actions
+                        for action in quick_actions
                     ]
                 )
             ]
-            if decision.quick_actions
+            if quick_actions
             else [],
             session_state=SessionState(
                 base_scene=decision.base_scene.value,

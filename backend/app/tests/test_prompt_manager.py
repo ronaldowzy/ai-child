@@ -30,6 +30,7 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
     ]
     assert "当前场景：放学后交流" in prompt.prompt
     assert "父亲规则" in prompt.prompt
+    assert "小白狐" in prompt.prompt
     assert "近期对积木和太空主题感兴趣" in prompt.prompt
     assert prompt.prompt_versions["global_system"].version == "v0.1"
     assert (
@@ -101,6 +102,14 @@ def test_after_school_prompt_allows_free_interest_chat() -> None:
 
     assert "孩子自然聊天时不要强行回到选项" in prompt.prompt
     assert "玩具、游戏、动物、故事或其他兴趣" in prompt.prompt
+
+
+def test_open_conversation_prompt_avoids_fixed_menu() -> None:
+    prompt = PromptManager().compose("conversation.open")
+
+    assert "当前场景：开放对话" in prompt.prompt
+    assert "不要输出" in prompt.prompt
+    assert "开心的事 / 遇到的难题 / 想安静一会儿" in prompt.prompt
 
 
 def test_bedtime_prompt_uses_three_questions_one_at_a_time() -> None:

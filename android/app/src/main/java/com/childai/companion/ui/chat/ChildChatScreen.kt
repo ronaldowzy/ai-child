@@ -1,5 +1,8 @@
 package com.childai.companion.ui.chat
 
+import android.content.Intent
+import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -65,6 +68,16 @@ fun ChildChatScreen(
         AndroidTtsController(context.applicationContext)
     }
 
+    fun openIntentWithFallback(primary: Intent, fallback: Intent = Intent(Settings.ACTION_SETTINGS)) {
+        val primaryIntent = primary.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val fallbackIntent = fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching {
+            context.startActivity(primaryIntent)
+        }.onFailure {
+            context.startActivity(fallbackIntent)
+        }
+    }
+
     DisposableEffect(viewModel, ttsController) {
         viewModel.attachTtsController(ttsController)
         onDispose {
@@ -78,6 +91,12 @@ fun ChildChatScreen(
         onQuickAction = viewModel::onQuickAction,
         onStopTts = viewModel::stopTtsPlayback,
         onToggleTtsMuted = viewModel::toggleTtsMuted,
+        onOpenTtsSettings = {
+            openIntentWithFallback(Intent(TTS_SETTINGS_ACTION))
+        },
+        onInstallTtsData = {
+            openIntentWithFallback(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
+        },
         onMockProblemTextChange = viewModel::updateMockProblemText,
         onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
         onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
@@ -94,6 +113,8 @@ private fun ChildChatScreenContent(
     onQuickAction: (QuickActionUi) -> Unit,
     onStopTts: () -> Unit,
     onToggleTtsMuted: () -> Unit,
+    onOpenTtsSettings: () -> Unit,
+    onInstallTtsData: () -> Unit,
     onMockProblemTextChange: (String) -> Unit,
     onDismissMockPhoto: () -> Unit,
     onSubmitMockPhoto: () -> Unit,
@@ -184,6 +205,8 @@ private fun ChildChatScreenContent(
                 tts = uiState.tts,
                 onStopTts = onStopTts,
                 onToggleTtsMuted = onToggleTtsMuted,
+                onOpenTtsSettings = onOpenTtsSettings,
+                onInstallTtsData = onInstallTtsData,
             )
         },
     ) { innerPadding ->
@@ -493,6 +516,8 @@ private fun ChildChatScreenPreview() {
             onQuickAction = {},
             onStopTts = {},
             onToggleTtsMuted = {},
+            onOpenTtsSettings = {},
+            onInstallTtsData = {},
             onMockProblemTextChange = {},
             onDismissMockPhoto = {},
             onSubmitMockPhoto = {},
@@ -501,3 +526,5 @@ private fun ChildChatScreenPreview() {
         )
     }
 }
+
+private const val TTS_SETTINGS_ACTION = "com.android.settings.TTS_SETTINGS"

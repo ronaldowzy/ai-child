@@ -15,9 +15,9 @@
 8. 小白狐 v1 候选形象资产已生成，当前包含 11 个状态：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
-11. Redmi K60 / Android 14 真机反馈显示上一版 TTS 无声且不可观测；下一步先做 TTS-D1 诊断和故障修复，不先推进 ASR。
+11. Redmi K60 / Android 14 截图显示上一版 TTS 为 `SKIPPED_UNAVAILABLE`，新 APK 已补 TTS service 查询、初始化竞态修复和系统朗读设置入口，仍需真机复测。
 12. 小白狐 v1 资源已扩展到 11 个状态，新增 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
-13. 下一版普通聊天方向是 Open Conversation Mode / Freer Context Mode，但本轮先做设计，不直接大改后端。
+13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 ```
 
 ---
@@ -288,7 +288,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 
 ---
 
-## Phase 7：Open Conversation Mode 设计
+## Phase 7：Open Conversation Mode 小步实现
 
 目标：让普通聊天和兴趣话题更自由，同时保留儿童安全、隐私、学习和睡前边界。
 
@@ -300,15 +300,23 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 3. 模型需要接收最近多轮 conversation history，而不是只看单轮输入和场景 fallback。
 ```
 
-建议设计：
+已完成的小步实现：
 
 ```text
-1. 新增 ConversationHistoryService，保存短期会话窗口。
-2. ChildAgentRuntime 输入最近 N 轮精简消息，避免只传当前 text。
-3. PromptManager 增加 conversation_history 层，严格控制 token 和隐私边界。
-4. 普通聊天使用更开放的 model-first 回复；SceneOrchestrator 保留安全、隐私、学习、睡前、父亲治理等 hard constraints。
-5. quick actions 从固定场景动作升级为“模型建议 + 后端安全过滤 + 场景 fallback”。
+1. 新增 conversation.open 场景，普通兴趣和日常话题不再硬拉回 after_school 固定菜单。
+2. 新增 ConversationHistoryService，只保存每个 session 的短期进程内窗口，服务重启丢失。
+3. ChildAgentRuntime 输入最近 N 轮精简 user/assistant 消息，避免只传当前 text。
+4. PromptManager 增加 conversation_open prompt，要求自然接住孩子话题，避免固定三选项菜单。
+5. QuickActionService 先用轻量上下文规则生成普通聊天快捷选项，硬场景仍保留 scene fallback。
 6. 长期 memory 仍只保存结构化摘要，不保存 full chat transcript。
+```
+
+后续设计：
+
+```text
+1. quick actions 可升级为模型建议 + 后端安全过滤 + 场景 fallback。
+2. history 窗口大小、摘要策略和 token 控制需要继续评估。
+3. 如果未来持久化完整对话，必须单独做儿童数据、父亲治理、删除和最小化审查。
 ```
 
 非目标：
@@ -317,7 +325,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. 不删除 SafetyEngine、IntentClassifier、SceneOrchestrator。
 2. 不放松学习“不直接给答案”。
 3. 不让普通聊天绕过父亲策略、隐私边界或高风险提醒。
-4. 不在本轮 TTS-D1 中大改后端。
+4. 不删除短期 history 的数据最小化边界，不把完整逐字聊天写入长期 memory。
 ```
 
 验收：

@@ -32,6 +32,15 @@ data class TtsUiState(
             else -> TtsController.UNAVAILABLE_MESSAGE
         }
 
+    val needsSystemSetup: Boolean
+        get() = !isAvailable ||
+            lastSpeakResult == "SKIPPED_UNAVAILABLE" ||
+            lastSpeakResult == "SKIPPED_NO_ENGINE" ||
+            lastSpeakResult == "SKIPPED_NULL_TTS" ||
+            lastSpeakResult == "ERROR" ||
+            lastFailureReason?.contains("TextToSpeech", ignoreCase = true) == true ||
+            lastFailureReason?.contains("TTS", ignoreCase = true) == true
+
     val diagnosticText: String
         get() {
             val parts = listOfNotNull(

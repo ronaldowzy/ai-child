@@ -14,6 +14,7 @@ class AndroidTtsController(
 ) : TtsController, TextToSpeech.OnInitListener {
     private var textToSpeech: TextToSpeech? = null
     private var isInitialized = false
+    private var progressListenerConfigured = false
     private var initializationFailed = false
     private var activeUtteranceId: String? = null
     private var activeCallbacks: TtsCallbacks? = null
@@ -38,15 +39,30 @@ class AndroidTtsController(
             Log.w(TAG, "TextToSpeech constructor failed", it)
             null
         }
-        diagnostics = diagnostics.copy(
-            isAvailable = textToSpeech != null,
-            isInitializing = textToSpeech != null,
-            enginePackageName = textToSpeech?.defaultEngine,
-        )
+        val createdTts = textToSpeech
+        if (createdTts == null && !initializationFailed) {
+            initializationFailed = true
+            diagnostics = diagnostics.copy(
+                isAvailable = false,
+                isInitializing = false,
+                isInitialized = false,
+                lastFailureReason = "No TextToSpeech engine was returned by Android.",
+                lastSpeakResult = "SKIPPED_NO_ENGINE",
+            )
+        } else {
+            diagnostics = diagnostics.copy(
+                isAvailable = createdTts != null,
+                isInitializing = createdTts != null && !isInitialized,
+                isInitialized = isInitialized,
+                enginePackageName = createdTts?.defaultEngine,
+            )
+            configureProgressListenerIfReady()
+            flushPendingRequestIfReady()
+        }
     }
 
     override fun onInit(status: Int) {
-        if (status != TextToSpeech.SUCCESS || textToSpeech == null) {
+        if (status != TextToSpeech.SUCCESS) {
             initializationFailed = true
             diagnostics = diagnostics.copy(
                 isAvailable = false,
@@ -63,6 +79,7 @@ class AndroidTtsController(
         }
 
         isInitialized = true
+        initializationFailed = false
         diagnostics = diagnostics.copy(
             isAvailable = true,
             isInitializing = false,
@@ -71,7 +88,15 @@ class AndroidTtsController(
             lastFailureReason = null,
         )
         Log.d(TAG, "TextToSpeech init succeeded, engine=${diagnostics.enginePackageName}")
-        textToSpeech?.setOnUtteranceProgressListener(
+        configureProgressListenerIfReady()
+        flushPendingRequestIfReady()
+    }
+
+    private fun configureProgressListenerIfReady() {
+        val tts = textToSpeech ?: return
+        if (!isInitialized || progressListenerConfigured) return
+        progressListenerConfigured = true
+        tts.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     if (utteranceId == activeUtteranceId) {
@@ -111,7 +136,10 @@ class AndroidTtsController(
                 }
             },
         )
+    }
 
+    private fun flushPendingRequestIfReady() {
+        if (!isInitialized || textToSpeech == null) return
         pendingRequest?.let { pending ->
             pendingRequest = null
             speak(pending.request, pending.callbacks)

@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.domain.enums import RiskLevel
+from app.domain.model_types import ModelMessage
 from app.domain.prompt import PromptVersion
 from app.domain.scene import SceneRouteDecision
 from app.domain.time import TimeContext
@@ -22,6 +23,7 @@ class AgentRuntimeRequest(BaseModel):
     time_context: TimeContext
     parent_policy: Any | None = None
     memory_context: list[Any] | dict[str, Any] | str | None = None
+    conversation_history: list[ModelMessage] = Field(default_factory=list)
     conversation_metadata: dict[str, Any] = Field(default_factory=dict)
 
 

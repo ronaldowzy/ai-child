@@ -247,6 +247,12 @@ class PromptManager:
                 version="v0.1",
                 filename="scenes/daily_after_school_checkin_v0_1.txt",
             ),
+            "scene_conversation_open_v0_1": PromptTemplateSpec(
+                id="scene_conversation_open_v0_1",
+                layer=PromptLayer.SCENE,
+                version="v0.1",
+                filename="scenes/conversation_open_v0_1.txt",
+            ),
             "scene_learning_homework_help_v0_1": PromptTemplateSpec(
                 id="scene_learning_homework_help_v0_1",
                 layer=PromptLayer.SCENE,
@@ -287,6 +293,7 @@ class PromptManager:
 
     def _default_scene_templates(self) -> dict[str, str]:
         return {
+            "conversation.open": "scene_conversation_open_v0_1",
             "daily.after_school_checkin": "scene_daily_after_school_checkin_v0_1",
             "learning.homework_help": "scene_learning_homework_help_v0_1",
             "daily.bedtime_reflection": "scene_daily_bedtime_reflection_v0_1",

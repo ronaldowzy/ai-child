@@ -49,6 +49,7 @@ class ChildAgentRuntime:
             task_type=ModelTaskType.CHILD_CHAT,
             messages=[
                 ModelMessage(role="system", content=composed_prompt.prompt),
+                *request.conversation_history,
                 ModelMessage(role="user", content=request.child_text),
             ],
             input_text=request.child_text,
@@ -152,6 +153,7 @@ class ChildAgentRuntime:
             "conversation": {
                 "child_id": request.child_id,
                 "session_id": request.session_id,
+                "recent_history_turns": len(request.conversation_history),
                 **request.conversation_metadata,
             },
             "time_context": request.time_context.model_dump(mode="json"),
@@ -186,6 +188,7 @@ class ChildAgentRuntime:
             "task_type": ModelTaskType.CHILD_CHAT.value,
             "active_scene": request.route_decision.active_scene.value,
             "reply_style": "voice_first_short_natural_one_question",
+            "uses_recent_conversation_history": bool(request.conversation_history),
             "prompt_version_layers": sorted(prompt_versions.keys()),
         }
 
@@ -230,11 +233,12 @@ class ChildAgentRuntime:
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
         text = self._keep_one_main_question(text)
 
-        max_chars = (
-            140
-            if request.route_decision.active_scene == SceneId.LEARNING_HOMEWORK_HELP
-            else 90
-        )
+        if request.route_decision.active_scene == SceneId.LEARNING_HOMEWORK_HELP:
+            max_chars = 140
+        elif request.route_decision.active_scene == SceneId.OPEN_CONVERSATION:
+            max_chars = 150
+        else:
+            max_chars = 100
         return self._limit_to_sentence_boundary(text, max_chars=max_chars)
 
     def _strip_markdown_for_voice(self, text: str) -> str:
@@ -244,7 +248,7 @@ class ChildAgentRuntime:
         text = re.sub(r"(?m)^\s*(?:#{1,6}\s*)+", "", text)
         text = re.sub(r"(?m)^\s*(?:[-*•]|\d+[.)、]|[一二三四五六七八九十]+[、.])\s*", "", text)
         text = re.sub(r"[*_`#>|]+", "", text)
-        text = re.sub(r"^\s*(?:小狐狸|助手|AI|ai)\s*[：:]\s*", "", text)
+        text = re.sub(r"^\s*(?:小白狐|小狐狸|助手|AI|ai)\s*[：:]\s*", "", text)
         return text
 
     def _keep_one_main_question(self, text: str) -> str:

@@ -219,6 +219,21 @@ class ChatTtsViewModelTest {
         assertEquals("Fake failure", state.lastFailureReason)
     }
 
+    @Test
+    fun ttsUiStateMarksSystemSetupWhenPlatformTtsIsUnavailable() {
+        val state = TtsUiState().withDiagnostics(
+            VoiceDiagnostics(
+                isAvailable = false,
+                isInitialized = false,
+                lastSpeakResult = "SKIPPED_UNAVAILABLE",
+                lastFailureReason = "TextToSpeech is unavailable",
+            ),
+        )
+
+        assertTrue(state.needsSystemSetup)
+        assertEquals(TtsController.UNAVAILABLE_MESSAGE, state.statusText)
+    }
+
     private fun response(reply: ConversationReply): ConversationMessageResponse {
         return ConversationMessageResponse(
             reply = reply,

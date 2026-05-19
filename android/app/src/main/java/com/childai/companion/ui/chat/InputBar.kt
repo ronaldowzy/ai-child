@@ -33,6 +33,8 @@ fun InputBar(
     tts: TtsUiState = TtsUiState(),
     onStopTts: () -> Unit = {},
     onToggleTtsMuted: () -> Unit = {},
+    onOpenTtsSettings: () -> Unit = {},
+    onInstallTtsData: () -> Unit = {},
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val trimmedDraft = draft.trim()
@@ -99,6 +101,20 @@ fun InputBar(
             }
             TextButton(onClick = onToggleTtsMuted) {
                 Text(text = if (tts.isMuted) "打开朗读" else "静音")
+            }
+        }
+        if (tts.needsSystemSetup) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onOpenTtsSettings) {
+                    Text(text = "检查朗读设置")
+                }
+                TextButton(onClick = onInstallTtsData) {
+                    Text(text = "安装语音数据")
+                }
             }
         }
         if (DevSettings.SHOW_TTS_DIAGNOSTICS && tts.diagnosticText.isNotBlank()) {

@@ -18,6 +18,10 @@ The current backend is intentionally local-first and mock-first:
 - Treats child chat as open-ended conversation. Time periods and scenes provide
   context, safety boundaries, and fallback replies; they should not force every
   ordinary message into a fixed script.
+- Uses `ConversationHistoryService` for short-term, in-memory recent turns so
+  ordinary chat can keep context within one running backend process. This is not
+  a durable chat database; service restart clears it, and full chat transcripts
+  are not written to long-term memory or parent reports.
 - Normalizes child-facing model replies for voice-first use: short natural
   sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and 小白狐 animation
@@ -30,6 +34,11 @@ The current backend is intentionally local-first and mock-first:
   reading of the 小白狐 reply, while still offering stop/mute and parent or
   DevSettings controls. The backend continues to return safe text and
   presentation metadata; it does not generate a 小白狐专属音色 in v1.
+
+If Android replies look like fixed templates such as “听起来可以聊”, the backend
+is probably running with the default mock provider. For real Mimo chat, restart
+the backend with the temporary environment variables in the Mimo section below;
+do not put the real API key into git, Android, docs, tests, or screenshots.
 
 ## Current Voice And Presentation Contract
 
@@ -211,7 +220,8 @@ export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=false
 ```
 
 For a local developer-only Mimo smoke test, use temporary shell environment
-variables and never write the real key to `.env`, docs, tests, Android, or git:
+variables or an ignored local root `.env`. Never write the real key to
+committed files, docs, tests, Android, screenshots, or git:
 
 ```bash
 export CHILD_AI_MODEL_PROVIDER=mimo
@@ -219,9 +229,14 @@ export CHILD_AI_MIMO_ENABLED=true
 export CHILD_AI_MIMO_API_KEY="<temporary key>"
 export CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
-export CHILD_AI_MIMO_TIMEOUT_MS=12000
+export CHILD_AI_MIMO_MAX_TOKENS=300
+export CHILD_AI_MIMO_TIMEOUT_MS=30000
 bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
 ```
+
+`scripts/dev_backend.sh` loads the root `.env` when it exists, then starts
+uvicorn. This is only for local development; `.env` must stay ignored and must
+not be shared.
 
 Only use fictional child IDs and test text in this mode. Keep
 `CHILD_AI_MIMO_ALLOW_IMAGE=false` and `CHILD_AI_MIMO_ALLOW_AUDIO=false` unless a

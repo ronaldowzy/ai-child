@@ -17,6 +17,14 @@ from app.repositories.routing_decision_repository import (
 class SceneRegistry:
     def __init__(self) -> None:
         self._definitions: dict[SceneId, SceneDefinition] = {
+            SceneId.OPEN_CONVERSATION: SceneDefinition(
+                scene_id=SceneId.OPEN_CONVERSATION,
+                display_name="开放对话",
+                prompt_template="conversation_open_v0_1",
+                default_transition=SceneTransitionType.MERGE,
+                default_needs_input=None,
+                priority=20,
+            ),
             SceneId.DAILY_AFTER_SCHOOL_CHECKIN: SceneDefinition(
                 scene_id=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
                 display_name="放学后交流",
@@ -110,8 +118,10 @@ class SceneOrchestrator:
             decision = self._bedtime_reflection(request)
         elif request.intent == IntentType.AFTER_SCHOOL_CHECKIN:
             decision = self._after_school_checkin(request)
-        else:
+        elif request.intent == IntentType.EMOTION_EXPRESSION:
             decision = self._fallback_checkin(request, current_stack)
+        else:
+            decision = self._open_conversation(request, current_stack)
 
         self._session_stacks[request.session_id] = decision.scene_stack
         self._routing_decision_repository.save(decision)
@@ -390,6 +400,35 @@ class SceneOrchestrator:
             confidence=max(request.intent_confidence, 0.72),
         )
 
+    def _open_conversation(
+        self, request: SceneRouteRequest, current_stack: list[SceneId]
+    ) -> SceneRouteDecision:
+        scene_id = SceneId.OPEN_CONVERSATION
+        stack = [scene_id]
+        if current_stack and current_stack[-1] == scene_id:
+            transition = SceneTransitionType.MERGE
+        else:
+            transition = SceneTransitionType.REPLACE
+        return SceneRouteDecision(
+            message_id=request.message_id,
+            session_id=request.session_id,
+            primary_intent=request.intent,
+            base_scene=scene_id,
+            active_scene=scene_id,
+            transition=transition,
+            scene_stack=stack,
+            risk_level=request.risk_level,
+            confidence=max(request.intent_confidence, 0.72),
+            reason="open_conversation",
+            needs_input=None,
+            reply_text=(
+                "我在听。你可以接着说这个话题，我会顺着你的想法聊。"
+            ),
+            reply_emotion="listening",
+            quick_actions=[],
+            signals=self._signals(request, transition=transition),
+        )
+
     def _pop_to_previous_scene(
         self, request: SceneRouteRequest, current_stack: list[SceneId]
     ) -> SceneRouteDecision:
@@ -467,6 +506,8 @@ class SceneOrchestrator:
     ) -> SceneId:
         if current_stack:
             return current_stack[0]
+        if request.intent in {IntentType.CASUAL_CHAT, IntentType.INTEREST_EXPLORATION}:
+            return SceneId.OPEN_CONVERSATION
         if request.time_context.time_period == TimePeriod.BEDTIME:
             return SceneId.DAILY_BEDTIME_REFLECTION
         return SceneId.DAILY_AFTER_SCHOOL_CHECKIN

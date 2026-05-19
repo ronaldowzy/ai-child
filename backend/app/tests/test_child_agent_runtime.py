@@ -5,7 +5,12 @@ from app.domain.agent_runtime import (
     AgentRuntimeSource,
 )
 from app.domain.enums import IntentType, RiskLevel
-from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
+from app.domain.model_types import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ModelTaskType,
+)
 from app.domain.scene import (
     SceneAction,
     SceneId,
@@ -101,6 +106,7 @@ def _route_decision(
 def _runtime_request(
     *,
     route_decision: SceneRouteDecision | None = None,
+    conversation_history: list[ModelMessage] | None = None,
 ) -> AgentRuntimeRequest:
     return AgentRuntimeRequest(
         child_id="child_runtime_test",
@@ -114,6 +120,7 @@ def _runtime_request(
             "safety_rules": {"no_secret_requests": True},
         },
         memory_context=[],
+        conversation_history=conversation_history or [],
         conversation_metadata={"message_id": "msg_runtime_test"},
     )
 
@@ -303,6 +310,37 @@ def test_child_agent_runtime_metadata_marks_voice_first_reply_style() -> None:
         registry.last_request.metadata["reply_style"]
         == "voice_first_short_natural_one_question"
     )
+
+
+def test_child_agent_runtime_sends_recent_conversation_history_to_model() -> None:
+    registry = CapturingModelRegistry(response=_model_response("那我们继续聊三角龙。"))
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            conversation_history=[
+                ModelMessage(role="user", content="我想聊恐龙"),
+                ModelMessage(role="assistant", content="你喜欢霸王龙还是三角龙？"),
+            ],
+        )
+    )
+
+    assert registry.last_request is not None
+    assert [message.role for message in registry.last_request.messages] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert registry.last_request.messages[1].content == "我想聊恐龙"
+    assert registry.last_request.messages[2].content == "你喜欢霸王龙还是三角龙？"
+    assert registry.last_request.messages[3].content == "我有一道题不会"
+    assert registry.last_request.metadata["uses_recent_conversation_history"] is True
+    assert registry.last_request.metadata["active_scene"] == "conversation.open"
 
 
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:

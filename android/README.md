@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech，但 Redmi K60 真机反馈显示上一版 TTS 无声且不可观测；当前优先修 TTS 诊断、UI 状态和降级。语音输入 ASR 仍是后续任务。
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech；Redmi K60 截图显示上一版失败为 `speak=SKIPPED_UNAVAILABLE` / `TextToSpeech is unavailable`，新版本已补 TTS service 查询、初始化竞态修复、诊断和系统朗读设置入口。语音输入 ASR 仍是后续任务。
 
 ## 当前范围
 
@@ -31,8 +31,10 @@
 - 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
 - TTS 朗读 v1 已使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
+- TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
 - TTS v1 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
 - Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也可能不适合孩子；Android system TTS 只是 v1 验证方案，不作为最终音色承诺。
+- Redmi K60 当前复测重点：如果仍显示 `SKIPPED_UNAVAILABLE`，先检查系统文字转语音引擎是否启用、是否有中文语音数据；如果进入 `lang` / `setVoice` / `speak` 具体错误，再按诊断继续定位。
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
 - 小白狐 v1 候选资源已导入，当前包含 11 个状态：`neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking`、`calm`、`sleepy`、`safety_concern`、`privacy_boundary`、`homework_focus`、`network_error`。
@@ -115,19 +117,30 @@ Redmi K60 / Android 14 真机反馈：
 ```text
 1. 语音输入不可用：符合当前状态，ASR 尚未实现。
 2. TTS 完全没有声音。
-3. 没有看到停止/静音提示。
-4. 小白狐没有切到 speaking。
+3. 截图显示朗读诊断：speak=SKIPPED_UNAVAILABLE，failure=TextToSpeech is unavailable。
+4. 小白狐没有切到 speaking，说明上一版没有进入可见的 speaking pending / onStart 路径。
 5. 系统 TTS 声音不好，不适合作为最终儿童产品音色。
 ```
 
-当前修复方向：
+当前修复内容：
 
 ```text
 1. TTS 请求被接受后先进入 speaking pending / speaking，不再只依赖系统 onStart。
 2. UI 显示朗读已开启、正在准备朗读、不可用等短状态。
 3. 开发构建显示诊断：engine、locale、voice、setLanguage、setVoice、speak、failure。
 4. speak() 返回 ERROR 或系统 TTS 不可用时恢复小白狐基础状态，并保留文字聊天。
-5. 当前不接第三方 TTS、不新增后端音频接口。
+5. AndroidManifest 声明 TTS service 查询，AndroidTtsController 修复初始化回调早于字段赋值时的误判风险。
+6. TTS 不可用时显示“检查朗读设置”和“安装语音数据”入口。
+7. 当前不接第三方 TTS、不新增后端音频接口。
+```
+
+最新真机 APK：
+
+```text
+路径：android/app/build/outputs/apk/debug/app-debug.apk
+大小：31M
+SHA256：febccc0bad9932744624affe3eb6658f627e1aa9fe0bd39fe209c3c9e1e02a1d
+base URL：http://192.168.0.118:8000/
 ```
 
 ## 双设备测试策略

@@ -12,9 +12,12 @@
 5. 语音第一阶段优先 Android 本地 SpeechRecognizer + Android TTS，不默认上传原始音频到后端。
 6. TTS v1 默认自动朗读小白狐回复，但必须可停止、可静音，并有 DevSettings 或父亲设置开关。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
-8. 小白狐 v1 候选形象资产已生成，当前包含 neutral_idle、listening、speaking、jumping_happy、thinking 五个基础状态。
+8. 小白狐 v1 候选形象资产已生成，当前包含 11 个状态：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
+11. Redmi K60 / Android 14 真机反馈显示上一版 TTS 无声且不可观测；下一步先做 TTS-D1 诊断和故障修复，不先推进 ASR。
+12. 小白狐 v1 资源已扩展到 11 个状态，新增 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
+13. 下一版普通聊天方向是 Open Conversation Mode / Freer Context Mode，但本轮先做设计，不直接大改后端。
 ```
 
 ---
@@ -143,8 +146,42 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. TTS 不绕过 SafetyEngine / ChildAgentRuntime。
 2. 高风险安全回复朗读稳定、低刺激。
-3. TTS 失败时文字仍可读。
-4. QA 记录 TTS 自然度和孩子接受度。
+3. TTS 失败时文字仍可读，UI 显示温和提示。
+4. Redmi K60 等真机上能看到 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason。
+5. TTS 请求被接受后小白狐进入 speaking pending；失败、停止或结束后恢复 base state。
+6. QA 记录 TTS 自然度和孩子接受度。
+```
+
+### Phase 3.1：TTS-D1 可观测性与故障修复
+
+目标：先判断 TTS 链路是否触发、初始化、选中中文 voice、调用 speak()，再决定是否继续依赖系统 TTS。
+
+范围：
+
+```text
+1. 扩展 TtsUiState / VoiceDiagnostics。
+2. 记录 enginePackageName、selectedLocale、selectedVoiceName、setLanguageResult、setVoiceResult、lastSpeakResult、lastFailureReason。
+3. InputBar 显示朗读已开启、正在准备朗读、不可用等短状态。
+4. 开发构建显示紧凑诊断文本，便于 Redmi K60 复验。
+5. speaking 状态前移到请求被接受阶段，不完全依赖系统 onStart。
+6. 系统 TTS 不可用或 speak 返回 ERROR 时恢复 baseAgentState，不影响文字聊天。
+```
+
+非目标：
+
+```text
+1. 不做 ASR / SpeechRecognizer。
+2. 不接第三方 TTS。
+3. 不新增后端音频接口。
+4. 不承诺 Android 系统 TTS 是最终产品音色。
+```
+
+后续判断：
+
+```text
+1. 如果 Redmi K60 能朗读但音色差，记录为音色方案问题。
+2. 如果 Redmi K60 仍无声但诊断显示 speak SUCCESS，需要继续查系统 TTS 引擎 / 音量 / onStart/onDone 回调。
+3. 如果 speak ERROR、语言不支持或 voice 选择失败，则评估替代 TTS。
 ```
 
 ---
@@ -158,8 +195,8 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. 基础静态形象资源。
 2. 优先探索 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感资源。
-3. 当前 v1 候选资产：neutral_idle、listening、speaking、jumping_happy、thinking。
-4. 后续补充：calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
+3. 当前 v1 候选资产：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
+4. 后续若继续补充，优先完善同一角色的一致光照、姿态比例和低配尺寸优化。
 5. 与 reply.emotion / reply.agent_motion 的映射表。
 6. Android 资源命名、drawable-nodpi 和尺寸规范。
 7. Compose Canvas / 2D 仅作为 fallback，不阻塞语音开发。
@@ -247,4 +284,47 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 4. 学习问题不直接给最终答案。
 5. 高风险输入鼓励联系父母、老师或可信成人，并触发父亲提醒。
 6. 小白狐不制造秘密关系或唯一朋友依赖。
+```
+
+---
+
+## Phase 7：Open Conversation Mode 设计
+
+目标：让普通聊天和兴趣话题更自由，同时保留儿童安全、隐私、学习和睡前边界。
+
+当前反馈：
+
+```text
+1. 父亲反馈普通对话仍显得程序控制较重。
+2. 快捷选项目前多由 SceneOrchestrator 固定返回，不够随上下文动态变化。
+3. 模型需要接收最近多轮 conversation history，而不是只看单轮输入和场景 fallback。
+```
+
+建议设计：
+
+```text
+1. 新增 ConversationHistoryService，保存短期会话窗口。
+2. ChildAgentRuntime 输入最近 N 轮精简消息，避免只传当前 text。
+3. PromptManager 增加 conversation_history 层，严格控制 token 和隐私边界。
+4. 普通聊天使用更开放的 model-first 回复；SceneOrchestrator 保留安全、隐私、学习、睡前、父亲治理等 hard constraints。
+5. quick actions 从固定场景动作升级为“模型建议 + 后端安全过滤 + 场景 fallback”。
+6. 长期 memory 仍只保存结构化摘要，不保存 full chat transcript。
+```
+
+非目标：
+
+```text
+1. 不删除 SafetyEngine、IntentClassifier、SceneOrchestrator。
+2. 不放松学习“不直接给答案”。
+3. 不让普通聊天绕过父亲策略、隐私边界或高风险提醒。
+4. 不在本轮 TTS-D1 中大改后端。
+```
+
+验收：
+
+```text
+1. “我想聊恐龙”等兴趣话题能自然多轮延续。
+2. 模型能引用最近一两轮上下文，但不保存长篇原文到长期记忆。
+3. 高风险、隐私、学习和睡前仍按既有边界处理。
+4. quick actions 不再长期固定为同一组，而是随上下文动态生成或安全 fallback。
 ```

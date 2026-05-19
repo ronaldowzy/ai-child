@@ -16,6 +16,7 @@ import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
 import com.childai.companion.voice.VoiceProfile
+import com.childai.companion.voice.previewForDiagnostics
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -75,8 +76,8 @@ class ChatViewModel(
                     it.copy(
                         quickActions = emptyList(),
                         agent = FoxAgentUiState(
-                            mood = FoxMood.Calm,
-                            motion = FoxMotion.CalmStill,
+                            mood = FoxMood.NetworkError,
+                            motion = FoxMotion.NetworkError,
                             statusText = "我们先等大人检查网络。",
                         ),
                         voice = VoiceUiState(isVoiceInputReserved = true),
@@ -200,8 +201,8 @@ class ChatViewModel(
                     quickActions = emptyList(),
                     sessionState = attachmentResponse.sessionState,
                     agent = FoxAgentUiState(
-                        mood = FoxMood.Calm,
-                        motion = FoxMotion.CalmStill,
+                        mood = FoxMood.NetworkError,
+                        motion = FoxMotion.NetworkError,
                         statusText = "题目在这里，我们等后端恢复。",
                     ),
                     voice = VoiceUiState(isVoiceInputReserved = true),
@@ -220,6 +221,10 @@ class ChatViewModel(
             state.copy(
                 tts = state.tts.copy(
                     isAvailable = true,
+                    isInitializing = false,
+                    isInitialized = false,
+                    isSpeaking = false,
+                    isSpeakingPending = false,
                     errorMessage = null,
                 ),
             )
@@ -240,6 +245,11 @@ class ChatViewModel(
                 tts = state.tts.copy(
                     isMuted = willMute,
                     isSpeaking = if (willMute) false else state.tts.isSpeaking,
+                    isSpeakingPending = if (willMute) {
+                        false
+                    } else {
+                        state.tts.isSpeakingPending
+                    },
                     errorMessage = null,
                 ),
             )
@@ -298,8 +308,10 @@ class ChatViewModel(
                 voice = reply.toVoiceUiState(),
                 tts = state.tts.copy(
                     isSpeaking = false,
+                    isSpeakingPending = false,
                     isAvailable = true,
                     errorMessage = null,
+                    lastFailureReason = null,
                 ),
                 isSending = false,
                 mockPhoto = mockPhoto,
@@ -347,6 +359,13 @@ class ChatViewModel(
                 voiceProfile = VoiceProfile.default(),
             ),
             callbacks = TtsCallbacks(
+                onDiagnostics = { diagnostics ->
+                    if (token == ttsToken) {
+                        _uiState.update { state ->
+                            state.copy(tts = state.tts.withDiagnostics(diagnostics))
+                        }
+                    }
+                },
                 onStart = {
                     if (token == ttsToken) {
                         _uiState.update { state ->
@@ -354,6 +373,7 @@ class ChatViewModel(
                                 agent = baseAgentState.asSpeaking(),
                                 tts = state.tts.copy(
                                     isSpeaking = true,
+                                    isSpeakingPending = false,
                                     isAvailable = true,
                                     errorMessage = null,
                                 ),
@@ -366,7 +386,10 @@ class ChatViewModel(
                         _uiState.update { state ->
                             state.copy(
                                 agent = baseAgentState,
-                                tts = state.tts.copy(isSpeaking = false),
+                                tts = state.tts.copy(
+                                    isSpeaking = false,
+                                    isSpeakingPending = false,
+                                ),
                             )
                         }
                     }
@@ -378,7 +401,8 @@ class ChatViewModel(
                                 agent = baseAgentState,
                                 tts = state.tts.copy(
                                     isSpeaking = false,
-                                    isAvailable = false,
+                                    isSpeakingPending = false,
+                                    isAvailable = state.tts.isAvailable,
                                     errorMessage = message.ifBlank {
                                         TtsController.UNAVAILABLE_MESSAGE
                                     },
@@ -396,11 +420,29 @@ class ChatViewModel(
                     agent = baseAgentState,
                     tts = state.tts.copy(
                         isSpeaking = false,
+                        isSpeakingPending = false,
                         isAvailable = false,
                         errorMessage = TtsController.UNAVAILABLE_MESSAGE,
+                        lastFailureReason = state.tts.lastFailureReason
+                            ?: "TtsController.speak returned false",
                     ),
                 )
             }
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                agent = baseAgentState.asSpeakingPending(),
+                tts = state.tts.copy(
+                    isSpeaking = state.tts.isSpeaking,
+                    isSpeakingPending = !state.tts.isSpeaking,
+                    isAvailable = true,
+                    errorMessage = null,
+                    lastRequestedTextPreview = reply.text.previewForDiagnostics(),
+                    lastFailureReason = null,
+                ),
+            )
         }
     }
 
@@ -410,7 +452,10 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 agent = if (restoreBaseAgent) baseAgentState else state.agent,
-                tts = state.tts.copy(isSpeaking = false),
+                tts = state.tts.copy(
+                    isSpeaking = false,
+                    isSpeakingPending = false,
+                ),
             )
         }
     }

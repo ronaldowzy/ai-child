@@ -70,6 +70,11 @@ private fun DrawScope.drawFoxAgent(
         FoxMood.Listening -> Color(0xFFE0964F)
         FoxMood.Encouraging -> Color(0xFFE28C3D)
         FoxMood.Warm -> Color(0xFFD88945)
+        FoxMood.Sleepy -> Color(0xFFC68F72)
+        FoxMood.SafetyConcern -> Color(0xFFC7835E)
+        FoxMood.PrivacyBoundary -> Color(0xFFD09255)
+        FoxMood.HomeworkFocus -> Color(0xFFD88945)
+        FoxMood.NetworkError -> Color(0xFFC68F72)
     }
     val foxCream = Color(0xFFFFF1DD)
     val foxBrown = Color(0xFF604230)
@@ -79,6 +84,11 @@ private fun DrawScope.drawFoxAgent(
         FoxMood.Listening -> Color(0xFF5B7C5A)
         FoxMood.Encouraging -> Color(0xFF6D7F43)
         FoxMood.Warm -> Color(0xFF5B7C5A)
+        FoxMood.Sleepy -> Color(0xFF6F7891)
+        FoxMood.SafetyConcern -> Color(0xFF6C746A)
+        FoxMood.PrivacyBoundary -> Color(0xFF536F77)
+        FoxMood.HomeworkFocus -> Color(0xFF536F77)
+        FoxMood.NetworkError -> Color(0xFF6F7891)
     }
     val softShadow = Color(0x263E4D39)
     val eyeHeight = if (agent.motion == FoxMotion.ThinkingBlink) {

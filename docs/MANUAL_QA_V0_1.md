@@ -27,7 +27,7 @@
 
 | 设备 | 定位 | 设备信息 | 用途 |
 |---|---|---|---|
-| Device A | 高配 Android 手机，功能主验证 | 具体型号和 Android 版本待 QA 记录 | 快速验证 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device A | 高配 Android 手机，功能主验证 | Redmi K60，Android 14，RAM 暂未提供 | 快速验证 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
 | Device B | Honor Pad 5，低配兼容性目标设备 | Android 9，RAM 4GB | Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
 
 执行原则：
@@ -55,6 +55,33 @@ ASR 准确率主观评价
 TTS 自然度主观评价
 小白狐动画流畅度
 是否需要降级
+```
+
+## Redmi K60 真机反馈
+
+日期：2026-05-19
+设备：Redmi K60
+Android：14
+RAM：暂未提供
+地区环境：中国大陆 Android 手机
+来源：父亲 / 产品负责人真实设备测试
+
+| 项 | 反馈 | 当前判断 |
+|---|---|---|
+| 语音输入 | 不可用 | 符合当前状态；ASR / SpeechRecognizer 尚未实现 |
+| TTS 播报 | 完全没有声音 | 需要先修通 TTS 可观测链路，不能直接判定为系统音色问题 |
+| TTS UI | 没有停止/静音提示 | 需要确保 InputBar 始终显示朗读状态、停止/静音入口和短提示 |
+| 小白狐状态 | 没有切到 speaking | speaking 状态不能只依赖系统 onStart；请求被接受后应先进入 speaking pending |
+| 系统 TTS 音色 | 系统里有相关服务，但声音不好，不适合孩子 | 系统 TTS 只作为 v1 验证方案；后续需要评估替代 TTS 或小白狐专属音色 |
+
+TTS-D1 复验目标：
+
+```text
+1. 能看到“朗读已开启 / 正在准备朗读 / 不能朗读”等短状态。
+2. 能看到停止和静音按钮。
+3. 能看到开发诊断：engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason。
+4. TTS 请求被接受后，小白狐先切 speaking pending / speaking。
+5. 如果仍然没声音，也能判断是初始化失败、语言不支持、voice 选择失败、speak 返回 ERROR，还是系统 onStart/onDone 没回调。
 ```
 
 环境结论：
@@ -164,12 +191,12 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 |---|---|---|
 | 正式名称“小白狐”替换 UI 文案 | code updated / device todo：儿童端主要可见文案已改为“小白狐” | 后续在 Device A 和 Honor Pad 5 上复验聊天标题、消息列表、错误提示、拍题 dialog、父亲页文案、日志/测试 fixture 是否仍有旧称呼 |
 | V1 语音输入 confirm-before-send | todo | 验证 Android 系统 ASR 只转文字，发送前必须让孩子确认；默认不上传或保存原始音频 |
-| V2 TTS 默认自动朗读小白狐回复 | code_done / device_todo | 代码已接 Android TextToSpeech + TtsController；仍需在 Device A 和 Honor Pad 5 上验证真实声音、延迟和文字仍可读 |
-| 停止/静音能力 | code_done / device_todo | 代码已提供停止和静音控制；仍需设备侧验证朗读中可停止，静音后不自动播放 |
+| V2 TTS 默认自动朗读小白狐回复 | tts_d1_in_progress | Redmi K60 反馈无声音且不可观测；TTS-D1 已补诊断、speaking pending 和 UI 状态，需重新打包复验 |
+| 停止/静音能力 | tts_d1_in_progress | Redmi K60 反馈未看到提示；TTS-D1 要求 InputBar 始终显示短状态、停止和静音入口 |
 | DevSettings / 父亲设置关闭自动朗读 | partial | `DevSettings.AUTO_TTS_ENABLED` 和 `DevSettings.TTS_MUTED` 已作为初始配置；父亲设置治理开关仍是后续任务 |
 | VoiceProfile | code_done / device_todo | 代码已使用 `zh-CN`、稍慢 `speechRate`、略高 `pitch` 和系统中文 fallback；仍需设备听感和缺失 voice 验证 |
 | Android 系统 ASR/TTS 效果评估 | todo | 需要真实设备或人工听感记录：识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
-| 3D 小白狐资源存在时显示 | todo | 当前 v1 候选资源包含 neutral_idle、listening、speaking、jumping_happy、thinking；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |
+| 3D 小白狐资源存在时显示 | in_progress | 当前 v1 候选资源已扩展到 11 个状态；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |
 | 3D 资源缺失时 Canvas fallback | partial / current fallback ok | 当前 Canvas fallback 仍保留；后续需在资源缺失、加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
 
 ## V2 TTS v1 代码验证
@@ -192,6 +219,50 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 3. 系统没有中文 TTS 时是否显示“我现在不能朗读，但文字还在这里。”并保持文字聊天可用。
 ```
 
+## TTS-D1 可观测性与故障修复
+
+日期：2026-05-19
+范围：Android 本地 TextToSpeech 诊断、UI 短状态、停止/静音可见性、speaking pending、小白狐新增状态图接入。未做 ASR、第三方 TTS、后端音频接口或实时 3D。
+
+### TTS-D1 命令结果
+
+| 命令 | 结果 |
+|---|---|
+| `bash scripts/android_gradle.sh test` | 通过：覆盖 TTS pending、不可用、speak false、停止恢复、静音、`reply.voice_enabled=false`、child message 不朗读、VoiceProfile 和诊断字段 |
+| `bash scripts/android_gradle.sh test assembleDebug lintDebug` | 通过：BUILD SUCCESSFUL |
+| `bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.0.118:8000/` | 通过：已生成真机 LAN debug APK |
+| `git diff --check` | 通过 |
+
+真机复验 APK：
+
+```text
+路径：android/app/build/outputs/apk/debug/app-debug.apk
+大小：31M
+SHA256：f90b199149c8551bd58578496bddcce0d50b3b099263d240682d8286433fa9fb
+base URL：http://192.168.0.118:8000/
+```
+
+代码侧期望：
+
+```text
+1. TtsUiState 暴露 isInitializing、isInitialized、isSpeaking、isSpeakingPending、isAvailable。
+2. VoiceDiagnostics 暴露 enginePackageName、selectedLocale、selectedVoiceName、setLanguageResult、setVoiceResult、lastSpeakResult、lastFailureReason。
+3. TextToSpeech.speak() 返回 SUCCESS / ERROR 必须记录。
+4. TTS 请求被接受后先切 speaking pending；onStart 后继续 speaking；失败、停止或结束后恢复 baseAgentState。
+5. 开发构建显示短诊断，便于 Redmi K60 真机复验。
+```
+
+Redmi K60 复验记录待补：
+
+| 检查项 | 期望 | 结果 |
+|---|---|---|
+| 自动朗读短状态 | 显示朗读已开启 / 正在准备朗读 / 不能朗读 | todo |
+| 停止 / 静音入口 | 可见且可点击 | todo |
+| speaking pending | 发言后小白狐立即进入 speaking pending / speaking | todo |
+| 诊断文本 | 可见 engine、locale、voice、lang、setVoice、speak、failure | todo |
+| 有声播放 | 若系统 TTS 可用应出声；若无声需记录 failure reason | todo |
+| 音色自然度 | 记录是否适合孩子 | todo |
+
 ## 下一阶段设备 QA 清单
 
 本清单用于 S26 之后的窗口模式模拟器或真实平板复验。全部测试必须使用虚构 child_id、虚构聊天内容和 mock 题目，不使用真实儿童身份、真实家庭信息、真实照片或真实音频。
@@ -209,9 +280,10 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | 语音输入 V1 | 使用 Android 系统 ASR 输入虚构内容 | confirm-before-send；发送前可编辑/取消；不上传或保存原始音频 | todo |
 | TTS V2 自动朗读 | 触发小白狐回复 | 默认自动朗读；可停止/静音；遵守 `reply.voice_enabled`；不朗读 child message、debug、session_state 或父亲页长列表 | code_done / device_todo |
 | VoiceProfile | 切换或缺失系统语音 | `zh-CN`、`speechRate`、`pitch` 生效；缺少指定 voice 时 fallback 正常；不生成或保存音频文件 | code_done / device_todo |
+| TTS-D1 诊断 | Redmi K60 真机触发一次小白狐回复 | 显示 TTS 状态和诊断字段；失败时有 failure reason；小白狐不永久卡 speaking | todo |
 | Android 系统 ASR/TTS 评估 | 真实平板或窗口模拟器人工评估 | 记录识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 | todo |
-| 小白狐 3D / fallback | Device A 和 Device B 各测一次；有资源和缺资源两种状态 | 3D 资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常；Honor Pad 5 记录图片内存、切换流畅度、发热、卡顿和是否需要降级 | todo |
-| 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、网络错误 | 普通聊天显示 neutral；倾听显示 listening；TTS 朗读切 speaking；学习求助显示 thinking；网络错误不能崩溃并 fallback 到 neutral/canvas | code_done / device_todo |
+| 小白狐 3D / fallback | Device A 和 Device B 各测一次；有资源和缺资源两种状态 | 11 个状态资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常；Honor Pad 5 记录图片内存、切换流畅度、发热、卡顿和是否需要降级 | todo |
+| 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、安全、隐私、睡前、网络错误 | 普通聊天显示 neutral；倾听显示 listening；TTS 朗读切 speaking；学习求助显示 homework_focus；安全/隐私/睡前/网络错误显示专用状态或安全 fallback | code_done / device_todo |
 
 Mimo 真实 provider 复验说明：
 

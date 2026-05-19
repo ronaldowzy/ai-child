@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech，语音输入 ASR 仍是下一阶段任务；完整设备 QA 仍需继续执行。
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech，但 Redmi K60 真机反馈显示上一版 TTS 无声且不可观测；当前优先修 TTS 诊断、UI 状态和降级。语音输入 ASR 仍是后续任务。
 
 ## 当前范围
 
@@ -30,11 +30,12 @@
 - 确认后的文本继续调用现有 `POST /api/v1/conversation/message`。
 - 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
 - TTS 朗读 v1 已使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
-- TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理。
+- TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS v1 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
+- Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也可能不适合孩子；Android system TTS 只是 v1 验证方案，不作为最终音色承诺。
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
-- 小白狐 v1 候选资源已导入，当前包含 `neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking` 五个基础状态。
+- 小白狐 v1 候选资源已导入，当前包含 11 个状态：`neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking`、`calm`、`sleepy`、`safety_concern`、`privacy_boundary`、`homework_focus`、`network_error`。
 - Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 - 小白狐资源优先放在 `android/app/src/main/res/drawable-nodpi/`，避免 Android 按密度自动缩放。
 - `FoxAgentAssetMapper` 负责把 `FoxAgentUiState` / `FoxMood` / `FoxMotion` 映射到 drawable 或 Canvas fallback。
@@ -63,6 +64,12 @@ docs/assets/fox/v1/fox_3d_listening.png
 docs/assets/fox/v1/fox_3d_speaking.png
 docs/assets/fox/v1/fox_3d_jumping_happy.png
 docs/assets/fox/v1/fox_3d_thinking.png
+docs/assets/fox/v1/calm.png
+docs/assets/fox/v1/sleepy.png
+docs/assets/fox/v1/safety_concern.png
+docs/assets/fox/v1/privacy_boundary.png
+docs/assets/fox/v1/homework_focus.png
+docs/assets/fox/v1/network_error.png
 ```
 
 Android 运行时资源位于：
@@ -74,6 +81,12 @@ android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
 android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
 android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
 android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
+android/app/src/main/res/drawable-nodpi/fox_3d_calm.png
+android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.png
+android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.png
+android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.png
+android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.png
+android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
 ```
 
 当前状态映射：
@@ -83,22 +96,39 @@ android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
 | 普通 / warm / idle | `fox_3d_neutral_idle` |
 | 倾听 / listening | `fox_3d_listening` |
 | 鼓励 / encouraging / celebrate small | `fox_3d_jumping_happy` |
-| 思考 / homework focus | `fox_3d_thinking` |
+| 思考 / thinking | `fox_3d_thinking` |
+| 学习 / homework focus | `fox_3d_homework_focus` |
+| 平静 / calm | `fox_3d_calm` |
+| 睡前 / sleepy | `fox_3d_sleepy` |
+| 安全关注 / safety concern | `fox_3d_safety_concern` |
+| 隐私边界 / privacy boundary | `fox_3d_privacy_boundary` |
 | TTS speaking / future speaking state | `fox_3d_speaking` |
-| 网络错误 / 缺失资源 / 低性能模式 | neutral 或 Canvas fallback |
-
-仍需补充：
-
-```text
-calm
-sleepy
-safety_concern
-privacy_boundary
-homework_focus
-network_error
-```
+| 网络错误 | `fox_3d_network_error` |
+| 缺失资源 / 低性能模式 | neutral 或 Canvas fallback |
 
 不要删除 Compose Canvas fallback；缺失状态、低性能设备或资源加载失败时必须能降级。
+
+## TTS-D1 真机诊断
+
+Redmi K60 / Android 14 真机反馈：
+
+```text
+1. 语音输入不可用：符合当前状态，ASR 尚未实现。
+2. TTS 完全没有声音。
+3. 没有看到停止/静音提示。
+4. 小白狐没有切到 speaking。
+5. 系统 TTS 声音不好，不适合作为最终儿童产品音色。
+```
+
+当前修复方向：
+
+```text
+1. TTS 请求被接受后先进入 speaking pending / speaking，不再只依赖系统 onStart。
+2. UI 显示朗读已开启、正在准备朗读、不可用等短状态。
+3. 开发构建显示诊断：engine、locale、voice、setLanguage、setVoice、speak、failure。
+4. speak() 返回 ERROR 或系统 TTS 不可用时恢复小白狐基础状态，并保留文字聊天。
+5. 当前不接第三方 TTS、不新增后端音频接口。
+```
 
 ## 双设备测试策略
 
@@ -106,7 +136,7 @@ network_error
 
 | 设备 | 定位 | 重点 |
 |---|---|---|
-| Device A：高配 Android 手机 | 功能主验证 | 先跑通 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验和核心安全流程 |
+| Device A：Redmi K60，Android 14 | 功能主验证 | 先跑通 TextToSpeech 诊断、SpeechRecognizer、自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验和核心安全流程 |
 | Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9、4GB 内存、平板横屏/大屏 UI、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
 
 开发原则：
@@ -122,7 +152,7 @@ network_error
 ## 当前不做
 
 - 当前不接真实相机或 SpeechRecognizer ASR；语音输入 v1 后续才会接 Android 本地 SpeechRecognizer。
-- 当前 TTS v1 使用系统 TextToSpeech 播放小白狐回复；不录制、生成或保存音频文件。
+- 当前 TTS v1 使用系统 TextToSpeech 播放小白狐回复；不录制、生成或保存音频文件。系统 TTS 只是验证方案，不作为最终小白狐音色承诺。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。

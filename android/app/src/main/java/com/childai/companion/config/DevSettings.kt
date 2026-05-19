@@ -10,6 +10,7 @@ object DevSettings {
     const val FOX_ASSET_MODE = "auto"
     const val AUTO_TTS_ENABLED = true
     const val TTS_MUTED = false
+    const val SHOW_TTS_DIAGNOSTICS = true
 
     val conversationApiBaseUrl: String = BuildConfig.CONVERSATION_API_BASE_URL
 }

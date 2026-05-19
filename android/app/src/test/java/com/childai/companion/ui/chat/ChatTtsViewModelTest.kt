@@ -8,6 +8,7 @@ import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
 import com.childai.companion.voice.VoiceProfile
+import com.childai.companion.voice.VoiceDiagnostics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,6 +50,20 @@ class ChatTtsViewModelTest {
         assertEquals(listOf("我在这里。"), fakeTts.requests.map { it.text })
         assertTrue(viewModel.uiState.value.tts.isSpeaking)
         assertEquals(FoxMotion.Speaking, viewModel.uiState.value.agent.motion)
+    }
+
+    @Test
+    fun acceptedTtsRequestShowsSpeakingPendingBeforePlatformStart() {
+        val fakeTts = FakeTtsController(autoStart = false)
+        val viewModel = ChatViewModel(ttsController = fakeTts)
+
+        viewModel.renderAgentReply(response(reply()))
+
+        assertEquals(listOf("我在这里。"), fakeTts.requests.map { it.text })
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+        assertTrue(viewModel.uiState.value.tts.isSpeakingPending)
+        assertEquals(FoxMotion.Speaking, viewModel.uiState.value.agent.motion)
+        assertEquals("我在这里。", viewModel.uiState.value.tts.lastRequestedTextPreview)
     }
 
     @Test
@@ -146,6 +161,30 @@ class ChatTtsViewModelTest {
             TtsController.UNAVAILABLE_MESSAGE,
             viewModel.uiState.value.tts.errorMessage,
         )
+        assertEquals(
+            "Fake TTS unavailable",
+            viewModel.uiState.value.tts.lastFailureReason,
+        )
+    }
+
+    @Test
+    fun speakReturningFalseRestoresBaseStateAndRecordsFailureReason() {
+        val fakeTts = FakeTtsController(acceptRequest = false)
+        val viewModel = ChatViewModel(ttsController = fakeTts)
+
+        viewModel.renderAgentReply(
+            response(
+                reply(
+                    emotion = "thinking",
+                    agentMotion = "thinking_blink",
+                ),
+            ),
+        )
+
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+        assertFalse(viewModel.uiState.value.tts.isSpeakingPending)
+        assertEquals(FoxMotion.ThinkingBlink, viewModel.uiState.value.agent.motion)
+        assertEquals("Fake speak returned ERROR", viewModel.uiState.value.tts.lastFailureReason)
     }
 
     @Test
@@ -156,6 +195,28 @@ class ChatTtsViewModelTest {
         assertTrue(profile.speechRate in 0.88f..0.95f)
         assertTrue(profile.pitch in 1.05f..1.15f)
         assertEquals(null, profile.preferredVoiceName)
+    }
+
+    @Test
+    fun ttsUiStateExposesReadableDiagnostics() {
+        val state = TtsUiState().withDiagnostics(
+            VoiceDiagnostics(
+                isAvailable = true,
+                isInitialized = true,
+                lastRequestedTextPreview = "我在这里。",
+                selectedLocale = "zh-CN",
+                selectedVoiceName = "fake-zh-cn",
+                setLanguageResult = "LANG_COUNTRY_AVAILABLE",
+                setVoiceResult = "SUCCESS",
+                lastSpeakResult = "ERROR",
+                enginePackageName = "fake.tts",
+                lastFailureReason = "Fake failure",
+            ),
+        )
+
+        assertTrue(state.diagnosticText.contains("engine=fake.tts"))
+        assertTrue(state.diagnosticText.contains("speak=ERROR"))
+        assertEquals("Fake failure", state.lastFailureReason)
     }
 
     private fun response(reply: ConversationReply): ConversationMessageResponse {
@@ -189,6 +250,8 @@ class ChatTtsViewModelTest {
 
     private class FakeTtsController(
         private val isAvailable: Boolean = true,
+        private val autoStart: Boolean = true,
+        private val acceptRequest: Boolean = true,
     ) : TtsController {
         val requests = mutableListOf<TtsRequest>()
         var stopCount = 0
@@ -196,12 +259,49 @@ class ChatTtsViewModelTest {
 
         override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
             if (!isAvailable) {
+                callbacks.onDiagnostics(
+                    VoiceDiagnostics(
+                        isAvailable = false,
+                        isInitialized = false,
+                        lastRequestedTextPreview = request.text,
+                        lastFailureReason = "Fake TTS unavailable",
+                        lastSpeakResult = "SKIPPED_UNAVAILABLE",
+                    ),
+                )
+                callbacks.onError(TtsController.UNAVAILABLE_MESSAGE)
+                return false
+            }
+            if (!acceptRequest) {
+                callbacks.onDiagnostics(
+                    VoiceDiagnostics(
+                        isAvailable = true,
+                        isInitialized = true,
+                        lastRequestedTextPreview = request.text,
+                        lastFailureReason = "Fake speak returned ERROR",
+                        lastSpeakResult = "ERROR",
+                    ),
+                )
                 callbacks.onError(TtsController.UNAVAILABLE_MESSAGE)
                 return false
             }
             requests += request
             this.callbacks = callbacks
-            callbacks.onStart()
+            callbacks.onDiagnostics(
+                VoiceDiagnostics(
+                    isAvailable = true,
+                    isInitialized = true,
+                    lastRequestedTextPreview = request.text,
+                    selectedLocale = request.voiceProfile.locale.toLanguageTag(),
+                    selectedVoiceName = "fake-zh-cn",
+                    setLanguageResult = "LANG_COUNTRY_AVAILABLE",
+                    setVoiceResult = "SUCCESS",
+                    lastSpeakResult = "SUCCESS",
+                    enginePackageName = "fake.tts",
+                ),
+            )
+            if (autoStart) {
+                callbacks.onStart()
+            }
             return true
         }
 

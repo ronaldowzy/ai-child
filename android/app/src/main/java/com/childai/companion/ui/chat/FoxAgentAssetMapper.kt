@@ -22,6 +22,21 @@ object FoxAgentAssetMapper {
             agent.motion == FoxMotion.Speaking ->
                 R.drawable.fox_3d_speaking
 
+            agent.motion == FoxMotion.HomeworkFocus || agent.mood == FoxMood.HomeworkFocus ->
+                R.drawable.fox_3d_homework_focus
+
+            agent.motion == FoxMotion.SleepyBlink || agent.mood == FoxMood.Sleepy ->
+                R.drawable.fox_3d_sleepy
+
+            agent.motion == FoxMotion.ConcernedStill || agent.mood == FoxMood.SafetyConcern ->
+                R.drawable.fox_3d_safety_concern
+
+            agent.motion == FoxMotion.SteadyBoundary || agent.mood == FoxMood.PrivacyBoundary ->
+                R.drawable.fox_3d_privacy_boundary
+
+            agent.motion == FoxMotion.NetworkError || agent.mood == FoxMood.NetworkError ->
+                R.drawable.fox_3d_network_error
+
             agent.motion == FoxMotion.ListeningTail || agent.mood == FoxMood.Listening ->
                 R.drawable.fox_3d_listening
 
@@ -32,7 +47,7 @@ object FoxAgentAssetMapper {
                 R.drawable.fox_3d_thinking
 
             agent.motion == FoxMotion.CalmStill || agent.mood == FoxMood.Calm ->
-                R.drawable.fox_3d_neutral_idle
+                R.drawable.fox_3d_calm
 
             else -> R.drawable.fox_3d_neutral_idle
         }

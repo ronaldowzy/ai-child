@@ -142,7 +142,7 @@
 
 ## 7. 资源格式和命名
 
-第一批资源优先目标是 Android `drawable-nodpi` 可直接使用的 3D rendered PNG/WebP sequence。当前小白狐 v1 候选资产已经导入仓库，包含 5 个基础状态；它不是最终完整视觉系统，仍需补充安全、隐私、睡前、网络错误等状态。
+第一批资源优先目标是 Android `drawable-nodpi` 可直接使用的 3D rendered PNG/WebP sequence。当前小白狐 v1 候选资产已经导入仓库，包含 11 个状态；它不是最终完整视觉系统，仍需继续在真实设备上验证资源质量、内存占用、切换流畅度和低配降级。
 
 当前候选资产：
 
@@ -153,6 +153,12 @@ docs/assets/fox/v1/fox_3d_listening.png
 docs/assets/fox/v1/fox_3d_speaking.png
 docs/assets/fox/v1/fox_3d_jumping_happy.png
 docs/assets/fox/v1/fox_3d_thinking.png
+docs/assets/fox/v1/calm.png
+docs/assets/fox/v1/sleepy.png
+docs/assets/fox/v1/safety_concern.png
+docs/assets/fox/v1/privacy_boundary.png
+docs/assets/fox/v1/homework_focus.png
+docs/assets/fox/v1/network_error.png
 ```
 
 建议 Android drawable 路径：
@@ -164,6 +170,12 @@ android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
 android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
 android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
 android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
+android/app/src/main/res/drawable-nodpi/fox_3d_calm.png
+android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.png
+android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.png
+android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.png
+android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.png
+android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
 ```
 
 设计交付包中可同步保留源资产路径：
@@ -232,23 +244,14 @@ assets/fox/v1/3d/fox_3d_network_error.png
 | TTS speaking / future speaking state | `fox_3d_speaking.png` | 轻量 speaking 状态 |
 | 思考、拆题 | `fox_3d_thinking.png` | `thinking_nod` |
 | 鼓励、小进步 | `fox_3d_jumping_happy.png` | `small_encourage` |
-| 安静、低能量 | `fox_3d_neutral_idle.png` 或 Canvas calm fallback | `calm_breathe` |
-| 睡前 | `fox_3d_neutral_idle.png` 或后续补图 | `sleepy_blink` |
-| 高风险关注 | `fox_3d_listening.png` 或 Canvas concerned fallback | `concerned_still` |
-| 隐私边界 | `fox_3d_thinking.png` 或 Canvas steady_boundary fallback | `steady_boundary` |
-| 学习聚焦 | `fox_3d_thinking.png`，后续补 `fox_3d_homework_focus.png` | `thinking_nod` |
-| 网络错误 | `fox_3d_neutral_idle.png` 或 Canvas calm fallback | `gentle_blink` |
+| 安静、低能量 | `fox_3d_calm.png` | `calm_breathe` |
+| 睡前 | `fox_3d_sleepy.png` | `sleepy_blink` |
+| 高风险关注 | `fox_3d_safety_concern.png` | `concerned_still` |
+| 隐私边界 | `fox_3d_privacy_boundary.png` | `steady_boundary` |
+| 学习聚焦 | `fox_3d_homework_focus.png` | `thinking_nod` |
+| 网络错误 | `fox_3d_network_error.png` | `gentle_blink` |
 
-当前缺失状态：
-
-```text
-calm
-sleepy
-safety_concern
-privacy_boundary
-homework_focus
-network_error
-```
+资源缺失、低性能设备或 QA 发现图像不合适时，继续使用最接近状态或 Canvas fallback，不阻塞 TTS / 对话链路调试。
 
 ## 9. 设计端交付物
 
@@ -257,7 +260,7 @@ network_error
 ```text
 1. 3D 角色设定图：正面为主，必要时补 3/4 视角。
 2. 材质和色板：主体白色/浅奶白色、辅助色、线条/阴影、毛绒质感和禁用色说明。
-3. 10 张状态 PNG：按 fox_3d_* 命名和 1024x1024 透明背景规格导出。
+3. 11 张状态 PNG：按 fox_3d_* 命名和 1024x1024 透明背景规格导出。
 4. 灯光和相机说明：确保后续追加状态时一致。
 5. 动作建议表：8 个动作的幅度、时长、循环方式和注意事项。
 6. 缩放预览：1024、512、256、96dp 近似尺寸下的可读性预览。
@@ -297,7 +300,7 @@ network_error
 14. 未把 2D fallback 或低质量临时图当作最终 3D 方向交付。
 15. 高配 Android 手机上 PNG 状态图显示正常。
 16. Honor Pad 5 Android 9 / 4GB 上显示不卡顿或有明确降级策略。
-17. 进入学习求助时显示 thinking/homework 状态，缺少 homework_focus 时可复用 thinking。
+17. 进入学习求助时优先显示 homework_focus；资源异常时可复用 thinking 或 Canvas fallback。
 18. 进入倾听或普通聊天时显示 listening / neutral 状态。
 19. TTS 朗读时后续能切到 speaking 状态。
 20. 网络错误时不能崩溃，应 fallback 到 neutral 或 Canvas。
@@ -312,6 +315,6 @@ network_error
 2. 主体白色和浅奶白色的精确色值，以及是否保留少量浅橙作为耳朵/尾巴辅助识别。
 3. 是否允许低调学习道具，例如小书本、铅笔、叶子胸饰。
 4. safety_concern 和 privacy_boundary 是否需要更明显的状态差异。
-5. 第一批是否只交付 10 张静态 3D rendered PNG，还是同时交付 3D 源文件和渲染参数。
+5. 第一批是否只交付 11 张静态 3D rendered PNG，还是同时交付 3D 源文件和渲染参数。
 6. 后续资源进入仓库时，由 Android 会话放入 res/drawable，还是先放独立设计资产目录再统一接入。
 ```

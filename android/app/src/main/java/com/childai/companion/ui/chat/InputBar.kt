@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.childai.companion.config.DevSettings
 import com.childai.companion.voice.TtsUiState
 
 @Composable
@@ -91,7 +92,7 @@ fun InputBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            if (tts.isSpeaking) {
+            if (tts.isSpeaking || tts.isSpeakingPending) {
                 TextButton(onClick = onStopTts) {
                     Text(text = "停止")
                 }
@@ -99,6 +100,14 @@ fun InputBar(
             TextButton(onClick = onToggleTtsMuted) {
                 Text(text = if (tts.isMuted) "打开朗读" else "静音")
             }
+        }
+        if (DevSettings.SHOW_TTS_DIAGNOSTICS && tts.diagnosticText.isNotBlank()) {
+            Text(
+                text = "朗读诊断：${tts.diagnosticText}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
         }
     }
 }

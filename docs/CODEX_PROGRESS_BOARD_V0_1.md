@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
 当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
-下一步：窗口模式模拟器复跑自由聊天、学习求助、直接要答案、mock 拍题、父亲设置、父亲入口保护、睡前、高风险、隐私边界、后端断开提示、自动记忆日报素材和安全场景细分；同步产品决策机制，并规划语音交互和小白狐下一阶段体验
+下一步：优先修通并诊断 Android TTS 链路，在 Redmi K60 上复验朗读状态、停止/静音、diagnostics、speaking pending、speak 返回值和 failure reason；随后处理开放上下文对话设计，ASR 暂缓
 ```
 
 第一轮已完成能力快照：
@@ -54,7 +54,7 @@ Mock 拍题：done
 | R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
-| V1 | 语音交互 v1 | Android 本地语音输入确认 + Android 默认自动 TTS | in_progress | R7/R8 | TTS v1 已实现本地 TextToSpeech 自动朗读、停止/静音、VoiceProfile 和 speaking 状态联动；SpeechRecognizer ASR 仍 todo；默认不上传原始音频 |
+| V1 | 语音交互 v1 | Android 本地语音输入确认 + Android 默认自动 TTS | in_progress | R7/R8 | Redmi K60 反馈上一版 TTS 无声且不可观测；TTS-D1 已进入优先修复，补诊断、UI 状态、speaking pending 和失败原因；SpeechRecognizer ASR 仍 todo |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | todo | R7/R8 | 温和、好奇、慢热友好；视觉优先毛绒感/立体绘本感；避免强刺激、排行榜、连击奖励和依赖感 |
 
 ---
@@ -201,12 +201,14 @@ Mock 拍题：done
 | R8-02 语音交互设计文档 | done |  | 明确 confirm-before-send、本地 ASR、默认自动 TTS、VoiceProfile、可替换抽象、原始音频策略、权限、错误文案、安全边界和 QA 指标 |
 | R8-03 下一阶段计划文档 | done |  | 拆分完整设备 QA、语音输入、TTS、小白狐视觉资源、小白狐动画状态机、真实平板家庭内测准备 |
 | V1-01 Android 本地语音输入 v1 | todo |  | SpeechRecognizer 识别后先展示可确认文本；确认后才发送后端；future hands-free conversational mode 不进 v1；不默认上传原始音频 |
-| V1-02 Android TTS 朗读 v1 | done |  | 使用系统 TTS 默认自动朗读小白狐回复，遵守 `reply.voice_enabled`，可停止/静音，不朗读 child message、debug 或 session_state；设备听感 QA 待执行 |
+| V1-02 Android TTS 朗读 v1 | in_progress |  | 使用系统 TTS 默认自动朗读小白狐回复，遵守 `reply.voice_enabled`；Redmi K60 反馈无声且无明显状态，TTS-D1 已补可观测性和 fallback，需重新打包真机复验 |
 | V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / SpeechRecognizer 抽象仍 todo；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
-| F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已导入：neutral_idle、listening、speaking、jumping_happy、thinking；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；仍需补充 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error |
-| F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；后续需设备侧验证图片显示、缺失状态 fallback 和低配降级 |
+| V1-05 TTS-D1 可观测性与故障修复 | in_progress |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段 |
+| F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
+| F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
 | F1-03 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
+| O1-01 Open Conversation Mode 设计 | todo |  | 下一版普通聊天更自由，模型接收最近多轮上下文；SceneOrchestrator 保留安全、隐私、学习、睡前等关键约束；本轮只做设计，不大改后端 |
 
 ---
 
@@ -216,11 +218,11 @@ Mock 拍题：done
 
 ```text
 今日目标：完成 S13 Android 拍题与父亲页验收，推进 S14 本机/API 联调和 S20a 文档同步，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI；本轮补充小白狐 v1 候选资源、双设备测试策略、预渲染 PNG/WebP + 轻量 Compose 动画原则、FoxAgentAssetMapper 和低配 fallback 规则；V2 已完成 Android 本地 TTS v1 代码接入，支持默认自动朗读、停止/静音、VoiceProfile 和小白狐 speaking 状态联动。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI；本轮补充小白狐 v1 候选资源、双设备测试策略、预渲染 PNG/WebP + 轻量 Compose 动画原则、FoxAgentAssetMapper 和低配 fallback 规则；V2 已完成 Android 本地 TTS v1 代码接入，支持默认自动朗读、停止/静音、VoiceProfile 和小白狐 speaking 状态联动；Redmi K60 真机反馈显示上一版 TTS 无声且不可观测，TTS-D1 已启动修复；6 张新增小白狐状态图已进入资源接入流程；Open Conversation Mode 被记录为下一版后端方向。
 阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实 provider 已用临时 env smoke 通过，后续不得重复使用错误模型 id `mimo-v2.5pro`。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：用 Device A 或窗口模式模拟器复跑 R7 完整设备侧手动 QA，覆盖自由聊天、学习求助、直接要答案、高风险、隐私边界、父亲入口保护、mock 拍题、后端断开提示、TTS 自动朗读/停止/静音/speaking 状态、PNG/fallback，并补充自动记忆日报素材的设备侧验证记录；ASR v1 另起 V3 子会话。
+明日第一任务：重新打包 Redmi K60 真机测试 APK，优先复验 TTS-D1：朗读状态、停止/静音、diagnostics、speaking pending、speak 返回值和 failure reason；随后再做 Open Conversation Mode 设计，不先实现 ASR。
 ```
 
 ### 日期：2026-05-18

@@ -94,6 +94,55 @@ class AgentPresentationTest {
     }
 
     @Test
+    fun mapsNewSceneMotionsToDedicatedFoxResources() {
+        assertEquals(
+            FoxAgentAsset.Drawable(R.drawable.fox_3d_homework_focus),
+            FoxAgentAssetMapper.resolve(
+                FoxAgentUiState(
+                    mood = FoxMood.HomeworkFocus,
+                    motion = FoxMotion.HomeworkFocus,
+                ),
+            ),
+        )
+        assertEquals(
+            FoxAgentAsset.Drawable(R.drawable.fox_3d_sleepy),
+            FoxAgentAssetMapper.resolve(
+                FoxAgentUiState(
+                    mood = FoxMood.Sleepy,
+                    motion = FoxMotion.SleepyBlink,
+                ),
+            ),
+        )
+        assertEquals(
+            FoxAgentAsset.Drawable(R.drawable.fox_3d_safety_concern),
+            FoxAgentAssetMapper.resolve(
+                FoxAgentUiState(
+                    mood = FoxMood.SafetyConcern,
+                    motion = FoxMotion.ConcernedStill,
+                ),
+            ),
+        )
+        assertEquals(
+            FoxAgentAsset.Drawable(R.drawable.fox_3d_privacy_boundary),
+            FoxAgentAssetMapper.resolve(
+                FoxAgentUiState(
+                    mood = FoxMood.PrivacyBoundary,
+                    motion = FoxMotion.SteadyBoundary,
+                ),
+            ),
+        )
+        assertEquals(
+            FoxAgentAsset.Drawable(R.drawable.fox_3d_network_error),
+            FoxAgentAssetMapper.resolve(
+                FoxAgentUiState(
+                    mood = FoxMood.NetworkError,
+                    motion = FoxMotion.NetworkError,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun canForceCanvasFallbackForLowPerformanceMode() {
         val asset = FoxAgentAssetMapper.resolve(
             agent = FoxAgentUiState(

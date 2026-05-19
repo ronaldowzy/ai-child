@@ -40,7 +40,7 @@ class MockModelProvider(BaseModelProvider):
     def _mock_output(self, request: ModelRequest) -> tuple[str, dict[str, Any]]:
         task_type = request.task_type
         if task_type == ModelTaskType.CHILD_CHAT:
-            return self._child_chat_output()
+            return self._child_chat_output(request)
         if task_type == ModelTaskType.INTENT_CLASSIFICATION:
             return self._intent_output(request.input_text or "")
         if task_type == ModelTaskType.SAFETY_CLASSIFICATION:
@@ -59,14 +59,30 @@ class MockModelProvider(BaseModelProvider):
             {"task_type": str(task_type), "handled": False},
         )
 
-    def _child_chat_output(self) -> tuple[str, dict[str, Any]]:
-        text = "我会先陪你把想法说清楚。我们一步一步来，不急着要答案。"
+    def _child_chat_output(
+        self, request: ModelRequest
+    ) -> tuple[str, dict[str, Any]]:
+        scene_route = request.context.get("scene_route", {})
+        fallback_reply_text = scene_route.get("fallback_reply_text")
+        text = (
+            fallback_reply_text
+            if isinstance(fallback_reply_text, str) and fallback_reply_text.strip()
+            else "我会先陪你把想法说清楚。我们一步一步来，不急着要答案。"
+        )
+        active_scene = scene_route.get("active_scene")
         return (
             text,
             {
                 "reply": text,
-                "scene_hint": "daily.after_school_checkin",
-                "requires_parent_attention": False,
+                "scene_hint": active_scene or "daily.after_school_checkin",
+                "requires_parent_attention": bool(
+                    scene_route.get("requires_parent_attention", False)
+                ),
+                "mock_child_chat_strategy": (
+                    "scene_fallback_text"
+                    if isinstance(fallback_reply_text, str)
+                    else "default_child_chat_text"
+                ),
             },
         )
 

@@ -7,6 +7,10 @@ The current backend is intentionally local-first and mock-first:
 - Uses `MockModelProvider` by default.
 - Does not call real model, OCR, vision, or external network services in tests.
 - Keeps all child-facing AI decisions behind backend services such as `SafetyEngine`, `IntentClassifier`, `SceneOrchestrator`, `PromptManager`, and `ModelRegistry`.
+- Routes child-facing replies through `ChildAgentRuntime`: `SceneOrchestrator`
+  decides the scene strategy and safe fallback reply, `PromptManager` composes
+  the prompt, `ModelRegistry` generates the child chat response, and
+  `SafetyEngine.classify_output()` checks the output before return.
 
 ## Setup
 
@@ -161,6 +165,15 @@ back to the mock profile without calling the external provider. Metadata
 `contains_image=true` and `contains_audio=true` also require `allow_image=true`
 and `allow_audio=true`. Mock providers are not blocked by this external
 transmission gate.
+
+The child-facing runtime always marks child chat model requests with
+`contains_child_data=true`. If prompt composition fails, the model registry
+blocks or falls back from an external provider, the model call fails, the model
+returns empty text, output safety is `high`/`critical`, or a learning-scene
+model output appears to give a direct final answer, the runtime returns the
+existing `SceneRouteDecision.reply_text` fallback instead of model text. This
+keeps the default path mock-first and preserves a deterministic safe reply for
+each routed scene.
 
 The Android app never stores model API keys. All model configuration belongs on the backend host.
 

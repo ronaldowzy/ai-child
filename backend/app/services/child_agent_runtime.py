@@ -1,0 +1,233 @@
+from typing import Any
+
+from app.domain.agent_runtime import (
+    AgentRuntimeRequest,
+    AgentRuntimeResult,
+    AgentRuntimeSource,
+)
+from app.domain.enums import RiskLevel
+from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
+from app.domain.prompt import PromptVersion
+from app.domain.scene import SceneAction, SceneId
+from app.services.model_registry import ModelRegistry, get_model_registry
+from app.services.prompt_manager import PromptManager, get_prompt_manager
+from app.services.safety_engine import SafetyEngine, get_safety_engine
+
+
+class ChildAgentRuntime:
+    """Executes the child-facing model turn after scene routing."""
+
+    def __init__(
+        self,
+        *,
+        prompt_manager: PromptManager | None = None,
+        model_registry: ModelRegistry | None = None,
+        safety_engine: SafetyEngine | None = None,
+    ) -> None:
+        self._prompt_manager = prompt_manager or get_prompt_manager()
+        self._model_registry = model_registry or get_model_registry()
+        self._safety_engine = safety_engine or get_safety_engine()
+
+    def run(self, request: AgentRuntimeRequest) -> AgentRuntimeResult:
+        prompt_versions: dict[str, PromptVersion] = {}
+        try:
+            composed_prompt = self._prompt_manager.compose(
+                request.route_decision.active_scene.value,
+                parent_policy=request.parent_policy,
+                memory_context=request.memory_context,
+            )
+            prompt_versions = composed_prompt.prompt_versions
+        except Exception:
+            return self._fallback_result(
+                request,
+                fallback_reason="prompt_compose_failed",
+                prompt_versions=prompt_versions,
+            )
+
+        model_request = ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            messages=[
+                ModelMessage(role="system", content=composed_prompt.prompt),
+                ModelMessage(role="user", content=request.child_text),
+            ],
+            input_text=request.child_text,
+            context=self._model_context(request),
+            metadata=self._model_metadata(request, prompt_versions),
+        )
+
+        try:
+            model_response = self._model_registry.generate(model_request)
+        except Exception:
+            return self._fallback_result(
+                request,
+                fallback_reason="model_generate_failed",
+                prompt_versions=prompt_versions,
+            )
+
+        registry_fallback_reason = self._registry_fallback_reason(
+            model_response.metadata
+        )
+        if registry_fallback_reason is not None:
+            return self._fallback_result(
+                request,
+                fallback_reason=registry_fallback_reason,
+                prompt_versions=prompt_versions,
+                provider_name=model_response.provider_name,
+                model_name=model_response.model_name,
+                model_metadata=model_response.metadata,
+            )
+
+        reply_text = model_response.response_text.strip()
+        if not reply_text:
+            return self._fallback_result(
+                request,
+                fallback_reason="empty_model_response",
+                prompt_versions=prompt_versions,
+                provider_name=model_response.provider_name,
+                model_name=model_response.model_name,
+                model_metadata=model_response.metadata,
+            )
+
+        output_safety = self._safety_engine.classify_output(reply_text)
+        if output_safety.risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}:
+            return self._fallback_result(
+                request,
+                fallback_reason="unsafe_model_output",
+                prompt_versions=prompt_versions,
+                provider_name=model_response.provider_name,
+                model_name=model_response.model_name,
+                model_metadata=model_response.metadata,
+                output_risk_level=output_safety.risk_level,
+            )
+        if self._looks_like_direct_homework_answer(request, reply_text):
+            return self._fallback_result(
+                request,
+                fallback_reason="learning_direct_answer_output",
+                prompt_versions=prompt_versions,
+                provider_name=model_response.provider_name,
+                model_name=model_response.model_name,
+                model_metadata=model_response.metadata,
+                output_risk_level=output_safety.risk_level,
+            )
+
+        return AgentRuntimeResult(
+            reply_text=reply_text,
+            source=AgentRuntimeSource.MODEL,
+            provider_name=model_response.provider_name,
+            model_name=model_response.model_name,
+            prompt_versions=prompt_versions,
+            model_metadata=model_response.metadata,
+            output_risk_level=output_safety.risk_level,
+        )
+
+    def _fallback_result(
+        self,
+        request: AgentRuntimeRequest,
+        *,
+        fallback_reason: str,
+        prompt_versions: dict[str, PromptVersion],
+        provider_name: str | None = None,
+        model_name: str | None = None,
+        model_metadata: dict[str, Any] | None = None,
+        output_risk_level: RiskLevel | None = None,
+    ) -> AgentRuntimeResult:
+        return AgentRuntimeResult(
+            reply_text=request.route_decision.reply_text,
+            source=AgentRuntimeSource.FALLBACK,
+            provider_name=provider_name,
+            model_name=model_name,
+            fallback_reason=fallback_reason,
+            prompt_versions=prompt_versions,
+            model_metadata=model_metadata or {},
+            output_risk_level=output_risk_level,
+        )
+
+    def _model_context(self, request: AgentRuntimeRequest) -> dict[str, Any]:
+        decision = request.route_decision
+        return {
+            "conversation": {
+                "child_id": request.child_id,
+                "session_id": request.session_id,
+                **request.conversation_metadata,
+            },
+            "time_context": request.time_context.model_dump(mode="json"),
+            "parent_policy": self._dump_context_value(request.parent_policy),
+            "memory_context": self._dump_context_value(request.memory_context),
+            "scene_route": {
+                "base_scene": decision.base_scene.value,
+                "active_scene": decision.active_scene.value,
+                "transition": decision.transition.value,
+                "reason": decision.reason,
+                "sub_scene": decision.sub_scene,
+                "risk_level": decision.risk_level.value,
+                "requires_parent_attention": decision.requires_parent_attention,
+                "needs_input": decision.needs_input,
+                "quick_actions": [
+                    self._action_to_context(action)
+                    for action in decision.quick_actions
+                ],
+                "fallback_reply_text": decision.reply_text,
+            },
+        }
+
+    def _model_metadata(
+        self,
+        request: AgentRuntimeRequest,
+        prompt_versions: dict[str, PromptVersion],
+    ) -> dict[str, Any]:
+        return {
+            "contains_child_data": True,
+            "contains_image": False,
+            "contains_audio": False,
+            "task_type": ModelTaskType.CHILD_CHAT.value,
+            "active_scene": request.route_decision.active_scene.value,
+            "prompt_version_layers": sorted(prompt_versions.keys()),
+        }
+
+    def _registry_fallback_reason(self, metadata: dict[str, Any]) -> str | None:
+        if metadata.get("policy_blocked") is True:
+            return "model_policy_blocked"
+        if metadata.get("fallback_used") is True:
+            return "model_registry_fallback"
+        return None
+
+    def _looks_like_direct_homework_answer(
+        self, request: AgentRuntimeRequest, reply_text: str
+    ) -> bool:
+        if request.route_decision.active_scene != SceneId.LEARNING_HOMEWORK_HELP:
+            return False
+        normalized = reply_text.strip().lower().replace(" ", "")
+        direct_answer_markers = (
+            "答案是",
+            "最终答案",
+            "直接答案",
+            "所以答案",
+            "结果是",
+            "得数是",
+            "等于",
+        )
+        return any(marker in normalized for marker in direct_answer_markers)
+
+    def _action_to_context(self, action: SceneAction) -> dict[str, str]:
+        return {"id": action.id, "label": action.label}
+
+    def _dump_context_value(self, value: Any) -> Any:
+        if value is None:
+            return None
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        if isinstance(value, list):
+            return [self._dump_context_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                str(key): self._dump_context_value(item)
+                for key, item in value.items()
+            }
+        return value
+
+
+_child_agent_runtime = ChildAgentRuntime()
+
+
+def get_child_agent_runtime() -> ChildAgentRuntime:
+    return _child_agent_runtime

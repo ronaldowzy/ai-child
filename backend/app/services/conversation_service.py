@@ -11,10 +11,15 @@ from app.domain.schemas.conversation import (
     UiAction,
 )
 from app.domain.enums import IntentType, RiskLevel
+from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
 from app.domain.scene import SceneRouteDecision, SceneRouteRequest
 from app.services.attachment_service import (
     AttachmentService,
     get_attachment_service,
+)
+from app.services.child_agent_runtime import (
+    ChildAgentRuntime,
+    get_child_agent_runtime,
 )
 from app.services.intent_classifier import (
     IntentClassification,
@@ -48,6 +53,7 @@ class ConversationService:
         intent_classifier: IntentClassifier | None = None,
         scene_orchestrator: SceneOrchestrator | None = None,
         attachment_service: AttachmentService | None = None,
+        child_agent_runtime: ChildAgentRuntime | None = None,
         debug_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
@@ -58,6 +64,7 @@ class ConversationService:
         self._intent_classifier = intent_classifier or get_intent_classifier()
         self._scene_orchestrator = scene_orchestrator or get_scene_orchestrator()
         self._attachment_service = attachment_service or get_attachment_service()
+        self._child_agent_runtime = child_agent_runtime or get_child_agent_runtime()
         self._debug_enabled = debug_enabled
 
     def handle_message(
@@ -122,7 +129,23 @@ class ConversationService:
                 ),
             )
         )
-        response = self._response_from_route_decision(route_decision)
+        runtime_result = self._child_agent_runtime.run(
+            AgentRuntimeRequest(
+                child_id=request.child_id,
+                session_id=request.session_id,
+                child_text=request.input.text,
+                route_decision=route_decision,
+                time_context=time_context,
+                parent_policy=parent_policy,
+                memory_context=[],
+                conversation_metadata={
+                    "app_mode": request.client_context.app_mode,
+                    "input_type": request.input.type,
+                    "attachment_count": len(request.input.attachments),
+                },
+            )
+        )
+        response = self._response_from_route_decision(route_decision, runtime_result)
 
         if self._debug_enabled:
             response.debug = ConversationDebug(
@@ -154,11 +177,13 @@ class ConversationService:
         return response
 
     def _response_from_route_decision(
-        self, decision: SceneRouteDecision
+        self,
+        decision: SceneRouteDecision,
+        runtime_result: AgentRuntimeResult,
     ) -> ConversationMessageResponse:
         return ConversationMessageResponse(
             reply=Reply(
-                text=decision.reply_text,
+                text=runtime_result.reply_text,
                 emotion=decision.reply_emotion,
             ),
             ui_actions=[

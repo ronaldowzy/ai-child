@@ -82,6 +82,18 @@ class AgentPresentationTest {
     }
 
     @Test
+    fun mapsSpeakingStateToSpeakingPngResource() {
+        val asset = FoxAgentAssetMapper.resolve(
+            agent = FoxAgentUiState(
+                mood = FoxMood.Warm,
+                motion = FoxMotion.Speaking,
+            ),
+        )
+
+        assertEquals(FoxAgentAsset.Drawable(R.drawable.fox_3d_speaking), asset)
+    }
+
+    @Test
     fun canForceCanvasFallbackForLowPerformanceMode() {
         val asset = FoxAgentAssetMapper.resolve(
             agent = FoxAgentUiState(

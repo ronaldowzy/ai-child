@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.childai.companion.voice.TtsUiState
 
 @Composable
 fun InputBar(
@@ -28,6 +29,9 @@ fun InputBar(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     voice: VoiceUiState = VoiceUiState(),
+    tts: TtsUiState = TtsUiState(),
+    onStopTts: () -> Unit = {},
+    onToggleTtsMuted: () -> Unit = {},
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val trimmedDraft = draft.trim()
@@ -76,10 +80,25 @@ fun InputBar(
                 Text(text = if (enabled) "发送" else "发送中")
             }
         }
-        Text(
-            text = voice.statusText,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${voice.statusText} · ${tts.statusText}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (tts.isSpeaking) {
+                TextButton(onClick = onStopTts) {
+                    Text(text = "停止")
+                }
+            }
+            TextButton(onClick = onToggleTtsMuted) {
+                Text(text = if (tts.isMuted) "打开朗读" else "静音")
+            }
+        }
     }
 }

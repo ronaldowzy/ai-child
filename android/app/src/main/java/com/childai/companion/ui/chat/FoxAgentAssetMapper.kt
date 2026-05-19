@@ -19,6 +19,9 @@ object FoxAgentAssetMapper {
         }
 
         val drawableId = when {
+            agent.motion == FoxMotion.Speaking ->
+                R.drawable.fox_3d_speaking
+
             agent.motion == FoxMotion.ListeningTail || agent.mood == FoxMood.Listening ->
                 R.drawable.fox_3d_listening
 

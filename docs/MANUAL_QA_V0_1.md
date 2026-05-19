@@ -164,13 +164,33 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 |---|---|---|
 | 正式名称“小白狐”替换 UI 文案 | code updated / device todo：儿童端主要可见文案已改为“小白狐” | 后续在 Device A 和 Honor Pad 5 上复验聊天标题、消息列表、错误提示、拍题 dialog、父亲页文案、日志/测试 fixture 是否仍有旧称呼 |
 | V1 语音输入 confirm-before-send | todo | 验证 Android 系统 ASR 只转文字，发送前必须让孩子确认；默认不上传或保存原始音频 |
-| V2 TTS 默认自动朗读小白狐回复 | todo | 验证小白狐回复默认自动朗读，且文本仍可读；不得把当前 disabled 语音按钮记录为长期目标 |
-| 停止/静音能力 | todo | 验证朗读中可停止，父亲或开发设置可静音，静音后不自动播放 |
-| DevSettings / 父亲设置关闭自动朗读 | todo | 验证父亲或开发设置能关闭自动朗读，关闭后仍可文字交流 |
-| VoiceProfile | todo | 验证 `zh-CN`、`speechRate`、`pitch` 和 fallback 策略；缺少指定 voice 时有温和 fallback |
+| V2 TTS 默认自动朗读小白狐回复 | code_done / device_todo | 代码已接 Android TextToSpeech + TtsController；仍需在 Device A 和 Honor Pad 5 上验证真实声音、延迟和文字仍可读 |
+| 停止/静音能力 | code_done / device_todo | 代码已提供停止和静音控制；仍需设备侧验证朗读中可停止，静音后不自动播放 |
+| DevSettings / 父亲设置关闭自动朗读 | partial | `DevSettings.AUTO_TTS_ENABLED` 和 `DevSettings.TTS_MUTED` 已作为初始配置；父亲设置治理开关仍是后续任务 |
+| VoiceProfile | code_done / device_todo | 代码已使用 `zh-CN`、稍慢 `speechRate`、略高 `pitch` 和系统中文 fallback；仍需设备听感和缺失 voice 验证 |
 | Android 系统 ASR/TTS 效果评估 | todo | 需要真实设备或人工听感记录：识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
 | 3D 小白狐资源存在时显示 | todo | 当前 v1 候选资源包含 neutral_idle、listening、speaking、jumping_happy、thinking；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |
 | 3D 资源缺失时 Canvas fallback | partial / current fallback ok | 当前 Canvas fallback 仍保留；后续需在资源缺失、加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
+
+## V2 TTS v1 代码验证
+
+日期：2026-05-19
+会话：V2 Android TTS v1 子会话
+范围：Android 本地 TextToSpeech、默认自动朗读、停止/静音、VoiceProfile、小白狐 speaking 状态联动。未做 SpeechRecognizer ASR、后端音频上传、第三方 TTS 或实时 3D。
+
+| 命令 | 结果 |
+|---|---|
+| `bash scripts/android_gradle.sh test` | 通过：BUILD SUCCESSFUL；覆盖 `reply.voice_enabled=false` 不朗读、AUTO_TTS 关闭不朗读、agent reply 自动朗读、child message 不朗读、speaking 状态、停止/结束恢复、TTS 不可用降级、VoiceProfile 默认值 |
+| `bash scripts/android_gradle.sh assembleDebug` | 通过：BUILD SUCCESSFUL |
+| `bash scripts/android_gradle.sh lintDebug` | 通过：BUILD SUCCESSFUL |
+
+设备侧仍需验证：
+
+```text
+1. Device A 高配 Android 手机上真实听感、延迟、停止/静音和 speaking PNG 切换。
+2. Device B Honor Pad 5 Android 9 / 4GB 上中文 TTS 是否存在、是否卡顿、是否需要默认关闭自动朗读或切低性能模式。
+3. 系统没有中文 TTS 时是否显示“我现在不能朗读，但文字还在这里。”并保持文字聊天可用。
+```
 
 ## 下一阶段设备 QA 清单
 
@@ -187,11 +207,11 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | Mock 拍题 | 点击“拍题目”并走 mock 题目流程 | 调用 attachment + conversation；后端引导题意，不接真实 CameraX，不保存真实照片 | todo |
 | Android 后端断开提示 | 停止后端后从 App 发送消息 | 显示温和错误和稍后再试，不诱导孩子反复尝试或自责 | todo |
 | 语音输入 V1 | 使用 Android 系统 ASR 输入虚构内容 | confirm-before-send；发送前可编辑/取消；不上传或保存原始音频 | todo |
-| TTS V2 自动朗读 | 触发小白狐回复 | 默认自动朗读；可停止/静音；DevSettings/父亲设置可关闭自动朗读 | todo |
-| VoiceProfile | 切换或缺失系统语音 | `zh-CN`、`speechRate`、`pitch` 生效；缺少指定 voice 时 fallback 正常 | todo |
+| TTS V2 自动朗读 | 触发小白狐回复 | 默认自动朗读；可停止/静音；遵守 `reply.voice_enabled`；不朗读 child message、debug、session_state 或父亲页长列表 | code_done / device_todo |
+| VoiceProfile | 切换或缺失系统语音 | `zh-CN`、`speechRate`、`pitch` 生效；缺少指定 voice 时 fallback 正常；不生成或保存音频文件 | code_done / device_todo |
 | Android 系统 ASR/TTS 评估 | 真实平板或窗口模拟器人工评估 | 记录识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 | todo |
 | 小白狐 3D / fallback | Device A 和 Device B 各测一次；有资源和缺资源两种状态 | 3D 资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常；Honor Pad 5 记录图片内存、切换流畅度、发热、卡顿和是否需要降级 | todo |
-| 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、网络错误 | 普通聊天显示 neutral；倾听显示 listening；后续 TTS 朗读可切 speaking；学习求助显示 thinking；网络错误不能崩溃并 fallback 到 neutral/canvas | todo |
+| 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、网络错误 | 普通聊天显示 neutral；倾听显示 listening；TTS 朗读切 speaking；学习求助显示 thinking；网络错误不能崩溃并 fallback 到 neutral/canvas | code_done / device_todo |
 
 Mimo 真实 provider 复验说明：
 
@@ -215,7 +235,7 @@ Mimo 真实 provider 复验说明：
 | Watch/隐私安全细分设备流程 | todo | 使用虚构测试句验证 safety.gentle_checkin 不强制父亲提醒，privacy.boundary 不索要真实信息 |
 | 父亲入口保护 | code_done / device_todo | 代码已实现长按父亲入口 + dev PIN `0000`；仍需在窗口模式模拟器或真实平板验证点击不进入、长按弹 PIN、错误 PIN 温和提示、正确 PIN 进入 |
 | 断网/后端不可达 | todo | 停止后端后验证 Android 展示温和错误，不诱导孩子反复尝试 |
-| 语音输入/TTS/VoiceProfile | todo | 按新产品决策复验 confirm-before-send、默认自动朗读、停止/静音、关闭自动朗读、VoiceProfile fallback 和系统 ASR/TTS 效果 |
+| 语音输入/TTS/VoiceProfile | in_progress | TTS v1 代码已完成默认自动朗读、停止/静音、VoiceProfile 和 speaking 联动；仍需复验系统 TTS 效果，ASR confirm-before-send 仍 todo |
 | 小白狐命名与 3D/fallback | todo | UI 文案逐步替换为“小白狐”；3D 资源存在时显示，资源缺失时 Canvas fallback 正常 |
 
 ## 网络排查记录

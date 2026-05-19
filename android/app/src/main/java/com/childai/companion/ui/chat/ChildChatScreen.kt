@@ -29,13 +29,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,6 +50,7 @@ import com.childai.companion.ui.parent.ParentEntryPinDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
 import com.childai.companion.ui.parent.ParentPinGate
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
+import com.childai.companion.voice.AndroidTtsController
 
 @Composable
 fun ChildChatScreen(
@@ -56,11 +60,24 @@ fun ChildChatScreen(
     viewModel: ChatViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val ttsController = remember {
+        AndroidTtsController(context.applicationContext)
+    }
+
+    DisposableEffect(viewModel, ttsController) {
+        viewModel.attachTtsController(ttsController)
+        onDispose {
+            viewModel.shutdownTts()
+        }
+    }
 
     ChildChatScreenContent(
         uiState = uiState,
         onSend = viewModel::sendText,
         onQuickAction = viewModel::onQuickAction,
+        onStopTts = viewModel::stopTtsPlayback,
+        onToggleTtsMuted = viewModel::toggleTtsMuted,
         onMockProblemTextChange = viewModel::updateMockProblemText,
         onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
         onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
@@ -75,6 +92,8 @@ private fun ChildChatScreenContent(
     uiState: ChatUiState,
     onSend: (String) -> Unit,
     onQuickAction: (QuickActionUi) -> Unit,
+    onStopTts: () -> Unit,
+    onToggleTtsMuted: () -> Unit,
     onMockProblemTextChange: (String) -> Unit,
     onDismissMockPhoto: () -> Unit,
     onSubmitMockPhoto: () -> Unit,
@@ -162,6 +181,9 @@ private fun ChildChatScreenContent(
                 onSend = onSend,
                 enabled = !uiState.isSending,
                 voice = uiState.voice,
+                tts = uiState.tts,
+                onStopTts = onStopTts,
+                onToggleTtsMuted = onToggleTtsMuted,
             )
         },
     ) { innerPadding ->
@@ -469,6 +491,8 @@ private fun ChildChatScreenPreview() {
             ),
             onSend = {},
             onQuickAction = {},
+            onStopTts = {},
+            onToggleTtsMuted = {},
             onMockProblemTextChange = {},
             onDismissMockPhoto = {},
             onSubmitMockPhoto = {},

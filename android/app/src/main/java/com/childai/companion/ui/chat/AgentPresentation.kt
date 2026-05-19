@@ -22,6 +22,7 @@ enum class FoxMotion {
     ThinkingBlink,
     CelebrateSmall,
     CalmStill,
+    Speaking,
 }
 
 data class VoiceUiState(
@@ -67,6 +68,7 @@ private fun String.toFoxMood(): FoxMood {
 
 private fun String.toFoxMotion(): FoxMotion {
     return when (lowercase()) {
+        "speaking", "talking" -> FoxMotion.Speaking
         "listening_tail", "tail_wag", "gentle_tail" -> FoxMotion.ListeningTail
         "thinking_blink", "blink", "thinking" -> FoxMotion.ThinkingBlink
         "celebrate_small", "small_bounce", "encourage" -> FoxMotion.CelebrateSmall
@@ -77,10 +79,18 @@ private fun String.toFoxMotion(): FoxMotion {
 
 private fun agentStatusText(mood: FoxMood, motion: FoxMotion): String {
     return when {
+        motion == FoxMotion.Speaking -> "我在说给你听。"
         motion == FoxMotion.ThinkingBlink || mood == FoxMood.Thinking -> "我先想一想。"
         motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听你说。"
         motion == FoxMotion.CelebrateSmall || mood == FoxMood.Encouraging -> "你刚才说得很清楚。"
         motion == FoxMotion.CalmStill || mood == FoxMood.Calm -> "我们慢一点说。"
         else -> "慢慢说，一次说一件事就好。"
     }
+}
+
+fun FoxAgentUiState.asSpeaking(): FoxAgentUiState {
+    return copy(
+        motion = FoxMotion.Speaking,
+        statusText = "我在说给你听。",
+    )
 }

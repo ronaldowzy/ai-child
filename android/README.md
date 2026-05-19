@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。下一阶段产品重点是语音交互和小白狐形象体验，但必须先完成完整设备 QA。
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech，语音输入 ASR 仍是下一阶段任务；完整设备 QA 仍需继续执行。
 
 ## 当前范围
 
@@ -13,7 +13,7 @@
 - 调用后端 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`；当前 UI 已做轻量状态映射，但语音输入、TTS 播放和复杂动画仍是后续能力。
+  `reply.agent_motion`；当前 UI 已做轻量状态映射，TTS v1 会默认自动朗读小白狐回复并在朗读时切到 speaking 状态，语音输入和复杂动画仍是后续能力。
 - 点击“拍题目”走 mock attachment 流程，不接真实 CameraX，不保存真实图片。
 - 父亲设置页可读取和保存目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
@@ -29,9 +29,9 @@
 - Future hands-free conversational mode 不进入 v1。
 - 确认后的文本继续调用现有 `POST /api/v1/conversation/message`。
 - 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
-- TTS 朗读 v1 优先使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
-- TTS 必须有停止/静音和 DevSettings 或父亲设置开关。
-- TTS v1 需要 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
+- TTS 朗读 v1 已使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
+- TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理。
+- TTS v1 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
 - 小白狐 v1 候选资源已导入，当前包含 `neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking` 五个基础状态。
@@ -39,6 +39,7 @@
 - 小白狐资源优先放在 `android/app/src/main/res/drawable-nodpi/`，避免 Android 按密度自动缩放。
 - `FoxAgentAssetMapper` 负责把 `FoxAgentUiState` / `FoxMood` / `FoxMotion` 映射到 drawable 或 Canvas fallback。
 - `DevSettings.FOX_ASSET_MODE` 当前支持 `auto` / `png` 资源优先语义和 `canvas` 低配 fallback 语义；低配设备可强制 Canvas 或静态状态。
+- TTS speaking 会临时映射到 `fox_3d_speaking`；朗读结束或停止后恢复后端 reply 对应的基础状态。
 - UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
 - 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；v1 通过 Android 系统 TTS + VoiceProfile 调整验证。
@@ -120,8 +121,8 @@ network_error
 
 ## 当前不做
 
-- 当前 v0.1 不接真实相机、语音或 TTS；下一阶段语音 v1 才会接 Android 本地 SpeechRecognizer 和系统 TTS。
-- 不在当前版本录制、生成或播放真实语音；语音入口和字段只作为后续接口预留。
+- 当前不接真实相机或 SpeechRecognizer ASR；语音输入 v1 后续才会接 Android 本地 SpeechRecognizer。
+- 当前 TTS v1 使用系统 TextToSpeech 播放小白狐回复；不录制、生成或保存音频文件。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。
@@ -275,7 +276,8 @@ bash scripts/dev_backend.sh
 8. 点击“父亲日报”不应直接进入；长按“父亲日报”后输入开发 PIN `0000`，读取当天 summary；如果当天没有结构化记忆，后端会返回“暂无可汇总的结构化会话素材”类摘要。
 9. 页面不应默认显示 `base=... | active=...` 这类内部 session_state 调试文本。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。
-11. 小白狐状态应随后端 `emotion` / `agent_motion` 轻量变化；底部语音入口仍是占位，不应录音或播放音频。
+11. 小白狐状态应随后端 `emotion` / `agent_motion` 轻量变化；小白狐回复默认自动朗读，朗读时切到 speaking，可停止或静音。
+12. 底部语音输入按钮仍是占位，不应录音或请求麦克风权限。
 ```
 
 如果需要先排除后端 API 合约问题，可以在仓库根目录运行：

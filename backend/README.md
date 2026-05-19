@@ -20,8 +20,39 @@ The current backend is intentionally local-first and mock-first:
   ordinary message into a fixed script.
 - Normalizes child-facing model replies for voice-first use: short natural
   sentences, no Markdown/list formatting, and usually one main question.
-- Returns child-facing reply metadata for future voice and white-fox animation
+- Returns child-facing reply metadata for future voice and 小白狐 animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
+- The next voice phase keeps speech recognition and TTS on Android first:
+  confirmed text is sent to the existing conversation API, raw child audio is
+  not uploaded by default, and backend audio upload / cloud ASR is deferred
+  until a separate child-data and retention review.
+- TTS v1 is an Android responsibility: Android should default to automatic
+  reading of the 小白狐 reply, while still offering stop/mute and parent or
+  DevSettings controls. The backend continues to return safe text and
+  presentation metadata; it does not generate a 小白狐专属音色 in v1.
+
+## Current Voice And Presentation Contract
+
+The backend remains the decision and safety boundary. Android may use local
+`SpeechRecognizer` and TextToSpeech in the next phase, but child-facing content
+still flows through:
+
+```text
+SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelRegistry -> output safety check
+```
+
+Current backend contract:
+
+- Accept confirmed text through `POST /api/v1/conversation/message`.
+- Treat v1 speech input as confirm-before-send; hands-free conversational mode
+  is a future product phase and should not change the v1 backend contract.
+- Do not require raw audio upload for v0.2 voice input.
+- Keep external audio transmission disabled unless a later confirmed product
+  decision and provider gate review explicitly allow it.
+- Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
+  `reply.agent_motion` for Android TTS and 小白狐 presentation.
+- Never use voice or presentation metadata to weaken learning-answer, secrecy,
+  trusted-adult, or long-term raw-data storage safety rules.
 
 ## Setup
 

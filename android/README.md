@@ -2,10 +2,12 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。下一阶段产品重点是语音交互和小白狐形象体验，但必须先完成完整设备 QA。
+
 ## 当前范围
 
 - 单一儿童聊天入口。
-- 小白狐/小狐狸智能体形象占位，会根据后端 `reply.emotion` 和
+- 小白狐智能体形象占位，会根据后端 `reply.emotion` 和
   `reply.agent_motion` 做轻量状态变化。
 - 文本输入框和发送按钮。
 - 调用后端 `POST /api/v1/conversation/message`。
@@ -18,10 +20,36 @@
 - 儿童聊天页中的父亲设置和父亲日报入口使用轻量误触保护：点击只提示，长按后输入开发 PIN 才进入。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
 
+## 下一阶段语音和小白狐方向
+
+已确认方向：
+
+- 语音输入 v1 优先使用 Android 本地 `SpeechRecognizer`。
+- 语音输入 v1 是 confirm-before-send：点击语音 -> 孩子说话 -> Android 本地 ASR -> 展示识别文本 -> 孩子确认/可编辑 -> 点击发送 -> text 走 `/conversation/message`。
+- Future hands-free conversational mode 不进入 v1。
+- 确认后的文本继续调用现有 `POST /api/v1/conversation/message`。
+- 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
+- TTS 朗读 v1 优先使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
+- TTS 必须有停止/静音和 DevSettings 或父亲设置开关。
+- TTS v1 需要 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
+- Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
+- 小白狐形象应温和、好奇、慢热友好，视觉目标优先 3D / soft 3D / 毛绒感 / 立体绘本感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
+- UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
+- 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
+- QA 需要记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度。
+
+详细设计见：
+
+- `docs/PRODUCT_DECISIONS_V0_1.md`
+- `docs/VOICE_INTERACTION_DESIGN_V0_1.md`
+- `docs/FOX_AGENT_VISUAL_DESIGN_V0_1.md`
+- `docs/NEXT_PHASE_PLAN_V0_2.md`
+
 ## 当前不做
 
-- 不接真实相机、语音或 TTS。
+- 当前 v0.1 不接真实相机、语音或 TTS；下一阶段语音 v1 才会接 Android 本地 SpeechRecognizer 和系统 TTS。
 - 不在当前版本录制、生成或播放真实语音；语音入口和字段只作为后续接口预留。
+- 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。
 - 不把父亲入口 PIN 当作强安全机制；它只是 v0.1 开发期的轻量误触保护。

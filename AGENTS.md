@@ -31,6 +31,7 @@ docs/SYSTEM_DESIGN_V0_1.md
 docs/DEVELOPMENT_BACKLOG_V0_1.md
 docs/CODEX_WORKFLOW_V0_1.md
 docs/CODEX_TASK_PROMPTS_V0_1.md
+docs/PRODUCT_DECISIONS_V0_1.md
 docs/session_process/SHARED_CONTEXT_V0_1.md
 ```
 
@@ -275,7 +276,21 @@ Known issues:
 
 ---
 
-## 11. 不确定时的默认选择
+## 11. Product Decision Sync
+
+```text
+1. 父亲/产品负责人确认的新想法、方案调整、边界原则，必须写入 docs/PRODUCT_DECISIONS_V0_1.md。
+2. 涉及语音、小白狐形象、儿童安全、模型外发、记忆、父亲治理的决策，不允许只存在对话中。
+3. 子会话开始前必须检查 PRODUCT_DECISIONS 是否有影响本任务的新决策。
+4. 子会话完成后如果发现新的产品事实或限制，必须建议主会话更新 PRODUCT_DECISIONS 或对应设计文档。
+5. 代码实现不得与 confirmed decision 冲突；如冲突，先报告，不要擅自改产品方向。
+6. UI、产品、设计和测试说明统一使用正式名称“小白狐”；代码 class 名 FoxAgent 暂可保留，后续重命名必须单独 refactor。
+7. 语音输入 v1 必须是 confirm-before-send；TTS v1 默认自动朗读但必须可停止/静音并受 DevSettings 或父亲设置治理。
+```
+
+---
+
+## 12. 不确定时的默认选择
 
 ```text
 1. 安全优先于体验。

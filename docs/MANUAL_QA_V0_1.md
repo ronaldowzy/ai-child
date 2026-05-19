@@ -14,8 +14,10 @@
 | 本机 health | 通过：`http://127.0.0.1:8000/api/v1/health` 返回 `{"status":"ok"}` |
 | 局域网 health | 通过：`http://192.168.0.118:8000/api/v1/health` 返回 `{"status":"ok"}` |
 | Android SDK | 存在：`/Users/wzy/Library/Android/sdk` |
-| adb 设备 | 通过：本次用 `emulator-5554` 做无窗口 smoke，验证后已关闭 |
+| adb 设备 | 通过：本次用 `emulator-5554` 做窗口模式 smoke |
 | Emulator / AVD | 通过：已安装 Android Emulator，并创建 `child_ai_tablet_api35` |
+| 模拟器网络 | 通过：`AndroidWifi` 连接后，模拟器内 `curl http://10.0.2.2:8000/api/v1/health` 返回 `{"status":"ok"}` |
+| 模拟器中文输入 | 通过：系统 Gboard 中文拼音可用；自动化中文注入使用 emulator 内 ADBKeyBoard 调试输入法 |
 | JDK | 通过：主控会话复验 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` 可用；S14 子会话的 Java Runtime 报错属于未加载共享环境的误判 |
 | 后端 Python | 系统 `python3` 为 3.9.6，不满足 backend `requires-python >=3.11`；应使用 `child-ai` conda 环境或显式 `PYTHON_BIN` |
 
@@ -44,6 +46,8 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | `bash scripts/android_gradle.sh lintDebug` | 通过：主控会话复验 |
 | `bash scripts/start_android_emulator.sh --headless` | 通过：`emulator-5554` 启动，`sys.boot_completed=1` |
 | `bash scripts/install_android_debug.sh` | 通过：debug APK 安装并启动 |
+| `adb shell cmd wifi connect-network AndroidWifi open` | 通过：修复模拟器 `10.0.2.2` 不通问题 |
+| `adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'` | 通过：通过 ADBKeyBoard 注入中文到 Compose 输入框 |
 
 ## API 联调场景
 
@@ -66,7 +70,7 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | 项 | 结果 |
 |---|---|
 | Android 设备或模拟器访问后端 | 通过：模拟器 App 发送 `hello` 后后端 `POST /api/v1/conversation/message` 返回 200 |
-| Android 文字聊天基础链路 | 通过：页面显示孩子消息、后端回复、quick actions 和 session_state |
+| Android 文字聊天基础链路 | 通过：窗口模式模拟器发送“我有一道题不会”，页面显示孩子消息、后端学习引导、`拍题目`/`读题目` quick actions 和 session_state |
 | Android 父亲日报读取 | 通过：父亲日报页显示后端空摘要和建议父亲动作 |
 | Android mock 拍题触发到后端题意引导 | 未执行；下一轮手动 QA 继续 |
 | Android 父亲策略更新影响后续 conversation | 未执行；下一轮手动 QA 继续 |
@@ -89,8 +93,9 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 2. Mac 本机 `127.0.0.1:8000` health 通过。
 3. Mac 局域网地址 `192.168.0.118:8000` health 通过。
 4. Android 模拟器预期 base URL：`http://10.0.2.2:8000/`。
-5. Android 真机/平板预期 base URL：`http://192.168.0.118:8000/`。
-6. 若真机访问失败，下一步优先检查同一 Wi-Fi、macOS 防火墙、VPN/代理、以及 Gradle `-PconversationApiBaseUrl` 是否使用了 LAN 地址。
+5. 如果模拟器 `ip route` 为空或 `10.0.2.2` 报 `Network is unreachable`，执行 `bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open`。
+6. Android 真机/平板预期 base URL：`http://192.168.0.118:8000/`。
+7. 若真机访问失败，下一步优先检查同一 Wi-Fi、macOS 防火墙、VPN/代理、以及 Gradle `-PconversationApiBaseUrl` 是否使用了 LAN 地址。
 
 ## 已知问题
 
@@ -98,6 +103,8 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 2. 后端脚本必须优先使用 `child-ai` conda 环境；本机系统 Python 为 3.9.6，不满足 backend `requires-python >=3.11`。
 3. Android mock 拍题、父亲设置影响和父亲入口保护完整手动流程仍需在窗口模式模拟器或真实平板上继续验收。
 4. 父亲 policy 和日报素材仍为内存态；后端重启后会丢失，v0.1 联调可接受，后续家庭内测前应明确持久化策略。
+5. 模拟器 `AndroidWifi` 可能保存但未连接，必须先连接后再验证 `10.0.2.2:8000`。
+6. `adb shell input text` 不能可靠输入中文；手动用 Gboard 中文拼音，自动化用 emulator 内 ADBKeyBoard。
 
 ## 结论
 

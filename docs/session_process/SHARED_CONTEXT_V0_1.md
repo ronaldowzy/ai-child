@@ -165,6 +165,40 @@ bash scripts/start_android_emulator.sh --headless
 bash scripts/install_android_debug.sh
 ```
 
+模拟器访问宿主机后端时，后端必须监听 `0.0.0.0:8000`，模拟器侧使用 `10.0.2.2:8000`：
+
+```bash
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/android_env.sh adb shell 'curl -fsS http://10.0.2.2:8000/api/v1/health'
+```
+
+已知坑：`child_ai_tablet_api35` 里 `AndroidWifi` 可能已保存但处于禁用/未连接状态，表现为 `ip route` 为空或 `10.0.2.2` 报 `Network is unreachable`。先执行：
+
+```bash
+bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open
+bash scripts/android_env.sh adb shell cmd wifi status
+```
+
+中文输入：
+
+```bash
+# 切到系统 Gboard 中文拼音 subtype，适合手动在模拟器里用拼音输入。
+bash scripts/android_env.sh adb shell settings put secure selected_input_method_subtype 617035939
+bash scripts/android_env.sh adb shell ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
+```
+
+自动化 QA 需要直接注入中文时，Android 自带 `adb shell input text` 对中文会失败或只输入拼音。当前模拟器已安装调试输入法 ADBKeyBoard，仅用于本机 emulator QA，不属于产品 APK，也不进入仓库：
+
+```bash
+# 如模拟器重建后需要重新安装，可从开源 release 下载到 /tmp 后安装。
+curl -fL -o /tmp/child-ai-qa/adbkeyboard.apk \
+  https://github.com/senzhk/ADBKeyBoard/releases/download/v2.5-dev/keyboardservice-debug.apk
+bash scripts/android_env.sh adb install -r /tmp/child-ai-qa/adbkeyboard.apk
+bash scripts/android_env.sh adb shell ime enable com.android.adbkeyboard/.AdbIME
+bash scripts/android_env.sh adb shell ime set com.android.adbkeyboard/.AdbIME
+bash scripts/android_env.sh adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'
+```
+
 设备侧验收前必须运行：
 
 ```bash
@@ -241,6 +275,8 @@ bash scripts/e2e_local_api_check.sh
 | K03 | 系统 `python3` 是 3.9.x，不满足 backend | 已知 | 使用 `child-ai` conda 环境或 `PYTHON_BIN` |
 | K04 | 设备侧 Android UI 验收需要真机或 AVD | 处理中 | 优先使用 `child_ai_tablet_api35` AVD；必要时连接真实平板 |
 | K05 | 后端 policy/report/memory 是进程内存态 | v0.1 可接受 | 联调记录中说明重启会丢失，后续持久化再处理 |
+| K06 | 模拟器 `AndroidWifi` 未连接导致 `10.0.2.2` 不通 | 已知 | `adb shell cmd wifi connect-network AndroidWifi open`，并用模拟器内 `curl http://10.0.2.2:8000/api/v1/health` 验证 |
+| K07 | `adb shell input text` 不能可靠输入中文 | 已知 | 手动 QA 用系统 Gboard 中文拼音；自动化 QA 用 emulator 内 ADBKeyBoard 广播注入中文 |
 
 ---
 

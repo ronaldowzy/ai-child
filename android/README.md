@@ -120,7 +120,32 @@ bash scripts/install_android_debug.sh
 模拟器访问宿主机后端使用默认 `http://10.0.2.2:8000/`。启动后端：
 
 ```bash
-bash scripts/dev_backend.sh --host 127.0.0.1 --port 8000
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+```
+
+如果模拟器里 App 提示无法连接后端，先确认模拟器网络和宿主机 health：
+
+```bash
+bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open
+bash scripts/android_env.sh adb shell 'curl -fsS http://10.0.2.2:8000/api/v1/health'
+```
+
+窗口模式手动输入中文时，可切到系统 Gboard 中文拼音：
+
+```bash
+bash scripts/android_env.sh adb shell settings put secure selected_input_method_subtype 617035939
+bash scripts/android_env.sh adb shell ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
+```
+
+自动化 UI QA 需要直接注入中文时，本机 emulator 可临时使用 ADBKeyBoard 调试输入法；它只安装到模拟器，不属于产品 APK：
+
+```bash
+curl -fL -o /tmp/child-ai-qa/adbkeyboard.apk \
+  https://github.com/senzhk/ADBKeyBoard/releases/download/v2.5-dev/keyboardservice-debug.apk
+bash scripts/android_env.sh adb install -r /tmp/child-ai-qa/adbkeyboard.apk
+bash scripts/android_env.sh adb shell ime enable com.android.adbkeyboard/.AdbIME
+bash scripts/android_env.sh adb shell ime set com.android.adbkeyboard/.AdbIME
+bash scripts/android_env.sh adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'
 ```
 
 ## 手动联调

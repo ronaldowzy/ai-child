@@ -18,6 +18,10 @@ from app.providers.model.base import (
 )
 from app.providers.model.mock_provider import MockModelProvider
 from app.providers.model.openai_compatible_provider import OpenAICompatibleProvider
+from app.services.model_data_policy_guard import (
+    ModelDataPolicyBlockedError,
+    ModelDataPolicyGuard,
+)
 
 
 class ModelRegistryError(RuntimeError):
@@ -39,12 +43,14 @@ class ModelRegistry:
         providers: Mapping[str, BaseModelProvider] | None = None,
         profiles: Mapping[str, ModelProfile] | None = None,
         task_profile_map: Mapping[ModelTaskType | str, str] | None = None,
+        data_policy_guard: ModelDataPolicyGuard | None = None,
     ) -> None:
         self._providers = dict(providers or self._default_providers())
         self._profiles = dict(profiles or self._default_profiles())
         self._task_profile_map = self._normalize_task_profile_map(
             task_profile_map or self._default_task_profile_map()
         )
+        self._data_policy_guard = data_policy_guard or ModelDataPolicyGuard()
 
     def select(self, task_type: ModelTaskType | str) -> BaseModelProvider:
         profile = self.select_profile(task_type)
@@ -72,7 +78,33 @@ class ModelRegistry:
         primary_profile = self._get_primary_profile(request.task_type)
         try:
             provider = self._provider_for_profile(primary_profile)
+            self._data_policy_guard.validate(
+                request=request,
+                profile=primary_profile,
+            )
             return provider.generate(request, profile=primary_profile)
+        except ModelDataPolicyBlockedError as exc:
+            fallback_profile = self._mock_fallback_profile_for(
+                primary_profile, request.task_type
+            )
+            if fallback_profile is None:
+                raise ModelRegistryError(
+                    "Model data policy blocked provider call without an enabled "
+                    f"mock fallback: {exc}"
+                ) from exc
+
+            fallback_provider = self._provider_for_profile(fallback_profile)
+            response = fallback_provider.generate(request, profile=fallback_profile)
+            response.metadata.update(
+                {
+                    "fallback_used": True,
+                    "policy_blocked": True,
+                    "failed_profile": primary_profile.profile_name,
+                    "failed_provider": primary_profile.provider_name,
+                    "failure_type": exc.__class__.__name__,
+                }
+            )
+            return response
         except (ModelProviderError, ModelRegistryError) as exc:
             fallback_profile = self._fallback_profile_for(
                 primary_profile, request.task_type
@@ -142,6 +174,33 @@ class ModelRegistry:
             if fallback is not None and fallback.enabled:
                 return fallback
         return None
+
+    def _mock_fallback_profile_for(
+        self, profile: ModelProfile, task_type: ModelTaskType
+    ) -> ModelProfile | None:
+        if profile.fallback_profile_name:
+            fallback = self._enabled_mock_profile(profile.fallback_profile_name)
+            if fallback is not None:
+                return fallback
+
+        mock_profile_name = self._default_task_profile_map().get(task_type)
+        if mock_profile_name and mock_profile_name != profile.profile_name:
+            return self._enabled_mock_profile(mock_profile_name)
+        return None
+
+    def _enabled_mock_profile(self, profile_name: str) -> ModelProfile | None:
+        profile = self._profiles.get(profile_name)
+        if (
+            profile is None
+            or not profile.enabled
+            or profile.provider_type != ModelProviderType.MOCK
+        ):
+            return None
+
+        provider = self._providers.get(profile.provider_name)
+        if provider is None or not provider.enabled:
+            return None
+        return profile
 
     def _normalize_task_profile_map(
         self, task_profile_map: Mapping[ModelTaskType | str, str]
@@ -248,8 +307,12 @@ class ModelRegistry:
                 allow_child_data=self._env_bool(
                     "CHILD_AI_MIMO_ALLOW_CHILD_DATA", default=False
                 ),
-                allow_image=False,
-                allow_audio=False,
+                allow_image=self._env_bool(
+                    "CHILD_AI_MIMO_ALLOW_IMAGE", default=False
+                ),
+                allow_audio=self._env_bool(
+                    "CHILD_AI_MIMO_ALLOW_AUDIO", default=False
+                ),
                 external_transmission=True,
                 retention_policy_checked=self._env_bool(
                     "CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", default=False

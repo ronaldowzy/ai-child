@@ -698,3 +698,291 @@ Done when:
 Output:
 先输出联调计划，列出会修改的文件、不会修改的文件、验证步骤、潜在风险。计划确认后再执行。
 ```
+
+---
+
+## S15：ChildAgentRuntime 会话
+
+```text
+你是 ai-child 项目的“ChildAgentRuntime 子会话 S15”。
+
+目标:
+把主 conversation 回复链路从 SceneOrchestrator 直接返回 hardcoded reply，升级为 SceneOrchestrator 决定策略和 fallback，ChildAgentRuntime 负责 PromptManager + ModelRegistry 生成回复、输出安全检查和 fallback。
+
+允许文件:
+- backend/app/services/child_agent_runtime.py
+- backend/app/domain/agent_runtime.py（如确有必要）
+- backend/app/services/conversation_service.py
+- backend/app/providers/model/mock_provider.py
+- backend/app/tests/** 中 runtime、conversation 回归测试
+- backend/README.md
+
+禁止文件:
+- android/**
+- backend/app/services/scene_orchestrator.py，除非只补充兼容字段且先说明
+- 任何真实 secret、本地 .env、真实 API key
+- 默认启用真实模型外发
+
+依赖:
+- S16 模型外发安全闸门已完成。
+- PromptManager、ModelRegistry、SafetyEngine、SceneOrchestrator 已存在。
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- pytest 覆盖 runtime 正常调用 PromptManager + ModelRegistry、provider 失败 fallback、空文本 fallback、输出 HIGH/CRITICAL fallback、学习场景不直接给答案、prompt_versions/metadata 可追踪。
+- 运行 bash scripts/test_backend.sh -q。
+- 运行 bash scripts/lint_backend.sh。
+
+Safety note:
+SceneRouteDecision.reply_text 是安全 fallback，不能删除。模型请求 metadata 必须标记 contains_child_data=true。输出必须经过 SafetyEngine.classify_output，不安全或失败时回落到 scene fallback。
+
+共享上下文更新项:
+- 是否发现 runtime 顺序、prompt_versions、model fallback 或 output safety 的共性坑。
+- 是否需要更新 SHARED_CONTEXT_V0_1.md、backend/README.md 或进度板。
+- 标准入口命令和结果。
+
+Output:
+先输出实现计划，列出会修改的文件、不会修改的文件、测试策略和潜在风险。计划确认后再执行。
+```
+
+---
+
+## S16：模型外发安全闸门会话
+
+```text
+你是 ai-child 项目的“模型外发安全闸门子会话 S16”。
+
+目标:
+真实外部模型 Provider 即使 enabled，也不能在儿童数据安全条件不满足时外发 child data。策略不满足时必须在 provider 调用前 fallback mock 或抛出清晰错误。
+
+允许文件:
+- backend/app/services/model_data_policy_guard.py 或 backend/app/services/model_policy_guard.py
+- backend/app/services/model_registry.py
+- backend/app/domain/model_types.py（仅必要字段）
+- backend/app/tests/test_model_registry.py
+- backend/app/tests/test_openai_compatible_provider.py
+- backend/app/tests/test_model_data_policy_guard.py（如新增）
+- backend/README.md
+- .env.example
+
+禁止文件:
+- backend/app/services/conversation_service.py
+- backend/app/services/scene_orchestrator.py
+- backend/app/services/safety_engine.py
+- android/**
+- 任何真实 API key、真实儿童数据、真实家庭信息
+
+依赖:
+- ModelRegistry 和 OpenAICompatibleProvider 已存在。
+- 真实 provider 默认 disabled，测试不得真实联网。
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- pytest 覆盖 Mimo child data 未授权不调用 urlopen、retention 未确认不调用 urlopen、策略完整时可进入 fake provider、image/audio gate、mock provider bypass、无 fallback 抛错。
+- 运行 bash scripts/test_backend.sh -q。
+- 运行 bash scripts/lint_backend.sh。
+
+Safety note:
+外部传输策略是儿童数据出境前硬闸门。不得把真实 key 写入仓库，不得把真实模型设为默认，不得让测试依赖真实网络。
+
+共享上下文更新项:
+- 是否发现模型开关、环境变量、provider fallback、外发 gate 的共性坑。
+- 是否需要更新 SHARED_CONTEXT_V0_1.md 或 backend/README.md。
+- 标准入口命令和结果。
+
+Output:
+先输出实现计划，列出会修改的文件、不会修改的文件、测试策略和潜在风险。计划确认后再执行。
+```
+
+---
+
+## S17：自动记忆闭环会话
+
+```text
+你是 ai-child 项目的“自动记忆闭环子会话 S17”。
+
+目标:
+让 conversation 主流程自动产生结构化 memory，支撑父亲日报和下一轮对话上下文。v0.1 先做规则型记忆，不急着用真实 LLM 抽取。
+
+允许文件:
+- backend/app/services/conversation_memory_hooks.py
+- backend/app/services/conversation_service.py
+- backend/app/services/memory_service.py
+- backend/app/services/parent_report_service.py
+- backend/app/tests/** 中 memory、conversation、parent report 回归测试
+- backend/README.md
+
+禁止文件:
+- android/**
+- 真实数据库迁移或持久化方案，除非先提交计划并等待确认
+- 保存 raw_chat、full_chat、真实音频、真实照片或真实身份信息
+- 把 safety 记忆默认混入普通 retrieve
+
+依赖:
+- S15 ChildAgentRuntime 合并后再做。
+- S18 安全场景细分合并后更稳；如果主控要求提前做，必须显式标出适配风险。
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- pytest 覆盖学习求助记忆、直接要答案记忆、不想说话情绪观察、高风险 safety memory、父亲日报读取自动 memory、evidence 不含 raw/full transcript 禁用 source。
+- 运行 bash scripts/test_backend.sh -q。
+- 运行 bash scripts/lint_backend.sh。
+
+Safety note:
+记忆只能保存有限、结构化、可解释、可过期的信息。证据必须是 summary，不保存长篇逐字原文，不贴固定负面人格标签，不把内向当缺陷。
+
+共享上下文更新项:
+- 是否发现内存态重启丢失、memory/report hook 顺序、测试 fixture 的共性坑。
+- 是否需要更新 SHARED_CONTEXT_V0_1.md、backend/README.md 或 MANUAL_QA_V0_1.md。
+- 标准入口命令和结果。
+
+Output:
+先输出实现计划，列出会修改的文件、不会修改的文件、测试策略和潜在风险。计划确认后再执行。
+```
+
+---
+
+## S18：安全场景细分会话
+
+```text
+你是 ai-child 项目的“安全场景细分子会话 S18”。
+
+目标:
+把当前安全路由从较粗的 safety.guardian 细化为 HIGH/CRITICAL -> safety.guardian，WATCH -> safety.gentle_checkin，LOW privacy -> privacy.boundary，LOW mental distress -> 温和情绪支持。
+
+允许文件:
+- backend/app/domain/enums.py
+- backend/app/domain/scene.py
+- backend/app/services/safety_engine.py
+- backend/app/services/intent_classifier.py
+- backend/app/services/scene_orchestrator.py
+- backend/app/prompts/scenes/**
+- backend/app/tests/** 中 safety、intent、scene、conversation scenario 测试
+
+禁止文件:
+- android/**
+- backend/app/services/conversation_service.py，除非主控确认接口协调
+- 模型 provider 真实外发配置
+- 任何真实儿童安全案例、真实身份信息或真实聊天原文
+- 放宽“不要求保密”“鼓励告诉可信成人”“父亲提醒”的底线
+
+依赖:
+- S15 ChildAgentRuntime 合并后更稳。
+- M5/M6 安全与场景编排基础已完成。
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- pytest 覆盖陌生人保密 -> guardian、同学骂我 -> gentle_checkin、我不想说话 -> 不进 guardian、家庭住址 -> privacy.boundary、直接要答案仍 learning.homework_help。
+- 运行 bash scripts/test_backend.sh -q。
+- 运行 bash scripts/lint_backend.sh。
+
+Safety note:
+不得让 AI 要求孩子保密，不得鼓励隐瞒父母/老师/可信成人。HIGH/CRITICAL 必须触发 requires_parent_attention；WATCH 不应全部粗暴升级为强 guardian。
+
+共享上下文更新项:
+- 是否发现安全测试句、风险类别、父亲提醒策略的共性坑。
+- 是否需要更新 SHARED_CONTEXT_V0_1.md、MANUAL_QA_V0_1.md 或进度板。
+- 标准入口命令和结果。
+
+Output:
+先输出实现计划，列出会修改的文件、不会修改的文件、测试策略和潜在风险。计划确认后再执行。
+```
+
+---
+
+## S19：Android 父亲入口保护会话
+
+```text
+你是 ai-child 项目的“Android 父亲入口保护子会话 S19”。
+
+目标:
+在不引入账号系统的前提下，为 Android 父亲设置页和父亲日报页增加 v0.1 基础入口保护。建议采用长按父亲入口 -> 输入 dev PIN -> 进入父亲模式。
+
+允许文件:
+- android/app/src/main/java/com/childai/companion/ui/chat/ChildChatScreen.kt
+- android/app/src/main/java/com/childai/companion/ui/AppNavHost.kt
+- android/app/src/main/java/com/childai/companion/config/DevSettings.kt
+- android/app/src/main/java/com/childai/companion/ui/parent/**
+- android/app/src/test/**
+- android/README.md
+
+禁止文件:
+- backend/**
+- 真实账号系统、云端登录、支付、广告或社交能力
+- Android 端模型 API key 或真实 secret
+- 展示孩子完整逐字聊天记录
+
+依赖:
+- A4 父亲设置/日报页面已完成。
+- docs/session_process/SHARED_CONTEXT_V0_1.md 中 Android 标准入口。
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- 运行 bash scripts/android_gradle.sh test assembleDebug lintDebug。
+- 如能操作设备，手动 QA：点击不直接进入，长按弹 PIN，错误 PIN 温和提示，正确 PIN 进入。
+
+Safety note:
+父亲入口保护是治理边界，不是账号系统或强安全机制。不得在客户端保存模型 API key，不得把父亲日报变成逐字监控，不得用惩罚性语言或诱导孩子长时间使用。
+
+共享上下文更新项:
+- 是否发现 Android 环境、Gradle、AVD、UI 手动 QA 的共性坑。
+- 是否需要更新 SHARED_CONTEXT_V0_1.md、android/README.md 或 MANUAL_QA_V0_1.md。
+- 标准入口命令和结果。
+
+Output:
+先输出实现计划，列出会修改的文件、不会修改的文件、测试策略和潜在风险。计划确认后再执行。
+```
+
+---
+
+## S20：文档同步与多会话协同会话
+
+```text
+你是 ai-child 项目的“文档同步与多会话协同子会话 S20”。如果主控指定 S20a/S20b，以主控指定的轮次目标为准。
+
+目标:
+修正文档与真实工程状态不一致的问题，维护进度板、共享上下文、工作流和子会话提示词，确保并行会话知道当前状态、文件所有权、merge gate、标准入口命令和新发现共性坑的交接方式。
+
+允许文件:
+- README.md
+- docs/CODEX_PROGRESS_BOARD_V0_1.md
+- docs/MANUAL_QA_V0_1.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
+- docs/CODEX_WORKFLOW_V0_1.md
+- docs/CODEX_TASK_PROMPTS_V0_1.md
+- docs/session_process/SUBSESSION_PROMPTS_V0_1.md
+
+禁止文件:
+- backend/app/**
+- android/app/**
+- 任何真实 secret、本地 .env、真实儿童身份信息、真实照片或真实音频
+- 把 todo 写成 done，或把 mock 能力写成真实生产能力
+
+依赖:
+- AGENTS.md
+- docs/session_process/README.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
+- docs/CODEX_PROGRESS_BOARD_V0_1.md
+- README.md
+- backend/README.md
+- android/README.md
+- docs/MANUAL_QA_V0_1.md
+- 主控会话提供的当前阶段说明
+
+测试计划:
+- 先运行 bash scripts/doctor_local_env.sh。
+- 文档修改后运行 git diff --check。
+- 运行主控指定的过期表述扫描命令，覆盖 README.md、docs、backend/README.md、android/README.md 中的旧阶段和未初始化类表述。
+- 如果扫描命中合理历史引用，必须在交接中说明。
+
+Safety note:
+文档不得削弱儿童安全底线。必须明确 Mock 优先、真实模型默认关闭、Android 不放 API key、学习不直接给答案、父亲日报不展示逐字聊天记录。
+
+共享上下文更新项:
+- 是否发现新的共性坑。
+- 是否已经写入 SHARED_CONTEXT_V0_1.md，或是否需要主控确认后写入。
+- 是否更新文件所有权矩阵、merge gate 或标准入口命令。
+
+Output:
+先输出文档同步计划，列出会修改的文件、不会修改的文件、验证方式和风险。计划确认或主控授权后执行。
+```

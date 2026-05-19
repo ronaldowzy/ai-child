@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from app.domain.model_types import (
+    ModelDataPolicy,
     ModelProfile,
     ModelProviderType,
     ModelRequest,
@@ -10,7 +13,21 @@ from app.domain.model_types import (
 from app.providers.model.base import BaseModelProvider, ModelProviderError
 from app.providers.model.mock_provider import MockModelProvider
 from app.providers.model.openai_compatible_provider import OpenAICompatibleProvider
-from app.services.model_registry import ModelRegistry
+from app.services.model_registry import ModelRegistry, ModelRegistryError
+
+
+class FakeHttpResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> "FakeHttpResponse":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self._payload).encode("utf-8")
 
 
 class FixedModelProvider(BaseModelProvider):
@@ -47,6 +64,7 @@ def _profile(
     provider_type: ModelProviderType = ModelProviderType.MOCK,
     fallback_profile_name: str | None = None,
     enabled: bool = True,
+    data_policy: ModelDataPolicy | None = None,
 ) -> ModelProfile:
     return ModelProfile(
         id=profile_name,
@@ -57,7 +75,27 @@ def _profile(
         task_type=task_type,
         enabled=enabled,
         fallback_profile_name=fallback_profile_name,
+        data_policy=data_policy or ModelDataPolicy(),
     )
+
+
+def _fake_mimo_response() -> dict[str, object]:
+    return {
+        "id": "chatcmpl_registry_test",
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": "fake mimo response"},
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+
+def _enable_mimo_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro")
+    monkeypatch.setenv("CHILD_AI_MIMO_API_KEY", "test-api-key")
 
 
 def test_model_registry_select_returns_default_mock_provider_for_child_chat() -> None:
@@ -195,3 +233,201 @@ def test_model_registry_can_register_enabled_mimo_profile(
     assert response.provider_name == "mock"
     assert response.metadata["fallback_used"] is True
     assert response.metadata["failure_type"] == "ModelProviderConfigurationError"
+
+
+def test_model_registry_blocks_mimo_child_data_without_allow_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "false")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+
+    def fail_if_called(_request: object, timeout: float) -> FakeHttpResponse:
+        raise AssertionError(f"urlopen should not be called, timeout={timeout}")
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fail_if_called,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="fictional child-facing message",
+            metadata={"contains_child_data": True},
+        )
+    )
+
+    assert response.provider_name == "mock"
+    assert response.metadata["fallback_used"] is True
+    assert response.metadata["policy_blocked"] is True
+    assert response.metadata["failed_provider"] == "mimo"
+    assert response.metadata["failed_profile"] == "mimo_child_chat"
+    assert response.metadata["failure_type"] == "ModelDataPolicyBlockedError"
+
+
+def test_model_registry_blocks_mimo_child_data_without_retention_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "false")
+
+    def fail_if_called(_request: object, timeout: float) -> FakeHttpResponse:
+        raise AssertionError(f"urlopen should not be called, timeout={timeout}")
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fail_if_called,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="fictional child-facing message",
+            metadata={"contains_child_data": True},
+        )
+    )
+
+    assert response.provider_name == "mock"
+    assert response.metadata["policy_blocked"] is True
+    assert response.metadata["failure_type"] == "ModelDataPolicyBlockedError"
+
+
+def test_model_registry_allows_mimo_child_data_when_policy_is_complete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+
+    def fake_urlopen(request: object, timeout: float) -> FakeHttpResponse:
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return FakeHttpResponse(_fake_mimo_response())
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fake_urlopen,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="fictional child-facing message",
+            metadata={"contains_child_data": True},
+        )
+    )
+
+    assert captured["url"] == (
+        "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+    )
+    assert captured["timeout"] == 5.0
+    assert captured["body"]["model"] == "mimo-v2.5pro"
+    assert response.provider_name == "mimo"
+    assert response.response_text == "fake mimo response"
+    assert "policy_blocked" not in response.metadata
+
+
+@pytest.mark.parametrize(
+    ("metadata_key", "allow_env"),
+    [
+        ("contains_image", "CHILD_AI_MIMO_ALLOW_IMAGE"),
+        ("contains_audio", "CHILD_AI_MIMO_ALLOW_AUDIO"),
+    ],
+)
+def test_model_registry_blocks_mimo_image_and_audio_without_explicit_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_key: str,
+    allow_env: str,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+    monkeypatch.setenv(allow_env, "false")
+
+    def fail_if_called(_request: object, timeout: float) -> FakeHttpResponse:
+        raise AssertionError(f"urlopen should not be called, timeout={timeout}")
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fail_if_called,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="fictional multimodal message",
+            metadata={metadata_key: True},
+        )
+    )
+
+    assert response.provider_name == "mock"
+    assert response.metadata["policy_blocked"] is True
+    assert response.metadata["failure_type"] == "ModelDataPolicyBlockedError"
+
+
+def test_model_registry_mock_provider_is_not_blocked_by_data_policy() -> None:
+    registry = ModelRegistry(
+        providers={"mock": MockModelProvider(provider_name="mock")},
+        profiles={
+            "mock_child_chat": _profile(
+                profile_name="mock_child_chat",
+                provider_name="mock",
+                provider_type=ModelProviderType.MOCK,
+                data_policy=ModelDataPolicy(
+                    external_transmission=True,
+                    allow_child_data=False,
+                    allow_image=False,
+                    allow_audio=False,
+                    retention_policy_checked=False,
+                ),
+            )
+        },
+        task_profile_map={ModelTaskType.CHILD_CHAT: "mock_child_chat"},
+    )
+
+    response = registry.generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="fictional mock-only message",
+            metadata={
+                "contains_child_data": True,
+                "contains_image": True,
+                "contains_audio": True,
+            },
+        )
+    )
+
+    assert response.provider_name == "mock"
+    assert "policy_blocked" not in response.metadata
+
+
+def test_model_registry_raises_when_policy_block_has_no_mock_fallback() -> None:
+    registry = ModelRegistry(
+        providers={"fixed": FixedModelProvider(provider_name="fixed")},
+        profiles={
+            "external_child_chat": _profile(
+                profile_name="external_child_chat",
+                provider_name="fixed",
+                provider_type=ModelProviderType.OPENAI_COMPATIBLE,
+                data_policy=ModelDataPolicy(
+                    external_transmission=True,
+                    allow_child_data=False,
+                    retention_policy_checked=True,
+                ),
+            )
+        },
+        task_profile_map={ModelTaskType.CHILD_CHAT: "external_child_chat"},
+    )
+
+    with pytest.raises(ModelRegistryError, match="without an enabled mock fallback"):
+        registry.generate(
+            ModelRequest(
+                task_type=ModelTaskType.CHILD_CHAT,
+                input_text="fictional child-facing message",
+                metadata={"contains_child_data": True},
+            )
+        )

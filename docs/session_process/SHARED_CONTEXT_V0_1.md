@@ -20,6 +20,54 @@
 
 如果 `doctor_local_env.sh` 已经证明某个环境能力可用，子会话不得再把它报告为“当前机器缺失”。如果直接运行裸命令失败，必须先尝试本文件里的标准入口。
 
+### 1.1 标准入口命令
+
+后续子会话优先使用以下入口，不要先用裸命令判断环境状态：
+
+| 场景 | 标准入口 |
+|---|---|
+| 环境诊断 | `bash scripts/doctor_local_env.sh` |
+| 后端测试 | `bash scripts/test_backend.sh` |
+| 后端 lint | `bash scripts/lint_backend.sh` |
+| 后端本地服务 | `bash scripts/dev_backend.sh` |
+| 后端演示 | `bash scripts/demo_backend_scenarios.sh` |
+| 本地 API 合约 | `bash scripts/e2e_local_api_check.sh` |
+| Android 单测 | `bash scripts/android_gradle.sh test` |
+| Android 构建 | `bash scripts/android_gradle.sh assembleDebug` |
+| Android lint | `bash scripts/android_gradle.sh lintDebug` |
+| 启动 tablet AVD | `bash scripts/start_android_emulator.sh` |
+| 安装 debug 包 | `bash scripts/install_android_debug.sh` |
+
+当前结论：JDK 17、Android SDK、adb、`child-ai` conda 环境和 `child_ai_tablet_api35` AVD 已配置。裸 `python3`、`conda`、`./gradlew` 或 `adb` 失败，只能说明当前 shell 可能没加载环境；必须先使用上表标准入口复跑。
+
+### 1.2 并行会话文件所有权矩阵
+
+并行会话以主控会话最新提示词为准。默认写入权如下：
+
+| 文件或目录 | 默认拥有者 | 规则 |
+|---|---|---|
+| `backend/app/services/child_agent_runtime.py`、AgentRuntime 相关 tests | S15 ChildAgentRuntime 会话 | 可接 conversation 编排，但不得绕过 SafetyEngine、PromptManager、ModelRegistry |
+| `backend/app/providers/model/`、模型外发 gate 相关配置/tests | S16 模型安全闸门会话 | 真实 provider 默认 disabled；不得提交真实 API key |
+| `backend/app/services/memory*`、`backend/app/repositories/memory*`、日报素材接入 tests | S17 自动记忆闭环会话 | 不保存长篇逐字原文，不把 safety 记忆混入普通检索 |
+| `backend/app/services/safety_engine.py`、`scene_orchestrator.py`、安全场景 tests | S18 安全场景细分会话 | 高风险优先；不得放宽儿童安全原则 |
+| `android/` 父亲入口保护相关 UI / ViewModel / tests | S19 Android 父亲入口保护会话 | 不做账号系统，不在客户端加入模型 key |
+| `README.md`、`docs/`、`docs/session_process/` | 主控或文档同步会话 | 只同步事实，不夸大未完成能力 |
+
+如果必须修改不属于自己的文件，子会话必须在计划中说明原因，并在交接中标记冲突风险。发现其他会话的并行改动时，先读取 diff 并适配，不要回退。
+
+### 1.3 Merge gate
+
+子会话交接前必须自查：
+
+```text
+1. 只修改授权文件范围。
+2. 不包含真实 secret、真实儿童身份信息、真实照片或音频。
+3. 没有绕过 ModelRegistry、PromptManager、SafetyEngine、IntentClassifier、SceneOrchestrator 等核心边界。
+4. 相关标准入口测试或手动验证已运行；不能运行时说明真实阻塞。
+5. 文档 PR 至少运行 git diff --check，并扫描明显过期表述。
+6. 并行工作中发现的共性坑必须写进交接摘要，交给主控会话决定是否更新本文件。
+```
+
 ---
 
 ## 2. 当前本机环境事实

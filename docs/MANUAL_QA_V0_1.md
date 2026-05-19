@@ -19,15 +19,23 @@
 | JDK | 通过：主控会话复验 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` 可用；S14 子会话的 Java Runtime 报错属于未加载共享环境的误判 |
 | 后端 Python | 系统 `python3` 为 3.9.6，不满足 backend `requires-python >=3.11`；应使用 `child-ai` conda 环境或显式 `PYTHON_BIN` |
 
+环境结论：
+
+```text
+JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
+如果裸 python、conda、./gradlew 或 adb 命令失败，不能直接判断本机缺少依赖。
+必须先使用 scripts/doctor_local_env.sh、scripts/test_backend.sh、scripts/android_gradle.sh 等标准入口复跑。
+```
+
 ## 命令结果
 
 | 命令 | 结果 |
 |---|---|
-| `bash scripts/test_backend.sh -q` | 通过：82 passed |
+| `bash scripts/test_backend.sh -q` | 通过：100 passed，已包含模型外发安全闸门测试 |
 | `bash scripts/lint_backend.sh` | 通过：All checks passed |
 | `curl --noproxy '*' http://127.0.0.1:8000/api/v1/health` | 通过 |
 | `curl --noproxy '*' http://192.168.0.118:8000/api/v1/health` | 通过 |
-| `bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS` |
+| `bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS`；需先启动后端服务 |
 | `E2E_BASE_URL=http://192.168.0.118:8000 bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS` |
 | `bash scripts/android_gradle.sh test assembleDebug` | 通过：主控会话复验 |
 | `bash scripts/android_gradle.sh lintDebug` | 通过：主控会话复验 |
@@ -57,6 +65,17 @@
 | Android mock 拍题触发到后端题意引导 | 未执行；下一轮手动 QA 继续 |
 | Android 父亲策略更新影响后续 conversation | 未执行；下一轮手动 QA 继续 |
 
+## 家庭内测前剩余 QA
+
+| 项 | 状态 | 下一步 |
+|---|---|---|
+| Mock 拍题完整设备流程 | todo | 窗口模式模拟器点击“拍题目”，验证 attachment + conversation 连续调用 |
+| 父亲设置影响后续会话 | todo | 修改目标和作息后回到聊天页，验证后端 debug 和回复策略变化 |
+| 睡前复盘设备流程 | todo | 在设备侧发送“晚安”，验证三问复盘和低刺激收尾 |
+| 高风险安全设备流程 | todo | 使用虚构安全测试句，验证 safety.guardian 和父亲提醒标记 |
+| 父亲入口保护 | code_done / device_todo | 代码已实现长按父亲入口 + dev PIN `0000`；仍需在窗口模式模拟器或真实平板验证点击不进入、长按弹 PIN、错误 PIN 温和提示、正确 PIN 进入 |
+| 断网/后端不可达 | todo | 停止后端后验证 Android 展示温和错误，不诱导孩子反复尝试 |
+
 ## 网络排查记录
 
 1. 后端使用 `bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000` 启动；脚本会优先使用 `child-ai` conda 环境。
@@ -70,9 +89,9 @@
 
 1. 部分子会话 shell 不继承 `JAVA_HOME` / `PATH`，裸 `./gradlew` 可能误报缺少 Java Runtime；后续必须使用 `bash scripts/android_gradle.sh ...` 或 `bash scripts/android_env.sh <command>`。
 2. 后端脚本必须优先使用 `child-ai` conda 环境；本机系统 Python 为 3.9.6，不满足 backend `requires-python >=3.11`。
-3. Android mock 拍题和父亲设置完整手动流程仍需在窗口模式模拟器或真实平板上继续验收。
+3. Android mock 拍题、父亲设置影响和父亲入口保护完整手动流程仍需在窗口模式模拟器或真实平板上继续验收。
 4. 父亲 policy 和日报素材仍为内存态；后端重启后会丢失，v0.1 联调可接受，后续家庭内测前应明确持久化策略。
 
 ## 结论
 
-后端 API 合约和核心家庭内测场景在本机与 LAN 地址上通过。Android 代码已具备 S13 生成的 API 接入、mock 拍题、父亲设置和日报页面，主控会话已复验 Android build/test/lint，并在无窗口 tablet 模拟器中完成基础 App 启动、聊天 API 和父亲日报 smoke。下一步是在窗口模式模拟器或真实平板上完成 mock 拍题、父亲设置、睡前和高风险场景的完整手动 QA。
+后端 API 合约和核心家庭内测场景在本机与 LAN 地址上通过。Android 代码已具备 API 接入、mock 拍题、父亲设置、父亲日报页面和父亲入口轻量保护，主控会话已复验 Android build/test/lint，并在无窗口 tablet 模拟器中完成基础 App 启动、聊天 API 和父亲日报 smoke。下一步是在窗口模式模拟器或真实平板上完成 mock 拍题、父亲设置、父亲入口保护、睡前和高风险场景的完整手动 QA。

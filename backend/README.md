@@ -148,8 +148,19 @@ For child-facing traffic, do not enable real external transmission until the saf
 
 ```bash
 export CHILD_AI_MIMO_ALLOW_CHILD_DATA=false
+export CHILD_AI_MIMO_ALLOW_IMAGE=false
+export CHILD_AI_MIMO_ALLOW_AUDIO=false
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=false
 ```
+
+`ModelRegistry.generate()` enforces this as a code-level gate before any
+OpenAI-compatible provider call. When request metadata marks
+`contains_child_data=true`, an external profile must have both
+`allow_child_data=true` and `retention_policy_checked=true`; otherwise it falls
+back to the mock profile without calling the external provider. Metadata
+`contains_image=true` and `contains_audio=true` also require `allow_image=true`
+and `allow_audio=true`. Mock providers are not blocked by this external
+transmission gate.
 
 The Android app never stores model API keys. All model configuration belongs on the backend host.
 

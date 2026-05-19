@@ -1072,6 +1072,37 @@ A1-13 添加基本 UI 测试或手动 QA 脚本。
 4. 最后合并端到端测试和文档。
 ```
 
+### 18.4 当前加固阶段文件所有权矩阵
+
+第一轮后端和 Android MVP 完成后，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。并行会话必须按文件所有权拆分，避免互相覆盖。
+
+| 文件或目录 | 默认拥有者 | 合并注意事项 |
+|---|---|---|
+| `backend/app/services/agent_runtime*`、runtime tests | AgentRuntime 会话 | AgentRuntime 只能编排既有服务，不得绕过 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry |
+| `backend/app/providers/model/`、模型外发 gate tests | 模型安全闸门会话 | 真实模型默认 disabled；child data 外发必须有显式开关、data policy 确认和 fallback |
+| `backend/app/services/memory*`、`backend/app/repositories/memory*`、日报素材 tests | 自动记忆闭环会话 | 不保存长篇原文；高风险记忆和普通检索隔离 |
+| `backend/app/services/safety_engine.py`、`scene_orchestrator.py`、安全场景 tests | 安全场景细分会话 | 高风险优先，不放宽父亲提醒和可信成人引导 |
+| `android/` 父亲设置/日报入口保护相关文件 | 父亲入口保护会话 | v0.1 不做账号系统，但必须避免儿童轻易进入父亲治理页 |
+| `README.md`、`docs/`、`docs/session_process/` | 主控或文档同步会话 | 只同步真实状态，不夸大未完成能力 |
+
+如果子会话必须跨所有权边界，计划里必须说明原因、影响文件和测试策略。发现并行改动时，读取并适配现有 diff；不得回退他人修改。
+
+### 18.5 Merge gate 和标准入口
+
+每个子会话在交接前必须过 merge gate：
+
+```text
+1. git status / diff 自查，只保留任务内变更。
+2. 相关标准入口命令已运行，或说明为什么不能运行。
+3. 不提交真实 secret、真实儿童身份信息、真实照片或真实音频。
+4. 不改变儿童安全底线，不把学习场景改成直接给答案。
+5. 不绕过核心服务边界。
+6. 文档同步任务运行 git diff --check，并扫描过期表述。
+7. 新发现的共性坑必须写入交接摘要，交给主控会话确认后更新 SHARED_CONTEXT_V0_1.md。
+```
+
+标准入口命令以 `docs/session_process/SHARED_CONTEXT_V0_1.md` 为准。当前本机 JDK 17、Android SDK、adb、`child-ai` conda 环境和 tablet AVD 已配置；裸命令失败不能直接判定缺依赖，必须先使用 `scripts/android_gradle.sh`、`scripts/test_backend.sh`、`scripts/doctor_local_env.sh` 等入口复跑。
+
 ---
 
 ## 19. Codex 任务粒度建议

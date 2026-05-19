@@ -1,6 +1,8 @@
 package com.childai.companion.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,13 +31,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.childai.companion.config.DevSettings
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.ui.parent.ParentEntryPinDialog
+import com.childai.companion.ui.parent.ParentEntryTarget
+import com.childai.companion.ui.parent.ParentPinGate
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 
 @Composable
@@ -72,6 +82,37 @@ private fun ChildChatScreenContent(
     onOpenParentReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var pendingParentEntry by rememberSaveable { mutableStateOf<ParentEntryTarget?>(null) }
+    var parentPinInput by rememberSaveable { mutableStateOf("") }
+    var parentPinError by rememberSaveable { mutableStateOf<String?>(null) }
+    var parentEntryHint by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun resetParentGate() {
+        pendingParentEntry = null
+        parentPinInput = ""
+        parentPinError = null
+    }
+
+    fun openParentGate(target: ParentEntryTarget) {
+        parentEntryHint = null
+        pendingParentEntry = target
+        parentPinInput = ""
+        parentPinError = null
+    }
+
+    fun submitParentPin() {
+        val target = pendingParentEntry ?: return
+        if (ParentPinGate.isPinAccepted(parentPinInput, DevSettings.DEV_PARENT_PIN)) {
+            resetParentGate()
+            when (target) {
+                ParentEntryTarget.Report -> onOpenParentReport()
+                ParentEntryTarget.Settings -> onOpenParentSettings()
+            }
+        } else {
+            parentPinError = ParentPinGate.GENTLE_ERROR_MESSAGE
+        }
+    }
+
     uiState.mockPhoto?.let { mockPhoto ->
         MockPhotoDialog(
             mockPhoto = mockPhoto,
@@ -80,14 +121,35 @@ private fun ChildChatScreenContent(
             onSubmit = onSubmitMockPhoto,
         )
     }
+    pendingParentEntry?.let { target ->
+        ParentEntryPinDialog(
+            target = target,
+            pinInput = parentPinInput,
+            errorMessage = parentPinError,
+            onPinInputChange = {
+                parentPinInput = it
+                parentPinError = null
+            },
+            onConfirm = ::submitParentPin,
+            onDismiss = ::resetParentGate,
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             AgentTopBar(
-                onOpenParentSettings = onOpenParentSettings,
-                onOpenParentReport = onOpenParentReport,
+                parentEntryHint = parentEntryHint,
+                onParentEntryTap = {
+                    parentEntryHint = "请让大人长按父亲入口。"
+                },
+                onOpenParentSettings = {
+                    openParentGate(ParentEntryTarget.Settings)
+                },
+                onOpenParentReport = {
+                    openParentGate(ParentEntryTarget.Report)
+                },
             )
         },
         bottomBar = {
@@ -268,6 +330,8 @@ private fun SessionStateStrip(sessionState: ConversationSessionState) {
 
 @Composable
 private fun AgentTopBar(
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
 ) {
@@ -275,32 +339,80 @@ private fun AgentTopBar(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(
-                text = "小狐狸",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "准备听你说",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            TextButton(onClick = onOpenParentReport) {
-                Text(text = "父亲日报")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = "小狐狸",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "准备听你说",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                ParentEntryButton(
+                    label = "父亲日报",
+                    onTap = onParentEntryTap,
+                    onLongPress = onOpenParentReport,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                ParentEntryButton(
+                    label = "父亲设置",
+                    onTap = onParentEntryTap,
+                    onLongPress = onOpenParentSettings,
+                )
             }
-            TextButton(onClick = onOpenParentSettings) {
-                Text(text = "父亲设置")
+            parentEntryHint?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 10.dp),
+                )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ParentEntryButton(
+    label: String,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.combinedClickable(
+            onClick = onTap,
+            onLongClick = onLongPress,
+            onLongClickLabel = "输入 PIN",
+        ),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+        )
     }
 }
 

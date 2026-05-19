@@ -237,7 +237,11 @@ class MemoryService:
                 *memory.tags,
             ]
         ).lower()
-        return any(token in haystack for token in normalized_query.split())
+        if any(token in haystack for token in normalized_query.split()):
+            return True
+        return any(
+            tag.lower() and tag.lower() in normalized_query for tag in memory.tags
+        )
 
     def _score(self, memory: MemoryItem, query: str | None) -> float:
         if not query:

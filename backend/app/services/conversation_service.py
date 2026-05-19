@@ -21,6 +21,10 @@ from app.services.child_agent_runtime import (
     ChildAgentRuntime,
     get_child_agent_runtime,
 )
+from app.services.conversation_memory_hooks import (
+    ConversationMemoryHooks,
+    get_conversation_memory_hooks,
+)
 from app.services.intent_classifier import (
     IntentClassification,
     IntentClassifier,
@@ -54,6 +58,7 @@ class ConversationService:
         scene_orchestrator: SceneOrchestrator | None = None,
         attachment_service: AttachmentService | None = None,
         child_agent_runtime: ChildAgentRuntime | None = None,
+        memory_hooks: ConversationMemoryHooks | None = None,
         debug_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
@@ -65,6 +70,7 @@ class ConversationService:
         self._scene_orchestrator = scene_orchestrator or get_scene_orchestrator()
         self._attachment_service = attachment_service or get_attachment_service()
         self._child_agent_runtime = child_agent_runtime or get_child_agent_runtime()
+        self._memory_hooks = memory_hooks or get_conversation_memory_hooks()
         self._debug_enabled = debug_enabled
 
     def handle_message(
@@ -129,6 +135,11 @@ class ConversationService:
                 ),
             )
         )
+        memory_context = self._memory_hooks.retrieve_context(
+            child_id=request.child_id,
+            current_text=request.input.text,
+            limit=5,
+        )
         runtime_result = self._child_agent_runtime.run(
             AgentRuntimeRequest(
                 child_id=request.child_id,
@@ -137,7 +148,7 @@ class ConversationService:
                 route_decision=route_decision,
                 time_context=time_context,
                 parent_policy=parent_policy,
-                memory_context=[],
+                memory_context=memory_context,
                 conversation_metadata={
                     "app_mode": request.client_context.app_mode,
                     "input_type": request.input.type,
@@ -174,6 +185,13 @@ class ConversationService:
                     evidence=intent.evidence,
                 ),
             )
+        self._memory_hooks.record_turn(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            safety=safety,
+            intent=intent,
+            route_decision=route_decision,
+        )
         return response
 
     def _response_from_route_decision(

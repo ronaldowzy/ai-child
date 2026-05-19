@@ -11,6 +11,10 @@ The current backend is intentionally local-first and mock-first:
   decides the scene strategy and safe fallback reply, `PromptManager` composes
   the prompt, `ModelRegistry` generates the child chat response, and
   `SafetyEngine.classify_output()` checks the output before return.
+- Retrieves non-safety structured memory before `ChildAgentRuntime`, and writes
+  rule-based conversation memory after routing. Memory evidence uses summary
+  sources only; raw chat, full transcripts, raw audio, and raw photos are not
+  stored as long-term evidence.
 
 ## Setup
 
@@ -101,6 +105,11 @@ They cover:
 - bedtime reflection
 - parent goal influencing reply wording
 - model fallback
+- automatic conversation memory hooks in
+  `app/tests/test_conversation_memory_hooks.py`, including learning patterns,
+  low-energy emotion observations, high-risk safety memory, watch observations,
+  privacy-boundary summaries, parent report visibility, and safety-memory
+  retrieval isolation
 
 ## Demo Scenarios
 
@@ -135,6 +144,10 @@ E2E_BASE_URL=http://MAC_MINI_LAN_IP:8000 bash scripts/e2e_local_api_check.sh
 ```
 
 The check covers health, after-school, learning help, mock homework attachment, bedtime, high-risk safety, parent policy update, and parent report read. It uses fictional IDs and mock homework text only.
+
+With automatic memory enabled, the parent report step may include structured
+conversation summaries generated during the same process. It still does not
+return evidence fields, quote summaries, or full chat transcripts.
 
 ## Optional Xiaomi Mimo Provider
 
@@ -194,12 +207,18 @@ The Android app never stores model API keys. All model configuration belongs on 
 
 - `high` / `critical` input routes to `safety.guardian` with
   `requires_parent_attention=true`.
+- Automatic safety memory created from `safety.guardian` is parent-visible and
+  requires parent attention, but normal runtime retrieval calls
+  `MemoryService.retrieve(..., include_safety=false)` so safety memories are not
+  mixed into ordinary child-facing memory context.
 - `watch` input, such as fictional peer bullying test text, routes to
   `safety.gentle_checkin` by default. It uses calm wording, encourages telling
-  a parent or teacher, and does not force parent attention.
+  a parent or teacher, and does not force parent attention. The automatic memory
+  hook records a parent-visible observation summary, not a raw transcript.
 - Low-risk privacy questions route to `privacy.boundary` and remind the child
   not to share addresses, phone numbers, school names, or photos with AI or
-  strangers.
+  strangers. The automatic memory hook stores only the generic boundary reminder,
+  not the specific address, phone number, school name, or photo content.
 - Low-energy emotion expressions, such as not wanting to talk, remain in normal
   check-in/emotion support instead of `safety.guardian`.
 - Learning help refuses direct final answers and asks for problem understanding or first-step thinking.

@@ -17,11 +17,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,6 +41,8 @@ import com.childai.companion.ui.theme.ChildAiCompanionTheme
 @Composable
 fun ChildChatScreen(
     modifier: Modifier = Modifier,
+    onOpenParentSettings: () -> Unit = {},
+    onOpenParentReport: () -> Unit = {},
     viewModel: ChatViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -45,6 +51,11 @@ fun ChildChatScreen(
         uiState = uiState,
         onSend = viewModel::sendText,
         onQuickAction = viewModel::onQuickAction,
+        onMockProblemTextChange = viewModel::updateMockProblemText,
+        onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
+        onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
+        onOpenParentSettings = onOpenParentSettings,
+        onOpenParentReport = onOpenParentReport,
         modifier = modifier,
     )
 }
@@ -54,13 +65,30 @@ private fun ChildChatScreenContent(
     uiState: ChatUiState,
     onSend: (String) -> Unit,
     onQuickAction: (QuickActionUi) -> Unit,
+    onMockProblemTextChange: (String) -> Unit,
+    onDismissMockPhoto: () -> Unit,
+    onSubmitMockPhoto: () -> Unit,
+    onOpenParentSettings: () -> Unit,
+    onOpenParentReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    uiState.mockPhoto?.let { mockPhoto ->
+        MockPhotoDialog(
+            mockPhoto = mockPhoto,
+            onProblemTextChange = onMockProblemTextChange,
+            onDismiss = onDismissMockPhoto,
+            onSubmit = onSubmitMockPhoto,
+        )
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AgentTopBar()
+            AgentTopBar(
+                onOpenParentSettings = onOpenParentSettings,
+                onOpenParentReport = onOpenParentReport,
+            )
         },
         bottomBar = {
             InputBar(
@@ -118,6 +146,59 @@ private fun ChildChatScreenContent(
             }
         }
     }
+}
+
+@Composable
+private fun MockPhotoDialog(
+    mockPhoto: MockPhotoUiState,
+    onProblemTextChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "拍题目")
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = mockPhoto.problemText,
+                    onValueChange = onProblemTextChange,
+                    enabled = !mockPhoto.isSubmitting,
+                    label = {
+                        Text(text = "题目文字")
+                    },
+                    minLines = 3,
+                    maxLines = 5,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                )
+                mockPhoto.errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onSubmit,
+                enabled = !mockPhoto.isSubmitting,
+            ) {
+                Text(text = if (mockPhoto.isSubmitting) "发送中" else "发送题目")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !mockPhoto.isSubmitting,
+            ) {
+                Text(text = "取消")
+            }
+        },
+    )
 }
 
 @Composable
@@ -186,7 +267,10 @@ private fun SessionStateStrip(sessionState: ConversationSessionState) {
 }
 
 @Composable
-private fun AgentTopBar() {
+private fun AgentTopBar(
+    onOpenParentSettings: () -> Unit,
+    onOpenParentReport: () -> Unit,
+) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
@@ -209,6 +293,13 @@ private fun AgentTopBar() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(modifier = Modifier.weight(1f))
+            TextButton(onClick = onOpenParentReport) {
+                Text(text = "父亲日报")
+            }
+            TextButton(onClick = onOpenParentSettings) {
+                Text(text = "父亲设置")
+            }
         }
     }
 }
@@ -253,6 +344,11 @@ private fun ChildChatScreenPreview() {
             ),
             onSend = {},
             onQuickAction = {},
+            onMockProblemTextChange = {},
+            onDismissMockPhoto = {},
+            onSubmitMockPhoto = {},
+            onOpenParentSettings = {},
+            onOpenParentReport = {},
         )
     }
 }

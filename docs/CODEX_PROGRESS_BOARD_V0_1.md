@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 13 / Android 拍题与父亲页准备
-当前目标：实现 Android mock 拍题流程、父亲设置页和父亲日报页
-下一步：启动 S13 Android 拍题与父亲页会话
+当前阶段：阶段 14 / 端到端联调准备
+当前目标：联调后端和 Android，完成家庭内测手动 QA
+下一步：启动 S14 后端 + Android 端到端联调会话
 ```
 
 ---
@@ -33,8 +33,8 @@
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | done | C0 | Android 可编译，单元测试通过 |
 | A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions/session_state |
-| A3 | Android 拍题 | Mock 拍题流程 | todo | A2/M9 | 学习求助可跑通 |
-| A4 | 父亲设置 | 设置目标和作息 | todo | A2/M2 | policy 可修改 |
+| A3 | Android 拍题 | Mock 拍题流程 | done | A2/M9 | mock attachment + conversation 连续调用可用 |
+| A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
 | E2E | 联调 | 后端 + Android 家庭内测流程 | todo | Q1/A1-A4 | 核心场景可手动跑通 |
 | H1 | 安全加固 | 真实模型接入前检查 | todo | E2E | 可切换 Mock/真实模型 |
 
@@ -146,13 +146,25 @@
 | A1-02 ChildChatScreen | done |  | 静态 UI 已创建，test 通过 |
 | A2-01 ConversationApiClient | done |  | 可请求后端 conversation API |
 | A2-02 ui_actions 渲染 | done |  | 快捷按钮和 session_state 可显示 |
-| A3-01 Mock 拍题 | todo |  | 题目流程跑通 |
-| A4-01 ParentSettingsScreen | todo |  | policy 可修改 |
+| A3-01 Mock 拍题 | done |  | 题目流程跑通，不接真实 CameraX |
+| A4-01 ParentSettingsScreen | done |  | policy 可修改 |
+| A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
 | E2E-01 手动 QA | todo |  | MANUAL_QA_V0_1.md |
 
 ---
 
 ## 3. 当天记录
+
+### 日期：2026-05-19
+
+```text
+今日目标：完成 S13 Android 拍题与父亲页验收。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；README 补充手动验证步骤；Android test、assembleDebug、lintDebug 通过。
+阻塞问题：无。
+Codex 偏差：未接真实 CameraX，未保存真实图片，符合 S13 mock 范围。
+需要补充到 AGENTS.md 的规则：暂无。
+明日第一任务：启动 S14 端到端联调，编写并执行家庭内测手动 QA。
+```
 
 ### 日期：2026-05-18
 

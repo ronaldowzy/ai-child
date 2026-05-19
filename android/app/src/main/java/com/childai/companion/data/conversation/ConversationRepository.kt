@@ -12,13 +12,17 @@ class ConversationRepository(
         childId: String,
         sessionId: String,
         text: String,
+        attachments: List<String> = emptyList(),
         timezone: String = DevSettings.TIMEZONE,
     ): ConversationMessageResponse {
         return apiClient.sendMessage(
             ConversationMessageRequest(
                 childId = childId,
                 sessionId = sessionId,
-                input = ConversationInput(text = text),
+                input = ConversationInput(
+                    text = text,
+                    attachments = attachments,
+                ),
                 clientContext = ClientContext(
                     deviceTime = nowIsoOffset(timezone),
                     timezone = timezone,

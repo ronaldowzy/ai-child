@@ -1,0 +1,225 @@
+package com.childai.companion.ui.parent
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.childai.companion.data.parent.ParentReport
+import com.childai.companion.ui.theme.ChildAiCompanionTheme
+
+@Composable
+fun ParentReportScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: ParentReportViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    ParentReportScreenContent(
+        uiState = uiState,
+        onBack = onBack,
+        onDateChange = viewModel::updateDate,
+        onLoad = viewModel::loadReport,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ParentReportScreenContent(
+    uiState: ParentReportUiState,
+    onBack: () -> Unit,
+    onDateChange: (String) -> Unit,
+    onLoad: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+        topBar = {
+            ParentTopBar(
+                title = "父亲日报",
+                onBack = onBack,
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = uiState.date,
+                    onValueChange = onDateChange,
+                    modifier = Modifier.width(170.dp),
+                    singleLine = true,
+                    label = {
+                        Text(text = "日期")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                )
+                Button(
+                    onClick = onLoad,
+                    enabled = !uiState.isLoading,
+                ) {
+                    Text(text = if (uiState.isLoading) "读取中" else "读取日报")
+                }
+                if (uiState.isLoading) {
+                    CircularProgressIndicator()
+                }
+            }
+            uiState.errorMessage?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            uiState.report?.let { report ->
+                ReportBody(report = report)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportBody(report: ParentReport) {
+    ReportSection(title = "今日整体摘要") {
+        Text(
+            text = report.summary,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+    ReportSection(
+        title = "学习观察",
+        items = report.learningObservations,
+    )
+    ReportSection(
+        title = "表达观察",
+        items = report.expressionObservations,
+    )
+    ReportSection(
+        title = "情绪/社交观察",
+        items = report.emotionObservations,
+    )
+    ReportSection(
+        title = "建议父亲动作",
+        items = report.suggestedParentActions,
+    )
+    ReportSection(
+        title = "需要关注事项",
+        items = report.safetyAlerts,
+        emptyText = "暂无需要关注事项。",
+    )
+}
+
+@Composable
+private fun ReportSection(
+    title: String,
+    items: List<String>,
+    emptyText: String = "暂无结构化观察。",
+) {
+    ReportSection(title = title) {
+        if (items.isEmpty()) {
+            Text(
+                text = emptyText,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items.forEach { item ->
+                    Row {
+                        Text(text = "·", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        content()
+    }
+}
+
+@Preview(showBackground = true, widthDp = 900, heightDp = 700)
+@Composable
+private fun ParentReportScreenPreview() {
+    ChildAiCompanionTheme {
+        ParentReportScreenContent(
+            uiState = ParentReportUiState(
+                date = "2026-05-18",
+                report = ParentReport(
+                    childId = "child_demo_001",
+                    date = "2026-05-18",
+                    summary = "今天暂无可汇总的结构化会话素材。建议保持轻量观察，不做额外判断。",
+                    learningObservations = emptyList(),
+                    expressionObservations = emptyList(),
+                    emotionObservations = emptyList(),
+                    safetyAlerts = emptyList(),
+                    suggestedParentActions = listOf(
+                        "今晚用一个具体问题轻轻收尾，不要追问过多。",
+                    ),
+                ),
+            ),
+            onBack = {},
+            onDateChange = {},
+            onLoad = {},
+        )
+    }
+}

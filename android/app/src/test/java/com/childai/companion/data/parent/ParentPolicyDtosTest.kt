@@ -1,0 +1,69 @@
+package com.childai.companion.data.parent
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ParentPolicyDtosTest {
+    @Test
+    fun parentPolicyUpdateSerializesBackendScheduleShape() {
+        val request = ParentPolicyUpdateRequest(
+            childId = "child_demo_001",
+            goals = listOf("数学题先复述题意"),
+            communicationPreferences = mapOf(
+                "offer_choices_before_open_questions" to true,
+                "do_not_force_expression" to true,
+                "ask_thinking_before_learning_answer" to true,
+                "avoid_labels" to true,
+            ),
+            schedule = defaultParentSchedule()
+                .withEntryTimes("after_school", "15:30", "18:00")
+                .withEntryTimes("bedtime", "20:20", "21:30"),
+        )
+
+        val json = request.toJsonString()
+
+        assertTrue(json.contains("\"daily_schedule\""))
+        assertTrue(json.contains("\"period\":\"after_school\""))
+        assertTrue(json.contains("\"period\":\"bedtime\""))
+        assertFalse(json.contains("\"safety_rules\""))
+    }
+
+    @Test
+    fun parentPolicyResponseParsesGoalsAndSchedule() {
+        val response = ParentPolicyResponse.fromJsonString(
+            """
+            {
+              "child_id": "child_demo_001",
+              "goals": ["数学题先复述题意"],
+              "communication_preferences": {
+                "offer_choices_before_open_questions": true
+              },
+              "safety_rules": {
+                "homework_answer_policy": "scaffold_not_direct_answer"
+              },
+              "schedule": {
+                "daily_schedule": [
+                  {
+                    "period": "after_school",
+                    "start": "15:30",
+                    "end": "18:00",
+                    "goal": "情绪缓冲",
+                    "preferred_interactions": ["状态选择"],
+                    "avoid": ["连续追问"]
+                  }
+                ]
+              },
+              "version": 2,
+              "created_at": "2026-05-18T00:00:00Z",
+              "updated_at": "2026-05-18T00:00:00Z"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("数学题先复述题意"), response.goals)
+        assertEquals("15:30", response.schedule.entry("after_school")?.start)
+        assertEquals(2, response.version)
+    }
+}

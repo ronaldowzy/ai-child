@@ -89,6 +89,38 @@ bash -lc 'source scripts/android_env.sh && cd android && ./gradlew test assemble
 bash scripts/doctor_local_env.sh
 ```
 
+## 本机模拟器
+
+本机已按项目共享上下文准备 tablet AVD：
+
+```text
+child_ai_tablet_api35
+```
+
+启动窗口模式模拟器：
+
+```bash
+bash scripts/start_android_emulator.sh
+```
+
+启动无窗口模式用于命令行 smoke test：
+
+```bash
+bash scripts/start_android_emulator.sh --headless
+```
+
+构建、安装并打开 debug 包：
+
+```bash
+bash scripts/install_android_debug.sh
+```
+
+模拟器访问宿主机后端使用默认 `http://10.0.2.2:8000/`。启动后端：
+
+```bash
+bash scripts/dev_backend.sh --host 127.0.0.1 --port 8000
+```
+
 ## 手动联调
 
 先从仓库根目录启动后端：

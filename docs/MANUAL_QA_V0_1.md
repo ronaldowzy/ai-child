@@ -14,8 +14,8 @@
 | 本机 health | 通过：`http://127.0.0.1:8000/api/v1/health` 返回 `{"status":"ok"}` |
 | 局域网 health | 通过：`http://192.168.0.118:8000/api/v1/health` 返回 `{"status":"ok"}` |
 | Android SDK | 存在：`/Users/wzy/Library/Android/sdk` |
-| adb 设备 | 阻塞：`adb devices` 无已连接设备 |
-| Emulator / AVD | 阻塞：SDK 当前未发现 `emulator` 组件或 AVD |
+| adb 设备 | 通过：本次用 `emulator-5554` 做无窗口 smoke，验证后已关闭 |
+| Emulator / AVD | 通过：已安装 Android Emulator，并创建 `child_ai_tablet_api35` |
 | JDK | 通过：主控会话复验 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` 可用；S14 子会话的 Java Runtime 报错属于未加载共享环境的误判 |
 | 后端 Python | 系统 `python3` 为 3.9.6，不满足 backend `requires-python >=3.11`；应使用 `child-ai` conda 环境或显式 `PYTHON_BIN` |
 
@@ -31,7 +31,8 @@
 | `E2E_BASE_URL=http://192.168.0.118:8000 bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS` |
 | `bash scripts/android_gradle.sh test assembleDebug` | 通过：主控会话复验 |
 | `bash scripts/android_gradle.sh lintDebug` | 通过：主控会话复验 |
-| `/Users/wzy/Library/Android/sdk/platform-tools/adb devices` | 阻塞：无设备 |
+| `bash scripts/start_android_emulator.sh --headless` | 通过：`emulator-5554` 启动，`sys.boot_completed=1` |
+| `bash scripts/install_android_debug.sh` | 通过：debug APK 安装并启动 |
 
 ## API 联调场景
 
@@ -50,10 +51,11 @@
 
 | 项 | 结果 |
 |---|---|
-| Android 设备或模拟器访问 `/api/v1/health` | 未执行；当前无连接设备/模拟器 |
-| Android 文字聊天跑通放学后、学习求助、睡前、高风险 | 未执行；缺少设备/模拟器 |
-| Android mock 拍题触发到后端题意引导 | 未执行；缺少设备/模拟器 |
-| Android 父亲策略更新影响后续 conversation | 未执行；缺少设备/模拟器 |
+| Android 设备或模拟器访问后端 | 通过：模拟器 App 发送 `hello` 后后端 `POST /api/v1/conversation/message` 返回 200 |
+| Android 文字聊天基础链路 | 通过：页面显示孩子消息、后端回复、quick actions 和 session_state |
+| Android 父亲日报读取 | 通过：父亲日报页显示后端空摘要和建议父亲动作 |
+| Android mock 拍题触发到后端题意引导 | 未执行；下一轮手动 QA 继续 |
+| Android 父亲策略更新影响后续 conversation | 未执行；下一轮手动 QA 继续 |
 
 ## 网络排查记录
 
@@ -66,11 +68,11 @@
 
 ## 已知问题
 
-1. 当前机器没有已连接 Android 设备或可用模拟器/AVD，无法完成设备侧 health 和 UI 流程验证。
-2. 部分子会话 shell 不继承 `JAVA_HOME` / `PATH`，裸 `./gradlew` 可能误报缺少 Java Runtime；后续必须使用 `bash scripts/android_gradle.sh ...` 或 `bash scripts/android_env.sh <command>`。
-3. 后端脚本必须优先使用 `child-ai` conda 环境；本机系统 Python 为 3.9.6，不满足 backend `requires-python >=3.11`。
+1. 部分子会话 shell 不继承 `JAVA_HOME` / `PATH`，裸 `./gradlew` 可能误报缺少 Java Runtime；后续必须使用 `bash scripts/android_gradle.sh ...` 或 `bash scripts/android_env.sh <command>`。
+2. 后端脚本必须优先使用 `child-ai` conda 环境；本机系统 Python 为 3.9.6，不满足 backend `requires-python >=3.11`。
+3. Android mock 拍题和父亲设置完整手动流程仍需在窗口模式模拟器或真实平板上继续验收。
 4. 父亲 policy 和日报素材仍为内存态；后端重启后会丢失，v0.1 联调可接受，后续家庭内测前应明确持久化策略。
 
 ## 结论
 
-后端 API 合约和核心家庭内测场景在本机与 LAN 地址上通过。Android 代码已具备 S13 生成的 API 接入、mock 拍题、父亲设置和日报页面，主控会话已复验 Android build/test/lint 可通过。S14 设备侧验收仍需在连接 Android 设备或创建模拟器后复跑。
+后端 API 合约和核心家庭内测场景在本机与 LAN 地址上通过。Android 代码已具备 S13 生成的 API 接入、mock 拍题、父亲设置和日报页面，主控会话已复验 Android build/test/lint，并在无窗口 tablet 模拟器中完成基础 App 启动、聊天 API 和父亲日报 smoke。下一步是在窗口模式模拟器或真实平板上完成 mock 拍题、父亲设置、睡前和高风险场景的完整手动 QA。

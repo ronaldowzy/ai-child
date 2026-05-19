@@ -91,13 +91,39 @@ bash -lc 'source scripts/android_env.sh && cd android && ./gradlew test assemble
 
 ### Android 设备 / 模拟器
 
-截至 2026-05-19，主控会话未确认有已连接 Android 设备或可用 AVD。设备侧验收前必须运行：
+截至 2026-05-19，主控会话已安装 Android Emulator，并创建本机 tablet AVD：
+
+```text
+AVD name: child_ai_tablet_api35
+System image: system-images;android-35;google_apis_tablet;arm64-v8a
+Device profile: pixel_tablet
+```
+
+启动模拟器：
+
+```bash
+bash scripts/start_android_emulator.sh
+```
+
+无窗口 smoke test 可用：
+
+```bash
+bash scripts/start_android_emulator.sh --headless
+```
+
+安装并打开 debug 包：
+
+```bash
+bash scripts/install_android_debug.sh
+```
+
+设备侧验收前必须运行：
 
 ```bash
 bash scripts/android_env.sh adb devices
 ```
 
-这是当前真实设备侧阻塞点：没有设备或模拟器时，无法完成 Android UI 端到端手动验收。
+如果 `adb devices` 没有设备，先启动上面的 AVD；如果模拟器启动失败，再考虑连接真实平板。
 
 ---
 
@@ -165,7 +191,7 @@ bash scripts/e2e_local_api_check.sh
 | K01 | 子会话裸 `./gradlew` 误报缺少 Java Runtime | 已知 | 使用 `bash scripts/android_gradle.sh ...` 或 `bash scripts/android_env.sh <command>` |
 | K02 | 非交互 shell 找不到 `conda` | 已知 | 根脚本会探测 `/opt/homebrew/bin/conda`；必要时显式设置 `PYTHON_BIN` |
 | K03 | 系统 `python3` 是 3.9.x，不满足 backend | 已知 | 使用 `child-ai` conda 环境或 `PYTHON_BIN` |
-| K04 | 设备侧 Android UI 验收需要真机或 AVD | 未完成 | 连接设备或安装 emulator/创建 AVD 后复跑 S14 手动 QA |
+| K04 | 设备侧 Android UI 验收需要真机或 AVD | 处理中 | 优先使用 `child_ai_tablet_api35` AVD；必要时连接真实平板 |
 | K05 | 后端 policy/report/memory 是进程内存态 | v0.1 可接受 | 联调记录中说明重启会丢失，后续持久化再处理 |
 
 ---

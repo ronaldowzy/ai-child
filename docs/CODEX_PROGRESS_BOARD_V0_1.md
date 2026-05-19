@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 14 / 端到端设备验收阻塞
-当前目标：连接 Android 设备或创建模拟器，复跑设备侧家庭内测手动 QA
-下一步：完成 Android 设备/模拟器准备后复跑 S14 设备侧验收
+当前阶段：阶段 14 / 端到端设备验收
+当前目标：用本机 tablet 模拟器完成家庭内测核心手动 QA
+下一步：窗口模式模拟器复跑 mock 拍题、父亲设置、睡前和高风险场景
 ```
 
 ---
@@ -35,7 +35,7 @@
 | A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions/session_state |
 | A3 | Android 拍题 | Mock 拍题流程 | done | A2/M9 | mock attachment + conversation 连续调用可用 |
 | A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
-| E2E | 联调 | 后端 + Android 家庭内测流程 | blocked | Q1/A1-A4 | 本机/LAN API 已通过；设备侧 UI 验收等待 Android 设备或 AVD |
+| E2E | 联调 | 后端 + Android 家庭内测流程 | in_progress | Q1/A1-A4 | 本机/LAN API 已通过；模拟器基础 UI smoke 已通过，完整手动 QA 待跑 |
 | H1 | 安全加固 | 真实模型接入前检查 | todo | E2E | 可切换 Mock/真实模型 |
 
 ---
@@ -151,7 +151,8 @@
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
 | A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
-| E2E-02 Android 设备侧 QA | blocked |  | 等待连接 Android 设备或创建 AVD |
+| E2E-02 Android 模拟器基础 smoke | done |  | AVD 启动、App 安装、聊天 API、父亲日报读取通过 |
+| E2E-03 Android 完整手动 QA | todo |  | mock 拍题、父亲设置、睡前、高风险场景 |
 
 ---
 
@@ -160,12 +161,12 @@
 ### 日期：2026-05-19
 
 ```text
-今日目标：完成 S13 Android 拍题与父亲页验收，并推进 S14 本机/API 联调和多会话共享上下文机制。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；Android test、assembleDebug、lintDebug 通过。
-阻塞问题：当前没有已连接 Android 设备或可用 AVD，设备侧 UI 验收未执行。
+今日目标：完成 S13 Android 拍题与父亲页验收，并推进 S14 本机/API 联调、多会话共享上下文机制和本机模拟器准备。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过。
+阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需在窗口模式模拟器或真实平板上继续执行。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：准备 Android 设备或模拟器，复跑 S14 设备侧手动 QA。
+明日第一任务：用窗口模式模拟器复跑 S14 完整设备侧手动 QA。
 ```
 
 ### 日期：2026-05-18

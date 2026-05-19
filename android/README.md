@@ -33,10 +33,16 @@
 - TTS 必须有停止/静音和 DevSettings 或父亲设置开关。
 - TTS v1 需要 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
-- 小白狐形象应温和、好奇、慢热友好，视觉目标优先 3D / soft 3D / 毛绒感 / 立体绘本感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
+- 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
+- 小白狐 v1 候选资源已导入，当前包含 `neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking` 五个基础状态。
+- Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+- 小白狐资源优先放在 `android/app/src/main/res/drawable-nodpi/`，避免 Android 按密度自动缩放。
+- `FoxAgentAssetMapper` 负责把 `FoxAgentUiState` / `FoxMood` / `FoxMotion` 映射到 drawable 或 Canvas fallback。
+- `DevSettings.FOX_ASSET_MODE` 当前支持 `auto` / `png` 资源优先语义和 `canvas` 低配 fallback 语义；低配设备可强制 Canvas 或静态状态。
 - UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
-- QA 需要记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度。
+- 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；v1 通过 Android 系统 TTS + VoiceProfile 调整验证。
+- QA 需要记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度、孩子接受度、小白狐动画流畅度和是否需要降级。
 
 详细设计见：
 
@@ -44,6 +50,73 @@
 - `docs/VOICE_INTERACTION_DESIGN_V0_1.md`
 - `docs/FOX_AGENT_VISUAL_DESIGN_V0_1.md`
 - `docs/NEXT_PHASE_PLAN_V0_2.md`
+
+## 小白狐 v1 候选资源
+
+当前候选资源来自父亲 / 产品负责人提供的小白狐角色设定，已经归档到：
+
+```text
+docs/assets/fox/v1/little_white_fox_character_sheet_v1.png
+docs/assets/fox/v1/fox_3d_neutral_idle.png
+docs/assets/fox/v1/fox_3d_listening.png
+docs/assets/fox/v1/fox_3d_speaking.png
+docs/assets/fox/v1/fox_3d_jumping_happy.png
+docs/assets/fox/v1/fox_3d_thinking.png
+```
+
+Android 运行时资源位于：
+
+```text
+android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.png
+android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.png
+android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
+android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
+android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
+android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
+```
+
+当前状态映射：
+
+| 状态 | 资源 |
+|---|---|
+| 普通 / warm / idle | `fox_3d_neutral_idle` |
+| 倾听 / listening | `fox_3d_listening` |
+| 鼓励 / encouraging / celebrate small | `fox_3d_jumping_happy` |
+| 思考 / homework focus | `fox_3d_thinking` |
+| TTS speaking / future speaking state | `fox_3d_speaking` |
+| 网络错误 / 缺失资源 / 低性能模式 | neutral 或 Canvas fallback |
+
+仍需补充：
+
+```text
+calm
+sleepy
+safety_concern
+privacy_boundary
+homework_focus
+network_error
+```
+
+不要删除 Compose Canvas fallback；缺失状态、低性能设备或资源加载失败时必须能降级。
+
+## 双设备测试策略
+
+父亲 / 产品负责人已确认双设备策略：
+
+| 设备 | 定位 | 重点 |
+|---|---|---|
+| Device A：高配 Android 手机 | 功能主验证 | 先跑通 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验和核心安全流程 |
+| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9、4GB 内存、平板横屏/大屏 UI、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
+
+开发原则：
+
+```text
+1. Honor Pad 5 不阻塞第一阶段语音和小白狐功能开发。
+2. 高配手机先跑通功能闭环。
+3. Honor Pad 5 用于最低兼容目标和性能降级验证。
+4. Android 9 兼容性不能被破坏。
+5. Honor Pad 5 上语音效果不好时，允许降级为文字优先，但必须记录 QA 结果。
+```
 
 ## 当前不做
 
@@ -57,6 +130,7 @@
 - 不在客户端实现 AI 决策。
 - 不在客户端做安全分类、意图识别或场景路由。
 - 不展示孩子完整逐字聊天记录。
+- 不引入实时 3D 引擎或大型动画依赖作为第一版小白狐资源必需能力。
 
 ## 后端配置
 

@@ -11,11 +11,13 @@
 ```text
 1. 下一阶段优先解决语音交互和小白狐形象体验。
 2. 正式名称确定为“小白狐”。
-3. 小白狐形象应温和、好奇、慢热友好，优先采用 3D / soft 3D / 毛绒感 / 立体绘本感。
+3. 小白狐形象应温和、好奇、活泼开朗，优先采用 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感。
 4. Compose Canvas fallback 或 2D 静态图只作为前期替代，不是最终视觉目标。
 5. 后端继续通过 reply.emotion 和 reply.agent_motion 向 Android 暴露表现层信号。
 6. 小白狐表现层不得制造依赖感。
 7. 所有新体验继续遵守儿童安全底线和数据最小化原则。
+8. Android 第一版优先使用预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+9. Honor Pad 5 Android 9 / 4GB 是低配兼容性目标设备，不阻塞高配手机上的第一阶段功能闭环。
 ```
 
 命名约定：
@@ -23,7 +25,7 @@
 ```text
 1. 面向儿童端的正式角色名称统一为“小白狐”。
 2. Android drawable 资源命名优先使用 fox_3d_*。
-3. 旧有“小狐狸”表述只作为历史代码或现有 UI 文案背景，不作为新设计 brief 的正式命名。
+3. 旧有“小狐狸”表述只作为历史代码或旧文档背景，不作为新设计 brief 的正式命名。
 ```
 
 ## 1. 角色定位
@@ -53,8 +55,8 @@
 ## 2. 视觉关键词
 
 ```text
-核心气质：温和、稳定、清澈、聪明、好奇、耐心。
-目标风格：3D / soft 3D / 毛绒感 / 立体绘本感。
+核心气质：温和、清澈、聪明、好奇、耐心、活泼开朗。
+目标风格：3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感。
 最终方向：三维立体小白狐形象，适合后续扩展为稳定状态机和轻量动画。
 前期替代：Compose Canvas fallback 或 2D 静态占位可以保留，但只用于资源缺失或早期过渡。
 年龄适配：适合 8 岁儿童，明亮但保持年龄感。
@@ -64,6 +66,7 @@
 比例方向：头身比例可偏亲和，但不要婴儿化；耳朵和尾巴有识别度。
 情绪表达：通过眼睛、耳朵、尾巴、身体重心和小幅动作表达状态。
 屏幕适配：在 Android 平板聊天页中作为顶部或中部主视觉，缩小到 96dp 仍能识别。
+动作方向：可以有说话、倾听、轻轻蹦跳等状态，但节奏要短、可收尾，不做奖励连击或强刺激循环。
 ```
 
 ## 3. 禁止风格和安全边界
@@ -86,11 +89,11 @@
 
 ## 4. 基础形象规格
 
-最终资源目标是三维立体小白狐形象，以 3D rendered PNG sequence 交付给 Android 使用。前期可继续保留 Compose Canvas fallback 或 2D 静态占位，但不得为了赶进度硬塞低质量临时图片。
+最终资源目标是三维立体小白狐形象，以 3D rendered PNG/WebP sequence 交付给 Android 使用。前期可继续保留 Compose Canvas fallback 或 2D 静态占位，但不得为了赶进度硬塞低质量临时图片。
 
 ```text
 画布：1024x1024 px。
-格式：3D rendered PNG sequence，透明背景。
+格式：3D rendered PNG/WebP sequence，透明背景优先。
 主体：白色或浅奶白色小白狐，亲和、温和、聪明、好奇。
 主体占比：角色主体建议占画布宽高的 72%-86%，四周保留安全边距。
 背景：透明，不要画固定场景背景。
@@ -98,7 +101,7 @@
 五官：表情清楚但克制，眼睛和嘴部能支持多状态差异。
 比例：各状态保持一致角色比例、头身关系、耳朵位置、尾巴体量和主色。
 姿态：consistent character pose and lighting，各状态变化只改变必要表情和小幅姿态。
-风格：soft 3D / 毛绒感 / 立体绘本感；not too cartoonishly babyish。
+风格：3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；not too cartoonishly babyish。
 文字：no text baked into image；所有文案由 Android UI 渲染。
 光影：柔和、稳定、适合儿童端；避免强对比和复杂反光。
 ```
@@ -111,6 +114,8 @@
 |---|---|---|
 | `neutral_idle` | 默认聊天、普通问候、无特殊情绪 | 自然站立或坐姿，轻微微笑，耳朵放松，尾巴稳定。 |
 | `listening` | 孩子正在输入、语音预留、倾听表达 | 身体略前倾，眼睛专注，耳朵朝前，尾巴小幅上扬。 |
+| `speaking` | TTS 朗读、小白狐正在说话 | 开口说话或挥手，活泼但不吵闹，适合短句朗读。 |
+| `jumping_happy` | 小进步、鼓励、轻量开心反馈 | 小幅蹦跳或抬脚，不能做连击奖励或强刺激庆祝。 |
 | `thinking` | AI 正在生成回复、引导拆题 | 眼神向上或略收，头部轻轻倾斜，表现思考而不是困惑。 |
 | `encouraging` | 孩子说清楚想法、完成一步推理 | 温和鼓励，小幅开心，避免胜利式夸张庆祝。 |
 | `calm` | 孩子低能量、不想说话、睡前放松 | 呼吸感、低刺激、表情安静，适合慢慢说。 |
@@ -137,21 +142,28 @@
 
 ## 7. 资源格式和命名
 
-第一批资源优先目标是 Android drawable 可直接使用的 3D rendered PNG sequence。资源进入仓库前由主会话确认并由 Android 会话接入；本文档不要求当前创建图片文件。
+第一批资源优先目标是 Android `drawable-nodpi` 可直接使用的 3D rendered PNG/WebP sequence。当前小白狐 v1 候选资产已经导入仓库，包含 5 个基础状态；它不是最终完整视觉系统，仍需补充安全、隐私、睡前、网络错误等状态。
+
+当前候选资产：
+
+```text
+docs/assets/fox/v1/little_white_fox_character_sheet_v1.png
+docs/assets/fox/v1/fox_3d_neutral_idle.png
+docs/assets/fox/v1/fox_3d_listening.png
+docs/assets/fox/v1/fox_3d_speaking.png
+docs/assets/fox/v1/fox_3d_jumping_happy.png
+docs/assets/fox/v1/fox_3d_thinking.png
+```
 
 建议 Android drawable 路径：
 
 ```text
-android/app/src/main/res/drawable/fox_3d_neutral_idle.png
-android/app/src/main/res/drawable/fox_3d_listening.png
-android/app/src/main/res/drawable/fox_3d_thinking.png
-android/app/src/main/res/drawable/fox_3d_encouraging.png
-android/app/src/main/res/drawable/fox_3d_calm.png
-android/app/src/main/res/drawable/fox_3d_sleepy.png
-android/app/src/main/res/drawable/fox_3d_safety_concern.png
-android/app/src/main/res/drawable/fox_3d_privacy_boundary.png
-android/app/src/main/res/drawable/fox_3d_homework_focus.png
-android/app/src/main/res/drawable/fox_3d_network_error.png
+android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.png
+android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.png
+android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
+android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
+android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
+android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
 ```
 
 设计交付包中可同步保留源资产路径：
@@ -172,16 +184,16 @@ assets/fox/v1/3d/fox_3d_network_error.png
 每个文件要求：
 
 ```text
-1. 3D rendered PNG sequence。
+1. 3D rendered PNG/WebP sequence。
 2. 1024x1024。
-3. transparent background。
+3. transparent background 优先；候选图如仍含背景或阴影，应在资源 QA 中记录并后续替换。
 4. sRGB 色彩空间。
 5. 文件名全小写 snake_case。
 6. consistent character pose and lighting。
 7. 角色比例、视角、光源、边距一致。
 8. no text baked into image。
 9. 不包含水印、UI 按钮、对话气泡或答案内容。
-10. 可另外提供 3D 源文件、渲染参数或 2D fallback，但 Android 第一批不依赖复杂动画引擎。
+10. 可另外提供 3D 源文件、渲染参数或 2D fallback，但 Android 第一批不依赖复杂动画引擎或实时 3D。
 ```
 
 可选附加导出：
@@ -198,7 +210,7 @@ assets/fox/v1/3d/fox_3d_network_error.png
 当前 Android 端已有 Compose Canvas fallback，并根据后端 `reply.emotion` 和 `reply.agent_motion` 做轻量状态映射。第一版资源接入原则如下：
 
 ```text
-1. 最终方向是三维立体小白狐形象，优先接入 fox_3d_* drawable PNG。
+1. 最终方向是三维立体小白狐形象，优先接入 fox_3d_* drawable-nodpi PNG/WebP。
 2. 当前 Compose Canvas fallback 必须保留，作为资源缺失、资源加载失败或 3D 资源未交付时的默认显示。
 3. 2D 静态图也只作为前期替代，不应取代最终 3D / soft 3D 方向。
 4. 资源进入仓库前不要硬编码临时图片，不要引用本地设计软件路径。
@@ -206,6 +218,9 @@ assets/fox/v1/3d/fox_3d_network_error.png
 6. 后端仍只输出语义状态和动作 ID，Android 负责展示映射。
 7. 图片不承载业务逻辑、安全判断、学习答案或父亲策略。
 8. 不硬塞低质量临时图片；资源质量不达标时继续使用 Canvas fallback。
+9. 使用 `FoxAgentAssetMapper` 做轻量资源选择：输入 `FoxAgentUiState` / `FoxMood` / `FoxMotion`，输出 drawable resource id 或 Canvas fallback。
+10. 使用 `DevSettings.FOX_ASSET_MODE` 控制资源模式：`auto` / `png` 优先资源图，`canvas` 强制使用 Canvas fallback。
+11. Honor Pad 5 等低配设备必须保留低性能模式：减少动画、降低图片尺寸、关闭自动动画或仅保留静态状态图。
 ```
 
 建议后续接入映射：
@@ -214,14 +229,26 @@ assets/fox/v1/3d/fox_3d_network_error.png
 |---|---|---|
 | 默认、温和 | `fox_3d_neutral_idle.png` | `gentle_blink` |
 | 倾听、孩子输入中 | `fox_3d_listening.png` | `listening_tail` |
+| TTS speaking / future speaking state | `fox_3d_speaking.png` | 轻量 speaking 状态 |
 | 思考、拆题 | `fox_3d_thinking.png` | `thinking_nod` |
-| 鼓励、小进步 | `fox_3d_encouraging.png` | `small_encourage` |
-| 安静、低能量 | `fox_3d_calm.png` | `calm_breathe` |
-| 睡前 | `fox_3d_sleepy.png` | `sleepy_blink` |
-| 高风险关注 | `fox_3d_safety_concern.png` | `concerned_still` |
-| 隐私边界 | `fox_3d_privacy_boundary.png` | `steady_boundary` |
-| 学习聚焦 | `fox_3d_homework_focus.png` | `thinking_nod` |
-| 网络错误 | `fox_3d_network_error.png` | `gentle_blink` |
+| 鼓励、小进步 | `fox_3d_jumping_happy.png` | `small_encourage` |
+| 安静、低能量 | `fox_3d_neutral_idle.png` 或 Canvas calm fallback | `calm_breathe` |
+| 睡前 | `fox_3d_neutral_idle.png` 或后续补图 | `sleepy_blink` |
+| 高风险关注 | `fox_3d_listening.png` 或 Canvas concerned fallback | `concerned_still` |
+| 隐私边界 | `fox_3d_thinking.png` 或 Canvas steady_boundary fallback | `steady_boundary` |
+| 学习聚焦 | `fox_3d_thinking.png`，后续补 `fox_3d_homework_focus.png` | `thinking_nod` |
+| 网络错误 | `fox_3d_neutral_idle.png` 或 Canvas calm fallback | `gentle_blink` |
+
+当前缺失状态：
+
+```text
+calm
+sleepy
+safety_concern
+privacy_boundary
+homework_focus
+network_error
+```
 
 ## 9. 设计端交付物
 
@@ -268,6 +295,14 @@ assets/fox/v1/3d/fox_3d_network_error.png
 12. 不需要新增复杂动画依赖即可完成第一批表现。
 13. 设计端能说明素材版权来源和可使用范围。
 14. 未把 2D fallback 或低质量临时图当作最终 3D 方向交付。
+15. 高配 Android 手机上 PNG 状态图显示正常。
+16. Honor Pad 5 Android 9 / 4GB 上显示不卡顿或有明确降级策略。
+17. 进入学习求助时显示 thinking/homework 状态，缺少 homework_focus 时可复用 thinking。
+18. 进入倾听或普通聊天时显示 listening / neutral 状态。
+19. TTS 朗读时后续能切到 speaking 状态。
+20. 网络错误时不能崩溃，应 fallback 到 neutral 或 Canvas。
+21. 缺失状态资源时不能崩溃。
+22. 不引入实时 3D 引擎或大型动画依赖。
 ```
 
 ## 11. 待父亲和设计端确认的问题

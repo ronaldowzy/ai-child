@@ -12,6 +12,8 @@ PD-005：后端继续通过 reply.voice_enabled、reply.audio_url、reply.emotio
 PD-010：语音输入 v1 是 confirm-before-send，future hands-free conversational mode 不进入 v1。
 PD-011：TTS v1 默认自动朗读小白狐回复，必须有停止/静音和 DevSettings 或父亲设置开关。
 PD-014：SpeechRecognizer / TextToSpeech 必须通过 VoiceEngine / SpeechInputController / TtsController 抽象。
+PD-017：小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚。
+PD-018：采用双设备测试策略，高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性验证。
 ```
 
 ---
@@ -124,8 +126,18 @@ v1 流程：
 | `preferredVoiceName` | 优先选择可用的中文系统 voice；找不到时为空并走 fallback |
 | `locale` | `zh-CN` |
 | `speechRate` | 稍慢，便于 8 岁儿童听清 |
-| `pitch` | 略高但不过度，不做尖锐或夸张音色 |
+| `pitch` | 略高但不过度，目标是干净、清脆、中性、活泼可爱，不做尖锐或过度幼稚音色 |
 | `fallbackVoice` | 系统默认中文 voice；仍不可用时只显示文字 |
+
+音色方向：
+
+```text
+1. 小孩子般干净、清脆、中性、活泼可爱。
+2. 不过度尖锐、不婴儿化、不做夸张动画配音腔。
+3. 睡前场景可降低语速和刺激感。
+4. 高风险安全回复保持稳定、温和，不使用戏剧化情绪音色。
+5. v1 不承诺固定专属音色；如果系统 TTS 效果不好，记录 QA 并评估替换方案。
+```
 
 ---
 
@@ -238,6 +250,36 @@ v0.2 前默认不新增后端音频接口。
 ## 11. QA Checklist
 
 全部 QA 使用虚构 child_id、虚构输入，不使用真实儿童身份、真实家庭信息、真实照片或真实音频。
+
+### 11.1 双设备测试策略
+
+| 设备 | 定位 | 用途 |
+|---|---|---|
+| Device A：高配 Android 手机 | 功能主验证 | 快速验证 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源和轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热和卡顿 |
+
+执行顺序：
+
+```text
+1. V1 语音输入先在 Device A 跑通点击语音 -> 本地识别 -> 展示文字 -> 确认/编辑 -> 发送。
+2. 再在 Honor Pad 5 验证权限申请、中文识别、儿童声音识别、延迟、失败提示和是否可接受。
+3. V2 TTS 先在 Device A 跑通默认自动朗读、停止、关闭、VoiceProfile 调整。
+4. 再在 Honor Pad 5 验证中文 TTS 是否存在、音色是否可接受、是否卡顿、是否延迟明显、是否需要关闭自动朗读作为低配默认。
+5. 如果 Honor Pad 5 语音效果不好，允许降级为文字优先，但必须记录结果和降级原因。
+```
+
+每条语音 QA 记录必须包含：
+
+```text
+设备型号
+Android 版本
+是否通过
+延迟
+是否卡顿
+ASR 准确率主观评价
+TTS 自然度主观评价
+是否需要降级
+```
 
 | ID | 场景 | 期望 |
 |---|---|---|

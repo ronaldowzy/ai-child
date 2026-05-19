@@ -65,7 +65,7 @@ private fun MessageBubble(message: ChatMessage) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Text(
-                text = if (isChild) "我" else "小狐狸",
+                text = if (isChild) "我" else "小白狐",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = textColor.copy(alpha = 0.78f),

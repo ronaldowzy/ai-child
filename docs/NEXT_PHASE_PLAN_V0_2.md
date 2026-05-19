@@ -11,7 +11,10 @@
 4. 默认 Mock 优先，真实模型和儿童数据外发仍受后端 gate 约束。
 5. 语音第一阶段优先 Android 本地 SpeechRecognizer + Android TTS，不默认上传原始音频到后端。
 6. TTS v1 默认自动朗读小白狐回复，但必须可停止、可静音，并有 DevSettings 或父亲设置开关。
-7. 小白狐视觉优先 3D / soft 3D / 毛绒感 / 立体绘本感；Compose Canvas / 2D 只是 fallback。
+7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
+8. 小白狐 v1 候选形象资产已生成，当前包含 neutral_idle、listening、speaking、jumping_happy、thinking 五个基础状态。
+9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
 ```
 
 ---
@@ -19,6 +22,13 @@
 ## Phase 1：完整设备 QA
 
 目标：在窗口模式模拟器或真实安卓平板上完整验收现有 v0.1 MVP。
+
+设备策略：
+
+```text
+Device A：高配 Android 手机，功能主验证。
+Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设备。
+```
 
 范围：
 
@@ -51,6 +61,14 @@
 ## Phase 2：语音输入 v1
 
 目标：让孩子可以用语音辅助输入，但仍由确认后的文字进入后端。v1 是 confirm-before-send，不做 hands-free conversational mode。
+
+设备顺序：
+
+```text
+1. 先在高配 Android 手机上跑通：点击语音 -> 本地识别 -> 展示文字 -> 确认/编辑 -> 发送。
+2. 再在 Honor Pad 5 上验证权限申请、中文识别、儿童声音识别、延迟、失败提示和是否可接受。
+3. Honor Pad 5 不作为第一阶段语音功能开发阻塞设备；如效果不好，允许降级为文字优先并记录 QA。
+```
 
 范围：
 
@@ -89,6 +107,13 @@
 
 目标：用 Android 系统 TTS 默认自动朗读小白狐回复，朗读内容必须来自后端已安全处理的 reply。
 
+设备顺序：
+
+```text
+1. 先在高配 Android 手机上跑通默认自动朗读、停止、关闭、VoiceProfile 调整。
+2. 再在 Honor Pad 5 上验证中文 TTS 是否存在、音色是否可接受、是否卡顿、是否延迟明显、是否需要关闭自动朗读作为低配默认。
+```
+
 范围：
 
 ```text
@@ -101,6 +126,7 @@
 7. 提供 DevSettings 或父亲设置开关。
 8. 通过 TtsController 抽象接入 TextToSpeech。
 9. 实现 VoiceProfile：preferredVoiceName、zh-CN、speechRate 稍慢、pitch 偏高不过度、fallback 系统默认中文 voice。
+10. 音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚。
 ```
 
 非目标：
@@ -125,18 +151,20 @@
 
 ## Phase 4：小白狐视觉资源 v1
 
-目标：替换占位形象，形成温和、好奇、慢热友好的小白狐基础视觉。优先方向是 3D / soft 3D / 毛绒感 / 立体绘本感。
+目标：替换占位形象，形成温和、好奇、活泼开朗的小白狐基础视觉。优先方向是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感。
 
 范围：
 
 ```text
 1. 基础静态形象资源。
-2. 优先探索 3D / soft 3D / 毛绒感 / 立体绘本感资源。
-3. 常用表情状态：neutral、happy、thinking、concerned、sleepy。
-4. 常用动作姿态：idle、listening、speaking、thinking、encouraging。
+2. 优先探索 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感资源。
+3. 当前 v1 候选资产：neutral_idle、listening、speaking、jumping_happy、thinking。
+4. 后续补充：calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 5. 与 reply.emotion / reply.agent_motion 的映射表。
-6. Android 资源命名和尺寸规范。
+6. Android 资源命名、drawable-nodpi 和尺寸规范。
 7. Compose Canvas / 2D 仅作为 fallback，不阻塞语音开发。
+8. 优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画。
+9. 低配设备静态降级：减少动画、降低图片尺寸、关闭自动动画或只保留静态状态图。
 ```
 
 原则：
@@ -147,6 +175,7 @@
 3. 不制造“唯一朋友”“只有我懂你”的依赖表达。
 4. 视觉资源来源和版权必须清晰。
 5. UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 FoxAgent 暂可保留。
+6. 不引入实时 3D 引擎或重型动画依赖作为第一版必需能力。
 ```
 
 验收：
@@ -155,6 +184,8 @@
 1. 资源能在平板横竖屏或目标布局中稳定显示。
 2. 不遮挡聊天、确认文本、父亲入口或错误提示。
 3. 与 F1 视觉 brief 保持一致。
+4. 高配手机上 PNG 状态图显示正常。
+5. Honor Pad 5 Android 9 / 4GB 上记录图片内存占用、切换流畅度、发热、卡顿和是否需要降级。
 ```
 
 ---

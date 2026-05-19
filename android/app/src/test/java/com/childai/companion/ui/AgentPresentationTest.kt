@@ -1,6 +1,10 @@
 package com.childai.companion.ui
 
 import com.childai.companion.data.conversation.ConversationReply
+import com.childai.companion.R
+import com.childai.companion.ui.chat.FoxAgentAsset
+import com.childai.companion.ui.chat.FoxAgentAssetMapper
+import com.childai.companion.ui.chat.FoxAgentUiState
 import com.childai.companion.ui.chat.FoxMood
 import com.childai.companion.ui.chat.FoxMotion
 import com.childai.companion.ui.chat.toFoxAgentUiState
@@ -63,5 +67,30 @@ class AgentPresentationTest {
         assertTrue(voice.isTtsAvailable)
         assertEquals("https://example.test/audio.mp3", voice.audioUrl)
         assertEquals("朗读稍后接上", voice.statusText)
+    }
+
+    @Test
+    fun mapsFoxStateToCandidatePngResource() {
+        val asset = FoxAgentAssetMapper.resolve(
+            agent = FoxAgentUiState(
+                mood = FoxMood.Listening,
+                motion = FoxMotion.ListeningTail,
+            ),
+        )
+
+        assertEquals(FoxAgentAsset.Drawable(R.drawable.fox_3d_listening), asset)
+    }
+
+    @Test
+    fun canForceCanvasFallbackForLowPerformanceMode() {
+        val asset = FoxAgentAssetMapper.resolve(
+            agent = FoxAgentUiState(
+                mood = FoxMood.Encouraging,
+                motion = FoxMotion.CelebrateSmall,
+            ),
+            assetMode = "canvas",
+        )
+
+        assertEquals(FoxAgentAsset.CanvasFallback, asset)
     }
 }

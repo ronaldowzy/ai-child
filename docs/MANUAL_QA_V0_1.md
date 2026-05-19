@@ -21,6 +21,42 @@
 | JDK | 通过：主控会话复验 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` 可用；S14 子会话的 Java Runtime 报错属于未加载共享环境的误判 |
 | 后端 Python | 系统 `python3` 为 3.9.6，不满足 backend `requires-python >=3.11`；应使用 `child-ai` conda 环境或显式 `PYTHON_BIN` |
 
+## 双设备测试策略
+
+父亲 / 产品负责人已确认：如果 Honor Pad 5 配置较低，不利于早期开发和体验验证，可以先使用一台配置更高的 Android 手机作为主力测试设备。
+
+| 设备 | 定位 | 设备信息 | 用途 |
+|---|---|---|---|
+| Device A | 高配 Android 手机，功能主验证 | 具体型号和 Android 版本待 QA 记录 | 快速验证 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device B | Honor Pad 5，低配兼容性目标设备 | Android 9，RAM 4GB | Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
+
+执行原则：
+
+```text
+1. Honor Pad 5 不作为第一阶段语音和小白狐功能开发的阻塞设备。
+2. 高配手机先跑通功能闭环。
+3. Honor Pad 5 作为最低兼容目标和性能降级验证设备。
+4. 小白狐目标视觉仍然是 3D 卡通，但 Android 运行时第一版不做复杂实时 3D。
+5. 优先使用预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画。
+6. 必须保留低性能模式：减少动画、降低图片尺寸、关闭自动动画或仅保留静态状态图。
+7. 语音功能在 Honor Pad 5 上如果效果不好，允许降级为文字优先，但要记录 QA 结果。
+8. Android 9 兼容性不能被破坏。
+```
+
+每个语音和小白狐 QA 结果都要记录：
+
+```text
+设备型号
+Android 版本
+是否通过
+延迟
+是否卡顿
+ASR 准确率主观评价
+TTS 自然度主观评价
+小白狐动画流畅度
+是否需要降级
+```
+
 环境结论：
 
 ```text
@@ -126,15 +162,15 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 
 | 项 | 当前结果 | 下一步 |
 |---|---|---|
-| 正式名称“小白狐”替换 UI 文案 | fail / not yet：当前 Android UI 仍显示“小狐狸” | 后续实现后复验所有儿童可见文案、父亲页文案、日志/测试 fixture 是否逐步替换为“小白狐” |
+| 正式名称“小白狐”替换 UI 文案 | code updated / device todo：儿童端主要可见文案已改为“小白狐” | 后续在 Device A 和 Honor Pad 5 上复验聊天标题、消息列表、错误提示、拍题 dialog、父亲页文案、日志/测试 fixture 是否仍有旧称呼 |
 | V1 语音输入 confirm-before-send | todo | 验证 Android 系统 ASR 只转文字，发送前必须让孩子确认；默认不上传或保存原始音频 |
 | V2 TTS 默认自动朗读小白狐回复 | todo | 验证小白狐回复默认自动朗读，且文本仍可读；不得把当前 disabled 语音按钮记录为长期目标 |
 | 停止/静音能力 | todo | 验证朗读中可停止，父亲或开发设置可静音，静音后不自动播放 |
 | DevSettings / 父亲设置关闭自动朗读 | todo | 验证父亲或开发设置能关闭自动朗读，关闭后仍可文字交流 |
 | VoiceProfile | todo | 验证 `zh-CN`、`speechRate`、`pitch` 和 fallback 策略；缺少指定 voice 时有温和 fallback |
 | Android 系统 ASR/TTS 效果评估 | todo | 需要真实设备或人工听感记录：识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
-| 3D 小白狐资源存在时显示 | todo | 资源接入后验证 3D/soft 3D 资源加载、状态动作、性能和不强刺激 |
-| 3D 资源缺失时 Canvas fallback | partial / current fallback ok | 当前 Canvas 形象可显示；后续需在 3D 资源缺失、加载失败、低性能设备时验证 fallback 正常 |
+| 3D 小白狐资源存在时显示 | todo | 当前 v1 候选资源包含 neutral_idle、listening、speaking、jumping_happy、thinking；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |
+| 3D 资源缺失时 Canvas fallback | partial / current fallback ok | 当前 Canvas fallback 仍保留；后续需在资源缺失、加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
 
 ## 下一阶段设备 QA 清单
 
@@ -154,7 +190,8 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | TTS V2 自动朗读 | 触发小白狐回复 | 默认自动朗读；可停止/静音；DevSettings/父亲设置可关闭自动朗读 | todo |
 | VoiceProfile | 切换或缺失系统语音 | `zh-CN`、`speechRate`、`pitch` 生效；缺少指定 voice 时 fallback 正常 | todo |
 | Android 系统 ASR/TTS 评估 | 真实平板或窗口模拟器人工评估 | 记录识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 | todo |
-| 小白狐 3D / fallback | 有资源和缺资源两种状态 | 3D 资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常 | todo |
+| 小白狐 3D / fallback | Device A 和 Device B 各测一次；有资源和缺资源两种状态 | 3D 资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常；Honor Pad 5 记录图片内存、切换流畅度、发热、卡顿和是否需要降级 | todo |
+| 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、网络错误 | 普通聊天显示 neutral；倾听显示 listening；后续 TTS 朗读可切 speaking；学习求助显示 thinking；网络错误不能崩溃并 fallback 到 neutral/canvas | todo |
 
 Mimo 真实 provider 复验说明：
 

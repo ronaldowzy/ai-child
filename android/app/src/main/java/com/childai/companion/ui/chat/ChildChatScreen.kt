@@ -357,7 +357,7 @@ private fun AgentTopBar(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(
-                        text = "小狐狸",
+                        text = "小白狐",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,

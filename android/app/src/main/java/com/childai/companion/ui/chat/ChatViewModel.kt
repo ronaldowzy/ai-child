@@ -69,7 +69,7 @@ class ChatViewModel(
                     ChatMessage(
                         id = nextMessageId("agent-error"),
                         author = MessageAuthor.Agent,
-                        text = "小狐狸现在没有连上后端。我们先停一下，请大人检查网络后再试。",
+                        text = "小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。",
                     ),
                 )
                 _uiState.update {
@@ -114,7 +114,7 @@ class ChatViewModel(
             _uiState.update { state ->
                 state.copy(
                     mockPhoto = mockPhoto.copy(
-                        errorMessage = "请先保留题目文字，再发送给小狐狸。",
+                        errorMessage = "请先保留题目文字，再发送给小白狐。",
                     ),
                 )
             }

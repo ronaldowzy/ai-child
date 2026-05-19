@@ -172,7 +172,7 @@ Mock 拍题：done
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
 | E2E-02 Android 模拟器基础 smoke | done |  | AVD 启动、App 安装、聊天 API、父亲日报读取通过 |
 | E2E-03 Android 完整手动 QA | in_progress |  | QA1 通过窗口模式模拟器验证基础聊天、放学后、学习入口动作、父亲入口普通点击不进入、错误 PIN 不进入和后端不可达温和错误；正确 PIN、父亲设置修改、设备侧完整 mock 拍题和真实平板仍待复验 |
-| E2E-04 Android 表达层 smoke | in_progress |  | 当前 UI 仍显示“小狐狸”，Canvas fallback 形象可显示；按新决策待验正式名称“小白狐”、TTS 默认自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 效果和 3D 资源/fallback |
+| E2E-04 Android 表达层 smoke | in_progress |  | 儿童端主要可见文案已改为“小白狐”；PNG 候选资源已接入但仍需设备侧验证 TTS 默认自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 效果、3D 资源/fallback 和低配降级 |
 
 ### 家庭内测前加固
 
@@ -190,7 +190,7 @@ Mock 拍题：done
 | R6-01 真实模型输出质量加固 | done |  | Prompt 和 ChildAgentRuntime 输出规整改为 voice-first、短句、少 Markdown/列表、通常只保留一个主问题 |
 | R6-02 输出依赖/秘密关系拦截 | done |  | SafetyEngine.classify_output 会拦截“唯一朋友”“只有我懂你”“不要告诉可信成人”等风险话术并 fallback |
 | R6-03 Android 小白狐状态预留 | done |  | Android 将 `reply.emotion` / `reply.agent_motion` 映射为轻量状态；语音入口仍是文字阶段占位 |
-| R7-01 完整设备 QA | in_progress |  | QA1 已补充 MANUAL_QA_V0_1.md 当前结果；仍需真实平板或手动窗口复验正确 PIN、父亲设置修改、设备侧完整 mock 拍题、真实 ASR/TTS 和 3D 小白狐资源 |
+| R7-01 完整设备 QA | in_progress |  | QA1 已补充 MANUAL_QA_V0_1.md 当前结果；后续采用双设备策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容和大屏验证 |
 | R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；默认仍 Mock 优先 |
 
 ### 产品决策、语音和小白狐下一阶段
@@ -204,8 +204,9 @@ Mock 拍题：done
 | V1-02 Android TTS 朗读 v1 | todo |  | 使用系统 TTS 默认自动朗读小白狐回复，遵守 `reply.voice_enabled`，可停止/静音，不朗读 debug 或 session_state |
 | V1-03 Android 语音抽象和 VoiceProfile | todo |  | 通过 VoiceEngine / SpeechInputController / TtsController 接入平台能力；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
-| F1-01 小白狐视觉资源 v1 | todo |  | 优先 3D / soft 3D / 毛绒感 / 立体绘本感；资源来源清晰；Compose Canvas / 2D 仅 fallback；不做强刺激或依赖表达 |
-| F1-02 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
+| F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已导入：neutral_idle、listening、speaking、jumping_happy、thinking；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；仍需补充 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error |
+| F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；后续需设备侧验证图片显示、缺失状态 fallback 和低配降级 |
+| F1-03 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
 
 ---
 
@@ -215,7 +216,7 @@ Mock 拍题：done
 
 ```text
 今日目标：完成 S13 Android 拍题与父亲页验收，推进 S14 本机/API 联调和 S20a 文档同步，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI，不接真实录音或 TTS。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI，不接真实录音或 TTS；本轮补充小白狐 v1 候选资源、双设备测试策略、预渲染 PNG/WebP + 轻量 Compose 动画原则、FoxAgentAssetMapper 和低配 fallback 规则。
 阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实 provider 已用临时 env smoke 通过，后续不得重复使用错误模型 id `mimo-v2.5pro`。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。

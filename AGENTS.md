@@ -31,6 +31,7 @@ docs/SYSTEM_DESIGN_V0_1.md
 docs/DEVELOPMENT_BACKLOG_V0_1.md
 docs/CODEX_WORKFLOW_V0_1.md
 docs/CODEX_TASK_PROMPTS_V0_1.md
+docs/session_process/SHARED_CONTEXT_V0_1.md
 ```
 
 如果文档与代码冲突：
@@ -152,6 +153,7 @@ uvicorn app.main:app --reload
 项目脚本，具体以 scripts/ 为准：
 
 ```bash
+bash scripts/doctor_local_env.sh
 bash scripts/test_backend.sh
 bash scripts/dev_backend.sh
 bash scripts/demo_backend_scenarios.sh
@@ -160,12 +162,11 @@ bash scripts/demo_backend_scenarios.sh
 Android 命令，具体以 android/README.md 为准：
 
 ```bash
-cd android
-./gradlew assembleDebug
-./gradlew test
+bash scripts/android_gradle.sh assembleDebug
+bash scripts/android_gradle.sh test
 ```
 
-如果命令不存在，不要假装运行成功；应创建脚本或说明未实现。
+如果裸命令失败，不要立即报告机器缺少依赖；先查 `docs/session_process/SHARED_CONTEXT_V0_1.md` 并使用标准脚本复跑。如果标准脚本也失败，不要假装运行成功；应说明真实阻塞。
 
 ---
 
@@ -253,11 +254,12 @@ Known issues:
 
 ```text
 1. 阅读相关文档和代码。
-2. 输出计划。
-3. 列出会修改的文件。
-4. 列出不会修改的文件。
-5. 列出测试策略。
-6. 等待确认或直接按任务要求执行。
+2. 阅读共享上下文并运行 `bash scripts/doctor_local_env.sh`。
+3. 输出计划。
+4. 列出会修改的文件。
+5. 列出不会修改的文件。
+6. 列出测试策略。
+7. 等待确认或直接按任务要求执行。
 ```
 
 完成后输出：
@@ -268,6 +270,7 @@ Known issues:
 3. 测试命令和结果。
 4. 未完成事项。
 5. 风险点。
+6. 是否发现需要写入共享上下文的新共性坑。
 ```
 
 ---

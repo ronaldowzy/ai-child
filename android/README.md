@@ -35,9 +35,17 @@ http://10.0.2.2:8000/
 如需改成真机或其他地址，可以在 Gradle 命令中传入：
 
 ```bash
-cd android
-./gradlew assembleDebug -PconversationApiBaseUrl=http://192.168.1.10:8000/
+bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.1.10:8000/
 ```
+
+联调前先确认后端可从 Mac 本机和局域网地址访问：
+
+```bash
+curl --noproxy '*' http://127.0.0.1:8000/api/v1/health
+curl --noproxy '*' http://192.168.1.10:8000/api/v1/health
+```
+
+模拟器继续使用默认 `http://10.0.2.2:8000/`；真机或平板必须使用 Mac mini 的局域网 IP，并确保设备和 Mac 在同一网络。
 
 本地开发使用 HTTP 明文访问后端；不要在 Android 端写入任何模型 API key 或真实 secret。
 
@@ -49,18 +57,36 @@ cd android
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 ```
 
+本项目推荐从仓库根目录使用包装脚本，它会加载本机 JDK 17 和 Android SDK 路径，避免非交互 shell 误报缺少 Java Runtime：
+
+```bash
+bash scripts/android_gradle.sh test
+bash scripts/android_gradle.sh assembleDebug
+bash scripts/android_gradle.sh lintDebug
+```
+
 构建：
 
 ```bash
-cd android
-./gradlew assembleDebug
+bash scripts/android_gradle.sh assembleDebug
 ```
 
 单元测试：
 
 ```bash
-cd android
-./gradlew test
+bash scripts/android_gradle.sh test
+```
+
+如果需要手动进入 `android/` 运行 Gradle，先从仓库根目录加载环境：
+
+```bash
+bash -lc 'source scripts/android_env.sh && cd android && ./gradlew test assembleDebug'
+```
+
+环境排查：
+
+```bash
+bash scripts/doctor_local_env.sh
 ```
 
 ## 手动联调
@@ -84,6 +110,12 @@ bash scripts/dev_backend.sh
 8. 点击“父亲日报”，读取当天 summary；如果当天没有结构化记忆，后端会返回“暂无可汇总的结构化会话素材”类摘要。
 9. 页面底部应显示后端返回的 session_state。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。
+```
+
+如果需要先排除后端 API 合约问题，可以在仓库根目录运行：
+
+```bash
+bash scripts/e2e_local_api_check.sh
 ```
 
 ## 父亲日报说明

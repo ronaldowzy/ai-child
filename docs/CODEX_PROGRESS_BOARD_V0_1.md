@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：阶段 14 / 端到端联调准备
-当前目标：联调后端和 Android，完成家庭内测手动 QA
-下一步：启动 S14 后端 + Android 端到端联调会话
+当前阶段：阶段 14 / 端到端设备验收阻塞
+当前目标：连接 Android 设备或创建模拟器，复跑设备侧家庭内测手动 QA
+下一步：完成 Android 设备/模拟器准备后复跑 S14 设备侧验收
 ```
 
 ---
@@ -35,7 +35,7 @@
 | A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions/session_state |
 | A3 | Android 拍题 | Mock 拍题流程 | done | A2/M9 | mock attachment + conversation 连续调用可用 |
 | A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
-| E2E | 联调 | 后端 + Android 家庭内测流程 | todo | Q1/A1-A4 | 核心场景可手动跑通 |
+| E2E | 联调 | 后端 + Android 家庭内测流程 | blocked | Q1/A1-A4 | 本机/LAN API 已通过；设备侧 UI 验收等待 Android 设备或 AVD |
 | H1 | 安全加固 | 真实模型接入前检查 | todo | E2E | 可切换 Mock/真实模型 |
 
 ---
@@ -55,6 +55,7 @@
 | C0-07 创建 scripts 目录 | done |  | dev/test 脚本占位 |
 | C0-08 创建 PR 模板 | done |  | 包含 Tests/Safety/Docs |
 | C0-09 创建多会话协作流程 | done |  | docs/session_process 可指导子会话协作 |
+| C0-10 共享上下文与环境 doctor | done |  | 子会话先读共享上下文并使用标准入口，避免重复踩环境坑 |
 
 ### M1：后端骨架
 
@@ -149,7 +150,8 @@
 | A3-01 Mock 拍题 | done |  | 题目流程跑通，不接真实 CameraX |
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
 | A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
-| E2E-01 手动 QA | todo |  | MANUAL_QA_V0_1.md |
+| E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
+| E2E-02 Android 设备侧 QA | blocked |  | 等待连接 Android 设备或创建 AVD |
 
 ---
 
@@ -158,12 +160,12 @@
 ### 日期：2026-05-19
 
 ```text
-今日目标：完成 S13 Android 拍题与父亲页验收。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；README 补充手动验证步骤；Android test、assembleDebug、lintDebug 通过。
-阻塞问题：无。
-Codex 偏差：未接真实 CameraX，未保存真实图片，符合 S13 mock 范围。
+今日目标：完成 S13 Android 拍题与父亲页验收，并推进 S14 本机/API 联调和多会话共享上下文机制。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；Android test、assembleDebug、lintDebug 通过。
+阻塞问题：当前没有已连接 Android 设备或可用 AVD，设备侧 UI 验收未执行。
+Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：启动 S14 端到端联调，编写并执行家庭内测手动 QA。
+明日第一任务：准备 Android 设备或模拟器，复跑 S14 设备侧手动 QA。
 ```
 
 ### 日期：2026-05-18

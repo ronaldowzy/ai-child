@@ -38,6 +38,9 @@ CODEX_PROGRESS_BOARD_V0_1.md
 CODEX_PLAN_TEMPLATE.md
   复杂任务开始前让 Codex 填写的执行计划模板。
 
+session_process/SHARED_CONTEXT_V0_1.md
+  多会话共享上下文，记录本机环境事实、已知坑和标准命令入口，避免重复踩坑。
+
 AGENTS_TEMPLATE.md
   建议复制到仓库根目录并改名为 AGENTS.md，作为 Codex 的长期项目规则。
 ```
@@ -49,7 +52,8 @@ AGENTS_TEMPLATE.md
 3. 将 `docs/AGENTS_TEMPLATE.md` 复制到项目根目录，并改名为 `AGENTS.md`。
 4. 将 `docs/CODEX_PROGRESS_BOARD_V0_1.md` 保留在 docs 中，每次任务完成后更新。
 5. 先让 Codex 阅读 `AGENTS.md` 和 `docs/` 中的核心文档。
-6. 再让 Codex 按 `CODEX_TASK_PROMPTS_V0_1.md` 中的任务顺序开始开发。
+6. 多会话开发时，先让每个子会话阅读 `docs/session_process/SHARED_CONTEXT_V0_1.md` 并运行 `bash scripts/doctor_local_env.sh`。
+7. 再让 Codex 按 `CODEX_TASK_PROMPTS_V0_1.md` 中的任务顺序开始开发。
 
 ## 第一条 Codex 指令
 

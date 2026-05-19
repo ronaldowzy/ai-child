@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="${ROOT_DIR}/backend"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-child-ai}"
+CONDA_CMD=""
 
 if [[ ! -d "${BACKEND_DIR}" ]]; then
   echo "backend/ has not been initialized yet. Run S01 backend skeleton before backend linting." >&2
@@ -16,13 +17,19 @@ resolve_python_cmd() {
     return
   fi
 
-  if command -v python >/dev/null 2>&1; then
-    PYTHON_CMD=(python)
+  if command -v conda >/dev/null 2>&1; then
+    CONDA_CMD="$(command -v conda)"
+  elif [[ -x "/opt/homebrew/bin/conda" ]]; then
+    CONDA_CMD="/opt/homebrew/bin/conda"
+  fi
+
+  if [[ -n "${CONDA_CMD}" ]] && "${CONDA_CMD}" env list | awk '{print $1}' | grep -qx "${CONDA_ENV_NAME}"; then
+    PYTHON_CMD=("${CONDA_CMD}" run --no-capture-output -n "${CONDA_ENV_NAME}" python)
     return
   fi
 
-  if command -v conda >/dev/null 2>&1 && conda env list | awk '{print $1}' | grep -qx "${CONDA_ENV_NAME}"; then
-    PYTHON_CMD=(conda run --no-capture-output -n "${CONDA_ENV_NAME}" python)
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_CMD=(python)
     return
   fi
 

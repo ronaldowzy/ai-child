@@ -6,6 +6,40 @@
 
 ---
 
+## 0. 共享上下文和已知坑
+
+所有子会话启动前必须阅读：
+
+```text
+docs/session_process/SHARED_CONTEXT_V0_1.md
+```
+
+并先运行：
+
+```bash
+bash scripts/doctor_local_env.sh
+```
+
+规则：
+
+```text
+1. 不要只根据裸命令失败就判断本机缺少依赖。
+2. 后端验证优先使用 scripts/test_backend.sh、scripts/lint_backend.sh、scripts/dev_backend.sh。
+3. Android 验证优先使用 scripts/android_gradle.sh，而不是直接运行裸 ./gradlew。
+4. 遇到 JDK、Conda、Android SDK、设备、局域网 IP、base URL 等问题，先查 SHARED_CONTEXT_V0_1.md。
+5. 新发现的共性坑必须在交接摘要里提出，由主控会话确认后写入共享上下文。
+```
+
+当前已知重点：
+
+```text
+JDK 17 已安装，但部分非交互 shell 可能没有继承 JAVA_HOME。
+Android SDK 已安装，但设备/模拟器是否连接需要每次联调时现场确认。
+Conda 已安装在 /opt/homebrew/bin/conda，但部分 shell 的 PATH 可能找不到 conda。
+```
+
+---
+
 ## 1. 会话角色
 
 ### 1.1 主控会话：项目总控 / 架构治理
@@ -54,6 +88,7 @@ scripts/
 5. 添加或更新测试。
 6. 运行相关测试。
 7. 输出交接摘要。
+8. 报告是否发现新的共性坑。
 ```
 
 ---
@@ -124,6 +159,7 @@ docs/session_process/         主控会话拥有
 5. 文档更新。
 6. 未完成事项。
 7. 下一个会话需要知道的接口或约束。
+8. 共享上下文是否需要更新。
 ```
 
 主控会话收到交接后：
@@ -143,17 +179,24 @@ docs/session_process/         主控会话拥有
 当前初期开发机是 Mac mini，本机运行后端服务。Python 环境统一使用：
 
 ```bash
-conda activate child-ai
+bash scripts/test_backend.sh
+bash scripts/lint_backend.sh
 ```
 
-后端命令统一从 `backend/` 目录执行：
+如果必须手动使用 Conda：
 
 ```bash
-python -m pytest
-python -m uvicorn app.main:app --reload
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m pytest
 ```
 
-如果命令不存在或失败，子会话必须如实报告，不能假装通过。
+Android 环境统一使用：
+
+```bash
+bash scripts/android_gradle.sh test
+bash scripts/android_gradle.sh assembleDebug
+```
+
+如果命令不存在或失败，子会话必须如实报告，不能假装通过；但报告阻塞前必须先尝试共享上下文里的标准入口。
 
 ---
 
@@ -172,4 +215,3 @@ python -m uvicorn app.main:app --reload
 ```
 
 在 S01 到 S06 完成前，不建议启动 Android API 接入会话。Android 壳会话 S11 可以较早启动，但只能做静态 UI 和项目骨架，不应写死业务场景。
-

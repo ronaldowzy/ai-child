@@ -13,16 +13,23 @@ The current backend is intentionally local-first and mock-first:
 Project convention uses the local conda environment from `docs/session_process/README.md`:
 
 ```bash
+eval "$(/opt/homebrew/bin/conda shell.zsh hook)"
 conda activate child-ai
 cd backend
 python -m pip install -e ".[dev]"
 ```
 
-If the environment is not activated, root scripts will try `conda run --no-capture-output -n child-ai python`. You can override this explicitly:
+If the environment is not activated, root scripts will try `/opt/homebrew/bin/conda run --no-capture-output -n child-ai python` before falling back to system Python. You can override this explicitly:
 
 ```bash
-PYTHON_BIN="conda run --no-capture-output -n child-ai python" bash scripts/test_backend.sh
+PYTHON_BIN="/opt/homebrew/bin/conda run --no-capture-output -n child-ai python" bash scripts/test_backend.sh
 PYTHON_BIN=python3 bash scripts/lint_backend.sh
+```
+
+For local environment diagnosis:
+
+```bash
+bash scripts/doctor_local_env.sh
 ```
 
 ## Run
@@ -37,6 +44,18 @@ Or from `backend/` after activating the environment:
 
 ```bash
 python -m uvicorn app.main:app --reload
+```
+
+For Android device or tablet LAN testing, listen on all interfaces:
+
+```bash
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+```
+
+Then use the Mac mini LAN address from the Android build, for example:
+
+```bash
+bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://MAC_MINI_LAN_IP:8000/
 ```
 
 Default local API docs:
@@ -94,6 +113,22 @@ DEMO_BASE_URL=http://127.0.0.1:8000 bash scripts/demo_backend_scenarios.sh
 ```
 
 The demo uses only fictional IDs such as `child_demo_001` and mock homework text. It does not use real child data, real photos, real OCR, or real model calls.
+
+## Local E2E API Check
+
+With a backend server already running, validate the Android-facing API contract:
+
+```bash
+bash scripts/e2e_local_api_check.sh
+```
+
+To target a LAN server:
+
+```bash
+E2E_BASE_URL=http://MAC_MINI_LAN_IP:8000 bash scripts/e2e_local_api_check.sh
+```
+
+The check covers health, after-school, learning help, mock homework attachment, bedtime, high-risk safety, parent policy update, and parent report read. It uses fictional IDs and mock homework text only.
 
 ## Current API Scope
 

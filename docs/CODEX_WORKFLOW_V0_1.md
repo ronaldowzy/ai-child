@@ -11,6 +11,7 @@ docs/DEVELOPMENT_BACKLOG_V0_1.md
 docs/CODEX_TASK_PROMPTS_V0_1.md
 docs/CODEX_PROGRESS_BOARD_V0_1.md
 docs/CODEX_PLAN_TEMPLATE.md
+docs/session_process/SHARED_CONTEXT_V0_1.md
 AGENTS.md
 ```
 
@@ -81,6 +82,7 @@ Codex 不应该擅自：
 
 ```text
 理解任务
+  -> 读取共享上下文并运行环境 doctor
   -> 列出计划
   -> 实现最小变更
   -> 添加或更新测试
@@ -99,6 +101,7 @@ Codex 不应该擅自：
 4. 为了省事跳过安全逻辑。
 5. 遇到不确定点时自行引入复杂依赖。
 6. 未说明原因就改变 API 结构。
+7. 把已知环境问题重复误报为新的机器阻塞。
 ```
 
 ---

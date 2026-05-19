@@ -6,6 +6,8 @@
 
 ```text
 先不要写代码。先阅读指定文档和相关文件，输出计划，等待确认后再实现。
+必须先阅读 docs/session_process/SHARED_CONTEXT_V0_1.md，并运行 bash scripts/doctor_local_env.sh。
+遇到环境问题时，先使用共享上下文里的标准入口命令复跑，不要只根据裸命令失败报告阻塞。
 ```
 
 ---
@@ -530,6 +532,7 @@ Context:
 - docs/SYSTEM_DESIGN_V0_1.md 中 Android Tablet App
 - docs/DEVELOPMENT_BACKLOG_V0_1.md 的 Android MVP
 - docs/session_process/README.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
 
 Scope:
 允许创建或修改 android/。
@@ -546,6 +549,7 @@ Done when:
 - 有静态聊天界面。
 - 有文本输入框和消息列表占位。
 - 有卡通智能体形象占位。
+- Android 验证优先使用 bash scripts/android_gradle.sh test assembleDebug。
 
 Output:
 先输出计划，列出会修改的文件、不会修改的文件、验证方式、潜在风险。计划确认后再执行。
@@ -568,6 +572,7 @@ Context:
 - docs/CODEX_PROGRESS_BOARD_V0_1.md 的 A2 Android API 任务
 - docs/CODEX_TASK_PROMPTS_V0_1.md 的 A2：Android 接入后端 Conversation API
 - docs/session_process/README.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
 - backend/README.md
 - android/README.md
 - 当前 Android 项目结构
@@ -589,7 +594,7 @@ Done when:
 - 输入“我回来了”能显示后端回复。
 - 输入“我有一道题不会”能显示“拍题目 / 读题目”或等价 ui_actions。
 - session_state 可被保存或用于下一轮请求。
-- Android 可编译，或如本机缺少 Android SDK，给出明确手动验证步骤和阻塞原因。
+- Android 可编译；如失败，必须先用 bash scripts/android_gradle.sh 复跑，再给出明确手动验证步骤和阻塞原因。
 
 Output:
 先输出计划，列出会修改的文件、不会修改的文件、验证方式、潜在风险。计划确认后再执行。
@@ -612,6 +617,7 @@ Context:
 - docs/CODEX_PROGRESS_BOARD_V0_1.md 的 A3 / A4 任务
 - docs/CODEX_TASK_PROMPTS_V0_1.md 的 A3：Android Mock 拍题流程 和 A4：父亲设置页
 - docs/session_process/README.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
 - backend 的 conversation、attachment、parent policy、parent report API 文档或 schema
 - 当前 Android 项目结构
 
@@ -636,7 +642,7 @@ Done when:
 - 点击“拍题目”可走 mock attachment 流程，并展示后端题意引导。
 - 父亲设置页可读取并更新目标、沟通偏好和作息时间。
 - 父亲日报页可显示后端 summary；如果后端未完成对应 API，必须明确作为 stub 并写入 README。
-- Android 可编译，或如本机缺少 Android SDK，给出明确手动验证步骤和阻塞原因。
+- Android 可编译；如失败，必须先用 bash scripts/android_gradle.sh 复跑，再给出明确手动验证步骤和阻塞原因。
 
 Output:
 先输出计划，列出会修改的文件、不会修改的文件、验证方式、潜在风险。计划确认后再执行。
@@ -660,6 +666,7 @@ Context:
 - docs/CODEX_PROGRESS_BOARD_V0_1.md 的 E2E 任务
 - docs/CODEX_TASK_PROMPTS_V0_1.md 的 E2E：端到端联调
 - docs/session_process/README.md
+- docs/session_process/SHARED_CONTEXT_V0_1.md
 - backend/README.md
 - android/README.md
 - scripts/ 当前脚本
@@ -686,7 +693,7 @@ Done when:
 - mock 拍题流程可从 Android 触发到后端题意引导。
 - 父亲策略更新能影响后续 conversation 行为或 debug。
 - 手动 QA 文档记录通过项、失败项、环境信息和已知问题。
-- 后端 pytest / ruff 通过；Android build/test 如环境可用则通过，否则明确记录阻塞。
+- 后端 pytest / ruff 通过；Android build/test 必须优先使用 bash scripts/android_gradle.sh。只有标准入口也失败时，才能明确记录环境阻塞。
 
 Output:
 先输出联调计划，列出会修改的文件、不会修改的文件、验证步骤、潜在风险。计划确认后再执行。

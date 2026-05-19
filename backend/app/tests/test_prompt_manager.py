@@ -46,6 +46,7 @@ def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None
     assert "不直接给最终答案" in prompt.prompt
     assert "不要直接给完整答案" in prompt.prompt
     assert "先引导审题和思路，不直接给最终答案" in prompt.prompt
+    assert "回复默认会被语音播报" in prompt.prompt
 
 
 def test_global_prompt_contains_no_secret_safety_rule() -> None:
@@ -53,6 +54,8 @@ def test_global_prompt_contains_no_secret_safety_rule() -> None:
 
     assert "不能要求孩子保密或保守秘密" in prompt.prompt
     assert "不能鼓励孩子隐瞒父母" in prompt.prompt
+    assert "悄悄告诉我" in prompt.prompt
+    assert "对话本质是自由交流" in prompt.prompt
 
 
 def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:

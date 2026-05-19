@@ -31,7 +31,9 @@ class Reply(BaseModel):
     type: Literal["agent_message"] = "agent_message"
     text: str
     voice_enabled: bool = True
+    audio_url: str | None = None
     emotion: str = "warm"
+    agent_motion: str = "gentle_idle"
 
 
 class QuickAction(BaseModel):

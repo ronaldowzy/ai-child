@@ -219,7 +219,7 @@ class ModelRegistry:
                 api_key_env="CHILD_AI_MIMO_API_KEY",
                 model_name_env="CHILD_AI_MIMO_MODEL",
                 default_base_url="https://token-plan-cn.xiaomimimo.com/v1",
-                default_model_name="mimo-v2.5pro",
+                default_model_name="mimo-v2.5-pro",
                 enabled=self._env_bool("CHILD_AI_MIMO_ENABLED", default=False),
             ),
         }
@@ -249,7 +249,7 @@ class ModelRegistry:
             ),
             "mimo_child_chat": self._mimo_profile(
                 profile_name="mimo_child_chat",
-                model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro"),
+                model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
                 task_type=ModelTaskType.CHILD_CHAT,
                 temperature=0.4,
             ),

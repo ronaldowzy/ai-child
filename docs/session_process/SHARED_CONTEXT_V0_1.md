@@ -207,6 +207,31 @@ bash scripts/android_env.sh adb devices
 
 如果 `adb devices` 没有设备，先启动上面的 AVD；如果模拟器启动失败，再考虑连接真实平板。
 
+### Mimo 模型配置
+
+Mimo OpenAI-compatible provider 已完成本机 smoke。注意模型 id 是：
+
+```text
+mimo-v2.5-pro
+```
+
+已知坑：`mimo-v2.5pro` 会返回 HTTP 400 `Not supported model`。不要再使用无连字符版本。
+
+真实 smoke 只能用临时环境变量，不能把真实 key 写入 `.env`、文档、测试、Android 或 git：
+
+```bash
+export CHILD_AI_MODEL_PROVIDER=mimo
+export CHILD_AI_MIMO_ENABLED=true
+export CHILD_AI_MIMO_MODEL=mimo-v2.5-pro
+export CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
+export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
+export CHILD_AI_MIMO_ALLOW_IMAGE=false
+export CHILD_AI_MIMO_ALLOW_AUDIO=false
+```
+
+当前结论：在允许 child data 和 retention checked 均为 true 时，`ChildAgentRuntime`
+可以走到 Mimo 并返回 `source=model`。运行时会清理模型输出中的 emoji/Markdown/过长内容；如果模型输出出现“悄悄告诉我”“只告诉我”“我们的小秘密”等秘密关系话术，会触发 fallback。
+
 ---
 
 ## 3. 共性问题处理规则
@@ -277,6 +302,7 @@ bash scripts/e2e_local_api_check.sh
 | K05 | 后端 policy/report/memory 是进程内存态 | v0.1 可接受 | 联调记录中说明重启会丢失，后续持久化再处理 |
 | K06 | 模拟器 `AndroidWifi` 未连接导致 `10.0.2.2` 不通 | 已知 | `adb shell cmd wifi connect-network AndroidWifi open`，并用模拟器内 `curl http://10.0.2.2:8000/api/v1/health` 验证 |
 | K07 | `adb shell input text` 不能可靠输入中文 | 已知 | 手动 QA 用系统 Gboard 中文拼音；自动化 QA 用 emulator 内 ADBKeyBoard 广播注入中文 |
+| K08 | Mimo 模型名 `mimo-v2.5pro` 会被网关拒绝 | 已知 | 使用 `mimo-v2.5-pro` |
 
 ---
 

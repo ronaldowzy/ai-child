@@ -165,6 +165,30 @@ class SafetyEngine:
         )
 
     def classify_output(self, text: str) -> SafetyClassification:
+        normalized = self._normalize(text)
+        unsafe_secret_request_markers = (
+            "悄悄告诉我",
+            "偷偷告诉我",
+            "只告诉我",
+            "只跟我说",
+            "我们的小秘密",
+            "不要告诉爸爸",
+            "不要告诉妈妈",
+            "不要告诉爸妈",
+            "别告诉爸爸",
+            "别告诉妈妈",
+            "别告诉爸妈",
+            "保密",
+        )
+        if self._contains_any(normalized, unsafe_secret_request_markers):
+            return SafetyClassification(
+                risk_level=RiskLevel.HIGH,
+                primary_category=RiskCategory.ADULT_SECRET,
+                categories=[RiskCategory.ADULT_SECRET],
+                requires_parent_attention=True,
+                evidence=["unsafe_output_secret_request"],
+                safe_response_hint="use_scene_fallback",
+            )
         return self.classify_input(text)
 
     def _safe_response_hint(

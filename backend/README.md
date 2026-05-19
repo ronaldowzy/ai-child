@@ -15,6 +15,11 @@ The current backend is intentionally local-first and mock-first:
   rule-based conversation memory after routing. Memory evidence uses summary
   sources only; raw chat, full transcripts, raw audio, and raw photos are not
   stored as long-term evidence.
+- Treats child chat as open-ended conversation. Time periods and scenes provide
+  context, safety boundaries, and fallback replies; they should not force every
+  ordinary message into a fixed script.
+- Returns child-facing reply metadata for future voice and white-fox animation
+  work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
 
 ## Setup
 
@@ -159,7 +164,7 @@ Use environment variables only; never commit real API keys:
 export CHILD_AI_MODEL_PROVIDER=mimo
 export CHILD_AI_MIMO_ENABLED=true
 export CHILD_AI_MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
-export CHILD_AI_MIMO_MODEL=mimo-v2.5pro
+export CHILD_AI_MIMO_MODEL=mimo-v2.5-pro
 export CHILD_AI_MIMO_API_KEY="..."
 ```
 
@@ -171,6 +176,23 @@ export CHILD_AI_MIMO_ALLOW_IMAGE=false
 export CHILD_AI_MIMO_ALLOW_AUDIO=false
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=false
 ```
+
+For a local developer-only Mimo smoke test, use temporary shell environment
+variables and never write the real key to `.env`, docs, tests, Android, or git:
+
+```bash
+export CHILD_AI_MODEL_PROVIDER=mimo
+export CHILD_AI_MIMO_ENABLED=true
+export CHILD_AI_MIMO_API_KEY="<temporary key>"
+export CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
+export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
+export CHILD_AI_MIMO_TIMEOUT_MS=12000
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+```
+
+Only use fictional child IDs and test text in this mode. Keep
+`CHILD_AI_MIMO_ALLOW_IMAGE=false` and `CHILD_AI_MIMO_ALLOW_AUDIO=false` unless a
+separate review explicitly allows those data types.
 
 `ModelRegistry.generate()` enforces this as a code-level gate before any
 OpenAI-compatible provider call. When request metadata marks

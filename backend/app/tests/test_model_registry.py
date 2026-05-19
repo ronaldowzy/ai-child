@@ -94,7 +94,7 @@ def _fake_mimo_response() -> dict[str, object]:
 def _enable_mimo_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
     monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
-    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro")
+    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro")
     monkeypatch.setenv("CHILD_AI_MIMO_API_KEY", "test-api-key")
 
 
@@ -220,7 +220,7 @@ def test_model_registry_can_register_enabled_mimo_profile(
 ) -> None:
     monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
     monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
-    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro")
+    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro")
     monkeypatch.delenv("CHILD_AI_MIMO_API_KEY", raising=False)
 
     registry = ModelRegistry()
@@ -228,7 +228,7 @@ def test_model_registry_can_register_enabled_mimo_profile(
     response = registry.generate(ModelRequest(task_type=ModelTaskType.CHILD_CHAT))
 
     assert profile.profile_name == "mimo_child_chat"
-    assert profile.model_name == "mimo-v2.5pro"
+    assert profile.model_name == "mimo-v2.5-pro"
     assert profile.fallback_profile_name == "child_chat_primary"
     assert response.provider_name == "mock"
     assert response.metadata["fallback_used"] is True
@@ -325,7 +325,7 @@ def test_model_registry_allows_mimo_child_data_when_policy_is_complete(
         "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
     )
     assert captured["timeout"] == 5.0
-    assert captured["body"]["model"] == "mimo-v2.5pro"
+    assert captured["body"]["model"] == "mimo-v2.5-pro"
     assert response.provider_name == "mimo"
     assert response.response_text == "fake mimo response"
     assert "policy_blocked" not in response.metadata

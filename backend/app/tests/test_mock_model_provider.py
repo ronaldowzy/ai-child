@@ -11,14 +11,46 @@ def test_mock_model_provider_returns_child_chat_structure() -> None:
         ModelRequest(
             task_type=ModelTaskType.CHILD_CHAT,
             input_text="我有一道题不会",
+            context={
+                "scene_route": {
+                    "active_scene": "learning.homework_help",
+                    "needs_input": "problem_content",
+                }
+            },
         )
     )
 
     assert response.provider_name == "mock"
     assert response.model_name == "mock-model-v0"
     assert response.structured_output["requires_parent_attention"] is False
-    assert response.structured_output["scene_hint"] == "daily.after_school_checkin"
-    assert "不急着要答案" in response.response_text
+    assert response.structured_output["scene_hint"] == "learning.homework_help"
+    assert "不用急着要答案" in response.response_text
+    assert response.structured_output["mock_child_chat_strategy"] == (
+        "learning_problem_intake"
+    )
+
+
+def test_mock_model_provider_simulates_free_dialogue_topic_reply() -> None:
+    provider = MockModelProvider()
+    response = provider.generate(
+        ModelRequest(
+            task_type=ModelTaskType.CHILD_CHAT,
+            input_text="我想聊恐龙",
+            context={
+                "scene_route": {
+                    "active_scene": "daily.after_school_checkin",
+                    "needs_input": "child_choice",
+                    "fallback_reply_text": "我在这里。你可以先选一个小事情。",
+                }
+            },
+        )
+    )
+
+    assert "恐龙" in response.response_text
+    assert "固定流程" not in response.response_text
+    assert response.structured_output["mock_child_chat_strategy"] == (
+        "free_dialogue_topic_echo"
+    )
 
 
 def test_mock_model_provider_keeps_child_safety_boundaries() -> None:

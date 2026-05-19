@@ -9,6 +9,9 @@
 - 文本输入框和发送按钮。
 - 调用后端 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text`、`ui_actions` 快捷按钮和 `session_state`。
+- DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
+  `reply.agent_motion`，为后续语音播报和小白狐动画状态预留字段；当前 UI
+  仍以文字聊天为主。
 - 点击“拍题目”走 mock attachment 流程，不接真实 CameraX，不保存真实图片。
 - 父亲设置页可读取和保存目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
@@ -18,6 +21,7 @@
 ## 当前不做
 
 - 不接真实相机、语音或 TTS。
+- 不在当前版本生成或播放真实语音；语音字段只作为后续接口预留。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。
 - 不把父亲入口 PIN 当作强安全机制；它只是 v0.1 开发期的轻量误触保护。

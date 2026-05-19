@@ -95,6 +95,30 @@ def test_scenario_after_school_checkin_uses_low_pressure_choices() -> None:
     assert {"happy_moment", "hard_thing", "quiet_time"} <= _action_ids(body)
     assert "选" in body["reply"]["text"]
     assert "学习" not in body["reply"]["text"]
+    assert body["reply"]["voice_enabled"] is True
+    assert body["reply"]["agent_motion"] == "listening_tail"
+
+
+def test_scenario_general_topic_stays_open_ended_not_fixed_flow() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_message_payload(
+            child_id="child_scenario_free_topic",
+            session_id="scenario_free_topic_session",
+            text="我想聊恐龙",
+            device_time="2026-05-18T16:32:00+08:00",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
+    assert "恐龙" in body["reply"]["text"]
+    assert "开心的事、遇到的难题" not in body["reply"]["text"]
+    assert body["reply"]["voice_enabled"] is True
+    assert "audio_url" not in body["reply"]
+    assert body["reply"]["agent_motion"] == "listening_tail"
 
 
 def test_scenario_learning_help_requests_photo_or_speech_without_answer() -> None:

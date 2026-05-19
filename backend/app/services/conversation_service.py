@@ -203,6 +203,7 @@ class ConversationService:
             reply=Reply(
                 text=runtime_result.reply_text,
                 emotion=decision.reply_emotion,
+                agent_motion=self._agent_motion_for(decision),
             ),
             ui_actions=[
                 UiAction(
@@ -223,3 +224,19 @@ class ConversationService:
                 ),
             ),
         )
+
+    def _agent_motion_for(self, decision: SceneRouteDecision) -> str:
+        active_scene = decision.active_scene.value
+        if active_scene == "learning.homework_help":
+            return "thinking_nod"
+        if active_scene == "daily.bedtime_reflection":
+            return "sleepy_blink"
+        if active_scene == "safety.guardian":
+            return "concerned_still"
+        if active_scene == "safety.gentle_checkin":
+            return "gentle_nod"
+        if active_scene == "privacy.boundary":
+            return "steady_boundary"
+        if decision.reply_emotion == "calm":
+            return "calm_breathe"
+        return "listening_tail"

@@ -36,7 +36,7 @@ def _mimo_provider() -> OpenAICompatibleProvider:
         api_key_env="CHILD_AI_MIMO_API_KEY",
         model_name_env="CHILD_AI_MIMO_MODEL",
         default_base_url="https://token-plan-cn.xiaomimimo.com/v1",
-        default_model_name="mimo-v2.5pro",
+        default_model_name="mimo-v2.5-pro",
         enabled=True,
     )
 
@@ -47,7 +47,7 @@ def _profile() -> ModelProfile:
         profile_name="mimo_child_chat",
         provider_name="mimo",
         provider_type=ModelProviderType.OPENAI_COMPATIBLE,
-        model_name="mimo-v2.5pro",
+        model_name="mimo-v2.5-pro",
         task_type=ModelTaskType.CHILD_CHAT,
     )
 
@@ -108,9 +108,9 @@ def test_openai_compatible_provider_calls_chat_completions_without_real_network(
     )
     assert captured["authorization"] == "Bearer test-api-key"
     assert captured["timeout"] == 5.0
-    assert captured["body"]["model"] == "mimo-v2.5pro"
+    assert captured["body"]["model"] == "mimo-v2.5-pro"
     assert captured["body"]["messages"] == [{"role": "user", "content": "你好"}]
     assert response.provider_name == "mimo"
-    assert response.model_name == "mimo-v2.5pro"
+    assert response.model_name == "mimo-v2.5-pro"
     assert response.response_text == "你好，我在这里。"
     assert response.metadata["response_id"] == "chatcmpl_test"

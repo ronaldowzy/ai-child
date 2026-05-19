@@ -66,7 +66,9 @@ data class ConversationReply(
     val type: String,
     val text: String,
     val voiceEnabled: Boolean,
+    val audioUrl: String?,
     val emotion: String,
+    val agentMotion: String,
 ) {
     companion object {
         fun fromJson(json: JSONObject): ConversationReply {
@@ -74,7 +76,9 @@ data class ConversationReply(
                 type = json.optString("type", "agent_message"),
                 text = json.getString("text"),
                 voiceEnabled = json.optBoolean("voice_enabled", true),
+                audioUrl = json.optNullableString("audio_url"),
                 emotion = json.optString("emotion", "warm"),
+                agentMotion = json.optString("agent_motion", "gentle_idle"),
             )
         }
     }

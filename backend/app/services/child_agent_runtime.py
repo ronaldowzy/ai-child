@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from app.domain.agent_runtime import (
@@ -77,7 +78,10 @@ class ChildAgentRuntime:
                 model_metadata=model_response.metadata,
             )
 
-        reply_text = model_response.response_text.strip()
+        raw_reply_text = model_response.response_text.strip()
+        reply_text = self._normalize_model_reply(raw_reply_text, request)
+        if reply_text != raw_reply_text:
+            model_response.metadata["reply_normalized"] = True
         if not reply_text:
             return self._fallback_result(
                 request,
@@ -207,6 +211,61 @@ class ChildAgentRuntime:
             "等于",
         )
         return any(marker in normalized for marker in direct_answer_markers)
+
+    def _normalize_model_reply(
+        self, reply_text: str, request: AgentRuntimeRequest
+    ) -> str:
+        text = reply_text.strip()
+        if not text:
+            return ""
+
+        text = re.sub(r"[\U00010000-\U0010ffff]", "", text)
+        text = re.sub(r"[*_`#>]+", "", text)
+        text = re.sub(r"(?m)^\s*[-•]\s*", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"([。！？!?])\s+", r"\1", text)
+        text = self._keep_one_main_question(text)
+
+        max_chars = (
+            140
+            if request.route_decision.active_scene == SceneId.LEARNING_HOMEWORK_HELP
+            else 90
+        )
+        return self._limit_to_sentence_boundary(text, max_chars=max_chars)
+
+    def _keep_one_main_question(self, text: str) -> str:
+        question_positions = [
+            position
+            for position, char in enumerate(text)
+            if char in {"?", "？"}
+        ]
+        if len(question_positions) <= 1:
+            return text
+        return text[: question_positions[0] + 1].strip()
+
+    def _limit_to_sentence_boundary(self, text: str, *, max_chars: int) -> str:
+        if len(text) <= max_chars:
+            return text
+
+        segments = re.findall(r"[^。！？!?]+[。！？!?]?", text)
+        selected: list[str] = []
+        total = 0
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
+            if selected and total + len(segment) > max_chars:
+                break
+            if not selected and len(segment) > max_chars:
+                return segment[:max_chars].rstrip("，,；;：: ") + "。"
+            selected.append(segment)
+            total += len(segment)
+            if segment.endswith(("?", "？")):
+                break
+
+        if selected:
+            return "".join(selected).strip()
+        return text[:max_chars].rstrip("，,；;：: ") + "。"
 
     def _action_to_context(self, action: SceneAction) -> dict[str, str]:
         return {"id": action.id, "label": action.label}

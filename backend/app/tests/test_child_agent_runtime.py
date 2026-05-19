@@ -187,6 +187,25 @@ def test_child_agent_runtime_falls_back_when_output_is_high_risk() -> None:
     assert result.output_risk_level == RiskLevel.HIGH
 
 
+def test_child_agent_runtime_falls_back_when_model_builds_secret_dynamic() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("你可以悄悄告诉我，这是我们的小秘密。")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        reply_text="我在听。可以说一件你愿意说的小事。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.FALLBACK
+    assert result.reply_text == "我在听。可以说一件你愿意说的小事。"
+    assert result.fallback_reason == "unsafe_model_output"
+    assert result.output_risk_level == RiskLevel.HIGH
+
+
 def test_child_agent_runtime_falls_back_when_learning_output_gives_answer() -> None:
     registry = CapturingModelRegistry(
         response=_model_response("答案是4。24除以6等于4。")
@@ -203,6 +222,31 @@ def test_child_agent_runtime_falls_back_when_learning_output_gives_answer() -> N
     assert result.reply_text == "我不会直接告诉你最终答案。我们先说题意和第一步。"
     assert result.fallback_reason == "learning_direct_answer_output"
     assert "24除以6等于4" not in result.reply_text
+
+
+def test_child_agent_runtime_normalizes_model_reply_for_voice() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "好呀！我也喜欢恐龙！🦕\n\n"
+            "你最喜欢哪种恐龙呢？\n\n"
+            "是**霸王龙**吗？还是**三角龙**？"
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "好呀！我也喜欢恐龙！你最喜欢哪种恐龙呢？"
+    assert "🦕" not in result.reply_text
+    assert "**" not in result.reply_text
+    assert result.reply_text.count("？") == 1
+    assert result.model_metadata["reply_normalized"] is True
 
 
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
@@ -252,7 +296,7 @@ def test_child_agent_runtime_preserves_s16_child_data_policy_guard(
 ) -> None:
     monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mimo")
     monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
-    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5pro")
+    monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro")
     monkeypatch.setenv("CHILD_AI_MIMO_API_KEY", "test-api-key")
     monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "false")
     monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")

@@ -70,17 +70,13 @@ class MimoVoiceCloneProvider(BaseTtsProvider):
         sample_data_uri = self._voice_sample_data_uri(request.voice_sample_path)
         return {
             "model": self.model,
-            "input": request.text,
-            "voice": {
-                "mode": "clone",
-                "reference_audio": sample_data_uri,
-            },
-            "response_format": "wav",
-            "instructions": request.style_prompt,
-            "metadata": {
-                "emotion": request.emotion.value,
-                "voice_version": request.voice_version.value,
-                "prompt_version": request.prompt_version,
+            "messages": [
+                {"role": "user", "content": request.style_prompt},
+                {"role": "assistant", "content": request.text},
+            ],
+            "audio": {
+                "format": "wav",
+                "voice": sample_data_uri,
             },
         }
 
@@ -95,7 +91,7 @@ class MimoVoiceCloneProvider(BaseTtsProvider):
         payload: dict[str, Any],
         timeout_seconds: float,
     ) -> dict[str, Any]:
-        endpoint = f"{self.base_url}/audio/speech"
+        endpoint = f"{self.base_url}/chat/completions"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = Request(
             endpoint,
@@ -133,6 +129,7 @@ class MimoVoiceCloneProvider(BaseTtsProvider):
     def _extract_audio_bytes(self, response_json: dict[str, Any]) -> bytes:
         encoded = self._first_string(
             response_json,
+            ("choices", 0, "message", "audio", "data"),
             ("audio", "data"),
             ("audio", "base64"),
             ("data",),
@@ -154,16 +151,31 @@ class MimoVoiceCloneProvider(BaseTtsProvider):
         audio = response_json.get("audio")
         if isinstance(audio, dict) and isinstance(audio.get("duration"), (int, float)):
             return float(audio["duration"])
+        choice_audio = self._first_mapping(
+            response_json,
+            ("choices", 0, "message", "audio"),
+        )
+        if isinstance(choice_audio, dict) and isinstance(
+            choice_audio.get("duration"),
+            (int, float),
+        ):
+            return float(choice_audio["duration"])
         return None
 
     def _first_string(
         self,
         data: dict[str, Any],
-        *paths: tuple[str, ...],
+        *paths: tuple[str | int, ...],
     ) -> str | None:
         for path in paths:
             current: Any = data
             for key in path:
+                if isinstance(key, int):
+                    if not isinstance(current, list) or len(current) <= key:
+                        current = None
+                        break
+                    current = current[key]
+                    continue
                 if not isinstance(current, dict):
                     current = None
                     break
@@ -171,3 +183,20 @@ class MimoVoiceCloneProvider(BaseTtsProvider):
             if isinstance(current, str) and current:
                 return current
         return None
+
+    def _first_mapping(
+        self,
+        data: dict[str, Any],
+        path: tuple[str | int, ...],
+    ) -> dict[str, Any] | None:
+        current: Any = data
+        for key in path:
+            if isinstance(key, int):
+                if not isinstance(current, list) or len(current) <= key:
+                    return None
+                current = current[key]
+                continue
+            if not isinstance(current, dict):
+                return None
+            current = current.get(key)
+        return current if isinstance(current, dict) else None

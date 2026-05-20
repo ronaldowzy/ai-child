@@ -348,6 +348,27 @@ export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=true
 export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=true
 ```
 
+For a real local MiMo VoiceClone smoke test, keep the API key in `.env` or the
+shell only, start the backend with the same TTS env, then run:
+
+```bash
+TTS_SMOKE_BASE_URL=http://127.0.0.1:8000 bash scripts/smoke_mimo_tts.sh
+```
+
+The script checks the server-side voice sample, prints only the API-key length,
+calls `POST /api/v1/tts/xiaobaohu`, downloads the generated `/media/tts/...wav`,
+and then verifies that `/api/v1/conversation/message` can return a non-empty
+`reply.audio_url`. It uses fake smoke text only.
+
+Current real MiMo VoiceClone adapter notes from 2026-05-20 smoke:
+
+```text
+endpoint: /chat/completions
+request audio: top-level audio.format=wav and audio.voice=data:audio/wav;base64,...
+response audio: choices[0].message.audio.data
+voice sample sha256: 8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40
+```
+
 `TtsDataPolicyGuard` runs before any external TTS provider call. If the guard
 blocks, the endpoint returns a clear error and conversation can still return
 text with `audio_url=null`. The conversation integration is also gated by

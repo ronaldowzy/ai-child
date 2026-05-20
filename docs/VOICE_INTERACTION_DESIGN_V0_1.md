@@ -138,8 +138,9 @@ v1 流程：
 10. Android Manifest 已声明 TTS service 查询，避免 Android 11+ package visibility 影响引擎发现。
 11. AndroidTtsController 已修复 TextToSpeech 初始化回调早于字段赋值时的误判风险。
 12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
-13. Android 尚未实现 remote audioUrl 优先播放；这是下一步 Android 任务。
-14. 真实设备听感、远程音频播放、系统 TTS fallback、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
+13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
+14. Android 尚未实现 remote audioUrl 优先播放；这是下一步 Android 任务。
+15. 真实设备听感、远程音频播放、系统 TTS fallback、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
 ```
 
 ### 4.0 Redmi K60 Real Device Feedback
@@ -226,6 +227,17 @@ backend/assets/voices/xiaobaohu_voice_v01.wav
 
 ```http
 POST /api/v1/tts/xiaobaohu
+```
+
+当前 MiMo VoiceClone provider 适配（2026-05-20 smoke 验证）：
+
+```text
+1. Endpoint：`/chat/completions`，不是 `/audio/speech`。
+2. 鉴权仍使用 OpenAI-compatible `Authorization: Bearer <key>`，key 只来自本地 `.env` 或 shell env。
+3. 请求体包含 `messages` 和 top-level `audio`；`audio.voice` 使用 `data:audio/wav;base64,...` voice sample。
+4. 返回音频优先读取 `choices[0].message.audio.data`。
+5. 已用 `scripts/smoke_mimo_tts.sh` 验证真实 `/api/v1/tts/xiaobaohu` 和 conversation 自动 `reply.audio_url`。
+6. voice sample sha256：`8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40`。
 ```
 
 核心约束：
@@ -455,7 +467,7 @@ TTS 自然度主观评价
 | VQA-13 | 数据检查 | 日志、memory、fixture 中没有原始音频、真实身份或长篇逐字转写 |
 | VQA-14 | TTS 诊断可见 | Redmi K60 等真机上能看到朗读开启、正在准备、不可用或失败原因；开发诊断含 engine、locale、voice、speak 返回值 |
 | VQA-15 | speaking pending | TTS 请求被接受后小白狐先切 speaking pending / speaking；失败或停止后恢复 base state，不一直卡住 |
-| VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 默认 mock 返回 `/media/tts/...wav`；MiMo disabled 时不外发 |
+| VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 默认 mock 返回 `/media/tts/...wav`；MiMo disabled 时不外发；真实 MiMo smoke 已通过并下载 RIFF/WAV |
 | VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时 fallback 到系统 TTS 或文字 |
 | VQA-18 | TTS 数据策略 | MiMo VoiceClone 未显式开启 allow child text 和 retention checked 时不能调用外部 provider |
 

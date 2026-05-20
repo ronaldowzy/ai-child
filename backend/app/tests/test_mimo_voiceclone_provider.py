@@ -31,18 +31,29 @@ def test_mimo_voiceclone_provider_extracts_audio_data(monkeypatch, tmp_path) -> 
 
     def fake_urlopen(request, timeout: float) -> FakeResponse:
         assert timeout == 30.0
-        assert request.full_url == "https://example.test/v1/audio/speech"
+        assert request.full_url == "https://example.test/v1/chat/completions"
         payload = json.loads(request.data.decode("utf-8"))
         assert payload["model"] == "mimo-v2.5-tts-voiceclone"
-        assert payload["voice"]["reference_audio"].startswith("data:audio/wav;base64,")
-        assert payload["metadata"]["emotion"] == "encourage"
+        assert payload["messages"][0] == {
+            "role": "user",
+            "content": "小白狐声音",
+        }
+        assert payload["messages"][1] == {"role": "assistant", "content": "你好。"}
+        assert payload["audio"]["format"] == "wav"
+        assert payload["audio"]["voice"].startswith("data:audio/wav;base64,")
         return FakeResponse(
             {
                 "id": "tts-response-id",
-                "audio": {
-                    "data": base64.b64encode(audio_bytes).decode("ascii"),
-                    "duration": 1.25,
-                },
+                "choices": [
+                    {
+                        "message": {
+                            "audio": {
+                                "data": base64.b64encode(audio_bytes).decode("ascii"),
+                                "duration": 1.25,
+                            }
+                        }
+                    }
+                ],
             }
         )
 

@@ -83,6 +83,19 @@ RAM：暂未提供
 4. Android 不能直接调用 MiMo，也不能保存 MiMo API key。
 ```
 
+后端真实 MiMo VoiceClone smoke（2026-05-20）：
+
+```text
+voice sample: backend/assets/voices/xiaobaohu_voice_v01.wav
+voice sample sha256: 8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40
+script: TTS_SMOKE_BASE_URL=http://127.0.0.1:18085 bash scripts/smoke_mimo_tts.sh
+result: PASS
+endpoint result: provider=mimo, model=mimo-v2.5-tts-voiceclone, audioUrl=/media/tts/...
+conversation result: reply.text present, voice_enabled=true, reply.audio_url=/media/tts/...
+download check: generated audio is RIFF/WAV and larger than 1KB
+secret handling: API key not printed, not committed, and not exposed to Android
+```
+
 TTS-D1 复验目标：
 
 ```text

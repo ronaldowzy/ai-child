@@ -198,6 +198,8 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 4. 新增本地缓存目录 `backend/storage/tts_cache`，生成缓存不进 git。
 5. `/media/tts/...wav` 只暴露生成音频，不暴露 voice sample 或 metadata。
 6. conversation 自动生成 audioUrl 默认为关闭；TTS 失败不影响文字回复。
+7. 真实 MiMo VoiceClone smoke 已通过，当前 provider 使用 `/chat/completions`，从 `choices[0].message.audio.data` 读取音频。
+8. `scripts/smoke_mimo_tts.sh` 已验证 `/api/v1/tts/xiaobaohu` 和 conversation 自动 `reply.audio_url` 都能返回可下载 RIFF/WAV。
 ```
 
 下一步：

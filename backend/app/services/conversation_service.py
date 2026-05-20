@@ -51,6 +51,7 @@ from app.services.time_context_service import (
     TimeContextService,
     get_time_context_service,
 )
+from app.services.tts_service import TtsService, get_tts_service
 
 
 class ConversationService:
@@ -69,6 +70,7 @@ class ConversationService:
         memory_hooks: ConversationMemoryHooks | None = None,
         conversation_history_service: ConversationHistoryService | None = None,
         quick_action_service: QuickActionService | None = None,
+        tts_service: TtsService | None = None,
         debug_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
@@ -85,6 +87,7 @@ class ConversationService:
             conversation_history_service or get_conversation_history_service()
         )
         self._quick_action_service = quick_action_service or get_quick_action_service()
+        self._tts_service = tts_service or get_tts_service()
         self._debug_enabled = debug_enabled
 
     def handle_message(
@@ -184,6 +187,7 @@ class ConversationService:
             runtime_result,
             child_text=request.input.text,
         )
+        self._attach_audio_url_if_enabled(response)
 
         if self._debug_enabled:
             response.debug = ConversationDebug(
@@ -263,6 +267,22 @@ class ConversationService:
                 ),
             ),
         )
+
+    def _attach_audio_url_if_enabled(
+        self,
+        response: ConversationMessageResponse,
+    ) -> None:
+        if not response.reply.voice_enabled:
+            return
+        try:
+            audio_url = self._tts_service.generate_for_conversation(
+                text=response.reply.text,
+                emotion=response.reply.emotion,
+            )
+        except Exception:
+            return
+        if audio_url:
+            response.reply.audio_url = audio_url
 
     def _agent_motion_for(self, decision: SceneRouteDecision) -> str:
         active_scene = decision.active_scene.value

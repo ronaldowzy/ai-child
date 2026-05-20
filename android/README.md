@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS v1 已接入 Android 本地 TextToSpeech；Redmi K60 截图显示上一版失败为 `speak=SKIPPED_UNAVAILABLE` / `TextToSpeech is unavailable`，新版本已补 TTS service 查询、初始化竞态修复、诊断和系统朗读设置入口。语音输入 ASR 仍是后续任务。
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 本地 TextToSpeech 已作为 fallback/诊断能力接入；正式小白狐音色主路径已调整为后端 MiMo VoiceClone 生成 `reply.audio_url`，Android 下一步需要优先播放远程音频。语音输入 ASR 仍是后续任务。
 
 ## 当前范围
 
@@ -29,11 +29,12 @@
 - Future hands-free conversational mode 不进入 v1。
 - 确认后的文本继续调用现有 `POST /api/v1/conversation/message`。
 - 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
-- TTS 朗读 v1 已使用 Android 系统 TextToSpeech，默认自动朗读小白狐回复，朗读后端已安全处理的 `reply.text`。
+- TTS 朗读下一步应优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
-- TTS v1 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice；v2 再评估小白狐专属音色。
-- Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也可能不适合孩子；Android system TTS 只是 v1 验证方案，不作为最终音色承诺。
+- TTS fallback 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice。
+- Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也可能不适合孩子；Android system TTS 只作为 fallback 和诊断能力，不作为最终音色承诺。
+- Android 不直接调用 MiMo，不保存 MiMo API key；正式音频由后端 `/api/v1/tts/xiaobaohu` 生成并通过 `/media/tts/...wav` 返回。
 - Redmi K60 当前复测重点：如果仍显示 `SKIPPED_UNAVAILABLE`，先检查系统文字转语音引擎是否启用、是否有中文语音数据；如果进入 `lang` / `setVoice` / `speak` 具体错误，再按诊断继续定位。
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
@@ -45,7 +46,7 @@
 - TTS speaking 会临时映射到 `fox_3d_speaking`；朗读结束或停止后恢复后端 reply 对应的基础状态。
 - UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
-- 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；v1 通过 Android 系统 TTS + VoiceProfile 调整验证。
+- 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；当前正式方向是后端 MiMo VoiceClone v01，系统 TTS 只做 fallback。
 - QA 需要记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度、孩子接受度、小白狐动画流畅度和是否需要降级。
 
 详细设计见：
@@ -131,7 +132,7 @@ Redmi K60 / Android 14 真机反馈：
 4. speak() 返回 ERROR 或系统 TTS 不可用时恢复小白狐基础状态，并保留文字聊天。
 5. AndroidManifest 声明 TTS service 查询，AndroidTtsController 修复初始化回调早于字段赋值时的误判风险。
 6. TTS 不可用时显示“检查朗读设置”和“安装语音数据”入口。
-7. 当前不接第三方 TTS、不新增后端音频接口。
+7. 当前 Android 不接第三方 TTS、不直接调用 MiMo；后端已提供受控 TTS endpoint，Android remote audioUrl 播放仍是下一步。
 ```
 
 最新真机 APK：
@@ -165,7 +166,7 @@ base URL：http://192.168.0.118:8000/
 ## 当前不做
 
 - 当前不接真实相机或 SpeechRecognizer ASR；语音输入 v1 后续才会接 Android 本地 SpeechRecognizer。
-- 当前 TTS v1 使用系统 TextToSpeech 播放小白狐回复；不录制、生成或保存音频文件。系统 TTS 只是验证方案，不作为最终小白狐音色承诺。
+- 当前 Android 尚未直接调用 MiMo，也不保存模型或 TTS API key。小白狐正式语音由后端生成 `audio_url`；Android 下一步优先播放远程音频，失败时 fallback 系统 TextToSpeech 或文字。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。

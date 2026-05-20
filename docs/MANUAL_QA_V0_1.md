@@ -27,7 +27,7 @@
 
 | 设备 | 定位 | 设备信息 | 用途 |
 |---|---|---|---|
-| Device A | 高配 Android 手机，功能主验证 | Redmi K60，Android 14，RAM 暂未提供 | 快速验证 SpeechRecognizer、TextToSpeech 自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device A | 高配 Android 手机，功能主验证 | Redmi K60，Android 14，RAM 暂未提供 | 快速验证 SpeechRecognizer、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
 | Device B | Honor Pad 5，低配兼容性目标设备 | Android 9，RAM 4GB | Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、系统 ASR/TTS 可用性、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
 
 执行原则：
@@ -73,6 +73,15 @@ RAM：暂未提供
 | TTS UI | 没有停止/静音提示 | 需要确保 InputBar 始终显示朗读状态、停止/静音入口和短提示 |
 | 小白狐状态 | 没有切到 speaking | speaking 状态不能只依赖系统 onStart；请求被接受后应先进入 speaking pending |
 | 系统 TTS 音色 | 系统里有相关服务，但声音不好，不适合孩子 | 系统 TTS 只作为 v1 验证方案；后续需要评估替代 TTS 或小白狐专属音色 |
+
+后续产品决策更新（2026-05-20）：
+
+```text
+1. 小白狐正式音色主路径改为后端 MiMo VoiceClone。
+2. Android 系统 TTS 保留为 fallback 和诊断能力，不作为正式品牌音色。
+3. Redmi K60 下一轮应优先验证 `reply.audio_url` 远程音频播放、speaking 状态、停止/静音和系统 fallback。
+4. Android 不能直接调用 MiMo，也不能保存 MiMo API key。
+```
 
 TTS-D1 复验目标：
 
@@ -258,6 +267,31 @@ base URL：http://192.168.0.118:8000/
 3. TextToSpeech.speak() 返回 SUCCESS / ERROR 必须记录。
 4. TTS 请求被接受后先切 speaking pending；onStart 后继续 speaking；失败、停止或结束后恢复 baseAgentState。
 5. 开发构建显示短诊断，便于 Redmi K60 真机复验。
+```
+
+## Backend 小白狐 TTS endpoint 验证
+
+日期：2026-05-20
+范围：后端小白狐 TTS endpoint、mock provider、本地 wav 缓存、TTS data policy guard。未做 Android remote audio 播放、ASR、第三方直接 Android 调用或实时 3D。
+
+| 场景 | 期望 | 当前结果 |
+|---|---|---|
+| `POST /api/v1/tts/xiaobaohu` 默认配置 | 返回 mock provider 的 `/media/tts/...wav`，不调用外部服务 | code_done / backend_test_pass |
+| `/media/tts/...wav` | 只允许读取生成 wav | code_done / smoke_pass |
+| `/media/tts/...json` | 不能暴露缓存 metadata | code_done / backend_test_pass |
+| MiMo policy 不满足 | 不调用外部 provider，返回清晰错误 | code_done / backend_test_pass |
+| 缓存命中 | 同文本、emotion、voiceVersion、provider、model、voice sample 命中缓存，不重复 provider 调用 | code_done / backend_test_pass |
+| conversation 自动 audioUrl | 默认关闭；TTS 失败时 conversation 仍返回文字 | code_done / backend_test_pass |
+| Android remote audioUrl 播放 | `reply.audio_url` 非空时优先播放，失败时 fallback 系统 TTS 或文字 | todo |
+
+设备侧新增 QA：
+
+```text
+1. Redmi K60：后端返回 audioUrl 后，Android 是否优先播放远程音频。
+2. Redmi K60：播放期间小白狐是否进入 speaking，停止后是否恢复。
+3. Redmi K60：远程 wav 播放失败时是否 fallback 系统 TTS 或文字。
+4. Honor Pad 5：远程 wav 播放延迟、卡顿、发热和低配降级。
+5. 两台设备都要记录音频自然度、播放延迟、是否卡顿、是否需要关闭自动朗读。
 ```
 
 Redmi K60 复验记录待补：

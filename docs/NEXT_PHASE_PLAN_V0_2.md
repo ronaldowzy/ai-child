@@ -9,15 +9,16 @@
 2. 当前仍需完成完整设备 QA，不能跳过现有文字和安全闭环验收。
 3. 下一阶段优先解决语音交互和小白狐形象体验。
 4. 默认 Mock 优先，真实模型和儿童数据外发仍受后端 gate 约束。
-5. 语音第一阶段优先 Android 本地 SpeechRecognizer + Android TTS，不默认上传原始音频到后端。
-6. TTS v1 默认自动朗读小白狐回复，但必须可停止、可静音，并有 DevSettings 或父亲设置开关。
+5. 语音输入第一阶段优先 Android 本地 SpeechRecognizer，不默认上传原始音频到后端。
+6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
 8. 小白狐 v1 候选形象资产已生成，当前包含 11 个状态：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
-11. Redmi K60 / Android 14 截图显示上一版 TTS 为 `SKIPPED_UNAVAILABLE`，新 APK 已补 TTS service 查询、初始化竞态修复和系统朗读设置入口，仍需真机复测。
+11. Redmi K60 / Android 14 截图显示上一版系统 TTS 为 `SKIPPED_UNAVAILABLE`，系统 TTS 不再作为正式小白狐音色方案。
 12. 小白狐 v1 资源已扩展到 11 个状态，新增 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
+14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
 ```
 
 ---
@@ -108,37 +109,37 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 
 ## Phase 3：TTS 朗读 v1
 
-目标：用 Android 系统 TTS 默认自动朗读小白狐回复，朗读内容必须来自后端已安全处理的 reply。
+目标：用后端 MiMo VoiceClone 生成小白狐回复音频，Android 优先播放 `reply.audio_url`。Android 系统 TTS 只作为 fallback 和诊断能力，朗读内容必须来自后端已安全处理的 reply。
 
 设备顺序：
 
 ```text
-1. 先在高配 Android 手机上跑通默认自动朗读、停止、关闭、VoiceProfile 调整。
-2. 再在 Honor Pad 5 上验证中文 TTS 是否存在、音色是否可接受、是否卡顿、是否延迟明显、是否需要关闭自动朗读作为低配默认。
+1. 先在高配 Android 手机上跑通 `reply.audio_url` 远程音频播放、停止、关闭、speaking 状态和系统 TTS fallback。
+2. 再在 Honor Pad 5 上验证远程 wav 播放、延迟、卡顿、缓存音频体积、系统 TTS fallback 是否可用，以及是否需要关闭自动朗读作为低配默认。
 ```
 
 范围：
 
 ```text
-1. Android TextToSpeech 初始化、播放、停止。
+1. 后端 `/api/v1/tts/xiaobaohu` 生成或返回缓存音频 URL。
 2. 只朗读 reply.text，不朗读 debug、session_state 或内部字段。
 3. 遵守 reply.voice_enabled。
-4. reply.audio_url 为空时使用本地 TTS。
+4. reply.audio_url 非空时 Android 优先播放远程音频。
 5. 朗读状态和小白狐轻量状态联动。
 6. 提供停止当前朗读和静音 / 关闭自动朗读入口。
 7. 提供 DevSettings 或父亲设置开关。
-8. 通过 TtsController 抽象接入 TextToSpeech。
-9. 实现 VoiceProfile：preferredVoiceName、zh-CN、speechRate 稍慢、pitch 偏高不过度、fallback 系统默认中文 voice。
-10. 音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚。
+8. 通过 TtsController / AudioUrlPlayer 抽象接入远程音频播放；系统 TextToSpeech 作为 fallback。
+9. 系统 fallback 保留 VoiceProfile：preferredVoiceName、zh-CN、speechRate 稍慢、pitch 偏高不过度、fallback 系统默认中文 voice。
+10. 正式音色方向由 MiMo VoiceClone v01 承担：小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚。
 ```
 
 非目标：
 
 ```text
-1. 不生成真实后端音频文件。
-2. 不上传孩子音频给真实模型 provider。
+1. 不上传孩子原始音频给真实模型 provider。
+2. 不让 Android 直接调用 MiMo 或保存 MiMo API key。
 3. 不做夸张音效或刺激型反馈。
-4. v1 不做小白狐专属音色，v2 再评估。
+4. 不做复杂音频流式播放或实时 3D。
 ```
 
 验收：
@@ -147,14 +148,14 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. TTS 不绕过 SafetyEngine / ChildAgentRuntime。
 2. 高风险安全回复朗读稳定、低刺激。
 3. TTS 失败时文字仍可读，UI 显示温和提示。
-4. Redmi K60 等真机上能看到 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason。
+4. 后端 TTS 默认 mock 时不外发；MiMo policy 不满足时不调用外部 provider。
 5. TTS 请求被接受后小白狐进入 speaking pending；失败、停止或结束后恢复 base state。
-6. QA 记录 TTS 自然度和孩子接受度。
+6. QA 记录远程音频播放延迟、自然度、孩子接受度和系统 fallback 结果。
 ```
 
 ### Phase 3.1：TTS-D1 可观测性与故障修复
 
-目标：先判断 TTS 链路是否触发、初始化、选中中文 voice、调用 speak()，再决定是否继续依赖系统 TTS。
+目标：先判断 Android 系统 TTS fallback 链路是否触发、初始化、选中中文 voice、调用 speak()，并作为 remote audioUrl 失败时的诊断和降级能力。
 
 范围：
 
@@ -171,17 +172,40 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 
 ```text
 1. 不做 ASR / SpeechRecognizer。
-2. 不接第三方 TTS。
-3. 不新增后端音频接口。
+2. 不让 Android 直接接第三方 TTS。
+3. 不新增后端音频上传接口。
 4. 不承诺 Android 系统 TTS 是最终产品音色。
 ```
 
 后续判断：
 
 ```text
-1. 如果 Redmi K60 能朗读但音色差，记录为音色方案问题。
+1. 如果 Redmi K60 能用系统 TTS 朗读但音色差，记录为 fallback 体验问题，不再作为正式音色方向。
 2. 如果 Redmi K60 仍无声但诊断显示 speak SUCCESS，需要继续查系统 TTS 引擎 / 音量 / onStart/onDone 回调。
-3. 如果 speak ERROR、语言不支持或 voice 选择失败，则评估替代 TTS。
+3. 如果 speak ERROR、语言不支持或 voice 选择失败，则保留文字 fallback，并优先推进后端 VoiceClone audioUrl 播放。
+```
+
+### Phase 3.2：Backend VoiceClone TTS endpoint
+
+目标：提供受控的小白狐语音生成后端能力，为 Android remote audio playback 做准备。
+
+当前实现：
+
+```text
+1. 新增 `POST /api/v1/tts/xiaobaohu`。
+2. 默认 `CHILD_AI_TTS_PROVIDER=mock`，返回本地 mock wav audioUrl，不调用外部服务。
+3. 新增 `TtsDataPolicyGuard`，MiMo VoiceClone 必须显式 enabled、API key、allow child text 和 retention policy checked。
+4. 新增本地缓存目录 `backend/storage/tts_cache`，生成缓存不进 git。
+5. `/media/tts/...wav` 只暴露生成音频，不暴露 voice sample 或 metadata。
+6. conversation 自动生成 audioUrl 默认为关闭；TTS 失败不影响文字回复。
+```
+
+下一步：
+
+```text
+1. Android 增加 remote audioUrl 播放优先级。
+2. 如果 `reply.audio_url` 播放失败，fallback 到系统 TTS 或文字。
+3. 在 Redmi K60 和 Honor Pad 5 上记录播放延迟、卡顿、speaking 状态和 fallback。
 ```
 
 ---

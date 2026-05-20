@@ -51,6 +51,8 @@ Thumbs.db
 *.log
 logs/
 tmp/
+backend/storage/tts_cache/*
+!backend/storage/tts_cache/.gitkeep
 *.sqlite
 *.sqlite3
 *.sqlite-shm

@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
 当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
-下一步：优先修通并诊断 Android TTS 链路，在 Redmi K60 上复验朗读状态、停止/静音、diagnostics、speaking pending、speak 返回值和 failure reason；随后处理开放上下文对话设计，ASR 暂缓
+下一步：小白狐语音输出主路径改为后端 MiMo VoiceClone。已先落地后端 TTS endpoint / mock provider / cache / policy guard，下一步让 Android 优先播放 `reply.audio_url`，系统 TTS 仅作为 fallback 和诊断；ASR 暂缓
 ```
 
 第一轮已完成能力快照：
@@ -54,7 +54,7 @@ Mock 拍题：done
 | R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
-| V1 | 语音交互 v1 | Android 本地语音输入确认 + Android 默认自动 TTS | in_progress | R7/R8 | Redmi K60 反馈上一版 TTS 无声且不可观测；TTS-D1 已进入优先修复，补诊断、UI 状态、speaking pending 和失败原因；SpeechRecognizer ASR 仍 todo |
+| V1 | 语音交互 v1 | Android 本地语音输入确认 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；Android remote audioUrl 播放仍 todo；系统 TTS 仅 fallback；SpeechRecognizer ASR 仍 todo |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | todo | R7/R8 | 温和、好奇、慢热友好；视觉优先毛绒感/立体绘本感；避免强刺激、排行榜、连击奖励和依赖感 |
 
 ---
@@ -201,10 +201,12 @@ Mock 拍题：done
 | R8-02 语音交互设计文档 | done |  | 明确 confirm-before-send、本地 ASR、默认自动 TTS、VoiceProfile、可替换抽象、原始音频策略、权限、错误文案、安全边界和 QA 指标 |
 | R8-03 下一阶段计划文档 | done |  | 拆分完整设备 QA、语音输入、TTS、小白狐视觉资源、小白狐动画状态机、真实平板家庭内测准备 |
 | V1-01 Android 本地语音输入 v1 | todo |  | SpeechRecognizer 识别后先展示可确认文本；确认后才发送后端；future hands-free conversational mode 不进 v1；不默认上传原始音频 |
-| V1-02 Android TTS 朗读 v1 | in_progress |  | 使用系统 TTS 默认自动朗读小白狐回复，遵守 `reply.voice_enabled`；Redmi K60 截图显示 `SKIPPED_UNAVAILABLE`，新 APK 已补 TTS service 查询、初始化竞态修复和系统朗读设置入口，需真机复验 |
+| V1-02 Android TTS 朗读 v1 | in_progress |  | 下一步改为优先播放 `reply.audio_url`，播放失败时 fallback 系统 TTS 或文字；系统 TTS 已有诊断和停止/静音基础 |
 | V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / SpeechRecognizer 抽象仍 todo；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
 | V1-05 TTS-D1 可观测性与故障修复 | done |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段；新增 TTS 设置/语音数据入口 |
+| V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发 |
+| V1-07 Android remote audioUrl 播放 | todo |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
 | F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
 | F1-03 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
@@ -222,7 +224,7 @@ Mock 拍题：done
 阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实 provider 已用临时 env smoke 通过，后续不得重复使用错误模型 id `mimo-v2.5pro`。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：安装 SHA256 为 febccc0bad9932744624affe3eb6658f627e1aa9fe0bd39fe209c3c9e1e02a1d 的 Redmi K60 真机 APK，复验 TTS-D1：朗读状态、检查朗读设置入口、安装语音数据入口、diagnostics、speaking pending、speak 返回值和 failure reason；随后做普通聊天多轮体验 QA，不先实现 ASR。
+明日第一任务：在 Android 端接入 `reply.audio_url` 远程音频播放优先级，继续保留系统 TTS fallback 和文字 fallback；随后重新打包给 Redmi K60 验证小白狐是否能通过后端音频“开口说话”，ASR 仍暂缓。
 ```
 
 ### 日期：2026-05-18

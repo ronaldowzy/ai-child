@@ -26,14 +26,14 @@ The current backend is intentionally local-first and mock-first:
   sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and 小白狐 animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
-- The next voice phase keeps speech recognition and TTS on Android first:
-  confirmed text is sent to the existing conversation API, raw child audio is
-  not uploaded by default, and backend audio upload / cloud ASR is deferred
-  until a separate child-data and retention review.
-- TTS v1 is an Android responsibility: Android should default to automatic
-  reading of the 小白狐 reply, while still offering stop/mute and parent or
-  DevSettings controls. The backend continues to return safe text and
-  presentation metadata; it does not generate a 小白狐专属音色 in v1.
+- Speech recognition remains Android confirm-before-send: confirmed text is
+  sent to the existing conversation API, and raw child audio is not uploaded by
+  default.
+- 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
+  can generate or return a cached wav URL. The default provider is mock and
+  never calls external services. MiMo VoiceClone is disabled until explicit
+  local environment variables and the TTS data policy gate allow child text
+  transmission.
 
 If Android replies look like fixed templates such as “听起来可以聊”, the backend
 is probably running with the default mock provider. For real Mimo chat, restart
@@ -43,8 +43,8 @@ do not put the real API key into git, Android, docs, tests, or screenshots.
 ## Current Voice And Presentation Contract
 
 The backend remains the decision and safety boundary. Android may use local
-`SpeechRecognizer` and TextToSpeech in the next phase, but child-facing content
-still flows through:
+`SpeechRecognizer`, remote audio playback, and TextToSpeech fallback in the next
+phase, but child-facing content still flows through:
 
 ```text
 SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelRegistry -> output safety check
@@ -56,10 +56,11 @@ Current backend contract:
 - Treat v1 speech input as confirm-before-send; hands-free conversational mode
   is a future product phase and should not change the v1 backend contract.
 - Do not require raw audio upload for v0.2 voice input.
-- Keep external audio transmission disabled unless a later confirmed product
-  decision and provider gate review explicitly allow it.
+- Keep external audio and child text transmission disabled unless a confirmed
+  product decision and provider gate review explicitly allow it.
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
   `reply.agent_motion` for Android TTS and 小白狐 presentation.
+- Use `POST /api/v1/tts/xiaobaohu` for backend-generated 小白狐 speech audio.
 - Never use voice or presentation metadata to weaken learning-answer, secrecy,
   trusted-adult, or long-term raw-data storage safety rules.
 
@@ -277,6 +278,80 @@ The Android app never stores model API keys. All model configuration belongs on 
 - `GET /api/v1/parent/reports/{child_id}`
 - `GET /api/v1/parent/report/today`
 - `GET /api/v1/memories/{child_id}`
+- `POST /api/v1/tts/xiaobaohu`
+- `GET /media/tts/{voice_version}/{cache_key}.wav`
+
+## XiaoBaiHu TTS Endpoint
+
+The backend now owns the official 小白狐 voice path. Android should not call
+MiMo directly and must not store any TTS API key.
+
+Default behavior is local and mock-only:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/v1/tts/xiaobaohu \
+  -H 'content-type: application/json' \
+  -d '{"text":"我们先看这道题在问什么。","emotion":"hint","voiceVersion":"xiaobaohu_v01"}'
+```
+
+Expected response shape:
+
+```json
+{
+  "audioUrl": "/media/tts/xiaobaohu_v01/<cache_key>.wav",
+  "duration": 0.25,
+  "text": "我们先看这道题在问什么。",
+  "emotion": "hint",
+  "voiceVersion": "xiaobaohu_v01",
+  "provider": "mock",
+  "model": "mock-tts-v0",
+  "cacheHit": false
+}
+```
+
+Important paths:
+
+```text
+backend/assets/voices/xiaobaohu_voice_v01.wav
+backend/storage/tts_cache/
+```
+
+`backend/assets/voices/xiaobaohu_voice_v01.wav` is the server-side voice clone
+reference sample. It is not an Android asset and is not served through
+`/media/tts`.
+
+`backend/storage/tts_cache/` stores generated wav files and metadata. Generated
+cache files are ignored by git. The media route serves only `.wav` files and
+does not serve metadata JSON or the voice sample.
+
+Default TTS environment:
+
+```bash
+export CHILD_AI_TTS_PROVIDER=mock
+export CHILD_AI_CONVERSATION_TTS_ENABLED=false
+export CHILD_AI_MIMO_TTS_ENABLED=false
+export CHILD_AI_MIMO_TTS_API_KEY=""
+export CHILD_AI_MIMO_TTS_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
+export CHILD_AI_MIMO_TTS_MODEL=mimo-v2.5-tts-voiceclone
+export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=false
+export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=false
+```
+
+Only enable MiMo VoiceClone in a local ignored `.env` or temporary shell after
+explicitly accepting child-text transmission and retention policy checks:
+
+```bash
+export CHILD_AI_TTS_PROVIDER=mimo
+export CHILD_AI_MIMO_TTS_ENABLED=true
+export CHILD_AI_MIMO_TTS_API_KEY="<temporary key>"
+export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=true
+export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=true
+```
+
+`TtsDataPolicyGuard` runs before any external TTS provider call. If the guard
+blocks, the endpoint returns a clear error and conversation can still return
+text with `audio_url=null`. The conversation integration is also gated by
+`CHILD_AI_CONVERSATION_TTS_ENABLED=false` by default.
 
 ## Safety Notes
 

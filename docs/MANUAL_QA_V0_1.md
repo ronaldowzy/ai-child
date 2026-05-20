@@ -489,6 +489,49 @@ Mimo 初始 12 秒超时会 fallback mock；本地 dev 配置已调为 max_token
 | 小白狐 3D / fallback | Device A 和 Device B 各测一次；有资源和缺资源两种状态 | 11 个状态资源存在时显示；资源缺失、加载失败或低性能时 Canvas fallback 正常；Honor Pad 5 记录图片内存、切换流畅度、发热、卡顿和是否需要降级 | todo |
 | 小白狐状态资源映射 | 普通聊天、倾听、TTS 朗读、学习求助、安全、隐私、睡前、网络错误 | 普通聊天显示 neutral；倾听显示 listening；TTS 朗读切 speaking；学习求助显示 homework_focus；安全/隐私/睡前/网络错误显示专用状态或安全 fallback | code_done / device_todo |
 
+## 2026-05-20 Redmi K60 最新反馈
+
+设备：
+
+```text
+Device A：Redmi K60
+Android：14
+网络：与 Mac mini 同局域网
+```
+
+已确认：
+
+```text
+1. MiMo VoiceClone 小白狐语音初步可以听到。
+2. 动态小白狐形象已经在 App 中出现。
+3. 后端健康检查 `http://192.168.0.118:8000/api/v1/health` 可访问。
+4. Android 已优先使用 `reply.audio_url`，系统 TTS 仅作为 fallback。
+```
+
+问题和判断：
+
+```text
+1. 整体等待时间仍长：当前同步链路需要等待完整 LLM 回复和完整 MiMo TTS 音频，45 秒 read timeout 只是临时稳定性修复。
+2. 需要进入流式改造：先让文本渐进显示，再让 TTS 按句子/分段生成并排队播放。
+3. 不确定 11 个动态小白狐状态是否都由真实业务事件触发：需要状态覆盖矩阵。
+4. UI 需要横屏双栏：左侧小白狐，右侧对话，手机也进入横屏。
+5. 语音输入需要准备，但需先调研 MiMo ASR / audio input 能力和儿童语音数据边界。
+6. 运行诊断仍不足：需要 request_id、provider timing、stream latency、health 扩展和 QA 记录模板。
+```
+
+新增 QA 维度：
+
+| QA 项 | 设备 | 指标 | 状态 |
+|---|---|---|---|
+| 首字延迟 | Redmi K60 | child send -> first text delta ms | planned |
+| 首音频延迟 | Redmi K60 | child send -> first audio segment playable ms | planned |
+| 整轮完成时间 | Redmi K60 | child send -> text/audio done ms | planned |
+| 横屏双栏 | Redmi K60 / Honor Pad 5 | 小白狐左侧、交互右侧、字体可读、输入可点 | planned |
+| 小白狐状态覆盖 | Redmi K60 / Honor Pad 5 | idle/listening/thinking/speaking/homework/safety/privacy/network 等是否真实触发 | planned |
+| 分段音频连续性 | Redmi K60 | audio segment gap 是否明显 | planned |
+| stream 中断恢复 | Redmi K60 | 保留已有文本并温和提示 | planned |
+| ASR 调研后验证 | Redmi K60 / Honor Pad 5 | 中文儿童语音、延迟、识别准确率、权限和失败提示 | research_first |
+
 Mimo 真实 provider 复验说明：
 
 ```text

@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
-当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
-下一步：小白狐语音输出主路径已改为后端 MiMo VoiceClone，Android 已接入 `reply.audio_url` 远程播放优先级；小白狐 animation_v1 PNG 序列帧已进入 Android assets，并接入 animation_v1 -> png_static -> canvas fallback。下一步打 APK 让 Redmi K60 验证 MiMo 音色、speaking 动画、停止/静音和 fallback；Honor Pad 5 验证动画低配性能；PostgreSQL DB1-A 基础设施已完成，后续按 B2-B5 串行迁移业务；ASR 暂缓
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone 与动态小白狐初步跑通，进入流式交互、横屏布局、语音输入准备和运行基础组件补齐阶段
+当前目标：降低同步等待体验；设计并分阶段实现 conversation stream、分句/分段 TTS、Android 横屏双栏、小白狐状态覆盖验证、ASR 调研和基础可观测性
+下一步：第一批已完成 S-Stream-0 流式设计、UI-Landscape-1 横屏双栏、Fox-Coverage-1 状态覆盖矩阵和 Ops-Foundation-1 缺口分析；下一步启动后端 stream endpoint、Android stream client、ASR 调研和 Ops P0 小步实现
 ```
 
 第一轮已完成能力快照：
@@ -57,6 +57,11 @@ Mock 拍题：done
 | V1 | 语音交互 v1 | Android 本地语音输入确认 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；Android remote audioUrl 播放代码已完成，待 Redmi K60 真机 QA；系统 TTS 仅 fallback；SpeechRecognizer ASR 仍 todo |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 PNG 序列帧已接入 Android assets；保留静态 PNG 和 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
 | DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
+| S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | planned | V1/F1/R1 | 先设计，不直接打散现有同步接口；旧 `/conversation/message` 必须保留 |
+| UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
+| Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
+| ASR-Research | 语音输入调研 | 调研 MiMo ASR / audio input 能力和儿童语音数据边界 | planned | V1 | 未确认前不实现云端 ASR，不上传原始音频 |
+| Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | planned | DB1/V1 | 不接第三方 APM；日志脱敏 |
 
 ---
 
@@ -217,6 +222,13 @@ Mock 拍题：done
 | DB1-C Conversation message 持久化 | todo |  | 保存 child/agent message、audio_url、emotion、agent_motion；不保存 debug、原始音频或照片 |
 | DB1-D MemoryService 持久化 | todo |  | 结构化 memory_items 落库，evidence 继续使用 summary，不保存 full transcript |
 | DB1-E ParentReport 持久化 | todo |  | 日报生成结果可持久化，仍不展示逐字聊天记录 |
+| S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |
+| S-Stream-1 后端 stream endpoint | todo |  | 新增 `/api/v1/conversation/stream`，保留旧接口，继续走 Safety/Scene/Runtime/TTS gate |
+| S-Stream-2 Android stream client | todo |  | 渐进文本气泡 + audio segment queue；stream 失败 fallback 旧接口 |
+| UI-Landscape-1 横屏双栏布局 | done |  | Android 主界面已改为 sensorLandscape 横屏：左侧约 41% 小白狐，右侧约 59% 消息和输入；Android test/assemble/lint 通过，待真机视觉 QA |
+| Fox-Coverage-1 动态小白狐覆盖矩阵 | done |  | 新增 `FOX_AGENT_STATE_COVERAGE_V0_1.md`；manifest 确认 11 个状态，每状态 24 帧；记录 oneshot_hold 后续 QA 风险 |
+| ASR-Research-0 MiMo ASR 调研 | planned |  | 新增 ASR 研究文档；确认 speech-to-text/audio input、儿童语音、流式、格式和数据留存 |
+| Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
 
 ---
 
@@ -231,7 +243,8 @@ Mock 拍题：done
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
 今日补充：voice sample 已确认在 `backend/assets/voices/xiaobaohu_voice_v01.wav`，sha256=`8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40`；`scripts/smoke_mimo_tts.sh` 已通过真实 MiMo VoiceClone 验证，`/api/v1/tts/xiaobaohu` 和 conversation 自动 `reply.audio_url` 均能返回可下载 RIFF/WAV。
-明日第一任务：打包包含 remote audioUrl + animation_v1 的 Android APK 给 Redmi K60，验证 MiMo 音频播放、小白狐 speaking 动画、停止/静音、网络错误 fallback；随后在 Honor Pad 5 验证序列帧动画低配性能和是否需要切静态/Canvas 模式，ASR 仍暂缓。
+真机反馈：Redmi K60 已听到 MiMo 小白狐音频，动态小白狐形象已出现；但整体等待时间长，不能继续靠提高 read timeout 解决体验。下一阶段转向流式交互、横屏双栏、动态状态覆盖矩阵、MiMo ASR 调研和运行基础组件补齐。
+明日第一任务：启动 S-Stream-1 后端 stream endpoint 与 S-Stream-2 Android stream client；并并行开展 ASR-Research-0 和 Ops P0 小步实现。
 ```
 
 ### 日期：2026-05-18

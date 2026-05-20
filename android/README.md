@@ -398,6 +398,20 @@ bash scripts/dev_backend.sh
 bash scripts/e2e_local_api_check.sh
 ```
 
+## Next UI / Streaming Direction
+
+最新真机反馈已经确认：MiMo VoiceClone 音频可以在 Redmi K60 上初步听到，动态小白狐形象也已经出现；但当前同步等待时间仍长。下一轮 Android 重点如下：
+
+```text
+1. 主界面改为横屏双栏：左侧动态小白狐，右侧对话交互；手机也进入横屏。
+2. 保留现有 `reply.audioUrl` 远程音频优先播放，系统 TTS 只做 fallback。
+3. 后续接入 stream client 后，文本应渐进显示，audio segment 应排队播放。
+4. 小白狐状态需要覆盖矩阵验证：哪些状态有资源、哪些状态能被真实业务触发。
+5. 语音输入先调研 MiMo ASR / audio input 能力；未确认数据边界前不上传原始音频。
+```
+
+横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 PNG 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。
+
 ## 父亲日报说明
 
 后端当前已提供父亲日报 API：

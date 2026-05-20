@@ -425,6 +425,49 @@ blocks, the endpoint returns a clear error and conversation can still return
 text with `audio_url=null`. The conversation integration is also gated by
 `CHILD_AI_CONVERSATION_TTS_ENABLED=false` by default.
 
+## Streaming And Ops Roadmap
+
+The current conversation path is intentionally still synchronous:
+
+```text
+child input -> full LLM reply -> full TTS audio -> response text + audio_url
+```
+
+This is good enough for smoke tests, but recent Redmi K60 testing shows that it
+creates visible wait time even after Android's read timeout was raised. The next
+backend milestone is to design and then add a separate streaming endpoint
+without breaking the existing API:
+
+```text
+POST /api/v1/conversation/stream
+```
+
+Planned stream behavior:
+
+```text
+1. Keep `/api/v1/conversation/message` for fallback and regression safety.
+2. Continue routing through SafetyEngine, IntentClassifier, SceneOrchestrator,
+   ChildAgentRuntime, ModelRegistry, and TtsDataPolicyGuard.
+3. Emit text delta events as soon as possible.
+4. Split text into sentence/chunk events and generate TTS segments.
+5. Emit audio-ready events as each segment becomes available.
+6. If MiMo VoiceClone does not support true audio streaming, use
+   sentence-level pseudo streaming first.
+7. TTS failure must not fail the text stream.
+```
+
+The ops foundation also needs local-development observability before stream work
+gets deep:
+
+```text
+1. request_id / trace_id middleware.
+2. structured request timing logs.
+3. LLM and TTS provider timing.
+4. health checks for PostgreSQL, TTS cache path, and MiMo config readiness.
+5. logs and QA records that do not include API keys, raw audio, raw photos, or
+   full child transcripts.
+```
+
 ## Safety Notes
 
 - `high` / `critical` input routes to `safety.guardian` with

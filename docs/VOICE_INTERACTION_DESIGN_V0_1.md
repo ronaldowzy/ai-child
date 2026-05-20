@@ -43,6 +43,8 @@ PD-027：小白狐正式品牌音色方案改为后端 MiMo VoiceClone；VoiceDe
 4. `audio_url` 不可用时，Android fallback 到系统 TextToSpeech；系统 TTS 不再作为正式小白狐音色方案。
 5. 后端不接收孩子原始音频上传；语音输入仍只发送确认后的文本消息和必要的轻量 metadata。
 6. Hands-free conversational mode 是 future，不进入 v1。
+7. 语音输入下一步先调研 MiMo ASR / audio input 能力；在接口和儿童语音数据边界确认前，不实现云端 ASR。
+8. 语音输出下一步转向文本流式和 TTS 分句/分段播放，不能继续依赖增加同步 read timeout。
 ```
 
 ---
@@ -80,6 +82,15 @@ VoiceEngine
 6. 不把原始音频写入本地长期存储，不上传原始音频到后端。
 7. 识别能力必须封装在 SpeechInputController，UI 不直接依赖 SpeechRecognizer。
 8. Hands-free conversational mode 不进入 v1；v1 必须保留确认按钮。
+```
+
+补充方向（2026-05-20）：
+
+```text
+1. 语音输入进入调研准备阶段，优先确认 MiMo 是否有 ASR / speech-to-text / audio input 能力。
+2. 未确认 API、留存策略和儿童语音处理边界前，不实现云端 ASR，不上传原始音频。
+3. 即使未来使用 MiMo ASR，Android 仍不得保存模型 API key，后端必须提供独立数据策略 gate。
+4. v1 继续坚持 confirm-before-send；hands-free conversational mode 仍是 future。
 ```
 
 v1 流程：
@@ -141,6 +152,36 @@ v1 流程：
 13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
 14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败再 fallback 到系统 TextToSpeech 或文字。
 15. 真实设备听感、远程音频播放、系统 TTS fallback、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
+16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式和 TTS 分句/分段播放设计。
+```
+
+### 4.3 Streaming Voice Direction
+
+当前同步语音链路：
+
+```text
+child input -> wait full LLM reply -> wait full MiMo TTS audio -> return audioUrl -> Android play
+```
+
+下一阶段目标：
+
+```text
+child input
+  -> stream text_delta
+  -> sentence/chunk ready
+  -> TTS segment generation
+  -> audio_ready event
+  -> Android audio segment queue playback
+```
+
+原则：
+
+```text
+1. 先确认 MiMo VoiceClone 是否支持 true streaming；不要假设一定支持。
+2. 如果不支持 true streaming，先做 sentence-level pseudo streaming。
+3. TTS 失败不能中断文本流。
+4. 高风险、安全、隐私、学习和睡前边界仍由后端安全链路控制。
+5. QA 必须记录 first_text_ms、first_audio_ms、total_turn_ms 和 audio segment gap。
 ```
 
 ### 4.0 Redmi K60 Real Device Feedback

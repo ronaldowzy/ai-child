@@ -214,6 +214,50 @@ idle
 docs/assets/fox/animation_v1/README.md
 ```
 
+## 7.1 状态覆盖检查要求
+
+父亲真机反馈已确认动态小白狐形象可见，但当前尚不确定每个设计状态是否都由真实业务事件触发。下一阶段必须输出状态覆盖矩阵，不允许把“资源已存在”误写成“业务已覆盖”。
+
+覆盖矩阵应检查：
+
+```text
+状态名 | 资源存在 | manifest 可解析 | MascotState 存在 | MascotController 可设置 | 业务触发路径 | QA 状态
+```
+
+当前必须检查的状态：
+
+```text
+idle
+listening
+thinking
+speaking
+homework_focus
+sleepy
+calm
+privacy_boundary
+safety_concern
+network_error
+jumping_happy
+```
+
+业务触发期望：
+
+```text
+idle：App 默认等待
+listening：未来录音中；ASR 前可由 debug/测试入口触发
+thinking：发送消息后等待后端或 stream 回复
+speaking：播放 MiMo audioUrl 或 fallback TTS 时
+homework_focus：learning.homework_help
+sleepy：daily.bedtime_reflection
+calm：低能量、comfort、calm 回复
+privacy_boundary：privacy.boundary
+safety_concern：safety.guardian / safety.gentle_checkin
+network_error：后端连接失败或 stream 中断
+jumping_happy：鼓励、答对、正向反馈后的短循环
+```
+
+如果某状态只有资源但没有业务触发，记录为 `resource_ready_but_not_triggered`。
+
 设计交付包中可同步保留源资产路径：
 
 ```text

@@ -20,6 +20,10 @@
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
 15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
+16. Redmi K60 真机反馈显示 MiMo VoiceClone 音频初步跑通、动态小白狐形象已经可见，但同步链路等待时间仍长，下一阶段不能继续依赖增加 read timeout。
+17. 儿童端主界面下一版改为横屏双栏：左侧动态小白狐，右侧聊天交互；手机也进入横屏。
+18. 语音输入开始进入方案准备阶段，优先调研 MiMo ASR / audio input 能力；在接口和儿童语音数据边界确认前，不实现云端 ASR。
+19. 下一阶段必须补齐 request_id、结构化日志、provider timing、health 扩展、环境检查和 QA 记录等运行基础组件。
 ```
 
 ---
@@ -146,6 +150,89 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. 原始音频、原始照片、API key 和 debug internals 不入库。
 2. TTS cache metadata 优先保存 hash，不保存完整敏感文本。
 3. 当前是本地家庭自用库；如果未来云端化或上架，必须重新做儿童数据合规评审。
+```
+
+---
+
+## Phase 8：Streaming Interaction And Landscape UX
+
+目标：把当前“同步等待完整回复 + 完整 TTS 音频”的体验改造成可渐进反馈的儿童对话体验，同时把 Android 主界面调整为横屏双栏。
+
+当前同步链路：
+
+```text
+child input
+  -> 后端等待 LLM 完整回复
+  -> 后端等待 MiMo TTS 完整音频
+  -> conversation 返回 text + audioUrl
+  -> Android 播放
+```
+
+下一阶段目标链路：
+
+```text
+child input
+  -> 后端立即返回 stream
+  -> text_delta 持续输出
+  -> sentence/chunk ready 后触发 TTS
+  -> audio segment ready 后 Android 排队播放
+  -> 文本和语音都能渐进反馈
+```
+
+阶段拆分：
+
+```text
+1. S-Stream-0：先写 `STREAMING_INTERACTION_DESIGN_V0_1.md`，确认 SSE/NDJSON、事件结构、pseudo streaming 和 QA 指标。
+2. S-Stream-1：新增 `/api/v1/conversation/stream`，保留旧 `/conversation/message`，不绕过安全、场景、runtime 和 TTS gate。
+3. S-Stream-2：Android 增加 stream client、progressive bubble 和 audio segment queue；stream 失败 fallback 到旧接口。
+4. UI-Landscape-1：Android 横屏双栏，左侧小白狐，右侧对话；不做完整美术重设计。
+5. Fox-Coverage-1：输出小白狐 11/12 状态资源和业务触发覆盖矩阵，不假装未触发状态已完成。
+```
+
+约束：
+
+```text
+1. 45 秒 read timeout 只是临时稳定性修复，不作为最终体验方案。
+2. 如果 MiMo VoiceClone 不支持 true streaming，先做 sentence-level pseudo streaming。
+3. TTS 失败不能中断文本流。
+4. 高风险、隐私、学习“不直接给答案”、睡前低刺激边界不得因流式而绕过。
+5. 横屏改造不得破坏 MiMo audioUrl 播放、animation_v1 和现有父亲入口保护。
+```
+
+QA 指标：
+
+```text
+1. first_text_ms：孩子发送后到首个文本 delta 的时间。
+2. first_audio_ms：孩子发送后到首段音频可播放的时间。
+3. total_turn_ms：整轮文本和音频完成时间。
+4. stream_interrupt_recovery：stream 中断时是否保留已有文本并温和提示。
+5. audio_segment_gap：分段音频之间是否有明显断裂。
+```
+
+---
+
+## Phase 9：ASR Research And Ops Foundation
+
+目标：语音输入先进入调研和边界确认，同时补齐本地家庭内测需要的运行基础组件。
+
+ASR 调研：
+
+```text
+1. 新增 `docs/ASR_INPUT_RESEARCH_V0_1.md`。
+2. 确认 MiMo 是否提供 speech-to-text / audio input 模型。
+3. 确认是否支持中文儿童语音、流式 ASR、非流式 ASR、音频格式、延迟、费用和数据留存。
+4. 未确认前不实现云端 ASR，不上传原始音频。
+5. Android v1 仍遵守 confirm-before-send，不做 hands-free conversational mode。
+```
+
+运行基础组件：
+
+```text
+1. 新增 `docs/OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`。
+2. 首批建议实现 request_id middleware、结构化日志、request timing 扩展、LLM/TTS provider timing、health 扩展。
+3. health 应逐步区分 app、postgres、tts_cache、mimo_config。
+4. 日志不得包含 API key、完整儿童原文、完整回复文本、原始音频或照片路径。
+5. 本地脚本和 QA 报告需要统一记录 request_id、设备、网络、后端 commit、APK build。
 ```
 
 范围：

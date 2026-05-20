@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -185,37 +188,6 @@ private fun ChildChatScreenContent(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            AgentTopBar(
-                parentEntryHint = parentEntryHint,
-                onParentEntryTap = {
-                    parentEntryHint = "请让大人长按父亲入口。"
-                },
-                onOpenParentSettings = {
-                    openParentGate(ParentEntryTarget.Settings)
-                },
-                onOpenParentReport = {
-                    openParentGate(ParentEntryTarget.Report)
-                },
-            )
-        },
-        bottomBar = {
-            InputBar(
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface)
-                    .navigationBarsPadding()
-                    .windowInsetsPadding(WindowInsets.ime)
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                onSend = onSend,
-                enabled = !uiState.isSending,
-                voice = uiState.voice,
-                tts = uiState.tts,
-                onStopTts = onStopTts,
-                onToggleTtsMuted = onToggleTtsMuted,
-                onOpenTtsSettings = onOpenTtsSettings,
-                onInstallTtsData = onInstallTtsData,
-            )
-        },
     ) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -223,45 +195,49 @@ private fun ChildChatScreenContent(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
-            if (maxWidth >= 720.dp) {
-                Row(
+            val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
+            val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
+            val verticalPadding = if (compactLandscape) 10.dp else 24.dp
+            val columnGap = if (compactLandscape) 14.dp else 28.dp
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AgentPanel(
+                    agent = uiState.agent,
+                    compactLandscape = compactLandscape,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 32.dp, vertical = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AgentPanel(
-                        agent = uiState.agent,
-                        modifier = Modifier
-                            .weight(0.42f)
-                            .fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.width(28.dp))
-                    ChatConversationPanel(
-                        uiState = uiState,
-                        onQuickAction = onQuickAction,
-                        modifier = Modifier.weight(0.58f),
-                    )
-                }
-            } else {
-                Column(
+                        .weight(0.41f)
+                        .fillMaxHeight(),
+                )
+                Spacer(modifier = Modifier.width(columnGap))
+                ChatPanel(
+                    uiState = uiState,
+                    compactLandscape = compactLandscape,
+                    parentEntryHint = parentEntryHint,
+                    onParentEntryTap = {
+                        parentEntryHint = "请让大人长按父亲入口。"
+                    },
+                    onOpenParentSettings = {
+                        openParentGate(ParentEntryTarget.Settings)
+                    },
+                    onOpenParentReport = {
+                        openParentGate(ParentEntryTarget.Report)
+                    },
+                    onSend = onSend,
+                    onQuickAction = onQuickAction,
+                    onStopTts = onStopTts,
+                    onToggleTtsMuted = onToggleTtsMuted,
+                    onOpenTtsSettings = onOpenTtsSettings,
+                    onInstallTtsData = onInstallTtsData,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    AgentPanel(
-                        agent = uiState.agent,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(18.dp))
-                    ChatConversationPanel(
-                        uiState = uiState,
-                        onQuickAction = onQuickAction,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                        .weight(0.59f)
+                        .fillMaxHeight(),
+                )
             }
         }
     }
@@ -347,6 +323,64 @@ private fun ChatConversationPanel(
 }
 
 @Composable
+private fun ChatPanel(
+    uiState: ChatUiState,
+    compactLandscape: Boolean,
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
+    onOpenParentSettings: () -> Unit,
+    onOpenParentReport: () -> Unit,
+    onSend: (String) -> Unit,
+    onQuickAction: (QuickActionUi) -> Unit,
+    onStopTts: () -> Unit,
+    onToggleTtsMuted: () -> Unit,
+    onOpenTtsSettings: () -> Unit,
+    onInstallTtsData: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val panelGap = if (compactLandscape) 8.dp else 12.dp
+    val inputHorizontalPadding = if (compactLandscape) 12.dp else 18.dp
+    val inputVerticalPadding = if (compactLandscape) 10.dp else 14.dp
+
+    Column(modifier = modifier) {
+        AgentTopBar(
+            parentEntryHint = parentEntryHint,
+            compactLandscape = compactLandscape,
+            onParentEntryTap = onParentEntryTap,
+            onOpenParentSettings = onOpenParentSettings,
+            onOpenParentReport = onOpenParentReport,
+        )
+        Spacer(modifier = Modifier.height(panelGap))
+        ChatConversationPanel(
+            uiState = uiState,
+            onQuickAction = onQuickAction,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.height(panelGap))
+        InputBar(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = if (compactLandscape) 96.dp else 112.dp)
+                .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.ime)
+                .padding(
+                    horizontal = inputHorizontalPadding,
+                    vertical = inputVerticalPadding,
+                ),
+            onSend = onSend,
+            enabled = !uiState.isSending,
+            voice = uiState.voice,
+            tts = uiState.tts,
+            onStopTts = onStopTts,
+            onToggleTtsMuted = onToggleTtsMuted,
+            onOpenTtsSettings = onOpenTtsSettings,
+            onInstallTtsData = onInstallTtsData,
+        )
+    }
+}
+
+@Composable
 private fun QuickActionsRow(
     actions: List<QuickActionUi>,
     enabled: Boolean,
@@ -388,10 +422,13 @@ private fun SessionStateStrip(sessionState: ConversationSessionState) {
 @Composable
 private fun AgentTopBar(
     parentEntryHint: String?,
+    compactLandscape: Boolean,
     onParentEntryTap: () -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
 ) {
+    val horizontalPadding = if (compactLandscape) 16.dp else 24.dp
+    val verticalPadding = if (compactLandscape) 10.dp else 18.dp
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
@@ -402,7 +439,7 @@ private fun AgentTopBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
@@ -441,7 +478,11 @@ private fun AgentTopBar(
                     text = hint,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 10.dp),
+                    modifier = Modifier.padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        bottom = if (compactLandscape) 8.dp else 10.dp,
+                    ),
                 )
             }
         }
@@ -476,30 +517,46 @@ private fun ParentEntryButton(
 @Composable
 private fun AgentPanel(
     agent: FoxAgentUiState,
+    compactLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
     val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CartoonAgentView(
-            agent = agent,
-            debugMascotState = debugMascotState,
+    BoxWithConstraints(modifier = modifier) {
+        val statusReserve = if (compactLandscape) 58.dp else 82.dp
+        val mascotMaxSize = minOf(
+            maxWidth,
+            (maxHeight - statusReserve).coerceAtLeast(160.dp),
+            if (compactLandscape) 300.dp else 430.dp,
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = agent.statusText,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
-            Spacer(modifier = Modifier.height(10.dp))
-            MascotDebugSwitcher(
-                selectedStateId = debugMascotStateId,
-                onStateSelected = { debugMascotStateId = it },
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            CartoonAgentView(
+                agent = agent,
+                debugMascotState = debugMascotState,
+                modifier = Modifier.sizeIn(
+                    maxWidth = mascotMaxSize,
+                    maxHeight = mascotMaxSize,
+                ),
             )
+            Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 16.dp))
+            Text(
+                text = agent.statusText,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = if (compactLandscape) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
+                Spacer(modifier = Modifier.height(10.dp))
+                MascotDebugSwitcher(
+                    selectedStateId = debugMascotStateId,
+                    onStateSelected = { debugMascotStateId = it },
+                )
+            }
         }
     }
 }

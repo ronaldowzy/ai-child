@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
 当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
-下一步：小白狐语音输出主路径改为后端 MiMo VoiceClone。后端 TTS endpoint / mock provider / cache / policy guard 已落地，真实 MiMo VoiceClone smoke 已通过；Android 已接入 `reply.audio_url` 远程播放优先级，下一步打 APK 让 Redmi K60 验证小白狐音色、speaking 状态、停止/静音和 fallback；PostgreSQL DB1-A 基础设施已完成，后续按 B2-B5 串行迁移业务；ASR 暂缓
+下一步：小白狐语音输出主路径已改为后端 MiMo VoiceClone，Android 已接入 `reply.audio_url` 远程播放优先级；小白狐 animation_v1 PNG 序列帧已进入 Android assets，并接入 animation_v1 -> png_static -> canvas fallback。下一步打 APK 让 Redmi K60 验证 MiMo 音色、speaking 动画、停止/静音和 fallback；Honor Pad 5 验证动画低配性能；PostgreSQL DB1-A 基础设施已完成，后续按 B2-B5 串行迁移业务；ASR 暂缓
 ```
 
 第一轮已完成能力快照：
@@ -55,7 +55,7 @@ Mock 拍题：done
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
 | V1 | 语音交互 v1 | Android 本地语音输入确认 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；Android remote audioUrl 播放代码已完成，待 Redmi K60 真机 QA；系统 TTS 仅 fallback；SpeechRecognizer ASR 仍 todo |
-| F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | todo | R7/R8 | 温和、好奇、慢热友好；视觉优先毛绒感/立体绘本感；避免强刺激、排行榜、连击奖励和依赖感 |
+| F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 PNG 序列帧已接入 Android assets；保留静态 PNG 和 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
 | DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
 
 ---
@@ -210,7 +210,7 @@ Mock 拍题：done
 | V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；已覆盖相对 URL 拼接、muted、stop 和 fallback 单测 |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
 | F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
-| F1-03 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
+| F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧序列；Android test/assemble/lint 通过；debug APK 约 147MB，待真机验证流畅度和低配降级 |
 | O1-01 Open Conversation Mode 小步实现 | done |  | 普通兴趣和日常话题进入 `conversation.open`；ChildAgentRuntime 接收进程内短期 history；普通聊天 quick actions 随上下文轻量变化；安全、隐私、学习、睡前边界保留 |
 | DB1-A PostgreSQL 基础设施 | done |  | 新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local compose、初始 8 张表、migration/reset 脚本和基础测试；业务服务仍未迁移 |
 | DB1-B ParentPolicy 持久化 | todo |  | 从内存策略迁移到 DB repository，API 行为不变 |
@@ -231,7 +231,7 @@ Mock 拍题：done
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。
 今日补充：voice sample 已确认在 `backend/assets/voices/xiaobaohu_voice_v01.wav`，sha256=`8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40`；`scripts/smoke_mimo_tts.sh` 已通过真实 MiMo VoiceClone 验证，`/api/v1/tts/xiaobaohu` 和 conversation 自动 `reply.audio_url` 均能返回可下载 RIFF/WAV。
-明日第一任务：在 Android 端接入 `reply.audio_url` 远程音频播放优先级，继续保留系统 TTS fallback 和文字 fallback；随后重新打包给 Redmi K60 验证小白狐是否能通过后端音频“开口说话”，ASR 仍暂缓。
+明日第一任务：打包包含 remote audioUrl + animation_v1 的 Android APK 给 Redmi K60，验证 MiMo 音频播放、小白狐 speaking 动画、停止/静音、网络错误 fallback；随后在 Honor Pad 5 验证序列帧动画低配性能和是否需要切静态/Canvas 模式，ASR 仍暂缓。
 ```
 
 ### 日期：2026-05-18

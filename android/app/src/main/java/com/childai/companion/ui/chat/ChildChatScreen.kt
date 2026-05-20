@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.parent.ParentEntryPinDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
 import com.childai.companion.ui.parent.ParentPinGate
@@ -477,17 +478,53 @@ private fun AgentPanel(
     agent: FoxAgentUiState,
     modifier: Modifier = Modifier,
 ) {
+    var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
+    val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CartoonAgentView(agent = agent)
+        CartoonAgentView(
+            agent = agent,
+            debugMascotState = debugMascotState,
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = agent.statusText,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
+        if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
+            Spacer(modifier = Modifier.height(10.dp))
+            MascotDebugSwitcher(
+                selectedStateId = debugMascotStateId,
+                onStateSelected = { debugMascotStateId = it },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MascotDebugSwitcher(
+    selectedStateId: String?,
+    onStateSelected: (String?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AssistChip(
+            onClick = { onStateSelected(null) },
+            label = { Text(if (selectedStateId == null) "auto*" else "auto") },
+        )
+        MascotState.entries.forEach { state ->
+            AssistChip(
+                onClick = { onStateSelected(state.id) },
+                label = { Text(state.id) },
+            )
+        }
     }
 }
 

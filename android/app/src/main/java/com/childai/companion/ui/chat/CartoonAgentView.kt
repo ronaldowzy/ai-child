@@ -5,11 +5,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -19,14 +23,59 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.childai.companion.config.DevSettings
+import com.childai.companion.mascot.AssetManifestLoader
+import com.childai.companion.mascot.FrameBitmapCache
+import com.childai.companion.mascot.FrameSequencePlayer
+import com.childai.companion.mascot.MascotController
+import com.childai.companion.mascot.MascotState
 
 @Composable
 fun CartoonAgentView(
     agent: FoxAgentUiState,
     modifier: Modifier = Modifier,
+    debugMascotState: MascotState? = null,
 ) {
+    val context = LocalContext.current
+    val renderMode = DevSettings.FOX_RENDER_MODE.lowercase()
+    val useAnimation = DevSettings.FOX_ANIMATION_ENABLED &&
+        (renderMode == "animation_v1" || renderMode == "auto")
+    val manifestLoader = remember(context) {
+        AssetManifestLoader(context.assets)
+    }
+    val manifest = remember(manifestLoader) {
+        manifestLoader.loadManifestOrNull()
+    }
+    val mascotController = remember(manifest) {
+        MascotController(manifest)
+    }
+    var completedShortState by remember { mutableStateOf<MascotState?>(null) }
+    val baseMascotState = debugMascotState ?: mascotController.stateFor(agent)
+    val requestedMascotState = if (completedShortState == baseMascotState) {
+        MascotState.Idle
+    } else {
+        baseMascotState
+    }
+    val frameSequence = remember(useAnimation, requestedMascotState, manifest) {
+        if (useAnimation && manifest != null) {
+            manifestLoader.loadFrameSequenceOrNull(requestedMascotState, manifest)
+        } else {
+            null
+        }
+    }
+    val bitmapCache = remember(context) {
+        FrameBitmapCache(
+            assetManager = context.assets,
+            sampleSize = if (DevSettings.FOX_ANIMATION_LOW_PERFORMANCE_MODE) {
+                FrameBitmapCache.LOW_PERFORMANCE_SAMPLE_SIZE
+            } else {
+                FrameBitmapCache.DEFAULT_SAMPLE_SIZE
+            },
+        )
+    }
     val lift by animateFloatAsState(
         targetValue = if (agent.motion == FoxMotion.CelebrateSmall) -10f else 0f,
         animationSpec = tween(durationMillis = 360),
@@ -38,22 +87,56 @@ fun CartoonAgentView(
             .sizeIn(minWidth = 180.dp, maxWidth = 320.dp)
             .aspectRatio(1f),
     ) {
-        when (val asset = FoxAgentAssetMapper.resolve(agent)) {
-            is FoxAgentAsset.Drawable -> {
-                Image(
-                    painter = painterResource(id = asset.resId),
-                    contentDescription = "小白狐",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer { translationY = lift },
-                )
-            }
+        if (frameSequence != null) {
+            FrameSequencePlayer(
+                sequence = frameSequence,
+                bitmapCache = bitmapCache,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { translationY = lift },
+                onAnimationFinished = { finishedState ->
+                    completedShortState = finishedState
+                },
+                fallback = {
+                    StaticFoxAgentView(
+                        agent = agent,
+                        lift = lift,
+                        forceCanvas = renderMode == "canvas",
+                    )
+                },
+            )
+        } else {
+            StaticFoxAgentView(
+                agent = agent,
+                lift = lift,
+                forceCanvas = renderMode == "canvas",
+            )
+        }
+    }
+}
 
-            FoxAgentAsset.CanvasFallback -> {
-                Canvas(modifier = Modifier.matchParentSize()) {
-                    drawFoxAgent(agent = agent, verticalOffset = lift)
-                }
+@Composable
+private fun BoxScope.StaticFoxAgentView(
+    agent: FoxAgentUiState,
+    lift: Float,
+    forceCanvas: Boolean,
+) {
+    val mode = if (forceCanvas) "canvas" else DevSettings.FOX_ASSET_MODE
+    when (val asset = FoxAgentAssetMapper.resolve(agent, assetMode = mode)) {
+        is FoxAgentAsset.Drawable -> {
+            Image(
+                painter = painterResource(id = asset.resId),
+                contentDescription = "小白狐",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { translationY = lift },
+            )
+        }
+
+        FoxAgentAsset.CanvasFallback -> {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawFoxAgent(agent = agent, verticalOffset = lift)
             }
         }
     }

@@ -12,11 +12,11 @@
 5. 语音输入第一阶段优先 Android 本地 SpeechRecognizer，不默认上传原始音频到后端。
 6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
-8. 小白狐 v1 候选形象资产已生成，当前包含 11 个状态：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
-9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+8. 小白狐 v1 候选形象资产已生成，当前静态资源包含 11 个状态；动态 animation_v1 资源包以 `mascot_manifest.json` 为准，当前实际状态也是 11 个：idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
+9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 PNG 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
 11. Redmi K60 / Android 14 截图显示上一版系统 TTS 为 `SKIPPED_UNAVAILABLE`，系统 TTS 不再作为正式小白狐音色方案。
-12. 小白狐 v1 资源已扩展到 11 个状态，新增 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
+12. 小白狐 animation_v1 PNG 序列帧资源已导入 Android assets，当前运行时体积约 117MB，fallback 链为 animation_v1 -> png_static -> canvas。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
 15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
@@ -235,7 +235,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 下一步：
 
 ```text
-1. Android 增加 remote audioUrl 播放优先级。
+1. Redmi K60 验证 remote audioUrl 是否真正播放 MiMo 小白狐音色。
 2. 如果 `reply.audio_url` 播放失败，fallback 到系统 TTS 或文字。
 3. 在 Redmi K60 和 Honor Pad 5 上记录播放延迟、卡顿、speaking 状态和 fallback。
 ```
@@ -252,12 +252,13 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. 基础静态形象资源。
 2. 优先探索 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感资源。
 3. 当前 v1 候选资产：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
-4. 后续若继续补充，优先完善同一角色的一致光照、姿态比例和低配尺寸优化。
+4. 当前 animation_v1 动态资源：manifest-driven PNG frames，11 个状态，每状态 24 帧，12 FPS。
 5. 与 reply.emotion / reply.agent_motion 的映射表。
-6. Android 资源命名、drawable-nodpi 和尺寸规范。
-7. Compose Canvas / 2D 仅作为 fallback，不阻塞语音开发。
-8. 优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画。
-9. 低配设备静态降级：减少动画、降低图片尺寸、关闭自动动画或只保留静态状态图。
+6. Android 静态资源命名、drawable-nodpi 和尺寸规范。
+7. Android 动态资源放在 `android/app/src/main/assets/mascot/xiaobaohu/v1/`，保留 manifest 包结构。
+8. Compose Canvas / 2D 仅作为 fallback，不阻塞语音开发。
+9. 优先预渲染 3D PNG/WebP 状态图 + 本地序列帧轻量播放。
+10. 低配设备静态降级：减少动画、降低图片尺寸、关闭自动动画或只保留静态状态图。
 ```
 
 原则：
@@ -277,7 +278,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. 资源能在平板横竖屏或目标布局中稳定显示。
 2. 不遮挡聊天、确认文本、父亲入口或错误提示。
 3. 与 F1 视觉 brief 保持一致。
-4. 高配手机上 PNG 状态图显示正常。
+4. 高配手机上 PNG 静态图和 animation_v1 序列帧显示正常。
 5. Honor Pad 5 Android 9 / 4GB 上记录图片内存占用、切换流畅度、发热、卡顿和是否需要降级。
 ```
 
@@ -290,11 +291,13 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 范围：
 
 ```text
-1. Android 本地状态机。
-2. 输入中、识别中、待确认、后端请求中、回复中、TTS 播放中、错误状态。
-3. 后端 reply.emotion / reply.agent_motion 映射到温和表现。
-4. 动画时长和循环次数受控。
-5. 低性能设备上可降级为静态状态。
+1. Android 本地 `MascotController`。
+2. `AssetManifestLoader` 从 assets 读取 `mascot_manifest.json` 和状态 manifest。
+3. `FrameSequencePlayer` 按 fps 播放 PNG frames，支持 loop、oneshot_hold、short_loop。
+4. 输入中、识别中、待确认、后端请求中、回复中、TTS 播放中、错误状态。
+5. 后端 reply.emotion / reply.agent_motion 映射到温和表现。
+6. 动画时长和循环次数受控，`jumping_happy` 等正反馈不做上瘾式循环。
+7. 低性能设备上可降级为静态 PNG 或 Canvas。
 ```
 
 非目标：
@@ -311,6 +314,8 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 1. 动画不影响文字输入、语音确认、父亲入口和错误提示。
 2. 高风险场景表现稳定、克制，不戏剧化。
 3. 后端断开或 TTS 失败时状态可恢复。
+4. safety_concern / privacy_boundary 优先级高于 speaking。
+5. manifest 或 frames 缺失时不崩溃，fallback 到静态 PNG 或 Canvas。
 ```
 
 ---

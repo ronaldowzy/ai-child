@@ -13,7 +13,7 @@
 - 调用后端 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`；当前 UI 已做轻量状态映射，TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态，语音输入和复杂动画仍是后续能力。
+  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。语音输入 ASR 仍是后续能力。
 - 点击“拍题目”走 mock attachment 流程，不接真实 CameraX，不保存真实图片。
 - 父亲设置页可读取和保存目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
@@ -39,11 +39,11 @@
 - Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
 - 小白狐 v1 候选资源已导入，当前包含 11 个状态：`neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking`、`calm`、`sleepy`、`safety_concern`、`privacy_boundary`、`homework_focus`、`network_error`。
-- Android 第一版优先预渲染 3D PNG/WebP 状态图 + 轻量 Compose 动画，不引入实时 3D 引擎或大型动画依赖作为必需能力。
-- 小白狐资源优先放在 `android/app/src/main/res/drawable-nodpi/`，避免 Android 按密度自动缩放。
+- Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 PNG 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+- 小白狐动态序列帧放在 `android/app/src/main/assets/mascot/xiaobaohu/v1/`，由 manifest-driven loader 读取；旧静态 PNG fallback 保留在 `android/app/src/main/res/drawable-nodpi/`。
 - `FoxAgentAssetMapper` 负责把 `FoxAgentUiState` / `FoxMood` / `FoxMotion` 映射到 drawable 或 Canvas fallback。
-- `DevSettings.FOX_ASSET_MODE` 当前支持 `auto` / `png` 资源优先语义和 `canvas` 低配 fallback 语义；低配设备可强制 Canvas 或静态状态。
-- TTS speaking 会临时映射到 `fox_3d_speaking`；朗读结束或停止后恢复后端 reply 对应的基础状态。
+- `DevSettings.FOX_RENDER_MODE` 当前支持 `animation_v1` / `png_static` / `canvas` / `auto` 语义；`DevSettings.FOX_ASSET_MODE` 继续控制旧静态 PNG fallback；低配设备可强制 Canvas 或静态状态。
+- TTS speaking 会优先映射到 animation_v1 的 `speaking` 序列帧；朗读结束或停止后恢复后端 reply 对应的基础状态。
 - UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
 - 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；当前正式方向是后端 MiMo VoiceClone v01，系统 TTS 只做 fallback。
@@ -56,7 +56,73 @@
 - `docs/FOX_AGENT_VISUAL_DESIGN_V0_1.md`
 - `docs/NEXT_PHASE_PLAN_V0_2.md`
 
-## 小白狐 v1 候选资源
+## 小白狐 animation_v1 序列帧资源
+
+父亲 / 产品负责人已提供完整小白狐动态资源包。当前 Android 运行时必要文件已经导入：
+
+```text
+android/app/src/main/assets/mascot/xiaobaohu/v1/
+```
+
+导入内容：
+
+```text
+mascot_manifest.json
+每个状态目录下的 manifest.json
+每个状态目录下的 frames/*.png
+```
+
+当前没有把 preview html、gif/webp 预览和 spritesheet 调试资料作为运行时依赖。完整资源记录见：
+
+```text
+docs/assets/fox/animation_v1/README.md
+```
+
+manifest 当前声明 11 个状态，均为 24 帧、12 FPS：
+
+```text
+safety_concern
+privacy_boundary
+network_error
+speaking
+thinking
+listening
+homework_focus
+calm
+sleepy
+jumping_happy
+idle
+```
+
+渲染策略：
+
+```text
+1. `animation_v1`：优先使用 manifest + PNG frames 播放。
+2. `png_static`：animation manifest 或 frames 失败时使用旧静态 PNG。
+3. `canvas`：静态资源也不可用或低性能模式时使用 Compose Canvas fallback。
+```
+
+相关开关：
+
+```kotlin
+DevSettings.FOX_RENDER_MODE = "animation_v1"
+DevSettings.FOX_ANIMATION_ENABLED = true
+DevSettings.FOX_ANIMATION_LOW_PERFORMANCE_MODE = false
+DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
+```
+
+当前 animation_v1 assets 约 117MB，会显著增加 APK 体积。Redmi K60 作为功能主验证设备，Honor Pad 5 Android 9 / 4GB 作为低配性能和降级验证设备。
+
+最新 animation_v1 debug APK：
+
+```text
+路径：android/app/build/outputs/apk/debug/app-debug.apk
+大小：147M
+SHA256：25cbd4a8522987fc0551df9e162b8c1fa6b7b44e5aaace53e437beb4c90d4cd5
+base URL：http://192.168.0.118:8000/
+```
+
+## 小白狐 v1 静态候选资源
 
 当前候选资源来自父亲 / 产品负责人提供的小白狐角色设定，已经归档到：
 

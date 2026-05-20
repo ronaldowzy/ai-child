@@ -142,7 +142,7 @@
 
 ## 7. 资源格式和命名
 
-第一批资源优先目标是 Android `drawable-nodpi` 可直接使用的 3D rendered PNG/WebP sequence。当前小白狐 v1 候选资产已经导入仓库，包含 11 个状态；它不是最终完整视觉系统，仍需继续在真实设备上验证资源质量、内存占用、切换流畅度和低配降级。
+第一批资源优先目标是 Android 可直接使用的 3D rendered PNG/WebP 静态状态图和本地 PNG 序列帧。当前小白狐 v1 候选静态资产已经导入仓库，包含 11 个状态；父亲随后提供的 animation_v1 动态资源包也已进入 Android assets。它们仍不是最终完整视觉系统，需继续在真实设备上验证资源质量、内存占用、切换流畅度和低配降级。
 
 当前候选资产：
 
@@ -176,6 +176,42 @@ android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.png
 android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.png
 android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.png
 android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
+```
+
+当前 Android 动态序列帧路径：
+
+```text
+android/app/src/main/assets/mascot/xiaobaohu/v1/
+```
+
+该目录由 manifest 驱动，不使用 `drawable-nodpi` 平铺 frames。运行时保留：
+
+```text
+mascot_manifest.json
+每个状态 manifest.json
+每个状态 frames/*.png
+```
+
+当前 manifest 声明 11 个动态状态：
+
+```text
+safety_concern
+privacy_boundary
+network_error
+speaking
+thinking
+listening
+homework_focus
+calm
+sleepy
+jumping_happy
+idle
+```
+
+所有状态当前均为 24 帧、12 FPS。运行时 assets 约 117MB。preview html、gif/webp 预览和 spritesheet 调试资料不作为 Android 运行时依赖。详细清单见：
+
+```text
+docs/assets/fox/animation_v1/README.md
 ```
 
 设计交付包中可同步保留源资产路径：
@@ -222,17 +258,19 @@ assets/fox/v1/3d/fox_3d_network_error.png
 当前 Android 端已有 Compose Canvas fallback，并根据后端 `reply.emotion` 和 `reply.agent_motion` 做轻量状态映射。第一版资源接入原则如下：
 
 ```text
-1. 最终方向是三维立体小白狐形象，优先接入 fox_3d_* drawable-nodpi PNG/WebP。
-2. 当前 Compose Canvas fallback 必须保留，作为资源缺失、资源加载失败或 3D 资源未交付时的默认显示。
-3. 2D 静态图也只作为前期替代，不应取代最终 3D / soft 3D 方向。
-4. 资源进入仓库前不要硬编码临时图片，不要引用本地设计软件路径。
-5. 不为了动画引入复杂依赖，除非主会话确认。
-6. 后端仍只输出语义状态和动作 ID，Android 负责展示映射。
-7. 图片不承载业务逻辑、安全判断、学习答案或父亲策略。
-8. 不硬塞低质量临时图片；资源质量不达标时继续使用 Canvas fallback。
-9. 使用 `FoxAgentAssetMapper` 做轻量资源选择：输入 `FoxAgentUiState` / `FoxMood` / `FoxMotion`，输出 drawable resource id 或 Canvas fallback。
-10. 使用 `DevSettings.FOX_ASSET_MODE` 控制资源模式：`auto` / `png` 优先资源图，`canvas` 强制使用 Canvas fallback。
-11. Honor Pad 5 等低配设备必须保留低性能模式：减少动画、降低图片尺寸、关闭自动动画或仅保留静态状态图。
+1. 最终方向是三维立体小白狐形象，优先接入 animation_v1 PNG 序列帧。
+2. 旧静态 `fox_3d_*` drawable-nodpi PNG/WebP 作为第二层 fallback。
+3. 当前 Compose Canvas fallback 必须保留，作为资源缺失、资源加载失败、低性能设备或 3D 资源未交付时的最后显示。
+4. 2D 静态图也只作为前期替代，不应取代最终 3D / soft 3D 方向。
+5. 资源进入仓库前不要硬编码临时图片，不要引用本地设计软件路径。
+6. 不为了动画引入复杂依赖，除非主会话确认。
+7. 后端仍只输出语义状态和动作 ID，Android 负责展示映射。
+8. 图片不承载业务逻辑、安全判断、学习答案或父亲策略。
+9. 不硬塞低质量临时图片；资源质量不达标时继续使用静态 PNG 或 Canvas fallback。
+10. 使用 `MascotController` / `AssetManifestLoader` / `FrameSequencePlayer` 播放 animation_v1。
+11. 使用 `FoxAgentAssetMapper` 做旧静态资源选择：输入 `FoxAgentUiState` / `FoxMood` / `FoxMotion`，输出 drawable resource id 或 Canvas fallback。
+12. 使用 `DevSettings.FOX_RENDER_MODE` 控制渲染模式：`animation_v1` / `png_static` / `canvas` / `auto`。
+13. Honor Pad 5 等低配设备必须保留低性能模式：减少动画、降低图片尺寸、关闭自动动画或仅保留静态状态图。
 ```
 
 建议后续接入映射：

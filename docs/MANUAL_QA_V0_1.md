@@ -225,7 +225,7 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | 14. 父亲日报读取自动记忆素材 | E2E API | pass：同进程 E2E 生成结构化观察后，父亲日报返回摘要且不展示 evidence、quote_summary 或逐字聊天记录；设备侧待读取有素材状态 |
 | 15. 后端断开时 Android 温和错误 | 窗口模式模拟器 | pass：模拟器网络短暂不可达时，App 显示“小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。” |
 | 16. `session_state` 默认不展示给儿童 | 窗口模式模拟器 UI dump | pass：儿童界面未展示 `base=...` / `active=...` 等内部 session_state 调试文本 |
-| 17. 小白狐状态随 `emotion` / `motion` 轻量变化 | 窗口模式模拟器 | partial：当前 UI 有轻量 Canvas 形象和状态文案变化；未验证 3D 资源路径 |
+| 17. 小白狐状态随 `emotion` / `motion` 轻量变化 | 窗口模式模拟器 | partial：当前 UI 已接入 animation_v1 PNG 序列帧、静态 PNG 和 Canvas fallback；仍需 Redmi K60 / Honor Pad 5 设备侧验证流畅度和降级 |
 | 18. 语音按钮当前行为 | 窗口模式模拟器 | pass for v0.1 current：当前按钮显示“语音”但 disabled，底部提示“现在先用文字说”，未录音、未播放；注意这不是 V1/V2 长期目标 |
 
 ### QA1 新决策后的新增待验收项
@@ -240,8 +240,8 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | Android remote audioUrl 播放 | code_ready_device_qa | `reply.audio_url` 非空时优先播放后端 WAV；失败 fallback 系统 TTS 或文字；待 Redmi K60 验证 MiMo 音色 |
 | VoiceProfile | code_done / device_todo | 代码已使用 `zh-CN`、稍慢 `speechRate`、略高 `pitch` 和系统中文 fallback；仍需设备听感和缺失 voice 验证 |
 | Android 系统 ASR/TTS 效果评估 | todo | 需要真实设备或人工听感记录：识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
-| 3D 小白狐资源存在时显示 | in_progress | 当前 v1 候选资源已扩展到 11 个状态；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |
-| 3D 资源缺失时 Canvas fallback | partial / current fallback ok | 当前 Canvas fallback 仍保留；后续需在资源缺失、加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
+| animation_v1 小白狐序列帧显示 | code_ready_device_qa | 当前已导入 11 个状态 PNG 序列帧 assets，使用 manifest-driven loader 播放；需在高配手机和 Honor Pad 5 上验证 idle/listening/thinking/speaking/network_error、性能和不强刺激 |
+| 3D 资源缺失时 fallback | partial / current fallback ok | 当前 fallback 链为 animation_v1 -> 静态 PNG -> Canvas；后续需在 manifest 缺失、frame 加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
 
 ## V2 TTS v1 代码验证
 
@@ -317,7 +317,7 @@ base URL：http://192.168.0.118:8000/
 | MiMo policy 不满足 | 不调用外部 provider，返回清晰错误 | code_done / backend_test_pass |
 | 缓存命中 | 同文本、emotion、voiceVersion、provider、model、voice sample 命中缓存，不重复 provider 调用 | code_done / backend_test_pass |
 | conversation 自动 audioUrl | 默认关闭；TTS 失败时 conversation 仍返回文字 | code_done / backend_test_pass |
-| Android remote audioUrl 播放 | `reply.audio_url` 非空时优先播放，失败时 fallback 系统 TTS 或文字 | todo |
+| Android remote audioUrl 播放 | `reply.audio_url` 非空时优先播放，失败时 fallback 系统 TTS 或文字 | code_done / device_todo |
 
 设备侧新增 QA：
 
@@ -339,6 +339,83 @@ Redmi K60 复验记录待补：
 | 诊断文本 | 可见 engine、locale、voice、lang、setVoice、speak、failure | 上一版显示 `SKIPPED_UNAVAILABLE`；新 APK 待复验 |
 | 有声播放 | 若系统 TTS 可用应出声；若无声需记录 failure reason | todo |
 | 音色自然度 | 记录是否适合孩子 | todo |
+
+## 小白狐 animation_v1 序列帧验证
+
+日期：2026-05-20
+范围：Android 本地 PNG 序列帧小白狐动画。未接 Rive、实时 3D 引擎或大型动画依赖；未删除旧静态 PNG 和 Canvas fallback。
+
+资源事实：
+
+```text
+来源：/Users/wzy/Downloads/fox
+Android runtime：android/app/src/main/assets/mascot/xiaobaohu/v1/
+运行时文件：mascot_manifest.json、每个状态 manifest.json、frames/*.png
+状态数量：11
+帧数：每个状态 24 帧
+FPS：12
+运行时 assets 体积：约 117MB
+fallback：animation_v1 -> png_static -> canvas
+```
+
+代码验证：
+
+| 命令 | 结果 |
+|---|---|
+| `bash scripts/android_gradle.sh test` | 通过：覆盖 manifest 解析、frame path、状态优先级、privacy 高于 speaking、short_loop 回 base state、unknown fallback idle |
+| `bash scripts/android_gradle.sh assembleDebug` | 通过：BUILD SUCCESSFUL |
+| `bash scripts/android_gradle.sh lintDebug` | 通过：BUILD SUCCESSFUL |
+| `git diff --check` | 通过 |
+
+最新 debug APK：
+
+```text
+路径：android/app/build/outputs/apk/debug/app-debug.apk
+大小：147M
+SHA256：25cbd4a8522987fc0551df9e162b8c1fa6b7b44e5aaace53e437beb4c90d4cd5
+base URL：http://192.168.0.118:8000/
+说明：包体增大主要来自 117MB animation_v1 PNG frames。
+```
+
+状态清单：
+
+```text
+safety_concern
+privacy_boundary
+network_error
+speaking
+thinking
+listening
+homework_focus
+calm
+sleepy
+jumping_happy
+idle
+```
+
+代码侧期望：
+
+```text
+1. App 默认显示 idle 序列帧。
+2. MiMo audioUrl 或系统 TTS 播放时切 speaking。
+3. 后端请求中 / 思考状态切 thinking。
+4. 网络错误切 network_error。
+5. safety_concern / privacy_boundary 优先级高于 speaking。
+6. jumping_happy 作为 short_loop，播放后回到 base state 或 idle。
+7. manifest 或 frames 加载失败时 fallback 到静态 PNG，再 fallback 到 Canvas。
+8. 儿童正常界面不显示复杂调试面板。
+```
+
+待真机 QA：
+
+| 设备 | 检查项 | 期望 | 结果 |
+|---|---|---|---|
+| Redmi K60 / Android 14 | idle 动画 | 首屏流畅，不遮挡聊天 | todo |
+| Redmi K60 / Android 14 | speaking 动画 | MiMo 音频播放期间切 speaking，停止后恢复 | todo |
+| Redmi K60 / Android 14 | network_error | 后端断开时切 network_error 或稳定 fallback | todo |
+| Redmi K60 / Android 14 | 安全 / 隐私优先级 | safety / privacy 不被 speaking 覆盖 | todo |
+| Honor Pad 5 / Android 9 / 4GB | 低配性能 | 记录卡顿、发热、掉帧、是否需要低性能模式 | todo |
+| Honor Pad 5 / Android 9 / 4GB | fallback | 低性能或资源失败时静态 PNG / Canvas 可用 | todo |
 
 ## 下一阶段设备 QA 清单
 

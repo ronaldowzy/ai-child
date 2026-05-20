@@ -372,9 +372,42 @@ fallback：animation_v1 -> png_static -> canvas
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 大小：147M
-SHA256：25cbd4a8522987fc0551df9e162b8c1fa6b7b44e5aaace53e437beb4c90d4cd5
+SHA256：0f2df15d2731a662156162089195efbe1ae7eddccdeab073534942c70848aa9f
 base URL：http://192.168.0.118:8000/
 说明：包体增大主要来自 117MB animation_v1 PNG frames。
+```
+
+## Redmi K60 后端连接误报排查
+
+日期：2026-05-20
+
+现象：手机浏览器访问 `http://192.168.0.118:8000/api/v1/health` 正常，但 App 偶发显示“小白狐现在没有连上后端”。
+
+结论：后端服务未停止，LAN health 正常。问题主要来自 MiMo VoiceClone 开启后，conversation 同步等待“对话模型 + TTS 音频生成”，单轮请求耗时接近旧 Android read timeout。
+
+证据：
+
+```text
+后端 screen session：childai_backend
+LAN health：http://192.168.0.118:8000/api/v1/health -> {"status":"ok"}
+后端 timing log：POST /api/v1/conversation/message elapsed_ms=10543.5
+旧 Android read timeout：12_000ms
+```
+
+修复：
+
+```text
+1. 后端新增 `app.request_timing` 日志，记录 method/path/status/elapsed_ms。
+2. Android `ConversationApiClient` read timeout 从 12_000ms 调整为 45_000ms。
+3. 重新构建 LAN debug APK，base URL 仍为 `http://192.168.0.118:8000/`。
+```
+
+待真机复验：
+
+```text
+1. Redmi K60 连续发送 5 轮普通聊天。
+2. 每轮应等到 MiMo 小白狐音频播放，不应误报后端断开。
+3. 若仍报错，检查 `logs/backend_dev_8000.log` 中对应请求是否 200、是否超过 45 秒、是否有 request_failed。
 ```
 
 状态清单：

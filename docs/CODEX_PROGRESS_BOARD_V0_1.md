@@ -207,7 +207,7 @@ Mock 拍题：done
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
 | V1-05 TTS-D1 可观测性与故障修复 | done |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段；新增 TTS 设置/语音数据入口 |
 | V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发；真实 smoke 已确认 `/chat/completions` + `choices[0].message.audio.data` 可生成 RIFF/WAV |
-| V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；已覆盖相对 URL 拼接、muted、stop 和 fallback 单测 |
+| V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；Android conversation read timeout 已从 12s 调整为 45s，避免 MiMo TTS 同步生成接近 10s 时误报断网 |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
 | F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
 | F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧序列；Android test/assemble/lint 通过；debug APK 约 147MB，待真机验证流畅度和低配降级 |

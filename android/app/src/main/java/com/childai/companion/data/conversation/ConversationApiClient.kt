@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 class ConversationApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
-    private val readTimeoutMs: Int = 12_000,
+    private val readTimeoutMs: Int = 45_000,
 ) {
     suspend fun sendMessage(
         request: ConversationMessageRequest,

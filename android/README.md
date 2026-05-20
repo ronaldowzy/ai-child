@@ -118,9 +118,11 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 大小：147M
-SHA256：25cbd4a8522987fc0551df9e162b8c1fa6b7b44e5aaace53e437beb4c90d4cd5
+SHA256：0f2df15d2731a662156162089195efbe1ae7eddccdeab073534942c70848aa9f
 base URL：http://192.168.0.118:8000/
 ```
+
+MiMo VoiceClone 开启后，`/api/v1/conversation/message` 会同步等待“对话模型 + TTS 音频生成”。Redmi K60 真机测试中出现过旧版 App 误报“没有连上后端”的情况；后端日志显示一轮请求耗时约 10.5 秒，接近旧版 12 秒 read timeout。当前 Android conversation read timeout 已调为 45 秒，后端也增加了 `app.request_timing` 请求耗时日志。
 
 ## 小白狐 v1 静态候选资源
 

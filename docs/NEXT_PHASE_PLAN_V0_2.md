@@ -19,6 +19,7 @@
 12. 小白狐 v1 资源已扩展到 11 个状态，新增 calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
+15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
 ```
 
 ---
@@ -116,6 +117,35 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. 先在高配 Android 手机上跑通 `reply.audio_url` 远程音频播放、停止、关闭、speaking 状态和系统 TTS fallback。
 2. 再在 Honor Pad 5 上验证远程 wav 播放、延迟、卡顿、缓存音频体积、系统 TTS fallback 是否可用，以及是否需要关闭自动朗读作为低配默认。
+```
+
+## Phase 7：PostgreSQL Local Persistence
+
+目标：把当前内存态服务逐步迁移到本地 PostgreSQL，先支撑家庭内测的数据连续性，不做云端多租户。
+
+当前状态：
+
+```text
+1. DB1-A 基础设施已完成：SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local docker compose、migration/reset 脚本和基础测试。
+2. 初始表包含 children、parent_policies、conversation_sessions、conversation_messages、routing_decisions、memory_items、parent_reports、tts_cache_records。
+3. 业务服务仍未迁移，当前 parent policy、memory、report 等运行时行为仍以原有内存实现为主。
+```
+
+迁移顺序：
+
+```text
+1. B2：ParentPolicyService 持久化。
+2. B3：Conversation session/message 落库，保存 child/agent message、audio_url、emotion、agent_motion，不保存 debug。
+3. B4：MemoryService 落库。
+4. B5：ParentReportService 落库。
+```
+
+数据边界：
+
+```text
+1. 原始音频、原始照片、API key 和 debug internals 不入库。
+2. TTS cache metadata 优先保存 hash，不保存完整敏感文本。
+3. 当前是本地家庭自用库；如果未来云端化或上架，必须重新做儿童数据合规评审。
 ```
 
 范围：

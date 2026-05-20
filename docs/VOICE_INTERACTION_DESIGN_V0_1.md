@@ -30,7 +30,7 @@ PD-027：小白狐正式品牌音色方案改为后端 MiMo VoiceClone；VoiceDe
 2. Android DTO 已解析这些字段，并已做小白狐轻量状态映射。
 3. Android 语音输入入口仍是占位或后续入口，不录音、不调用真实 SpeechRecognizer。
 4. 后端已提供 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式开启环境变量和 TTS 数据策略闸门。
-5. Android 已实现本地 TextToSpeech fallback 抽象、默认自动朗读、停止/静音控制、VoiceProfile 和小白狐 speaking 状态联动；下一步需要优先接入 `reply.audio_url` 远程音频播放。
+5. Android 已实现 remote `reply.audio_url` 优先播放、本地 TextToSpeech fallback 抽象、默认自动朗读、停止/静音控制、VoiceProfile 和小白狐 speaking 状态联动。
 6. mock 拍题和学习求助仍以文字和 mock OCR 为主。
 ```
 
@@ -126,7 +126,7 @@ v1 流程：
 实现状态（2026-05-20）：
 
 ```text
-1. Android 已新增 TtsController / AndroidTtsController / TtsUiState / VoiceProfile。
+1. Android 已新增 TtsController / RemoteAudioTtsController / AudioUrlPlayer / AndroidTtsController / TtsUiState / VoiceProfile。
 2. ChatViewModel 在 agent reply 到达后，根据 reply.voice_enabled、AUTO_TTS_ENABLED 和静音状态决定是否自动朗读。
 3. TTS 请求被接受后先进入 speaking pending / speaking 视觉反馈，不再完全依赖系统 onStart 回调。
 4. 朗读结束或停止后恢复后端 reply 对应的 base mood / motion。
@@ -139,7 +139,7 @@ v1 流程：
 11. AndroidTtsController 已修复 TextToSpeech 初始化回调早于字段赋值时的误判风险。
 12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
 13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
-14. Android 尚未实现 remote audioUrl 优先播放；这是下一步 Android 任务。
+14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败再 fallback 到系统 TextToSpeech 或文字。
 15. 真实设备听感、远程音频播放、系统 TTS fallback、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
 ```
 
@@ -468,7 +468,7 @@ TTS 自然度主观评价
 | VQA-14 | TTS 诊断可见 | Redmi K60 等真机上能看到朗读开启、正在准备、不可用或失败原因；开发诊断含 engine、locale、voice、speak 返回值 |
 | VQA-15 | speaking pending | TTS 请求被接受后小白狐先切 speaking pending / speaking；失败或停止后恢复 base state，不一直卡住 |
 | VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 默认 mock 返回 `/media/tts/...wav`；MiMo disabled 时不外发；真实 MiMo smoke 已通过并下载 RIFF/WAV |
-| VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时 fallback 到系统 TTS 或文字 |
+| VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时 fallback 到系统 TTS 或文字；代码已实现，待 Redmi K60 真机确认听感和网络播放 |
 | VQA-18 | TTS 数据策略 | MiMo VoiceClone 未显式开启 allow child text 和 retention checked 时不能调用外部 provider |
 
 语音体验 QA 记录必须包含：

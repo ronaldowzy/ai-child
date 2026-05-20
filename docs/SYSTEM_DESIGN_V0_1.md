@@ -1384,7 +1384,16 @@ strategy：有效引导策略
 
 ## 11. 数据库设计
 
-v0.1 可以使用 PostgreSQL。家庭自用原型也可以先使用 SQLite，但表结构应保持可迁移。
+当前 v0.1-dev 已确认使用本地 PostgreSQL 作为家庭自用持久化数据库。SQLite 不再作为主开发目标，只可作为未来测试替代方案。DB1-A 已采用 SQLAlchemy 2.x sync + psycopg + Alembic 建立基础设施；业务服务仍需按 ParentPolicy、Conversation、Memory、ParentReport 顺序逐步迁移。
+
+数据边界：
+
+```text
+1. 本地交互文本可以进入 PostgreSQL，用于上下文、复盘和父亲日报。
+2. 原始音频、原始照片、API key、模型 key 和 debug internals 不入库。
+3. TTS cache metadata 优先保存 hash、provider、model、voice sample sha 和生成信息，不保存完整敏感文本。
+4. 当前设计是本地家庭自用库；未来云端化、多租户或上架前必须重新做儿童数据合规评审。
+```
 
 ### 11.1 child_profile
 

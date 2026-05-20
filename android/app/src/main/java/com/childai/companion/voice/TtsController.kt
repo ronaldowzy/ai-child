@@ -3,6 +3,8 @@ package com.childai.companion.voice
 data class TtsRequest(
     val text: String,
     val voiceProfile: VoiceProfile = VoiceProfile.default(),
+    val audioUrl: String? = null,
+    val backendBaseUrl: String? = null,
 )
 
 data class VoiceDiagnostics(
@@ -17,6 +19,8 @@ data class VoiceDiagnostics(
     val setVoiceResult: String? = null,
     val lastSpeakResult: String? = null,
     val enginePackageName: String? = null,
+    val playbackSource: String? = null,
+    val audioUrl: String? = null,
 )
 
 data class VoiceCapabilityReport(
@@ -43,6 +47,7 @@ interface TtsController {
 
     companion object {
         const val UNAVAILABLE_MESSAGE = "我现在不能朗读，但文字还在这里。"
+        const val AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE = "这次声音没有放出来，但文字还在这里。"
     }
 }
 

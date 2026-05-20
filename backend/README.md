@@ -33,7 +33,8 @@ The current backend is intentionally local-first and mock-first:
   can generate or return a cached wav URL. The default provider is mock and
   never calls external services. MiMo VoiceClone is disabled until explicit
   local environment variables and the TTS data policy gate allow child text
-  transmission.
+  transmission. Android now prefers `reply.audio_url` playback and falls back
+  to local TextToSpeech or text if remote audio fails.
 
 If Android replies look like fixed templates such as “听起来可以聊”, the backend
 is probably running with the default mock provider. For real Mimo chat, restart
@@ -43,8 +44,8 @@ do not put the real API key into git, Android, docs, tests, or screenshots.
 ## Current Voice And Presentation Contract
 
 The backend remains the decision and safety boundary. Android may use local
-`SpeechRecognizer`, remote audio playback, and TextToSpeech fallback in the next
-phase, but child-facing content still flows through:
+`SpeechRecognizer` later, and now uses remote audio playback plus TextToSpeech
+fallback for voice output, but child-facing content still flows through:
 
 ```text
 SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelRegistry -> output safety check
@@ -196,6 +197,56 @@ The check covers health, after-school, learning help, mock homework attachment, 
 With automatic memory enabled, the parent report step may include structured
 conversation summaries generated during the same process. It still does not
 return evidence fields, quote summaries, or full chat transcripts.
+
+## Local PostgreSQL Persistence
+
+The v0.1-dev persistence target is local PostgreSQL for family testing. DB1-A
+adds the database foundation only; current business services still use their
+existing in-memory repositories until the B2-B5 migration steps wire them in.
+
+Local dev database:
+
+```bash
+docker compose -f docker-compose.local.yml up -d
+bash scripts/db_migrate.sh
+```
+
+To reset the local schema during development:
+
+```bash
+bash scripts/db_reset_local.sh --yes
+```
+
+Default local database URL:
+
+```text
+CHILD_AI_DATABASE_URL=postgresql+psycopg://child_ai:child_ai@localhost:5432/child_ai_dev
+```
+
+Initial tables:
+
+```text
+children
+parent_policies
+conversation_sessions
+conversation_messages
+routing_decisions
+memory_items
+parent_reports
+tts_cache_records
+```
+
+Data boundary:
+
+- This is local family-use storage, not a cloud multi-tenant production design.
+- Conversation text may be stored locally for context, review, and parent report
+  material after the B3 migration step.
+- Raw audio files, raw photos, API keys, model keys, and debug internals must
+  not be written to PostgreSQL.
+- `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
+  input text.
+- Any future cloud deployment or app-store release requires a separate child
+  data compliance review before enabling remote persistence.
 
 ## Optional Xiaomi Mimo Provider
 

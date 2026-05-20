@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，进入家庭内测前加固
 当前目标：完成完整设备 QA；AgentRuntime、模型外发安全闸门、自动记忆闭环、父亲入口保护、安全场景细分、真实模型对话质量和 Android 表达层预留已完成代码级加固
-下一步：小白狐语音输出主路径改为后端 MiMo VoiceClone。后端 TTS endpoint / mock provider / cache / policy guard 已落地，真实 MiMo VoiceClone smoke 已通过；下一步让 Android 优先播放 `reply.audio_url`，系统 TTS 仅作为 fallback 和诊断；ASR 暂缓
+下一步：小白狐语音输出主路径改为后端 MiMo VoiceClone。后端 TTS endpoint / mock provider / cache / policy guard 已落地，真实 MiMo VoiceClone smoke 已通过；Android 已接入 `reply.audio_url` 远程播放优先级，下一步打 APK 让 Redmi K60 验证小白狐音色、speaking 状态、停止/静音和 fallback；PostgreSQL DB1-A 基础设施已完成，后续按 B2-B5 串行迁移业务；ASR 暂缓
 ```
 
 第一轮已完成能力快照：
@@ -54,8 +54,9 @@ Mock 拍题：done
 | R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
-| V1 | 语音交互 v1 | Android 本地语音输入确认 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；Android remote audioUrl 播放仍 todo；系统 TTS 仅 fallback；SpeechRecognizer ASR 仍 todo |
+| V1 | 语音交互 v1 | Android 本地语音输入确认 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；Android remote audioUrl 播放代码已完成，待 Redmi K60 真机 QA；系统 TTS 仅 fallback；SpeechRecognizer ASR 仍 todo |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | todo | R7/R8 | 温和、好奇、慢热友好；视觉优先毛绒感/立体绘本感；避免强刺激、排行榜、连击奖励和依赖感 |
+| DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
 
 ---
 
@@ -201,16 +202,21 @@ Mock 拍题：done
 | R8-02 语音交互设计文档 | done |  | 明确 confirm-before-send、本地 ASR、默认自动 TTS、VoiceProfile、可替换抽象、原始音频策略、权限、错误文案、安全边界和 QA 指标 |
 | R8-03 下一阶段计划文档 | done |  | 拆分完整设备 QA、语音输入、TTS、小白狐视觉资源、小白狐动画状态机、真实平板家庭内测准备 |
 | V1-01 Android 本地语音输入 v1 | todo |  | SpeechRecognizer 识别后先展示可确认文本；确认后才发送后端；future hands-free conversational mode 不进 v1；不默认上传原始音频 |
-| V1-02 Android TTS 朗读 v1 | in_progress |  | 下一步改为优先播放 `reply.audio_url`，播放失败时 fallback 系统 TTS 或文字；系统 TTS 已有诊断和停止/静音基础 |
+| V1-02 Android TTS 朗读 v1 | in_progress |  | Android 已优先播放 `reply.audio_url`，播放失败时 fallback 系统 TTS 或文字；系统 TTS 已有诊断和停止/静音基础；待 Redmi K60 听感和网络播放 QA |
 | V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / SpeechRecognizer 抽象仍 todo；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
 | V1-05 TTS-D1 可观测性与故障修复 | done |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段；新增 TTS 设置/语音数据入口 |
 | V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发；真实 smoke 已确认 `/chat/completions` + `choices[0].message.audio.data` 可生成 RIFF/WAV |
-| V1-07 Android remote audioUrl 播放 | todo |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking |
+| V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；已覆盖相对 URL 拼接、muted、stop 和 fallback 单测 |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
 | F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
 | F1-03 小白狐动画状态机 v1 | todo |  | 根据 `reply.emotion` / `reply.agent_motion` 和本地 UI 状态做轻量状态变化，不做排行榜、连击奖励或上瘾式动画 |
 | O1-01 Open Conversation Mode 小步实现 | done |  | 普通兴趣和日常话题进入 `conversation.open`；ChildAgentRuntime 接收进程内短期 history；普通聊天 quick actions 随上下文轻量变化；安全、隐私、学习、睡前边界保留 |
+| DB1-A PostgreSQL 基础设施 | done |  | 新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local compose、初始 8 张表、migration/reset 脚本和基础测试；业务服务仍未迁移 |
+| DB1-B ParentPolicy 持久化 | todo |  | 从内存策略迁移到 DB repository，API 行为不变 |
+| DB1-C Conversation message 持久化 | todo |  | 保存 child/agent message、audio_url、emotion、agent_motion；不保存 debug、原始音频或照片 |
+| DB1-D MemoryService 持久化 | todo |  | 结构化 memory_items 落库，evidence 继续使用 summary，不保存 full transcript |
+| DB1-E ParentReport 持久化 | todo |  | 日报生成结果可持久化，仍不展示逐字聊天记录 |
 
 ---
 

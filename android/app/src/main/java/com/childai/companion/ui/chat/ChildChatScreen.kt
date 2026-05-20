@@ -54,6 +54,8 @@ import com.childai.companion.ui.parent.ParentEntryTarget
 import com.childai.companion.ui.parent.ParentPinGate
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import com.childai.companion.voice.AndroidTtsController
+import com.childai.companion.voice.MediaPlayerAudioUrlPlayer
+import com.childai.companion.voice.RemoteAudioTtsController
 
 @Composable
 fun ChildChatScreen(
@@ -65,7 +67,11 @@ fun ChildChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val ttsController = remember {
-        AndroidTtsController(context.applicationContext)
+        RemoteAudioTtsController(
+            audioUrlPlayer = MediaPlayerAudioUrlPlayer(),
+            fallbackController = AndroidTtsController(context.applicationContext),
+            backendBaseUrl = DevSettings.conversationApiBaseUrl,
+        )
     }
 
     fun openIntentWithFallback(primary: Intent, fallback: Intent = Intent(Settings.ACTION_SETTINGS)) {

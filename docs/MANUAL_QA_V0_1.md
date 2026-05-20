@@ -96,6 +96,27 @@ download check: generated audio is RIFF/WAV and larger than 1KB
 secret handling: API key not printed, not committed, and not exposed to Android
 ```
 
+Android remote audioUrl playback code validation（2026-05-20）：
+
+```text
+范围：Android 收到 reply.audio_url 后优先播放远程 WAV；播放失败 fallback 到系统 TextToSpeech；系统 TTS 失败时保留文字提示。
+代码状态：已实现 AudioUrlPlayer / MediaPlayerAudioUrlPlayer / RemoteAudioTtsController；ChatViewModel 会把 reply.audioUrl 传入 TtsRequest。
+验证：Android 单测覆盖 remote 优先、相对 URL 拼接、remote 失败 fallback、muted 不播放、stop 恢复小白狐 base state、child message 不触发播放。
+待真机：Redmi K60 需要验证是否请求 /media/tts/...wav、是否能听到 MiMo 小白狐音色、speaking 状态、停止/静音和 404 fallback。
+APK：`android/app/build/outputs/apk/debug/app-debug.apk`，base URL=`http://192.168.0.118:8000/`，sha256=`c70f804c06621905c9cc4a8ca0d8357f6b8647df42013ff9dd2cd0de389fa503`。
+```
+
+PostgreSQL DB1-A foundation validation（2026-05-20）：
+
+```text
+范围：本地 PostgreSQL 基础设施，不迁移业务 service。
+代码状态：已新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 docker compose、db_migrate/db_reset 脚本和初始 8 张表。
+初始表：children、parent_policies、conversation_sessions、conversation_messages、routing_decisions、memory_items、parent_reports、tts_cache_records。
+验证：后端测试覆盖 metadata 表、关键列、JSON 类型、timezone-aware DateTime、CHILD_AI_DATABASE_URL 和 Alembic revision 可读。
+未验证：未要求 Docker/PostgreSQL live migration 作为自动测试前置；业务服务仍未迁移，父亲策略、conversation、memory 和 report 仍需 B2-B5。
+安全：原始音频、原始照片、API key、debug internals 不入库；TTS cache metadata 保存 hash 和 cache 信息。
+```
+
 TTS-D1 复验目标：
 
 ```text
@@ -213,9 +234,10 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 |---|---|---|
 | 正式名称“小白狐”替换 UI 文案 | code updated / device todo：儿童端主要可见文案已改为“小白狐” | 后续在 Device A 和 Honor Pad 5 上复验聊天标题、消息列表、错误提示、拍题 dialog、父亲页文案、日志/测试 fixture 是否仍有旧称呼 |
 | V1 语音输入 confirm-before-send | todo | 验证 Android 系统 ASR 只转文字，发送前必须让孩子确认；默认不上传或保存原始音频 |
-| V2 TTS 默认自动朗读小白狐回复 | tts_d1_in_progress | Redmi K60 反馈无声音且不可观测；TTS-D1 已补诊断、speaking pending 和 UI 状态，需重新打包复验 |
+| V2 TTS 默认自动朗读小白狐回复 | code_ready_device_qa | Redmi K60 反馈无声音且不可观测；TTS-D1 已补诊断、speaking pending 和 UI 状态；A1 已接入 `reply.audio_url` 远程播放，需重新打包复验 |
 | 停止/静音能力 | tts_d1_in_progress | Redmi K60 反馈未看到提示；TTS-D1 要求 InputBar 始终显示短状态、停止和静音入口 |
 | DevSettings / 父亲设置关闭自动朗读 | partial | `DevSettings.AUTO_TTS_ENABLED` 和 `DevSettings.TTS_MUTED` 已作为初始配置；父亲设置治理开关仍是后续任务 |
+| Android remote audioUrl 播放 | code_ready_device_qa | `reply.audio_url` 非空时优先播放后端 WAV；失败 fallback 系统 TTS 或文字；待 Redmi K60 验证 MiMo 音色 |
 | VoiceProfile | code_done / device_todo | 代码已使用 `zh-CN`、稍慢 `speechRate`、略高 `pitch` 和系统中文 fallback；仍需设备听感和缺失 voice 验证 |
 | Android 系统 ASR/TTS 效果评估 | todo | 需要真实设备或人工听感记录：识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
 | 3D 小白狐资源存在时显示 | in_progress | 当前 v1 候选资源已扩展到 11 个状态；需在高配手机和 Honor Pad 5 上验证 PNG 状态图加载、状态动作、性能和不强刺激 |

@@ -9,6 +9,9 @@ import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
 import com.childai.companion.voice.VoiceProfile
 import com.childai.companion.voice.VoiceDiagnostics
+import com.childai.companion.voice.AudioUrlPlayer
+import com.childai.companion.voice.AudioUrlPlayerCallbacks
+import com.childai.companion.voice.RemoteAudioTtsController
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,6 +56,16 @@ class ChatTtsViewModelTest {
     }
 
     @Test
+    fun passesReplyAudioUrlToTtsController() {
+        val fakeTts = FakeTtsController()
+        val viewModel = ChatViewModel(ttsController = fakeTts)
+
+        viewModel.renderAgentReply(response(reply(audioUrl = "/media/tts/fox.wav")))
+
+        assertEquals("/media/tts/fox.wav", fakeTts.requests.single().audioUrl)
+    }
+
+    @Test
     fun acceptedTtsRequestShowsSpeakingPendingBeforePlatformStart() {
         val fakeTts = FakeTtsController(autoStart = false)
         val viewModel = ChatViewModel(ttsController = fakeTts)
@@ -83,7 +96,7 @@ class ChatTtsViewModelTest {
         val viewModel = ChatViewModel(ttsController = fakeTts)
 
         viewModel.toggleTtsMuted()
-        viewModel.renderAgentReply(response(reply()))
+        viewModel.renderAgentReply(response(reply(audioUrl = "/media/tts/fox.wav")))
 
         assertTrue(fakeTts.requests.isEmpty())
         assertTrue(viewModel.uiState.value.tts.isMuted)
@@ -211,11 +224,15 @@ class ChatTtsViewModelTest {
                 lastSpeakResult = "ERROR",
                 enginePackageName = "fake.tts",
                 lastFailureReason = "Fake failure",
+                playbackSource = "remote_audio",
+                audioUrl = "/media/tts/fox.wav",
             ),
         )
 
         assertTrue(state.diagnosticText.contains("engine=fake.tts"))
         assertTrue(state.diagnosticText.contains("speak=ERROR"))
+        assertTrue(state.diagnosticText.contains("source=remote_audio"))
+        assertTrue(state.diagnosticText.contains("audio=/media/tts/fox.wav"))
         assertEquals("Fake failure", state.lastFailureReason)
     }
 
@@ -234,6 +251,112 @@ class ChatTtsViewModelTest {
         assertEquals(TtsController.UNAVAILABLE_MESSAGE, state.statusText)
     }
 
+    @Test
+    fun remoteAudioControllerPrefersAudioUrlOverSystemTts() {
+        val fakePlayer = FakeAudioUrlPlayer()
+        val fallbackTts = FakeTtsController()
+        val controller = RemoteAudioTtsController(
+            audioUrlPlayer = fakePlayer,
+            fallbackController = fallbackTts,
+            backendBaseUrl = "http://127.0.0.1:8000/",
+        )
+        var didStart = false
+
+        val accepted = controller.speak(
+            TtsRequest(text = "我在这里。", audioUrl = "/media/tts/fox.wav"),
+            TtsCallbacks(onStart = { didStart = true }),
+        )
+
+        assertTrue(accepted)
+        assertEquals(listOf("http://127.0.0.1:8000/media/tts/fox.wav"), fakePlayer.urls)
+        assertTrue(fallbackTts.requests.isEmpty())
+        assertTrue(didStart)
+    }
+
+    @Test
+    fun remoteAudioControllerFallsBackToSystemTtsWhenPlaybackFails() {
+        val fakePlayer = FakeAudioUrlPlayer(acceptRequest = false)
+        val fallbackTts = FakeTtsController()
+        val controller = RemoteAudioTtsController(
+            audioUrlPlayer = fakePlayer,
+            fallbackController = fallbackTts,
+            backendBaseUrl = "http://127.0.0.1:8000/",
+        )
+
+        val accepted = controller.speak(
+            TtsRequest(text = "我在这里。", audioUrl = "/media/tts/missing.wav"),
+            TtsCallbacks(),
+        )
+
+        assertTrue(accepted)
+        assertEquals(listOf("我在这里。"), fallbackTts.requests.map { it.text })
+        assertEquals(null, fallbackTts.requests.single().audioUrl)
+    }
+
+    @Test
+    fun remoteAndSystemFailureKeepsGentleAudioPlaybackError() {
+        val fakePlayer = FakeAudioUrlPlayer(acceptRequest = false)
+        val controller = RemoteAudioTtsController(
+            audioUrlPlayer = fakePlayer,
+            fallbackController = FakeTtsController(isAvailable = false),
+            backendBaseUrl = "http://127.0.0.1:8000/",
+        )
+        val viewModel = ChatViewModel(ttsController = controller)
+
+        viewModel.renderAgentReply(response(reply(audioUrl = "/media/tts/missing.wav")))
+
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+        assertEquals(
+            TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE,
+            viewModel.uiState.value.tts.errorMessage,
+        )
+    }
+
+    @Test
+    fun stopStopsRemoteAudioAndRestoresFoxState() {
+        val fakePlayer = FakeAudioUrlPlayer()
+        val controller = RemoteAudioTtsController(
+            audioUrlPlayer = fakePlayer,
+            fallbackController = FakeTtsController(),
+            backendBaseUrl = "http://127.0.0.1:8000/",
+        )
+        val viewModel = ChatViewModel(ttsController = controller)
+
+        viewModel.renderAgentReply(
+            response(
+                reply(
+                    audioUrl = "/media/tts/fox.wav",
+                    emotion = "thinking",
+                    agentMotion = "thinking_blink",
+                ),
+            ),
+        )
+        val stopCountAfterRender = fakePlayer.stopCount
+        viewModel.stopTtsPlayback()
+
+        assertEquals(stopCountAfterRender + 1, fakePlayer.stopCount)
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+        assertEquals(FoxMotion.ThinkingBlink, viewModel.uiState.value.agent.motion)
+    }
+
+    @Test
+    fun relativeAudioUrlResolvesAgainstBackendBaseUrl() {
+        assertEquals(
+            "http://phone.local:8000/media/tts/fox.wav",
+            RemoteAudioTtsController.resolveAudioUrl(
+                audioUrl = "/media/tts/fox.wav",
+                backendBaseUrl = "http://phone.local:8000/",
+            ),
+        )
+        assertEquals(
+            "https://cdn.example.test/audio.wav",
+            RemoteAudioTtsController.resolveAudioUrl(
+                audioUrl = "https://cdn.example.test/audio.wav",
+                backendBaseUrl = "http://phone.local:8000/",
+            ),
+        )
+    }
+
     private fun response(reply: ConversationReply): ConversationMessageResponse {
         return ConversationMessageResponse(
             reply = reply,
@@ -250,6 +373,7 @@ class ChatTtsViewModelTest {
     private fun reply(
         voiceEnabled: Boolean = true,
         text: String = "我在这里。",
+        audioUrl: String? = null,
         emotion: String = "warm",
         agentMotion: String = "gentle_idle",
     ): ConversationReply {
@@ -257,7 +381,7 @@ class ChatTtsViewModelTest {
             type = "agent_message",
             text = text,
             voiceEnabled = voiceEnabled,
-            audioUrl = null,
+            audioUrl = audioUrl,
             emotion = emotion,
             agentMotion = agentMotion,
         )
@@ -331,6 +455,37 @@ class ChatTtsViewModelTest {
 
         fun finish() {
             callbacks?.onDone()
+        }
+    }
+
+    private class FakeAudioUrlPlayer(
+        private val acceptRequest: Boolean = true,
+        private val autoStart: Boolean = true,
+    ) : AudioUrlPlayer {
+        val urls = mutableListOf<String>()
+        var stopCount = 0
+        private var callbacks: AudioUrlPlayerCallbacks? = null
+
+        override fun play(url: String, callbacks: AudioUrlPlayerCallbacks): Boolean {
+            urls += url
+            if (!acceptRequest) {
+                callbacks.onError("fake_remote_audio_failed")
+                return false
+            }
+            this.callbacks = callbacks
+            if (autoStart) {
+                callbacks.onStart()
+            }
+            return true
+        }
+
+        override fun stop() {
+            stopCount += 1
+            callbacks = null
+        }
+
+        override fun release() {
+            callbacks = null
         }
     }
 }

@@ -357,6 +357,8 @@ class ChatViewModel(
             request = TtsRequest(
                 text = reply.text,
                 voiceProfile = VoiceProfile.default(),
+                audioUrl = reply.audioUrl,
+                backendBaseUrl = DevSettings.conversationApiBaseUrl,
             ),
             callbacks = TtsCallbacks(
                 onDiagnostics = { diagnostics ->
@@ -422,7 +424,8 @@ class ChatViewModel(
                         isSpeaking = false,
                         isSpeakingPending = false,
                         isAvailable = false,
-                        errorMessage = TtsController.UNAVAILABLE_MESSAGE,
+                        errorMessage = state.tts.errorMessage
+                            ?: TtsController.UNAVAILABLE_MESSAGE,
                         lastFailureReason = state.tts.lastFailureReason
                             ?: "TtsController.speak returned false",
                     ),

@@ -19,6 +19,8 @@ data class TtsUiState(
     val setVoiceResult: String? = null,
     val lastSpeakResult: String? = null,
     val enginePackageName: String? = null,
+    val playbackSource: String? = null,
+    val audioUrl: String? = null,
 ) {
     val statusText: String
         get() = when {
@@ -50,6 +52,8 @@ data class TtsUiState(
                 setLanguageResult?.let { "lang=$it" },
                 setVoiceResult?.let { "setVoice=$it" },
                 lastSpeakResult?.let { "speak=$it" },
+                playbackSource?.let { "source=$it" },
+                audioUrl?.let { "audio=$it" },
                 lastFailureReason?.let { "failure=$it" },
                 lastRequestedTextPreview?.let { "text=$it" },
             )
@@ -70,6 +74,8 @@ data class TtsUiState(
             setVoiceResult = diagnostics.setVoiceResult ?: setVoiceResult,
             lastSpeakResult = diagnostics.lastSpeakResult ?: lastSpeakResult,
             enginePackageName = diagnostics.enginePackageName ?: enginePackageName,
+            playbackSource = diagnostics.playbackSource ?: playbackSource,
+            audioUrl = diagnostics.audioUrl ?: audioUrl,
         )
     }
 }

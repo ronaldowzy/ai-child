@@ -69,7 +69,7 @@ def test_xiaobaihu_tts_endpoint_uses_cache_on_second_request() -> None:
 def test_xiaobaihu_tts_rejects_too_long_text() -> None:
     response = client.post(
         "/api/v1/tts/xiaobaohu",
-        json={"text": "很" * 301, "emotion": "encourage"},
+        json={"text": "很" * 601, "emotion": "encourage"},
     )
 
     assert response.status_code == 400

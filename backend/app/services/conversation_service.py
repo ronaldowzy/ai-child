@@ -1,3 +1,7 @@
+import logging
+
+from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
+from app.domain.enums import IntentType, RiskLevel
 from app.domain.schemas.conversation import (
     ConversationDebug,
     ConversationMessageRequest,
@@ -10,8 +14,6 @@ from app.domain.schemas.conversation import (
     SessionState,
     UiAction,
 )
-from app.domain.enums import IntentType, RiskLevel
-from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
 from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest
 from app.services.attachment_service import (
     AttachmentService,
@@ -52,6 +54,9 @@ from app.services.time_context_service import (
     get_time_context_service,
 )
 from app.services.tts_service import TtsService, get_tts_service
+
+
+logger = logging.getLogger("app.conversation")
 
 
 class ConversationService:
@@ -188,6 +193,12 @@ class ConversationService:
             child_text=request.input.text,
         )
         self._attach_audio_url_if_enabled(response)
+        self._log_non_sensitive_turn_summary(
+            request=request,
+            route_decision=route_decision,
+            runtime_result=runtime_result,
+            response=response,
+        )
 
         if self._debug_enabled:
             response.debug = ConversationDebug(
@@ -229,6 +240,29 @@ class ConversationService:
             agent_text=response.reply.text,
         )
         return response
+
+    def _log_non_sensitive_turn_summary(
+        self,
+        *,
+        request: ConversationMessageRequest,
+        route_decision: SceneRouteDecision,
+        runtime_result: AgentRuntimeResult,
+        response: ConversationMessageResponse,
+    ) -> None:
+        logger.info(
+            "conversation_turn_summary child_id=%s session_id=%s scene=%s "
+            "runtime_source=%s fallback_reason=%s reply_chars=%s "
+            "reply_normalized=%s audio_url_present=%s quick_actions=%s",
+            request.child_id,
+            request.session_id,
+            route_decision.active_scene.value,
+            runtime_result.source.value,
+            runtime_result.fallback_reason,
+            len(response.reply.text),
+            runtime_result.model_metadata.get("reply_normalized") is True,
+            response.reply.audio_url is not None,
+            len(response.ui_actions),
+        )
 
     def _response_from_route_decision(
         self,

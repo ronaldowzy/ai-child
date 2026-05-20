@@ -249,11 +249,60 @@ def test_child_agent_runtime_normalizes_model_reply_for_voice() -> None:
     )
 
     assert result.source == AgentRuntimeSource.MODEL
-    assert result.reply_text == "好呀！我也喜欢恐龙！你最喜欢哪种恐龙呢？"
+    assert result.reply_text == (
+        "好呀！我也喜欢恐龙！你最喜欢哪种恐龙呢？是霸王龙吗？还是三角龙？"
+    )
     assert "🦕" not in result.reply_text
     assert "**" not in result.reply_text
-    assert result.reply_text.count("？") == 1
+    assert result.reply_text.count("？") == 3
     assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_allows_longer_open_conversation_reply() -> None:
+    long_reply = (
+        "恐龙这个话题真的很适合慢慢聊，因为它们不是一种动物，而是一大群生活在很久很久以前的动物。"
+        "有的恐龙像霸王龙一样很强壮，有的像三角龙一样有角和骨板，还有的可能长着羽毛，跑起来很快。"
+        "如果你喜欢恐龙，我们可以像探险一样，从它们吃什么、怎么保护自己、为什么会消失这些线索开始。"
+        "我会先陪你挑一个最想知道的小问题，再一点点往下挖，这样就不会一下子太乱。"
+        "你现在最想先了解哪一种恐龙？"
+    )
+    registry = CapturingModelRegistry(response=_model_response(long_reply))
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == long_reply
+    assert len(result.reply_text) > 150
+    assert result.reply_text.endswith("你现在最想先了解哪一种恐龙？")
+
+
+def test_child_agent_runtime_does_not_cut_story_at_first_question_mark() -> None:
+    story_reply = (
+        "点点在森林里迷路了。一只小松鼠问：\"你哭了吗？\""
+        "点点摇摇头说：\"我只是有点害怕。\""
+        "小松鼠递给它一片亮亮的叶子，说可以沿着小溪往回找。"
+        "点点听见远处朋友的脚步声，心里慢慢亮了起来。"
+    )
+    registry = CapturingModelRegistry(response=_model_response(story_reply))
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert "你哭了吗？" in result.reply_text
+    assert "小松鼠递给它一片亮亮的叶子" in result.reply_text
+    assert result.reply_text.endswith("心里慢慢亮了起来。")
 
 
 def test_child_agent_runtime_strips_numbered_markdown_for_tts() -> None:

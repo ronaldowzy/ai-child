@@ -281,7 +281,7 @@ export CHILD_AI_MIMO_ENABLED=true
 export CHILD_AI_MIMO_API_KEY="<temporary key>"
 export CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
-export CHILD_AI_MIMO_MAX_TOKENS=300
+export CHILD_AI_MIMO_MAX_TOKENS=800
 export CHILD_AI_MIMO_TIMEOUT_MS=30000
 bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
 ```

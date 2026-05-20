@@ -231,15 +231,29 @@ class ChildAgentRuntime:
         text = self._strip_markdown_for_voice(text)
         text = re.sub(r"\s+", " ", text).strip()
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
-        text = self._keep_one_main_question(text)
+        return self._limit_to_sentence_boundary(
+            text,
+            max_chars=self._scene_reply_max_chars(
+                request.route_decision.active_scene
+            ),
+        )
 
-        if request.route_decision.active_scene == SceneId.LEARNING_HOMEWORK_HELP:
-            max_chars = 140
-        elif request.route_decision.active_scene == SceneId.OPEN_CONVERSATION:
-            max_chars = 150
-        else:
-            max_chars = 100
-        return self._limit_to_sentence_boundary(text, max_chars=max_chars)
+    def _scene_reply_max_chars(self, active_scene: SceneId) -> int:
+        if active_scene == SceneId.OPEN_CONVERSATION:
+            return 520
+        if active_scene == SceneId.DAILY_AFTER_SCHOOL_CHECKIN:
+            return 360
+        if active_scene == SceneId.LEARNING_HOMEWORK_HELP:
+            return 280
+        if active_scene == SceneId.SAFETY_GUARDIAN:
+            return 240
+        if active_scene == SceneId.SAFETY_GENTLE_CHECKIN:
+            return 260
+        if active_scene == SceneId.PRIVACY_BOUNDARY:
+            return 220
+        if active_scene == SceneId.DAILY_BEDTIME_REFLECTION:
+            return 220
+        return 320
 
     def _strip_markdown_for_voice(self, text: str) -> str:
         text = re.sub(r"[\U00010000-\U0010ffff]", "", text)
@@ -278,9 +292,6 @@ class ChildAgentRuntime:
                 return segment[:max_chars].rstrip("，,；;：: ") + "。"
             selected.append(segment)
             total += len(segment)
-            if segment.endswith(("?", "？")):
-                break
-
         if selected:
             return "".join(selected).strip()
         return text[:max_chars].rstrip("，,；;：: ") + "。"

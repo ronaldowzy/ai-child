@@ -495,17 +495,57 @@ Planned stream behavior:
 7. TTS failure must not fail the text stream.
 ```
 
-The ops foundation also needs local-development observability before stream work
-gets deep:
+The first backend Ops P0 slice is now in place. It is intentionally local-first
+and does not use a third-party APM or external log platform:
 
 ```text
-1. request_id / trace_id middleware.
-2. structured request timing logs.
-3. LLM and TTS provider timing.
-4. health checks for PostgreSQL, TTS cache path, and MiMo config readiness.
-5. logs and QA records that do not include API keys, raw audio, raw photos, or
-   full child transcripts.
+1. Every HTTP response includes `X-Request-ID`.
+2. Safe incoming `X-Request-ID` values are reused; illegal or overlong values
+   are replaced.
+3. Backend logs are JSON lines and carry request_id context.
+4. `app.request_timing` logs request_finished/request_failed with method, path,
+   status_code, elapsed_ms, and error_type.
+5. `app.model_timing` logs model_call_finished with task_type, provider, model,
+   elapsed_ms, fallback_used, policy_blocked, error_type, child_id_hash, and
+   session_id_hash.
+6. `app.tts_timing` logs tts_call_finished with provider, model, voice_version,
+   emotion, cache_hit, elapsed_ms, audio_bytes, text_chars, cache_key_prefix,
+   and error_type.
+7. `GET /api/v1/health/detail` reports postgres, tts_cache, 小白狐 voice sample,
+   and MiMo TTS config status.
 ```
+
+Allowed log content:
+
+```text
+request_id, method, path, status_code, elapsed_ms
+provider, model, task_type, fallback_used, policy_blocked, cache_hit
+voice_version, emotion, audio_bytes, text_chars, cache_key_prefix
+child_id_hash, session_id_hash, error_type
+```
+
+Forbidden log content:
+
+```text
+API keys, Authorization headers, full child text, full prompt,
+full parent_message_raw, full image descriptions, raw audio/photo paths,
+full TTS text, full reply text, and signed audioUrl query parameters.
+```
+
+Local health detail:
+
+```bash
+curl -sS http://127.0.0.1:8000/api/v1/health/detail
+```
+
+`/api/v1/health` remains a lightweight process-alive check. `/health/detail`
+may return `"status":"degraded"` when PostgreSQL is unavailable, the TTS cache
+is not writable, the 小白狐 voice sample is missing, or MiMo TTS is enabled but
+missing key/policy configuration. It never returns the API key, database URL, or
+voice sample contents.
+
+Streaming v1 will reuse the same request_id and provider timing fields, then add
+stream-specific `first_text_ms`, `first_audio_ms`, and `stream_total_ms`.
 
 ## Safety Notes
 

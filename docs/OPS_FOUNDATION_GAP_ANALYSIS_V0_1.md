@@ -416,6 +416,56 @@ backend/app/tests/
 6. `bash scripts/lint_backend.sh`。
 ```
 
+当前实现状态（2026-05-21）：
+
+```text
+已完成 P0 thin slice。
+1. 新增 request_id middleware：生成/透传安全的 `X-Request-ID`，响应头写回；非法或超长 header 会被替换。
+2. 后端日志改为单行 JSON structured log，并通过 request_id 上下文关联 request timing、model timing 和 TTS timing。
+3. `app.request_timing` 记录 `request_finished` / `request_failed`、method、path、status_code、elapsed_ms 和 error_type。
+4. `ModelRegistry.generate()` 记录 `model_call_finished`，包含 task_type、provider、model、elapsed_ms、fallback_used、policy_blocked、error_type、child_id_hash 和 session_id_hash。
+5. `TtsService.generate_xiaobaihu()` 记录 `tts_call_finished`，包含 provider、model、voice_version、emotion、cache_hit、elapsed_ms、audio_bytes、text_chars、cache_key_prefix 和 error_type。
+6. 新增 `GET /api/v1/health/detail`，检查 postgres、tts_cache、xiaobaohu_voice_sample 和 mimo_tts_config；组件异常返回 degraded，不让 detail endpoint 直接 500。
+7. 新增后端测试覆盖 request_id、日志脱敏、model/TTS timing、health detail 不泄露 API key、postgres degraded 和 tts_cache degraded。
+```
+
+当前允许记录的字段：
+
+```text
+request_id
+method / path / status_code / elapsed_ms
+provider / model / task_type
+fallback_used / policy_blocked / cache_hit
+voice_version / emotion / audio_bytes / text_chars
+child_id_hash / session_id_hash
+cache_key_prefix
+error_type
+```
+
+当前禁止记录的字段：
+
+```text
+完整 child text
+完整 prompt
+完整 parent_message_raw
+完整图片描述或原始照片路径
+完整 TTS text
+完整 reply text
+API key / Authorization / token / secret
+完整 audioUrl query 参数或未来签名 URL
+原始音频内容或真实儿童身份信息
+```
+
+QA 使用方式：
+
+```text
+1. Android 或 curl 传入 `X-Request-ID` 后，可在响应头和后端 JSON 日志中使用同一 request_id 关联。
+2. 如果 Android 未传入，后端会生成 `req_<uuid>` 并写回响应头。
+3. 本地排查慢请求时，先看 `request_finished.elapsed_ms`，再用同一 request_id 查 `model_call_finished.elapsed_ms` 和 `tts_call_finished.elapsed_ms`。
+4. `GET /api/v1/health/detail` 用于区分进程存活、PostgreSQL、TTS cache、voice sample 和 MiMo TTS 配置问题；普通 `/health` 仍保持轻量 ok。
+5. Streaming v1 后端将复用 request_id 和 provider timing，并新增 `first_text_ms`、`first_audio_ms`、`stream_total_ms`。
+```
+
 ### Phase 2：Android 和 QA 诊断
 
 修改范围建议：

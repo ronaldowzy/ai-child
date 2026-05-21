@@ -61,7 +61,7 @@ Mock 拍题：done
 | UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
 | ASR-Research | 语音输入调研 | 调研 MiMo ASR / audio input 能力和儿童语音数据边界 | planned | V1 | 未确认前不实现云端 ASR，不上传原始音频 |
-| Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | planned | DB1/V1 | 不接第三方 APM；日志脱敏 |
+| Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | in_progress | DB1/V1 | P0 thin slice 已完成：后端 request_id、JSON 日志、request/model/TTS timing、health/detail 和日志脱敏测试；Android 诊断和清理脚本后续 |
 | Freedom-First | 自由对话底座 | 时段/父母寄语/图片/记忆作为上下文，安全/隐私/学习作为护栏 | done | R1/O1 | 学习触发已收窄；after_school/bedtime 不再强锁自由话题；父母寄语进入 prompt 并可 DB 持久化；普通图片后续快捷动作可带 image context 进入 LLM 上下文 |
 
 ---
@@ -230,10 +230,22 @@ Mock 拍题：done
 | Fox-Coverage-1 动态小白狐覆盖矩阵 | done |  | 新增 `FOX_AGENT_STATE_COVERAGE_V0_1.md`；manifest 确认 11 个状态，每状态 24 帧；记录 oneshot_hold 后续 QA 风险 |
 | ASR-Research-0 MiMo ASR 调研 | planned |  | 新增 ASR 研究文档；确认 speech-to-text/audio input、儿童语音、流式、格式和数据留存 |
 | Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
+| Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
 
 ---
 
 ## 3. 当天记录
+
+### 日期：2026-05-21
+
+```text
+今日目标：先完成 Ops v1 P0 thin slice，为 Streaming v1 后端实现提供 request_id、provider timing 和 health/detail 诊断骨架；暂不做 ASR、Android streaming 或 DB 全量迁移。
+完成任务：后端新增 request_id middleware，支持安全 `X-Request-ID` 透传和非法/超长值替换；日志改为单行 JSON structured log；request timing 记录 `request_finished` / `request_failed`；ModelRegistry 记录 `model_call_finished`；TtsService 记录 `tts_call_finished`；新增 `/api/v1/health/detail`，覆盖 postgres、tts_cache、小白狐 voice sample 和 MiMo TTS 配置状态；新增测试覆盖 request_id、日志脱敏、model/TTS timing、health/detail API key 不泄露、postgres degraded 和 tts_cache degraded。
+阻塞问题：无代码阻塞；Android 端尚未生成 `X-Request-ID`，后续 Android 诊断任务再接。
+Codex 偏差：无；本轮未做 ASR、未做 Android stream client、未改 UI 美术、未做 DB 全量迁移。
+需要补充到 AGENTS.md 的规则：暂无。
+明日第一任务：按 `STREAMING_INTERACTION_DESIGN_V0_1.md` 启动 S-Stream-1 后端 `/api/v1/conversation/stream`，优先 NDJSON 和 sentence-level pseudo streaming，复用 Ops P0 的 request_id、model/TTS timing，并保留旧 `/conversation/message`。
+```
 
 ### 日期：2026-05-19
 

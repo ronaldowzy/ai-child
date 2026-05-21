@@ -1,6 +1,10 @@
 from collections.abc import Mapping
+import logging
 import os
+import time
+from typing import Any
 
+from app.core.logging import hash_identifier
 from app.domain.model_types import (
     ModelCapabilities,
     ModelDataPolicy,
@@ -11,6 +15,7 @@ from app.domain.model_types import (
     ModelResponse,
     ModelTaskType,
 )
+from app.middleware.request_id import get_request_id
 from app.providers.model.base import (
     BaseModelProvider,
     ModelProviderDisabledError,
@@ -75,23 +80,51 @@ class ModelRegistry:
         return profile
 
     def generate(self, request: ModelRequest) -> ModelResponse:
-        primary_profile = self._get_primary_profile(request.task_type)
+        started_at = time.perf_counter()
+        primary_profile: ModelProfile | None = None
+        response: ModelResponse | None = None
+        error_type: str | None = None
+        policy_blocked = False
         try:
+            primary_profile = self._get_primary_profile(request.task_type)
             provider = self._provider_for_profile(primary_profile)
             self._data_policy_guard.validate(
                 request=request,
                 profile=primary_profile,
             )
-            return provider.generate(request, profile=primary_profile)
+            response = provider.generate(request, profile=primary_profile)
         except ModelDataPolicyBlockedError as exc:
+            error_type = exc.__class__.__name__
+            policy_blocked = True
+            if primary_profile is None:
+                self._log_model_call_finished(
+                    request=request,
+                    profile=None,
+                    response=None,
+                    started_at=started_at,
+                    fallback_used=False,
+                    policy_blocked=policy_blocked,
+                    error_type=error_type,
+                )
+                raise
             fallback_profile = self._mock_fallback_profile_for(
                 primary_profile, request.task_type
             )
             if fallback_profile is None:
-                raise ModelRegistryError(
+                registry_error = ModelRegistryError(
                     "Model data policy blocked provider call without an enabled "
                     f"mock fallback: {exc}"
-                ) from exc
+                )
+                self._log_model_call_finished(
+                    request=request,
+                    profile=primary_profile,
+                    response=None,
+                    started_at=started_at,
+                    fallback_used=False,
+                    policy_blocked=policy_blocked,
+                    error_type=registry_error.__class__.__name__,
+                )
+                raise registry_error from exc
 
             fallback_provider = self._provider_for_profile(fallback_profile)
             response = fallback_provider.generate(request, profile=fallback_profile)
@@ -104,15 +137,36 @@ class ModelRegistry:
                     "failure_type": exc.__class__.__name__,
                 }
             )
-            return response
         except (ModelProviderError, ModelRegistryError) as exc:
+            error_type = exc.__class__.__name__
+            if primary_profile is None:
+                self._log_model_call_finished(
+                    request=request,
+                    profile=None,
+                    response=None,
+                    started_at=started_at,
+                    fallback_used=False,
+                    policy_blocked=False,
+                    error_type=error_type,
+                )
+                raise
             fallback_profile = self._fallback_profile_for(
                 primary_profile, request.task_type
             )
             if fallback_profile is None:
-                raise ModelRegistryError(
+                registry_error = ModelRegistryError(
                     f"Model generation failed without fallback: {exc}"
-                ) from exc
+                )
+                self._log_model_call_finished(
+                    request=request,
+                    profile=primary_profile,
+                    response=None,
+                    started_at=started_at,
+                    fallback_used=False,
+                    policy_blocked=False,
+                    error_type=registry_error.__class__.__name__,
+                )
+                raise registry_error from exc
 
             fallback_provider = self._provider_for_profile(fallback_profile)
             response = fallback_provider.generate(request, profile=fallback_profile)
@@ -124,7 +178,62 @@ class ModelRegistry:
                     "failure_type": exc.__class__.__name__,
                 }
             )
-            return response
+        self._log_model_call_finished(
+            request=request,
+            profile=primary_profile,
+            response=response,
+            started_at=started_at,
+            fallback_used=bool(response and response.metadata.get("fallback_used")),
+            policy_blocked=policy_blocked
+            or bool(response and response.metadata.get("policy_blocked")),
+            error_type=error_type,
+        )
+        return response
+
+    def _log_model_call_finished(
+        self,
+        *,
+        request: ModelRequest,
+        profile: ModelProfile | None,
+        response: ModelResponse | None,
+        started_at: float,
+        fallback_used: bool,
+        policy_blocked: bool,
+        error_type: str | None,
+    ) -> None:
+        conversation_context = self._conversation_context(request.context)
+        logging.getLogger("app.model_timing").info(
+            "model_call_finished",
+            extra={
+                "event": "model_call_finished",
+                "request_id": get_request_id(),
+                "task_type": request.task_type.value,
+                "provider": response.provider_name if response else (
+                    profile.provider_name if profile else None
+                ),
+                "model": response.model_name if response else (
+                    profile.model_name if profile else None
+                ),
+                "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                "fallback_used": fallback_used,
+                "policy_blocked": policy_blocked,
+                "error_type": error_type,
+                "child_id_hash": hash_identifier(conversation_context.get("child_id")),
+                "session_id_hash": hash_identifier(
+                    conversation_context.get("session_id")
+                ),
+            },
+        )
+
+    def _conversation_context(self, context: dict[str, Any]) -> dict[str, str]:
+        raw_context = context.get("conversation")
+        if not isinstance(raw_context, dict):
+            return {}
+        return {
+            key: value
+            for key, value in raw_context.items()
+            if key in {"child_id", "session_id"} and isinstance(value, str)
+        }
 
     def _get_primary_profile(self, task_type: ModelTaskType | str) -> ModelProfile:
         normalized_task_type = ModelTaskType(task_type)

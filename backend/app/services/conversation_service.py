@@ -1,5 +1,6 @@
 import logging
 
+from app.core.logging import hash_identifier
 from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
 from app.domain.enums import IntentType, RiskLevel
 from app.domain.schemas.conversation import (
@@ -15,6 +16,7 @@ from app.domain.schemas.conversation import (
     UiAction,
 )
 from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest
+from app.middleware.request_id import get_request_id
 from app.services.attachment_service import (
     AttachmentService,
     get_attachment_service,
@@ -272,18 +274,22 @@ class ConversationService:
         response: ConversationMessageResponse,
     ) -> None:
         logger.info(
-            "conversation_turn_summary child_id=%s session_id=%s scene=%s "
-            "runtime_source=%s fallback_reason=%s reply_chars=%s "
-            "reply_normalized=%s audio_url_present=%s quick_actions=%s",
-            request.child_id,
-            request.session_id,
-            route_decision.active_scene.value,
-            runtime_result.source.value,
-            runtime_result.fallback_reason,
-            len(response.reply.text),
-            runtime_result.model_metadata.get("reply_normalized") is True,
-            response.reply.audio_url is not None,
-            len(response.ui_actions),
+            "conversation_turn_summary",
+            extra={
+                "event": "conversation_turn_summary",
+                "request_id": get_request_id(),
+                "child_id_hash": hash_identifier(request.child_id),
+                "session_id_hash": hash_identifier(request.session_id),
+                "scene": route_decision.active_scene.value,
+                "runtime_source": runtime_result.source.value,
+                "fallback_reason": runtime_result.fallback_reason,
+                "reply_chars": len(response.reply.text),
+                "reply_normalized": (
+                    runtime_result.model_metadata.get("reply_normalized") is True
+                ),
+                "audio_url_present": response.reply.audio_url is not None,
+                "quick_actions": len(response.ui_actions),
+            },
         )
 
     def _response_from_route_decision(

@@ -139,9 +139,11 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 
 | 命令 | 结果 |
 |---|---|
+| `bash scripts/test_backend.sh -q app/tests/test_ops_observability.py` | 通过：11 passed，覆盖 request_id、request timing、model/TTS 日志脱敏和 health/detail degraded |
+| `bash scripts/test_backend.sh -q app/tests/test_health.py app/tests/test_model_registry.py app/tests/test_tts_api.py app/tests/test_ops_observability.py` | 通过：32 passed，确认 health、模型 fallback、TTS endpoint 和 Ops P0 兼容 |
 | `bash scripts/test_backend.sh app/tests/test_conversation_memory_hooks.py -q` | 通过：8 passed，覆盖自动学习记忆、直接要答案、低能量情绪、高风险 safety、WATCH、隐私边界、日报素材和 safety 检索隔离 |
 | `bash scripts/test_backend.sh app/tests/test_parent_report_service.py app/tests/test_parent_report_api.py -q` | 通过：6 passed，父亲日报仍不返回 evidence、quote_summary 或逐字记录 |
-| `bash scripts/test_backend.sh -q` | 通过：184 passed，已包含模型外发安全闸门、安全场景细分、自动记忆闭环、Freedom-first 学习意图收窄、图片上下文连续性和父母寄语 DB repository 测试 |
+| `bash scripts/test_backend.sh -q` | 通过：195 passed，已包含模型外发安全闸门、安全场景细分、自动记忆闭环、Freedom-first 学习意图收窄、图片上下文连续性、父母寄语 DB repository 和 Ops P0 可观测性测试 |
 | `bash scripts/lint_backend.sh` | 通过：All checks passed |
 | `curl --noproxy '*' http://127.0.0.1:8000/api/v1/health` | 通过 |
 | `curl --noproxy '*' http://192.168.0.118:8000/api/v1/health` | 通过 |
@@ -155,6 +157,33 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | `adb shell cmd wifi connect-network AndroidWifi open` | 通过：修复模拟器 `10.0.2.2` 不通问题 |
 | `adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'` | 通过：通过 ADBKeyBoard 注入中文到 Compose 输入框 |
 | Mimo runtime smoke | 通过：临时 env 使用 `mimo-v2.5-pro` 时，`ChildAgentRuntime` 返回 `source=model`、provider=`mimo`；无连字符 `mimo-v2.5pro` 会被网关拒绝 |
+
+## Ops v1 P0 QA 记录
+
+日期：2026-05-21
+范围：后端 request_id、结构化日志、request/model/TTS timing、health/detail。未做 Android stream client、ASR 或 DB 全量迁移。
+
+| 检查项 | 期望 | 结果 |
+|---|---|---|
+| request_id 生成 | 未传 `X-Request-ID` 时响应头返回 `req_...` | pass |
+| request_id 透传 | 安全 header 如 `qa-request_123.abc:1` 被沿用 | pass |
+| request_id 清洗 | 空格、非法字符或超长 header 被替换 | pass |
+| request timing | `request_finished` 包含 request_id、method、path、status_code、elapsed_ms | pass |
+| model timing | `model_call_finished` 包含 provider、model、elapsed_ms、fallback_used、policy_blocked，不含 prompt 全文 | pass |
+| TTS timing | `tts_call_finished` 包含 provider、model、voice_version、emotion、cache_hit、text_chars、audio_bytes，不含 API key 或完整 TTS text | pass |
+| health detail | `/api/v1/health/detail` 返回 postgres、tts_cache、xiaobaohu_voice_sample、mimo_tts_config | pass |
+| PostgreSQL degraded | PostgreSQL 不可用时 detail 返回 degraded，不是 500 | pass |
+| tts_cache degraded | cache path 不可写时 detail 返回 degraded | pass |
+| secret 泄漏 | health/detail 不返回 MiMo API key；日志脱敏测试通过 | pass |
+
+QA 使用说明：
+
+```text
+1. Android 或 curl 传入 `X-Request-ID`，后端响应头会返回同一安全值；未传则后端生成。
+2. 用同一 request_id 在 JSON 日志中关联 `request_finished`、`model_call_finished`、`tts_call_finished`。
+3. 本地排查先看 `/api/v1/health/detail`：PostgreSQL、TTS cache、voice sample、MiMo TTS config 哪个 degraded。
+4. Streaming v1 QA 继续记录 request_id，并新增 first_text_ms、first_audio_ms、stream_total_ms。
+```
 
 ## API 联调场景
 

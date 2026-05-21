@@ -1,5 +1,7 @@
 import hashlib
+import logging
 from pathlib import Path
+import time
 
 from app.core.config import Settings, get_settings
 from app.domain.schemas.tts import XiaobaihuTtsRequest, XiaobaihuTtsResponse
@@ -11,6 +13,7 @@ from app.domain.tts import (
     TtsProviderRequest,
     xiaobaihu_style_prompt,
 )
+from app.middleware.request_id import get_request_id
 from app.providers.tts.base import TtsProviderError
 from app.providers.tts.mimo_voiceclone_provider import MimoVoiceCloneProvider
 from app.providers.tts.mock_tts_provider import MockTtsProvider
@@ -54,100 +57,154 @@ class TtsService:
         self,
         request: XiaobaihuTtsRequest,
     ) -> XiaobaihuTtsResponse:
-        normalized_text = self._validate_text(request.text)
-        emotion = self._validate_emotion(request.emotion)
-        voice_version = self._validate_voice_version(request.voice_version)
-        voice_sample_path = self._voice_sample_path(voice_version)
-        provider = self._provider_name()
-        model = self._model_name(provider)
-        voice_sample_sha256 = self._cache_service.voice_sample_sha256(
-            voice_sample_path
-        )
-        cache_key = self._cache_service.cache_key(
-            normalized_text=normalized_text,
-            emotion=emotion.value,
-            voice_version=voice_version,
-            provider=provider,
-            model=model,
-            voice_sample_sha256=voice_sample_sha256,
-            prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
-        )
+        started_at = time.perf_counter()
+        text_chars = len(request.text.strip())
+        provider: TtsProviderName | None = None
+        model: str | None = None
+        voice_version: TtsVoiceVersion | None = None
+        emotion: TtsEmotion | None = None
+        cache_key: str | None = None
+        cache_hit = False
+        audio_bytes: int | None = None
+        try:
+            normalized_text = self._validate_text(request.text)
+            text_chars = len(normalized_text)
+            emotion = self._validate_emotion(request.emotion)
+            voice_version = self._validate_voice_version(request.voice_version)
+            voice_sample_path = self._voice_sample_path(voice_version)
+            provider = self._provider_name()
+            model = self._model_name(provider)
+            voice_sample_sha256 = self._cache_service.voice_sample_sha256(
+                voice_sample_path
+            )
+            cache_key = self._cache_service.cache_key(
+                normalized_text=normalized_text,
+                emotion=emotion.value,
+                voice_version=voice_version,
+                provider=provider,
+                model=model,
+                voice_sample_sha256=voice_sample_sha256,
+                prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
+            )
 
-        if not request.force_refresh and self._cache_service.has(
-            voice_version=voice_version,
-            cache_key=cache_key,
-        ):
-            metadata = self._cache_service.load_metadata(
+            if not request.force_refresh and self._cache_service.has(
                 voice_version=voice_version,
                 cache_key=cache_key,
+            ):
+                cache_hit = True
+                metadata = self._cache_service.load_metadata(
+                    voice_version=voice_version,
+                    cache_key=cache_key,
+                )
+                audio_path = self._cache_service.audio_path(
+                    voice_version=voice_version,
+                    cache_key=cache_key,
+                )
+                audio_bytes = self._file_size(audio_path)
+                duration = metadata.get("duration")
+                response = self._response(
+                    audio_url=self._public_audio_url(
+                        voice_version=voice_version,
+                        cache_key=cache_key,
+                    ),
+                    duration=duration if isinstance(duration, (int, float)) else (
+                        self._cache_service.duration_seconds(audio_path)
+                    ),
+                    text=normalized_text,
+                    emotion=emotion,
+                    voice_version=voice_version,
+                    provider=provider,
+                    model=str(metadata.get("model") or model),
+                    cache_hit=True,
+                )
+                self._log_tts_call_finished(
+                    started_at=started_at,
+                    provider=provider,
+                    model=response.model,
+                    voice_version=voice_version,
+                    emotion=emotion,
+                    cache_hit=cache_hit,
+                    audio_bytes=audio_bytes,
+                    text_chars=text_chars,
+                    cache_key=cache_key,
+                    error_type=None,
+                )
+                return response
+
+            self._data_policy_guard.validate(
+                provider=provider,
+                settings=self._settings,
+                contains_child_text=True,
             )
-            audio_path = self._cache_service.audio_path(
+            provider_result = self._provider(provider).generate(
+                TtsProviderRequest(
+                    text=normalized_text,
+                    emotion=emotion,
+                    voice_version=voice_version,
+                    voice_sample_path=str(voice_sample_path),
+                    voice_sample_sha256=voice_sample_sha256,
+                    style_prompt=xiaobaihu_style_prompt(emotion),
+                    prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
+                )
+            )
+            audio_bytes = len(provider_result.audio_bytes)
+            text_hash = hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
+            duration = provider_result.duration
+            self._cache_service.save(
                 voice_version=voice_version,
                 cache_key=cache_key,
+                audio_bytes=provider_result.audio_bytes,
+                metadata={
+                    "textHash": text_hash,
+                    "emotion": emotion.value,
+                    "voiceVersion": voice_version.value,
+                    "provider": provider_result.provider.value,
+                    "model": provider_result.model,
+                    "voiceSampleSha256": voice_sample_sha256,
+                    "promptVersion": XIAOBAIHU_TTS_PROMPT_VERSION,
+                    "duration": duration,
+                },
             )
-            duration = metadata.get("duration")
-            return self._response(
+            response = self._response(
                 audio_url=self._public_audio_url(
                     voice_version=voice_version,
                     cache_key=cache_key,
                 ),
-                duration=duration if isinstance(duration, (int, float)) else (
-                    self._cache_service.duration_seconds(audio_path)
-                ),
+                duration=duration,
                 text=normalized_text,
                 emotion=emotion,
                 voice_version=voice_version,
-                provider=provider,
-                model=str(metadata.get("model") or model),
-                cache_hit=True,
+                provider=provider_result.provider,
+                model=provider_result.model,
+                cache_hit=False,
             )
-
-        self._data_policy_guard.validate(
-            provider=provider,
-            settings=self._settings,
-            contains_child_text=True,
-        )
-        provider_result = self._provider(provider).generate(
-            TtsProviderRequest(
-                text=normalized_text,
+            self._log_tts_call_finished(
+                started_at=started_at,
+                provider=provider_result.provider,
+                model=provider_result.model,
+                voice_version=voice_version,
                 emotion=emotion,
-                voice_version=voice_version,
-                voice_sample_path=str(voice_sample_path),
-                voice_sample_sha256=voice_sample_sha256,
-                style_prompt=xiaobaihu_style_prompt(emotion),
-                prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
-            )
-        )
-        text_hash = hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
-        duration = provider_result.duration
-        self._cache_service.save(
-            voice_version=voice_version,
-            cache_key=cache_key,
-            audio_bytes=provider_result.audio_bytes,
-            metadata={
-                "textHash": text_hash,
-                "emotion": emotion.value,
-                "voiceVersion": voice_version.value,
-                "provider": provider_result.provider.value,
-                "model": provider_result.model,
-                "voiceSampleSha256": voice_sample_sha256,
-                "promptVersion": XIAOBAIHU_TTS_PROMPT_VERSION,
-                "duration": duration,
-            },
-        )
-        return self._response(
-            audio_url=self._public_audio_url(
-                voice_version=voice_version,
+                cache_hit=False,
+                audio_bytes=audio_bytes,
+                text_chars=text_chars,
                 cache_key=cache_key,
-            ),
-            duration=duration,
-            text=normalized_text,
-            emotion=emotion,
-            voice_version=voice_version,
-            provider=provider_result.provider,
-            model=provider_result.model,
-            cache_hit=False,
-        )
+                error_type=None,
+            )
+            return response
+        except Exception as exc:
+            self._log_tts_call_finished(
+                started_at=started_at,
+                provider=provider,
+                model=model,
+                voice_version=voice_version,
+                emotion=emotion,
+                cache_hit=cache_hit,
+                audio_bytes=audio_bytes,
+                text_chars=text_chars,
+                cache_key=cache_key,
+                error_type=exc.__class__.__name__,
+            )
+            raise
 
     def generate_for_conversation(
         self,
@@ -285,6 +342,46 @@ class TtsService:
         if normalized in {"encouraging", "happy", "proud"}:
             return TtsEmotion.HAPPY.value
         return TtsEmotion.ENCOURAGE.value
+
+    def _file_size(self, path: Path) -> int | None:
+        try:
+            return path.stat().st_size
+        except OSError:
+            return None
+
+    def _log_tts_call_finished(
+        self,
+        *,
+        started_at: float,
+        provider: TtsProviderName | None,
+        model: str | None,
+        voice_version: TtsVoiceVersion | None,
+        emotion: TtsEmotion | None,
+        cache_hit: bool,
+        audio_bytes: int | None,
+        text_chars: int,
+        cache_key: str | None,
+        error_type: str | None,
+    ) -> None:
+        logging.getLogger("app.tts_timing").info(
+            "tts_call_finished",
+            extra={
+                "event": "tts_call_finished",
+                "request_id": get_request_id(),
+                "provider": provider.value if provider else None,
+                "model": model,
+                "voice_version": voice_version.value if voice_version else None,
+                "emotion": emotion.value if emotion else None,
+                "cache_hit": cache_hit,
+                "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                "audio_bytes": audio_bytes,
+                "text_chars": text_chars,
+                "cache_key_prefix": cache_key[:8] if cache_key else None,
+                "error_type": error_type,
+                "child_id_hash": None,
+                "session_id_hash": None,
+            },
+        )
 
 
 def get_tts_service() -> TtsService:

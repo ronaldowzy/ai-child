@@ -11,6 +11,7 @@ import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
+import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -107,6 +108,22 @@ class ChatViewModelStreamTest {
         assertTrue(ttsController.stopCalled)
         assertFalse(viewModel.uiState.value.tts.isSpeaking)
     }
+
+    @Test
+    fun streamFailureFallsBackToMessageEndpoint() {
+        val sender = StreamFailureConversationSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.sendText("我们聊恐龙")
+
+        val state = viewModel.uiState.value
+        assertEquals(1, sender.messageCalls)
+        assertFalse(state.isSending)
+        assertEquals("fallback reply", state.messages.last().text)
+    }
 }
 
 private fun streamEvent(type: String, vararg payloadValues: Pair<String, Any>): ConversationStreamEvent {
@@ -151,6 +168,51 @@ private class NoopConversationSender : ConversationMessageSender {
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
     ) = Unit
+}
+
+private class StreamFailureConversationSender : ConversationMessageSender {
+    var messageCalls = 0
+
+    override suspend fun sendTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+    ): ConversationMessageResponse {
+        messageCalls += 1
+        return ConversationMessageResponse(
+            reply = ConversationReply(
+                type = "agent_message",
+                text = "fallback reply",
+                voiceEnabled = false,
+                audioUrl = null,
+                emotion = "warm",
+                agentMotion = "gentle_idle",
+            ),
+            uiActions = emptyList(),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+            ),
+        )
+    }
+
+    override suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+        includeTts: Boolean,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) {
+        onEvent(streamEvent("session_started"))
+        onEvent(streamEvent("text_delta", "delta" to "partial"))
+        error("stream failed")
+    }
 }
 
 private class RecordingTtsController(

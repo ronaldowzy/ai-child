@@ -21,6 +21,8 @@ import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
 import com.childai.companion.voice.VoiceProfile
 import com.childai.companion.voice.previewForDiagnostics
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -33,6 +35,7 @@ class ChatViewModel(
     private val attachmentRepository: AttachmentRepository = AttachmentRepository(),
     private var ttsController: TtsController = NoOpTtsController,
     initialTtsUiState: TtsUiState = TtsUiState(),
+    private val sendDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
     private var nextMessageIndex = 0
@@ -116,7 +119,7 @@ class ChatViewModel(
             )
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(sendDispatcher) {
             if (DevSettings.USE_STREAMING_CONVERSATION) {
                 val streamed = runCatching {
                     streamTextWithAttachments(text = text, attachments = attachments)
@@ -232,7 +235,7 @@ class ChatViewModel(
             )
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(sendDispatcher) {
             runCatching {
                 if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
                     attachmentRepository.createMockHomeworkPhoto(

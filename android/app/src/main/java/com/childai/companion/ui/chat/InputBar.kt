@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
@@ -19,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -76,11 +78,25 @@ fun InputBar(
         }
     }
 
+    val useChildVoiceFirstInput = inputBarUsesChildVoiceFirstInput()
+    val shouldAutoSendPendingTranscript = inputBarShouldAutoSendHiddenPendingTranscript(
+        useChildVoiceFirstInput = useChildVoiceFirstInput,
+        enabled = enabled,
+        hasPendingTranscript = voice.hasPendingTranscript,
+        pendingTranscript = voice.pendingTranscript,
+    )
+
+    LaunchedEffect(shouldAutoSendPendingTranscript, voice.pendingTranscript) {
+        if (shouldAutoSendPendingTranscript) {
+            voice.actions.onSendPendingTranscript()
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (voice.hasPendingTranscript) {
+        if (inputBarShouldShowPendingTranscriptPanel(useChildVoiceFirstInput, voice.hasPendingTranscript)) {
             PendingVoiceTranscriptPanel(
                 transcript = voice.pendingTranscript,
                 errorMessage = voice.errorMessage,
@@ -91,25 +107,8 @@ fun InputBar(
                 onCancel = voice.actions.onCancelVoiceInput,
             )
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                enabled = enabled && !voice.hasPendingTranscript,
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text(text = "说点什么")
-                },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { sendDraft() }),
-            )
-            TextButton(
+        if (useChildVoiceFirstInput) {
+            Button(
                 onClick = {
                     if (voice.isRecording) {
                         voice.actions.onStopRecordingAndUpload()
@@ -117,17 +116,55 @@ fun InputBar(
                         startVoiceRecordingWithPermission()
                     }
                 },
-                enabled = enabled && !voice.isUploading,
-                modifier = Modifier.widthIn(min = 64.dp),
+                enabled = inputBarPrimaryVoiceButtonEnabled(enabled, voice.inputMode),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 58.dp),
             ) {
-                Text(text = if (voice.isRecording) "说完了" else "语音")
+                Text(
+                    text = inputBarPrimaryVoiceButtonText(voice.inputMode),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
-            Button(
-                onClick = { sendDraft() },
-                enabled = enabled && !voice.hasPendingTranscript && trimmedDraft.isNotEmpty(),
-                modifier = Modifier.widthIn(min = 88.dp),
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = if (enabled) "发送" else "发送中")
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    enabled = enabled && !voice.hasPendingTranscript,
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(text = "说点什么")
+                    },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { sendDraft() }),
+                )
+                TextButton(
+                    onClick = {
+                        if (voice.isRecording) {
+                            voice.actions.onStopRecordingAndUpload()
+                        } else {
+                            startVoiceRecordingWithPermission()
+                        }
+                    },
+                    enabled = enabled && !voice.isUploading,
+                    modifier = Modifier.widthIn(min = 64.dp),
+                ) {
+                    Text(text = if (voice.isRecording) "说完了" else "语音")
+                }
+                Button(
+                    onClick = { sendDraft() },
+                    enabled = enabled && !voice.hasPendingTranscript && trimmedDraft.isNotEmpty(),
+                    modifier = Modifier.widthIn(min = 88.dp),
+                ) {
+                    Text(text = if (enabled) "发送" else "发送中")
+                }
             }
         }
         Row(
@@ -146,9 +183,17 @@ fun InputBar(
                     Text(text = "停止")
                 }
             }
-            if (voice.isRecording) {
+            if (inputBarShouldShowResayAction(useChildVoiceFirstInput, voice.inputMode)) {
+                TextButton(
+                    onClick = { startVoiceRecordingWithPermission() },
+                    enabled = enabled && !voice.isUploading,
+                ) {
+                    Text(text = "重说")
+                }
+            }
+            if (inputBarShouldShowCancelAction(useChildVoiceFirstInput, voice.inputMode)) {
                 TextButton(onClick = voice.actions.onCancelVoiceInput) {
-                    Text(text = "取消语音")
+                    Text(text = if (useChildVoiceFirstInput) "取消" else "取消语音")
                 }
             }
             TextButton(onClick = onToggleTtsMuted) {
@@ -178,6 +223,72 @@ fun InputBar(
             )
         }
     }
+}
+
+internal fun inputBarUsesChildVoiceFirstInput(
+    childVoiceFirstMode: Boolean = DevSettings.CHILD_VOICE_FIRST_MODE,
+    showTextInputForChild: Boolean = DevSettings.SHOW_TEXT_INPUT_FOR_CHILD,
+    voiceConfirmBeforeSend: Boolean = DevSettings.VOICE_CONFIRM_BEFORE_SEND,
+): Boolean {
+    return childVoiceFirstMode && !showTextInputForChild && !voiceConfirmBeforeSend
+}
+
+internal fun inputBarShouldShowPendingTranscriptPanel(
+    useChildVoiceFirstInput: Boolean,
+    hasPendingTranscript: Boolean,
+): Boolean {
+    return hasPendingTranscript && !useChildVoiceFirstInput
+}
+
+internal fun inputBarShouldAutoSendHiddenPendingTranscript(
+    useChildVoiceFirstInput: Boolean,
+    enabled: Boolean,
+    hasPendingTranscript: Boolean,
+    pendingTranscript: String,
+): Boolean {
+    return useChildVoiceFirstInput &&
+        enabled &&
+        hasPendingTranscript &&
+        pendingTranscript.trim().isNotEmpty()
+}
+
+internal fun inputBarPrimaryVoiceButtonText(inputMode: VoiceInputMode): String {
+    return when (inputMode) {
+        VoiceInputMode.Listening -> "说完了"
+        VoiceInputMode.Uploading -> "正在听懂你说的话"
+        else -> "按一下开始说"
+    }
+}
+
+internal fun inputBarPrimaryVoiceButtonEnabled(
+    enabled: Boolean,
+    inputMode: VoiceInputMode,
+): Boolean {
+    return enabled &&
+        inputMode != VoiceInputMode.Uploading &&
+        inputMode != VoiceInputMode.PendingTranscript
+}
+
+internal fun inputBarShouldShowResayAction(
+    useChildVoiceFirstInput: Boolean,
+    inputMode: VoiceInputMode,
+): Boolean {
+    if (!useChildVoiceFirstInput) return false
+    return when (inputMode) {
+        VoiceInputMode.PendingTranscript,
+        VoiceInputMode.NeedsRetry,
+        VoiceInputMode.PermissionDenied,
+        VoiceInputMode.Failed -> true
+        else -> false
+    }
+}
+
+internal fun inputBarShouldShowCancelAction(
+    useChildVoiceFirstInput: Boolean,
+    inputMode: VoiceInputMode,
+): Boolean {
+    return inputMode == VoiceInputMode.Listening ||
+        (useChildVoiceFirstInput && inputMode == VoiceInputMode.PendingTranscript)
 }
 
 @Composable

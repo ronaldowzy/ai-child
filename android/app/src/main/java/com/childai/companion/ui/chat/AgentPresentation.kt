@@ -58,12 +58,12 @@ data class VoiceUiState(
         get() = when {
             errorMessage != null -> errorMessage
             inputMode == VoiceInputMode.Listening -> "小白狐正在听，点一下说完。"
-            inputMode == VoiceInputMode.Uploading -> "小白狐正在把声音转成文字。"
+            inputMode == VoiceInputMode.Uploading -> "我在听懂你刚才说的话。"
             inputMode == VoiceInputMode.PendingTranscript -> "可以先改文字，再发送。"
-            inputMode == VoiceInputMode.NeedsRetry -> "我刚才没听清，可以重说或打字。"
-            inputMode == VoiceInputMode.PermissionDenied -> "没关系，可以继续打字。"
+            inputMode == VoiceInputMode.NeedsRetry -> "我刚才没听清，可以再说一次。"
+            inputMode == VoiceInputMode.PermissionDenied -> "没有麦克风权限，我们可以请大人打开。"
             isTtsAvailable -> "朗读稍后接上"
-            isVoiceInputReserved -> "可以点语音，也可以打字"
+            isVoiceInputReserved -> "按一下语音开始说"
             else -> "文字交流"
         }
 }

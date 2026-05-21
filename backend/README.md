@@ -34,11 +34,15 @@ The current backend is intentionally local-first and mock-first:
   sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and 小白狐 animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
-- Speech recognition v1 is moving to backend MiMo ASR: Android records only
-  after an explicit tap, uploads short audio to the backend ASR endpoint, shows
-  a pending transcript, and sends only confirmed/edited text to conversation.
+- Speech recognition v1 is backend MiMo ASR: Android records only after an
+  explicit tap and uploads short audio to the backend ASR endpoint. Child mode
+  auto-sends a non-empty transcript to conversation; the pending transcript
+  panel remains only for DevSettings / father debugging.
   Raw child audio is never stored long-term and MiMo ASR remains disabled until
   father authorization and ASR policy flags allow it.
+- Opening greeting is available at `POST /api/v1/conversation/opening`.
+  It uses time context, parent policy names, and parent guidance to return one
+  short child-facing greeting, with optional `reply.audio_url`.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
   can generate or return a cached wav URL. The default provider is mock and
   never calls external services. MiMo VoiceClone is disabled until explicit
@@ -63,9 +67,12 @@ SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelR
 
 Current backend contract:
 
-- Accept confirmed text through `POST /api/v1/conversation/message`.
-- Treat v1 speech input as confirm-before-send; hands-free conversational mode
-  is a future product phase and should not change the v1 backend contract.
+- Accept child text through `POST /api/v1/conversation/message` and NDJSON
+  stream text through `POST /api/v1/conversation/stream`.
+- Treat v1 speech input as voice-first in child mode: ASR ok with non-empty
+  transcript is sent automatically by Android. Confirm-before-send remains a
+  debug/father mode only; hands-free conversational mode is still a future
+  product phase and should not change the v1 backend contract.
 - ASR v1 target is backend MiMo audio input / ASR. Android must not call MiMo
   directly or store provider API keys.
 - Raw audio uploaded for ASR must be short-lived request data only: no database
@@ -75,6 +82,9 @@ Current backend contract:
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
   `reply.agent_motion` for Android TTS and 小白狐 presentation.
 - Use `POST /api/v1/tts/xiaobaohu` for backend-generated 小白狐 speech audio.
+- Use `POST /api/v1/conversation/opening` when the child chat screen first
+  becomes visible. Call-name priority is `child_nickname`,
+  `child_display_name`, then no forced call name.
 - Never use voice or presentation metadata to weaken learning-answer, secrecy,
   trusted-adult, or long-term raw-data storage safety rules.
 
@@ -583,7 +593,7 @@ Current backend status:
 
 ```text
 1. ASR v1 target is backend MiMo audio input / ASR.
-2. Android records/uploads to the backend and displays `requiresConfirmation=true` pending transcript.
+2. Android records/uploads to the backend and child mode auto-sends a non-empty transcript; `requiresConfirmation=true` pending transcript UI is kept only for DevSettings / father debugging.
 3. Android must not call MiMo directly and must not store MiMo API keys.
 4. `POST /api/v1/asr/transcribe` is mounted, but default provider is mock; MiMo ASR is disabled and policy-blocked by default.
 5. Real MiMo `/chat/completions` ASR provider is implemented behind `AsrDataPolicyGuard`.

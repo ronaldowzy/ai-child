@@ -15,7 +15,7 @@ class ConversationApiClient(
     suspend fun sendMessage(
         request: ConversationMessageRequest,
     ): ConversationMessageResponse = withContext(Dispatchers.IO) {
-        val connection = openConnection()
+        val connection = openConnection(messageEndpoint())
         try {
             val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
             connection.outputStream.use { output ->
@@ -37,8 +37,33 @@ class ConversationApiClient(
         }
     }
 
-    private fun openConnection(): HttpURLConnection {
-        return (URL(messageEndpoint()).openConnection() as HttpURLConnection).apply {
+    suspend fun requestOpening(
+        request: ConversationOpeningRequest,
+    ): ConversationMessageResponse = withContext(Dispatchers.IO) {
+        val connection = openConnection(openingEndpoint())
+        try {
+            val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
+            connection.outputStream.use { output ->
+                output.write(requestBody)
+            }
+
+            val statusCode = connection.responseCode
+            val responseBody = connection.readBody(statusCode)
+            if (statusCode !in 200..299) {
+                throw ConversationApiException(
+                    "Conversation opening API returned HTTP $statusCode: $responseBody",
+                )
+            }
+            ConversationMessageResponse.fromJsonString(responseBody)
+        } catch (exception: IOException) {
+            throw ConversationApiException("Conversation opening request failed", exception)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun openConnection(endpoint: String): HttpURLConnection {
+        return (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
@@ -50,6 +75,10 @@ class ConversationApiClient(
 
     private fun messageEndpoint(): String {
         return "${baseUrl.trimEnd('/')}/api/v1/conversation/message"
+    }
+
+    private fun openingEndpoint(): String {
+        return "${baseUrl.trimEnd('/')}/api/v1/conversation/opening"
     }
 }
 

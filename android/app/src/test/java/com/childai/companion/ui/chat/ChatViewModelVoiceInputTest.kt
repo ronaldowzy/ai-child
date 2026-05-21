@@ -16,7 +16,7 @@ import org.junit.Test
 
 class ChatViewModelVoiceInputTest {
     @Test
-    fun transcriptIsPendingUntilExplicitSend() {
+    fun transcriptAutoSendsWhenConfirmationDisabled() {
         val sender = RecordingConversationSender()
         val speech = FakeSpeechInputController(
             result = SpeechInputResult.Transcript("我想聊恐龙。"),
@@ -28,13 +28,32 @@ class ChatViewModelVoiceInputTest {
         assertTrue(speech.started)
 
         viewModel.stopVoiceRecordingAndUpload()
+
+        assertEquals(listOf("我想聊恐龙。"), sender.sentTexts)
+        assertEquals(VoiceInputMode.Idle, viewModel.uiState.value.voice.inputMode)
+        assertFalse(viewModel.uiState.value.isSending)
+    }
+
+    @Test
+    fun transcriptCanRemainPendingWhenConfirmationEnabledForDebug() {
+        val sender = RecordingConversationSender()
+        val viewModel = viewModel(
+            sender = sender,
+            speech = FakeSpeechInputController(
+                result = SpeechInputResult.Transcript("我想聊恐龙。"),
+            ),
+            voiceConfirmBeforeSend = true,
+        )
+
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
         assertEquals(VoiceInputMode.PendingTranscript, viewModel.uiState.value.voice.inputMode)
         assertEquals("我想聊恐龙。", viewModel.uiState.value.voice.pendingTranscript)
         assertTrue(sender.sentTexts.isEmpty())
 
         viewModel.sendPendingVoiceTranscript()
         assertEquals(listOf("我想聊恐龙。"), sender.sentTexts)
-        assertFalse(viewModel.uiState.value.isSending)
     }
 
     @Test
@@ -45,6 +64,7 @@ class ChatViewModelVoiceInputTest {
             speech = FakeSpeechInputController(
                 result = SpeechInputResult.Transcript("这句不要发。"),
             ),
+            voiceConfirmBeforeSend = true,
         )
 
         viewModel.startVoiceRecording(tempDir())
@@ -106,17 +126,19 @@ class ChatViewModelVoiceInputTest {
 
         assertTrue(sender.sentTexts.isEmpty())
         assertEquals(VoiceInputMode.PermissionDenied, viewModel.uiState.value.voice.inputMode)
-        assertEquals("没关系，可以继续打字。", viewModel.uiState.value.voice.statusText)
+        assertEquals("没有麦克风权限，我们可以请大人打开。", viewModel.uiState.value.voice.statusText)
     }
 
     private fun viewModel(
         sender: RecordingConversationSender,
         speech: SpeechInputController = FakeSpeechInputController(),
+        voiceConfirmBeforeSend: Boolean = false,
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = sender,
             speechInputController = speech,
             sendDispatcher = Dispatchers.Unconfined,
+            voiceConfirmBeforeSend = voiceConfirmBeforeSend,
         )
     }
 

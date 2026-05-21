@@ -64,6 +64,8 @@ class ParentPolicyRepository:
                 )
                 record.safety_rules = dict(policy.safety_rules)
                 record.schedule = policy.schedule.model_dump(mode="json")
+                record.child_nickname = policy.child_nickname
+                record.child_display_name = policy.child_display_name
                 record.parent_message_raw = policy.parent_message_raw
                 record.parent_message_updated_at = policy.parent_message_updated_at
                 record.version = policy.version
@@ -91,6 +93,8 @@ class ParentPolicyRepository:
     def _to_domain(self, record: ParentPolicyRecord) -> ParentPolicy:
         return ParentPolicy(
             child_id=record.child_id,
+            child_nickname=record.child_nickname,
+            child_display_name=record.child_display_name,
             parent_message_raw=record.parent_message_raw,
             parent_message_updated_at=record.parent_message_updated_at,
             goals=list(record.goals or []),

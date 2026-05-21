@@ -33,6 +33,23 @@ class ConversationRepository(
         )
     }
 
+    suspend fun requestOpening(
+        childId: String,
+        sessionId: String,
+        timezone: String = DevSettings.TIMEZONE,
+    ): ConversationMessageResponse {
+        return apiClient.requestOpening(
+            ConversationOpeningRequest(
+                childId = childId,
+                sessionId = sessionId,
+                clientContext = ClientContext(
+                    deviceTime = nowIsoOffset(timezone),
+                    timezone = timezone,
+                ),
+            ),
+        )
+    }
+
     suspend fun streamTextMessage(
         childId: String,
         sessionId: String,

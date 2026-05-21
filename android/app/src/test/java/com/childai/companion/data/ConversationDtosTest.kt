@@ -1,6 +1,9 @@
 package com.childai.companion.data
 
 import com.childai.companion.data.conversation.ConversationMessageResponse
+import com.childai.companion.data.conversation.ClientContext
+import com.childai.companion.data.conversation.ConversationOpeningRequest
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -58,5 +61,25 @@ class ConversationDtosTest {
         assertTrue(response.reply.voiceEnabled)
         assertNull(response.reply.audioUrl)
         assertEquals("gentle_idle", response.reply.agentMotion)
+    }
+
+    @Test
+    fun serializesOpeningRequest() {
+        val rawJson = ConversationOpeningRequest(
+            childId = "child_demo",
+            sessionId = "session_demo",
+            clientContext = ClientContext(
+                deviceTime = "2026-05-21T18:30:00+08:00",
+                timezone = "Asia/Shanghai",
+            ),
+        ).toJsonString()
+
+        val root = JSONObject(rawJson)
+        assertEquals("child_demo", root.getString("child_id"))
+        assertEquals("session_demo", root.getString("session_id"))
+        assertEquals(
+            "child",
+            root.getJSONObject("client_context").getString("app_mode"),
+        )
     }
 }

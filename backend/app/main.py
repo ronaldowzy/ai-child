@@ -7,6 +7,7 @@ from fastapi import Request
 from app.api.v1.asr import router as asr_router
 from app.api.v1.conversation_attachment import router as conversation_attachment_router
 from app.api.v1.conversation import router as conversation_router
+from app.api.v1.conversation_opening import router as conversation_opening_router
 from app.api.v1.conversation_stream import router as conversation_stream_router
 from app.api.v1.health import router as health_router
 from app.api.v1.memories import router as memories_router
@@ -75,6 +76,7 @@ app.add_middleware(RequestIdMiddleware)
 app.include_router(tts_media_router)
 app.include_router(health_router, prefix=settings.api_v1_prefix, tags=["health"])
 app.include_router(conversation_router, prefix=settings.api_v1_prefix)
+app.include_router(conversation_opening_router, prefix=settings.api_v1_prefix)
 app.include_router(conversation_stream_router, prefix=settings.api_v1_prefix)
 app.include_router(conversation_attachment_router, prefix=settings.api_v1_prefix)
 app.include_router(parent_policy_router, prefix=settings.api_v1_prefix)

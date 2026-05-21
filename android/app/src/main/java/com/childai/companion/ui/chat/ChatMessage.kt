@@ -15,6 +15,6 @@ fun initialChatMessages(): List<ChatMessage> = listOf(
     ChatMessage(
         id = "agent-welcome",
         author = MessageAuthor.Agent,
-        text = "我在这里。你可以慢慢说，一次说一件小事就好。",
+        text = "我准备好啦。",
     ),
 )

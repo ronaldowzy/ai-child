@@ -42,3 +42,28 @@ def test_parent_policy_service_persists_parent_message_with_repository() -> None
     assert saved.parent_message_updated_at is not None
     assert reloaded.parent_message_raw == parent_message
     assert reloaded.parent_message_updated_at == saved.parent_message_updated_at
+
+
+def test_parent_policy_service_persists_child_names_with_repository() -> None:
+    session_factory = _sqlite_session_factory()
+    repository = ParentPolicyRepository(session_factory=session_factory)
+    service = ParentPolicyService(repository=repository, fallback_to_memory=False)
+    child_id = "child_names_db_test"
+
+    saved = service.update_policy(
+        ParentPolicyUpdateRequest(
+            child_id=child_id,
+            child_nickname="豆豆",
+            child_display_name="王小明",
+        )
+    )
+
+    reloaded = ParentPolicyService(
+        repository=repository,
+        fallback_to_memory=False,
+    ).get_policy(child_id)
+
+    assert saved.child_nickname == "豆豆"
+    assert saved.child_display_name == "王小明"
+    assert reloaded.child_nickname == "豆豆"
+    assert reloaded.child_display_name == "王小明"

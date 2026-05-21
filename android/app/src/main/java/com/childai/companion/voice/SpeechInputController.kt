@@ -88,10 +88,10 @@ class BackendSpeechInputController(
     }
 
     companion object {
-        const val NEEDS_RETRY_MESSAGE = "我刚才没听清，可以再说一次，也可以直接打字。"
-        const val AUDIO_TOO_LONG_MESSAGE = "这次说得有点长，可以短一点重说，或直接打字。"
-        const val PROVIDER_TIMEOUT_MESSAGE = "这次转文字等太久了，可以再说一遍，或直接打字。"
-        const val POLICY_BLOCKED_MESSAGE = "我现在还不能用云端听写，我们可以先打字。"
-        const val TEXT_FALLBACK_MESSAGE = "这次语音没有转成文字，我们先用打字说。"
+        const val NEEDS_RETRY_MESSAGE = "我刚才没听清，可以再说一次。"
+        const val AUDIO_TOO_LONG_MESSAGE = "这次说得有点长，可以短一点重说。"
+        const val PROVIDER_TIMEOUT_MESSAGE = "这次听懂声音等太久了，可以再说一遍。"
+        const val POLICY_BLOCKED_MESSAGE = "我现在还不能听懂声音，我们先请大人检查一下。"
+        const val TEXT_FALLBACK_MESSAGE = "这次没有听懂声音，我们先请大人检查一下。"
     }
 }

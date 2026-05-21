@@ -22,11 +22,22 @@ data class ConversationMessageRequest(
             )
             .put(
                 "client_context",
-                JSONObject()
-                    .put("device_time", clientContext.deviceTime)
-                    .put("timezone", clientContext.timezone)
-                    .put("app_mode", clientContext.appMode),
+                clientContext.toJson(),
             )
+            .toString()
+    }
+}
+
+data class ConversationOpeningRequest(
+    val childId: String,
+    val sessionId: String,
+    val clientContext: ClientContext,
+) {
+    fun toJsonString(): String {
+        return JSONObject()
+            .put("child_id", childId)
+            .put("session_id", sessionId)
+            .put("client_context", clientContext.toJson())
             .toString()
     }
 }
@@ -41,7 +52,14 @@ data class ClientContext(
     val deviceTime: String,
     val timezone: String,
     val appMode: String = "child",
-)
+) {
+    fun toJson(): JSONObject {
+        return JSONObject()
+            .put("device_time", deviceTime)
+            .put("timezone", timezone)
+            .put("app_mode", appMode)
+    }
+}
 
 data class ConversationMessageResponse(
     val reply: ConversationReply,

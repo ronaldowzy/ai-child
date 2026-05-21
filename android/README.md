@@ -2,18 +2,18 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和待确认文本 UI，仍待真机 QA。
+当前 Android MVP 已完成儿童统一聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式，仍待真机 QA。
 
 ## 当前范围
 
 - 单一儿童聊天入口。
 - 小白狐智能体形象占位，会根据后端 `reply.emotion` 和
   `reply.agent_motion` 做轻量状态变化。
-- 文本输入框和发送按钮。
+- 儿童默认 voice-first 输入：主按钮用于开始说话 / 说完了 / 正在听懂；文字输入框和发送按钮默认隐藏，可通过 DevSettings 打开。
 - 默认优先调用后端 `POST /api/v1/conversation/stream`；失败时 fallback 到 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，只在确认后发送文本。
+  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。
@@ -48,12 +48,13 @@
 已确认方向：
 
 - 语音输入 ASR v1 目标已修订为后端 MiMo audio input / ASR。
-- Android 不直接调用 MiMo，不保存 MiMo API key；Android 只负责点击录音、上传后端 ASR、展示待确认文本。
-- 语音输入 v1 是 confirm-before-send：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> 展示识别文本 -> 孩子确认/可编辑 -> 点击发送 -> text 走 conversation API。
+- Android 不直接调用 MiMo，不保存 MiMo API key；Android 只负责点击录音、上传后端 ASR 和儿童端语音状态。
+- 语音输入 v1 儿童默认流程：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> ASR ok 自动发送 transcript -> text 走 conversation stream；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
 - Future hands-free conversational mode 不进入 v1。
-- 确认后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
+- 自动发送后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
 - 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 做 MiMo ASR smoke，不用真实儿童录音。
-- 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、pending transcript 编辑面板，以及发送/重说/取消。
+- 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
+- App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示并按 `audio_url` 自动播放；如果孩子先开口，迟到的 opening 不插入。
 - TTS 朗读优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频；远程播放失败时 fallback 到系统 TextToSpeech 或文字。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
@@ -449,7 +450,7 @@ bash scripts/dev_backend.sh
 9. 页面不应默认显示 `base=... | active=...` 这类内部 session_state 调试文本。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。
 11. 小白狐状态应随后端 `emotion` / `agent_motion` 轻量变化；小白狐回复默认自动朗读，朗读时切到 speaking，可停止或静音。
-12. 底部语音按钮只在点击后请求麦克风权限；录音结果先进入待确认文本，不应自动发送。
+12. 底部语音按钮只在点击后请求麦克风权限；儿童默认 ASR 成功后自动发送，不显示文字编辑确认面板；打开 `VOICE_CONFIRM_BEFORE_SEND=true` 后才进入待确认文本。
 ```
 
 如果需要先排除后端 API 合约问题，可以在仓库根目录运行：
@@ -467,7 +468,7 @@ bash scripts/e2e_local_api_check.sh
 2. 保留现有 `reply.audioUrl` 远程音频优先播放，系统 TTS 只做 fallback。
 3. Stream client 已接入，下一步真机验证文本渐进显示和 audio segment 排队播放。
 4. 小白狐状态需要覆盖矩阵验证：哪些状态有资源、哪些状态能被真实业务触发。
-5. 语音输入已接入 Android 录音上传后端 ASR + 待确认文本 UI；下一步在 Redmi K60 / Honor Pad 5 做权限、录音、上传、编辑确认和失败 fallback 手动 QA。
+5. 语音输入已接入 Android 录音上传后端 ASR + 儿童默认自动发送；下一步在 Redmi K60 / Honor Pad 5 做权限、录音、上传、自动发送、DevSettings 确认模式和失败 fallback 手动 QA。
 ```
 
 横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 PNG 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。

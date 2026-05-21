@@ -49,6 +49,8 @@ class ChatViewModel(
     },
     initialTtsUiState: TtsUiState = TtsUiState(),
     private val sendDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    requestOpeningOnInit: Boolean = false,
+    private val voiceConfirmBeforeSend: Boolean = DevSettings.VOICE_CONFIRM_BEFORE_SEND,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
     private var nextMessageIndex = 0
@@ -56,6 +58,8 @@ class ChatViewModel(
     private var ttsToken = 0
     private var streamingAgentMessageId: String? = null
     private var voiceRecordingAutoStopJob: Job? = null
+    private var openingRequested = false
+    private var childInteractionStarted = false
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
@@ -116,6 +120,12 @@ class ChatViewModel(
         ),
     )
 
+    init {
+        if (requestOpeningOnInit) {
+            requestOpeningGreeting()
+        }
+    }
+
     fun sendText(text: String) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
@@ -127,6 +137,7 @@ class ChatViewModel(
         val state = _uiState.value
         if (state.isSending || state.voice.isUploading || state.voice.isRecording) return
 
+        childInteractionStarted = true
         stopCurrentTts(restoreBaseAgent = true)
         _uiState.update {
             it.copy(
@@ -154,7 +165,7 @@ class ChatViewModel(
                     current.copy(
                         voice = current.voice.copy(
                             inputMode = VoiceInputMode.Failed,
-                            errorMessage = "这次麦克风没有准备好，可以先打字。",
+                            errorMessage = "这次麦克风没有准备好，可以请大人检查一下。",
                         ),
                         agent = baseAgentState,
                     )
@@ -177,7 +188,7 @@ class ChatViewModel(
                 agent = FoxAgentUiState(
                     mood = FoxMood.Thinking,
                     motion = FoxMotion.ThinkingBlink,
-                    statusText = "我先把声音转成文字。",
+                    statusText = "我在听懂你刚才说的话。",
                 ),
             )
         }
@@ -192,13 +203,14 @@ class ChatViewModel(
                     timezone = DevSettings.TIMEZONE,
                 )
             }.getOrElse {
-                SpeechInputResult.Failed("这次语音没有转成文字，我们先用打字说。")
+                SpeechInputResult.Failed("这次没有听懂声音，我们先请大人检查一下。")
             }
             applySpeechInputResult(result)
         }
     }
 
     fun onVoicePermissionDenied() {
+        childInteractionStarted = true
         _uiState.update {
             it.copy(
                 voice = it.voice.copy(
@@ -261,6 +273,7 @@ class ChatViewModel(
     private fun sendTextWithAttachments(text: String, attachments: List<String>) {
         if (_uiState.value.isSending) return
 
+        childInteractionStarted = true
         recordChildMessage(text)
         _uiState.update {
             it.copy(
@@ -425,6 +438,7 @@ class ChatViewModel(
 
     private fun showMockPhotoCapture(imagePurpose: String = IMAGE_PURPOSE_SHARE) {
         if (_uiState.value.isSending) return
+        childInteractionStarted = true
         _uiState.update {
             it.copy(
                 mockPhoto = MockPhotoUiState(
@@ -514,6 +528,28 @@ class ChatViewModel(
     private fun applySpeechInputResult(result: SpeechInputResult) {
         when (result) {
             is SpeechInputResult.Transcript -> {
+                if (!voiceConfirmBeforeSend) {
+                    val transcript = result.text.trim()
+                    if (transcript.isNotEmpty()) {
+                        _uiState.update { state ->
+                            state.copy(
+                                isSending = false,
+                                voice = state.voice.copy(
+                                    inputMode = VoiceInputMode.Idle,
+                                    pendingTranscript = "",
+                                    errorMessage = null,
+                                ),
+                                agent = FoxAgentUiState(
+                                    mood = FoxMood.Thinking,
+                                    motion = FoxMotion.ThinkingBlink,
+                                    statusText = "我听到了，我们来聊这个。",
+                                ),
+                            )
+                        }
+                        sendText(transcript)
+                        return
+                    }
+                }
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
@@ -570,7 +606,7 @@ class ChatViewModel(
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
                             motion = FoxMotion.NetworkError,
-                            statusText = "我们先用打字说。",
+                            statusText = "我们先请大人检查一下。",
                         ),
                     )
                 }
@@ -1070,6 +1106,45 @@ class ChatViewModel(
         }
     }
 
+    fun requestOpeningGreeting() {
+        if (openingRequested) return
+        openingRequested = true
+        _uiState.update { state ->
+            state.copy(
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Warm,
+                    motion = FoxMotion.GentleIdle,
+                    statusText = "我准备好啦。",
+                ),
+            )
+        }
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                conversationSender.requestOpening(
+                    childId = DevSettings.CHILD_ID,
+                    sessionId = sessionId,
+                    timezone = DevSettings.TIMEZONE,
+                )
+            }.onSuccess { response ->
+                if (childInteractionStarted || _uiState.value.messages.any { it.author == MessageAuthor.Child }) {
+                    return@onSuccess
+                }
+                renderAgentReply(
+                    response = response,
+                    mockPhoto = null,
+                    replaceMessageId = "agent-welcome",
+                )
+            }.onFailure {
+                _uiState.update { state ->
+                    state.copy(
+                        agent = baseAgentState,
+                        isSending = false,
+                    )
+                }
+            }
+        }
+    }
+
     private fun scheduleVoiceRecordingAutoStop() {
         voiceRecordingAutoStopJob?.cancel()
         voiceRecordingAutoStopJob = viewModelScope.launch(sendDispatcher) {
@@ -1160,6 +1235,14 @@ private fun AttachmentCreateResponse.toPendingImageContext(): PendingImageContex
 }
 
 interface ConversationMessageSender {
+    suspend fun requestOpening(
+        childId: String,
+        sessionId: String,
+        timezone: String = DevSettings.TIMEZONE,
+    ): ConversationMessageResponse {
+        throw UnsupportedOperationException("Opening greeting is not implemented")
+    }
+
     suspend fun sendTextMessage(
         childId: String,
         sessionId: String,
@@ -1182,6 +1265,18 @@ interface ConversationMessageSender {
 private class ConversationRepositoryMessageSender(
     private val repository: ConversationRepository = ConversationRepository(),
 ) : ConversationMessageSender {
+    override suspend fun requestOpening(
+        childId: String,
+        sessionId: String,
+        timezone: String,
+    ): ConversationMessageResponse {
+        return repository.requestOpening(
+            childId = childId,
+            sessionId = sessionId,
+            timezone = timezone,
+        )
+    }
+
     override suspend fun sendTextMessage(
         childId: String,
         sessionId: String,

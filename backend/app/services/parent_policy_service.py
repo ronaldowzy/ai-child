@@ -47,6 +47,12 @@ class ParentPolicyService:
                 "parent_message_raw": request.parent_message_raw
                 if request.parent_message_raw is not None
                 else current.parent_message_raw,
+                "child_nickname": request.child_nickname
+                if request.child_nickname is not None
+                else current.child_nickname,
+                "child_display_name": request.child_display_name
+                if request.child_display_name is not None
+                else current.child_display_name,
                 "parent_message_updated_at": now
                 if request.parent_message_raw is not None
                 else current.parent_message_updated_at,

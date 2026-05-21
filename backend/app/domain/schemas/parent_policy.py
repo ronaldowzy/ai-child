@@ -37,6 +37,8 @@ class ParentSchedule(BaseModel):
 
 class ParentPolicy(BaseModel):
     child_id: str = Field(..., min_length=1)
+    child_nickname: str | None = Field(default=None, max_length=80)
+    child_display_name: str | None = Field(default=None, max_length=120)
     parent_message_raw: str | None = Field(default=None, max_length=4000)
     parent_message_updated_at: datetime | None = None
     goals: list[str] = Field(default_factory=default_parent_goals)
@@ -52,6 +54,8 @@ class ParentPolicy(BaseModel):
 
 class ParentPolicyUpdateRequest(BaseModel):
     child_id: str = Field(..., min_length=1)
+    child_nickname: str | None = Field(default=None, max_length=80)
+    child_display_name: str | None = Field(default=None, max_length=120)
     parent_message_raw: str | None = Field(default=None, max_length=4000)
     goals: list[str] | None = None
     communication_preferences: dict[str, Any] | None = None

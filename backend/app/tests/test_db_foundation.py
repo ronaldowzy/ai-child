@@ -34,6 +34,8 @@ def test_db_metadata_includes_key_columns() -> None:
             "communication_preferences",
             "safety_rules",
             "schedule",
+            "child_nickname",
+            "child_display_name",
             "parent_message_raw",
             "parent_message_updated_at",
             "version",
@@ -220,3 +222,20 @@ def test_alembic_parent_message_revision_is_readable() -> None:
     assert 'down_revision: str | None = "20260520_0001"' in revision_text
     assert "parent_message_raw" in revision_text
     assert "parent_message_updated_at" in revision_text
+
+
+def test_alembic_child_name_revision_is_readable() -> None:
+    backend_dir = Path(__file__).resolve().parents[2]
+    revision_path = (
+        backend_dir
+        / "alembic"
+        / "versions"
+        / "20260521_0003_add_child_names_to_parent_policies.py"
+    )
+
+    assert revision_path.is_file()
+    revision_text = revision_path.read_text(encoding="utf-8")
+    assert 'revision: str = "20260521_0003"' in revision_text
+    assert 'down_revision: str | None = "20260521_0002"' in revision_text
+    assert "child_nickname" in revision_text
+    assert "child_display_name" in revision_text

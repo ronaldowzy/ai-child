@@ -56,8 +56,8 @@
 
 | 设备 | 定位 | 设备信息 | 用途 |
 |---|---|---|---|
-| Device A | 高配 Android 手机，功能主验证 | Redmi K60，Android 14，RAM 暂未提供 | 快速验证后端 MiMo ASR confirm-before-send、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
-| Device B | Honor Pad 5，低配兼容性目标设备 | Android 9，RAM 4GB | Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、后端 ASR 上传确认、TTS fallback、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
+| Device A | 高配 Android 手机，功能主验证 | Redmi K60，Android 14，RAM 暂未提供 | 快速验证后端 MiMo ASR 自动发送、opening greeting、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device B | Honor Pad 5，低配兼容性目标设备 | Android 9，RAM 4GB | Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、后端 ASR 自动发送、opening greeting、TTS fallback、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
 
 执行原则：
 
@@ -97,7 +97,7 @@ RAM：暂未提供
 
 | 项 | 反馈 | 当前判断 |
 |---|---|---|
-| 语音输入 | 旧 APK 不可用 | 当前代码已接 Android 录音、后端 ASR 上传和待确认文本 UI；需新 APK 在 Redmi K60 复验权限、录音、上传、确认发送和失败 fallback |
+| 语音输入 | 旧 APK 不可用 | 当前代码已接 Android 录音、后端 ASR 上传和儿童默认自动发送；需新 APK 在 Redmi K60 复验权限、录音、上传、自动发送、重说/取消、DevSettings 确认模式和失败 fallback |
 | TTS 播报 | 完全没有声音 | 需要先修通 TTS 可观测链路，不能直接判定为系统音色问题 |
 | TTS UI | 没有停止/静音提示 | 需要确保 InputBar 始终显示朗读状态、停止/静音入口和短提示 |
 | 小白狐状态 | 没有切到 speaking | speaking 状态不能只依赖系统 onStart；请求被接受后应先进入 speaking pending |
@@ -340,14 +340,15 @@ ASR intake 结论：
 | 15. 后端断开时 Android 温和错误 | 窗口模式模拟器 | pass：模拟器网络短暂不可达时，App 显示“小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。” |
 | 16. `session_state` 默认不展示给儿童 | 窗口模式模拟器 UI dump | pass：儿童界面未展示 `base=...` / `active=...` 等内部 session_state 调试文本 |
 | 17. 小白狐状态随 `emotion` / `motion` 轻量变化 | 窗口模式模拟器 | partial：当前 UI 已接入 animation_v1 PNG 序列帧、静态 PNG 和 Canvas fallback；仍需 Redmi K60 / Honor Pad 5 设备侧验证流畅度和降级 |
-| 18. 语音按钮旧版本行为 | 窗口模式模拟器 | superseded：旧 APK 中按钮 disabled；当前代码已改为点击触发麦克风权限、短录音、后端 ASR 上传和待确认文本 UI，需新 APK 真机复验 |
+| 18. 语音按钮旧版本行为 | 窗口模式模拟器 | superseded：旧 APK 中按钮 disabled；当前代码已改为点击触发麦克风权限、短录音、后端 ASR 上传和儿童默认自动发送，需新 APK 真机复验 |
 
 ### QA1 新决策后的新增待验收项
 
 | 项 | 当前结果 | 下一步 |
 |---|---|---|
 | 正式名称“小白狐”替换 UI 文案 | code updated / device todo：儿童端主要可见文案已改为“小白狐” | 后续在 Device A 和 Honor Pad 5 上复验聊天标题、消息列表、错误提示、拍题 dialog、父亲页文案、日志/测试 fixture 是否仍有旧称呼 |
-| V1 语音输入 confirm-before-send | code_ready_device_qa | 验证 Android 只录音上传后端 ASR，返回待确认文本；发送前必须让孩子确认或编辑；默认不长期保存原始音频 |
+| V1 语音输入 voice-first 自动发送 | code_ready_device_qa | 验证 Android 只录音上传后端 ASR，ASR ok 后自动发送 transcript；DevSettings 打开确认模式时才返回待确认文本；默认不长期保存原始音频 |
+| Opening greeting | code_ready_device_qa | 验证 App 打开后小白狐主动短开场；有小名喊小名，有 display name 用 display name，都没有不强行称呼；孩子先说话时 opening 不插入 |
 | V2 TTS 默认自动朗读小白狐回复 | code_ready_device_qa | Redmi K60 反馈无声音且不可观测；TTS-D1 已补诊断、speaking pending 和 UI 状态；A1 已接入 `reply.audio_url` 远程播放，需重新打包复验 |
 | 停止/静音能力 | tts_d1_in_progress | Redmi K60 反馈未看到提示；TTS-D1 要求 InputBar 始终显示短状态、停止和静音入口 |
 | DevSettings / 父亲设置关闭自动朗读 | partial | `DevSettings.AUTO_TTS_ENABLED` 和 `DevSettings.TTS_MUTED` 已作为初始配置；父亲设置治理开关仍是后续任务 |
@@ -595,7 +596,8 @@ Mimo 初始 12 秒超时会 fallback mock；本地 dev 配置已调为 max_token
 | 父亲入口保护 | 普通点击父亲入口、长按入口、输入错误 PIN、输入 dev PIN `0000` | 普通点击不进入；长按弹 PIN；错误 PIN 温和提示；正确 PIN 进入父亲页 | todo |
 | Mock 拍题 | 点击“拍题目”并走 mock 题目流程 | 调用 attachment + conversation；后端引导题意，不接真实 CameraX，不保存真实照片 | todo |
 | Android 后端断开提示 | 停止后端后从 App 发送消息 | 显示温和错误和稍后再试，不诱导孩子反复尝试或自责 | todo |
-| 语音输入 V1 | 点击语音录制虚构内容并上传后端 ASR | confirm-before-send；发送前可编辑/取消；不长期保存原始音频；Android 不直接调用 MiMo | code_ready_device_qa |
+| 语音输入 V1 | 点击语音录制虚构内容并上传后端 ASR | 儿童默认自动发送 transcript；DevSettings 确认模式下发送前可编辑/取消；不长期保存原始音频；Android 不直接调用 MiMo | code_ready_device_qa |
+| Opening greeting | 打开儿童聊天页 | 小白狐请求一次 opening；展示/朗读短开场白；不查岗学校；孩子先说话时不覆盖孩子消息 | code_ready_device_qa |
 | TTS V2 自动朗读 | 触发小白狐回复 | 默认自动朗读；可停止/静音；遵守 `reply.voice_enabled`；不朗读 child message、debug、session_state 或父亲页长列表 | code_done / device_todo |
 | VoiceProfile | 切换或缺失系统语音 | `zh-CN`、`speechRate`、`pitch` 生效；缺少指定 voice 时 fallback 正常；不生成或保存音频文件 | code_done / device_todo |
 | TTS-D1 诊断 | Redmi K60 真机触发一次小白狐回复 | 显示 TTS 状态和诊断字段；失败时有 failure reason；小白狐不永久卡 speaking | todo |
@@ -669,7 +671,8 @@ Mimo 真实 provider 复验说明：
 | Watch/隐私安全细分设备流程 | todo | 使用虚构测试句验证 safety.gentle_checkin 不强制父亲提醒，privacy.boundary 不索要真实信息 |
 | 父亲入口保护 | code_done / device_todo | 代码已实现长按父亲入口 + dev PIN `0000`；仍需在窗口模式模拟器或真实平板验证点击不进入、长按弹 PIN、错误 PIN 温和提示、正确 PIN 进入 |
 | 断网/后端不可达 | todo | 停止后端后验证 Android 展示温和错误，不诱导孩子反复尝试 |
-| 语音输入/TTS/VoiceProfile | code_ready_device_qa | TTS v1 代码已完成默认自动朗读、停止/静音、VoiceProfile 和 speaking 联动；ASR confirm-before-send 代码路径已接 Android 录音上传和待确认文本；仍需 Redmi K60 / Honor Pad 5 复验 |
+| 语音输入/TTS/VoiceProfile | code_ready_device_qa | TTS v1 代码已完成默认自动朗读、停止/静音、VoiceProfile 和 speaking 联动；ASR voice-first 自动发送代码路径已接 Android 录音上传；仍需 Redmi K60 / Honor Pad 5 复验 |
+| Opening greeting | code_ready_device_qa | 后端 opening API 和 Android 首次请求已接入；仍需 Redmi K60 / Honor Pad 5 验证启动时文案、audioUrl 播放和不打断孩子输入 |
 | 小白狐命名与 3D/fallback | todo | UI 文案逐步替换为“小白狐”；3D 资源存在时显示，资源缺失时 Canvas fallback 正常 |
 
 ## 网络排查记录

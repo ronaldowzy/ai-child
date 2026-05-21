@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import IntentType, RiskCategory, RiskLevel
 from app.domain.time import TimeContext
@@ -15,9 +15,11 @@ class ConversationInput(BaseModel):
 
 
 class ClientContext(BaseModel):
-    device_time: datetime
+    device_time: datetime = Field(alias="deviceTime")
     timezone: str = Field(..., min_length=1)
-    app_mode: str = "child"
+    app_mode: str = Field(default="child", alias="appMode")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ConversationMessageRequest(BaseModel):
@@ -25,6 +27,14 @@ class ConversationMessageRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     input: ConversationInput
     client_context: ClientContext
+
+
+class ConversationOpeningRequest(BaseModel):
+    child_id: str = Field(..., min_length=1, alias="childId")
+    session_id: str = Field(..., min_length=1, alias="sessionId")
+    client_context: ClientContext = Field(alias="clientContext")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class Reply(BaseModel):

@@ -16,6 +16,7 @@ object DevSettings {
     const val AUTO_TTS_ENABLED = true
     const val TTS_MUTED = false
     const val SHOW_TTS_DIAGNOSTICS = true
+    const val USE_STREAMING_CONVERSATION = true
 
     val conversationApiBaseUrl: String = BuildConfig.CONVERSATION_API_BASE_URL
 }

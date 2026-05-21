@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。语音输入 ASR 仍是后续任务。
+当前 Android MVP 已完成文字聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR 录音确认 UI 仍是后续任务。
 
 ## 当前范围
 
@@ -10,10 +10,10 @@
 - 小白狐智能体形象占位，会根据后端 `reply.emotion` 和
   `reply.agent_motion` 做轻量状态变化。
 - 文本输入框和发送按钮。
-- 调用后端 `POST /api/v1/conversation/message`。
+- 默认优先调用后端 `POST /api/v1/conversation/stream`；失败时 fallback 到 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。语音输入 ASR 仍是后续能力。
+  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 仍是后续能力。
 - “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。
@@ -47,11 +47,12 @@
 
 已确认方向：
 
-- 语音输入 v1 优先使用 Android 本地 `SpeechRecognizer`。
-- 语音输入 v1 是 confirm-before-send：点击语音 -> 孩子说话 -> Android 本地 ASR -> 展示识别文本 -> 孩子确认/可编辑 -> 点击发送 -> text 走 `/conversation/message`。
+- 语音输入 ASR v1 目标已修订为后端 MiMo audio input / ASR。
+- Android 不直接调用 MiMo，不保存 MiMo API key；Android 只负责点击录音、上传后端 ASR、展示待确认文本。
+- 语音输入 v1 是 confirm-before-send：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> 展示识别文本 -> 孩子确认/可编辑 -> 点击发送 -> text 走 conversation API。
 - Future hands-free conversational mode 不进入 v1。
-- 确认后的文本继续调用现有 `POST /api/v1/conversation/message`。
-- 第一阶段默认不上传原始音频到后端，不长期保存原始音频。
+- 确认后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
+- 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 做 MiMo ASR smoke，不用真实儿童录音。
 - TTS 朗读优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频；远程播放失败时 fallback 到系统 TextToSpeech 或文字。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
@@ -59,7 +60,7 @@
 - Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也可能不适合孩子；Android system TTS 只作为 fallback 和诊断能力，不作为最终音色承诺。
 - Android 不直接调用 MiMo，不保存 MiMo API key；正式音频由后端 `/api/v1/tts/xiaobaohu` 生成并通过 `/media/tts/...wav` 返回。后端真实 MiMo VoiceClone smoke 已通过，Android 已接入 `reply.audio_url` 远程播放优先级。
 - Redmi K60 当前复测重点：确认 Android 是否请求 `/media/tts/...wav`、是否能听到 MiMo 小白狐音色、停止/静音是否生效；如果远程播放失败，再检查系统 TTS fallback 的 `lang` / `setVoice` / `speak` 诊断。
-- Android 可以使用 `SpeechRecognizer` / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
+- Android 可以使用平台录音 / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
 - 小白狐 v1 候选资源已导入，当前包含 11 个状态：`neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking`、`calm`、`sleepy`、`safety_concern`、`privacy_boundary`、`homework_focus`、`network_error`。
 - Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 PNG 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
@@ -71,6 +72,30 @@
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
 - 小白狐音色方向是小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚；当前正式方向是后端 MiMo VoiceClone v01，系统 TTS 只做 fallback。
 - QA 需要记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度、孩子接受度、小白狐动画流畅度和是否需要降级。
+
+## Streaming v1 Client
+
+当前实现：
+
+```text
+1. `DevSettings.USE_STREAMING_CONVERSATION=true` 时，ChatViewModel 优先走 `/api/v1/conversation/stream`。
+2. Android 逐行解析 NDJSON event。
+3. `text_delta` 追加到当前小白狐消息气泡。
+4. `text_final` 修正最终文本。
+5. `audio_ready` 进入 AudioSegmentQueuePlayer，顺序播放远程音频 segment。
+6. 静音时不播放 audio segment，也不 fallback 系统 TTS。
+7. 停止朗读会停止当前 segment 并清空队列。
+8. stream 失败时 fallback 到旧 `/conversation/message`。
+```
+
+待手动 QA：
+
+```text
+1. Redmi K60：普通聊天能看到渐进文字，不出现重复 agent bubble。
+2. Redmi K60：MiMo TTS segment 能按顺序播放，小白狐切 speaking，停止/静音生效。
+3. 后端断开或 stream 中断：已显示文本不被清空，旧接口 fallback 或温和错误可见。
+4. Honor Pad 5：横屏双栏、animation_v1 和 stream 更新同时运行不卡顿；必要时记录低性能降级。
+```
 
 详细设计见：
 
@@ -207,7 +232,7 @@ android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
 Redmi K60 / Android 14 真机反馈：
 
 ```text
-1. 语音输入不可用：符合当前状态，ASR 尚未实现。
+1. 语音输入不可用：符合当前状态，Android ASR 录音确认 UI 尚未实现。
 2. TTS 完全没有声音。
 3. 截图显示朗读诊断：speak=SKIPPED_UNAVAILABLE，failure=TextToSpeech is unavailable。
 4. 小白狐没有切到 speaking，说明上一版没有进入可见的 speaking pending / onStart 路径。
@@ -256,8 +281,8 @@ base URL：http://192.168.0.118:8000/
 
 ## 当前不做
 
-- 当前不接真实相机或 SpeechRecognizer ASR；语音输入 v1 后续才会接 Android 本地 SpeechRecognizer。
-- 当前 Android 不直接调用 MiMo，也不保存模型或 TTS API key。小白狐正式语音由后端生成 `audio_url`，后端 smoke 已确认可返回可下载 WAV；Android 优先播放远程音频，失败时 fallback 系统 TextToSpeech 或文字。
+- 当前不接真实相机或 Android ASR 录音 UI。
+- 当前 Android 不直接调用 MiMo，也不保存模型、TTS 或 ASR API key。小白狐正式语音由后端生成 `audio_url`，后端 smoke 已确认可返回可下载 WAV；Android 优先播放远程音频，失败时 fallback 系统 TextToSpeech 或文字。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
 - 不做账号系统。
@@ -426,11 +451,11 @@ bash scripts/e2e_local_api_check.sh
 最新真机反馈已经确认：MiMo VoiceClone 音频可以在 Redmi K60 上初步听到，动态小白狐形象也已经出现；但当前同步等待时间仍长。下一轮 Android 重点如下：
 
 ```text
-1. 主界面改为横屏双栏：左侧动态小白狐，右侧对话交互；手机也进入横屏。
+1. 主界面已改为横屏双栏：左侧动态小白狐，右侧对话交互；手机也进入横屏。
 2. 保留现有 `reply.audioUrl` 远程音频优先播放，系统 TTS 只做 fallback。
-3. 后续接入 stream client 后，文本应渐进显示，audio segment 应排队播放。
+3. Stream client 已接入，下一步真机验证文本渐进显示和 audio segment 排队播放。
 4. 小白狐状态需要覆盖矩阵验证：哪些状态有资源、哪些状态能被真实业务触发。
-5. 语音输入先调研 MiMo ASR / audio input 能力；未确认数据边界前不上传原始音频。
+5. 语音输入下一步做 Android 录音上传后端 ASR + 待确认文本 UI；Android 不直接调用 MiMo，不做常开麦克风，不自动发送识别结果。
 ```
 
 横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 PNG 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。

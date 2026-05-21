@@ -34,9 +34,11 @@ The current backend is intentionally local-first and mock-first:
   sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and 小白狐 animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
-- Speech recognition remains Android confirm-before-send: confirmed text is
-  sent to the existing conversation API, and raw child audio is not uploaded by
-  default.
+- Speech recognition v1 is moving to backend MiMo ASR: Android records only
+  after an explicit tap, uploads short audio to the backend ASR endpoint, shows
+  a pending transcript, and sends only confirmed/edited text to conversation.
+  Raw child audio is never stored long-term and MiMo ASR remains disabled until
+  father authorization and ASR policy flags allow it.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
   can generate or return a cached wav URL. The default provider is mock and
   never calls external services. MiMo VoiceClone is disabled until explicit
@@ -51,9 +53,9 @@ do not put the real API key into git, Android, docs, tests, or screenshots.
 
 ## Current Voice And Presentation Contract
 
-The backend remains the decision and safety boundary. Android may use local
-`SpeechRecognizer` later, and now uses remote audio playback plus TextToSpeech
-fallback for voice output, but child-facing content still flows through:
+The backend remains the decision and safety boundary. Android may record and
+upload short audio to backend ASR later, and now uses remote audio playback plus
+TextToSpeech fallback for voice output, but child-facing content still flows through:
 
 ```text
 SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelRegistry -> output safety check
@@ -64,7 +66,10 @@ Current backend contract:
 - Accept confirmed text through `POST /api/v1/conversation/message`.
 - Treat v1 speech input as confirm-before-send; hands-free conversational mode
   is a future product phase and should not change the v1 backend contract.
-- Do not require raw audio upload for v0.2 voice input.
+- ASR v1 target is backend MiMo audio input / ASR. Android must not call MiMo
+  directly or store provider API keys.
+- Raw audio uploaded for ASR must be short-lived request data only: no database
+  persistence, no logs, no memory, no test fixtures with real child recordings.
 - Keep external audio and child text transmission disabled unless a confirmed
   product decision and provider gate review explicitly allow it.
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
@@ -364,6 +369,7 @@ The Android app never stores model API keys. All model configuration belongs on 
 - `POST /api/v1/conversation/message`
 - `POST /api/v1/conversation/stream`
 - `POST /api/v1/conversation/attachment`
+- `POST /api/v1/asr/transcribe`
 - `GET /api/v1/parent/policy`
 - `POST /api/v1/parent/policy`
 - `GET /api/v1/parent/reports/{child_id}`
@@ -561,9 +567,9 @@ voice sample contents.
 Streaming v1 will reuse the same request_id and provider timing fields, then add
 stream-specific `first_text_ms`, `first_audio_ms`, and `stream_total_ms`.
 
-## ASR Spec Intake
+## MiMo ASR v1
 
-MiMo ASR / audio-input research is documented in:
+MiMo ASR / audio-input research and integration design are documented in:
 
 ```text
 docs/ASR_INPUT_RESEARCH_V0_1.md
@@ -573,11 +579,13 @@ docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md
 Current backend status:
 
 ```text
-1. ASR schema/service/provider skeleton exists for design validation and tests.
-2. The ASR router is not mounted in `backend/app/main.py`.
-3. Default provider is mock; MiMo ASR is disabled and policy-blocked by default.
-4. Android local SpeechRecognizer + confirm-before-send remains the v1 default.
-5. No real child audio should be uploaded or stored during this phase.
+1. ASR v1 target is backend MiMo audio input / ASR.
+2. Android records/uploads to the backend and displays `requiresConfirmation=true` pending transcript.
+3. Android must not call MiMo directly and must not store MiMo API keys.
+4. `POST /api/v1/asr/transcribe` is mounted, but default provider is mock; MiMo ASR is disabled and policy-blocked by default.
+5. Real MiMo `/chat/completions` ASR provider is implemented behind `AsrDataPolicyGuard`.
+6. No real child audio should be used in development smoke; use fake/smoke audio only.
+7. Raw audio must not be stored in the database, logs, long-term memory, docs, tests, or git.
 ```
 
 ASR environment defaults:
@@ -593,8 +601,27 @@ export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
 export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
 ```
 
-Do not enable MiMo ASR with real child audio until retention, deletion and
-no-training terms are confirmed and the product decision is written down.
+Fake-audio smoke script:
+
+```bash
+CHILD_AI_ASR_PROVIDER=mimo \
+CHILD_AI_MIMO_ASR_ENABLED=true \
+CHILD_AI_MIMO_ASR_API_KEY="<temporary key>" \
+CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true \
+CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true \
+CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true \
+CHILD_AI_MIMO_ASR_FAKE_AUDIO_PATH=/path/to/fake_smoke_audio.wav \
+CHILD_AI_MIMO_ASR_FAKE_AUDIO_CONFIRMED=true \
+ASR_SMOKE_BASE_URL=http://127.0.0.1:8000 \
+bash scripts/smoke_mimo_asr.sh
+```
+
+The smoke script prints only fake audio metadata, provider/model, status,
+`requiresConfirmation`, transcript length and stable error fields. It does not
+print the API key, base64 audio, or full transcript.
+
+Do not enable MiMo ASR with real child audio until father authorization,
+retention/deletion/no-training terms, and all ASR policy flags are confirmed.
 
 ## Safety Notes
 

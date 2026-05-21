@@ -40,7 +40,7 @@ TRANSCRIBE_ONLY_PROMPT = (
 class AsrService:
     MAX_DURATION_MS = 30_000
     MAX_DECODED_AUDIO_BYTES = 10 * 1024 * 1024
-    _UNCLEAR_MARKERS = {"未听清", "没听清", "听不清"}
+    _UNCLEAR_MARKERS = {"未听清", "没听清", "听不清", "听不清楚", "无法听清"}
 
     def __init__(
         self,
@@ -76,7 +76,7 @@ class AsrService:
             )
         )
         transcript = result.transcript.strip()
-        if not transcript or transcript in self._UNCLEAR_MARKERS:
+        if not transcript or self._is_unclear_marker(transcript):
             return AsrTranscriptionResponse(
                 status=AsrTranscriptStatus.NEEDS_RETRY,
                 transcript=None,
@@ -147,6 +147,13 @@ class AsrService:
                 "ASR audio data is empty",
             )
         return encoded
+
+    def _is_unclear_marker(self, transcript: str) -> bool:
+        normalized = transcript.strip().strip("。.!！?？[]【】()（） ")
+        return normalized.lower() in self._UNCLEAR_MARKERS or normalized.lower() in {
+            "unclear",
+            "unable_to_hear",
+        }
 
     def _build_provider(self) -> BaseAsrProvider:
         if self._settings.asr_provider == AsrProviderName.MIMO.value:

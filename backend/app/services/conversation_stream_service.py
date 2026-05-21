@@ -97,6 +97,9 @@ class ConversationStreamService:
                 "include_tts": request.stream_options.include_tts,
                 "audio_delivery": request.stream_options.audio_delivery,
                 "client_turn_id": request.stream_options.client_turn_id,
+                "stream_mode": "safe_reply_pseudo",
+                "text_delta_source": "post_safety_full_reply",
+                "true_llm_streaming": False,
             },
         )
 

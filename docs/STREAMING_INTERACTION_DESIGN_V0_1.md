@@ -33,14 +33,19 @@ S-Stream-1 后端骨架已新增独立 router/service/schema/text segmenter：
 - backend/app/services/text_segmenter.py
 
 实现方式是 conservative sentence-level pseudo streaming：
-1. 先发送 session_started。
+1. 先发送 `session_started`。这个事件可以在完整会话链路执行前 flush，用于让客户端确认 stream 已建立。
 2. 通过现有 ConversationService 复用 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry 和 ChildAgentRuntime。
 3. ConversationService 内部注入 no-op TTS，避免旧同步完整 TTS 阻塞 stream 文本。
-4. 对已通过输出安全检查的最终回复做 sentence text_delta / sentence_ready。
+4. `text_delta` 不是 raw LLM token，也不是 true LLM streaming；它必须等待 ChildAgentRuntime 得到完整回复并通过输出安全检查后，才按 sentence/chunk 伪流式输出。
 5. text_final 先完成，再按句子尝试 TTS。
 6. TTS 成功发送 audio_ready；TTS 失败发送 recoverable error，但不影响 text_final 和 done。
 
 Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/conversation/stream` 可通过后端测试和本地 curl 做 NDJSON 验证。Android stream client 尚未接入，生产 UI 仍使用旧 `/api/v1/conversation/message`。
+
+当前延迟口径：
+1. `session_started` 可立即出现，适合客户端进入 thinking 状态和记录 request_id。
+2. 首个 child-visible `text_delta` 仍等待完整安全 LLM/mock reply，不降低模型生成本身耗时。
+3. 当前收益主要是：文字不再等待完整 TTS；音频可按句段生成，而不是等整段回复 TTS 完成。
 
 Ops P0 timing 复用：
 1. 每个 stream 请求仍由 request_id middleware 写入 `X-Request-ID`。
@@ -102,9 +107,9 @@ Android POST /api/v1/conversation/message
 ```text
 child input
   -> backend 接受 POST /api/v1/conversation/stream
-  -> 立即返回 stream headers 和 turn.started
+  -> 立即返回 stream headers 和 session_started
   -> 安全、意图、场景和 runtime 仍按后端统一链路执行
-  -> 通过安全检查后的文本按 delta / sentence 渐进输出
+  -> 通过安全检查后的完整文本按 delta / sentence 伪流式输出
   -> sentence/chunk ready 后触发 TTS segment 生成
   -> audio segment ready 后 Android 排队播放
   -> 文本、语音、小白狐状态和 quick actions 渐进收敛到完整回合
@@ -133,11 +138,12 @@ Future:
 体验目标：
 
 ```text
-1. 首字延迟从“LLM 完整回复 + TTS 完整音频”降低到“安全回复文本可用后立即显示”。
-2. 首音频延迟从“完整回复 TTS”降低到“第一句 TTS segment 可播放”。
-3. TTS 失败不影响文本流完成。
-4. stream 中断时保留已有安全文本，不让孩子自责，不诱导反复刷请求。
-5. 高风险、隐私、学习和睡前场景的安全边界不因流式改变。
+1. stream 建立反馈从完整同步等待前移到 `session_started`。
+2. 首个 `text_delta` 从“LLM 完整回复 + TTS 完整音频”调整为“完整安全回复文本可用后立即显示”；它仍等待完整 LLM/mock reply。
+3. 首音频延迟从“完整回复 TTS”降低到“完整安全回复 + 第一句 TTS segment 可播放”。
+4. TTS 失败不影响文本流完成。
+5. stream 中断时保留已有安全文本，不让孩子自责，不诱导反复刷请求。
+6. 高风险、隐私、学习和睡前场景的安全边界不因流式改变。
 ```
 
 ---
@@ -179,6 +185,89 @@ FastAPI route 只负责：
 ```
 
 业务逻辑必须放在 service 层。
+
+### 3.1.1 Curl Smoke
+
+启动本地后端：
+
+```bash
+bash scripts/dev_backend.sh --host 127.0.0.1 --port 8000
+```
+
+文本流 smoke，关闭 TTS，预期不会出现 `tts_started` 或 `audio_ready`：
+
+```bash
+curl -sS --no-buffer \
+  -X POST http://127.0.0.1:8000/api/v1/conversation/stream \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -H 'Accept: application/x-ndjson' \
+  -H 'X-Request-ID: stream-curl-smoke-001' \
+  -d '{
+    "child_id": "stream_demo_child",
+    "session_id": "stream_demo_session",
+    "input": {
+      "type": "text",
+      "text": "我想聊恐龙",
+      "attachments": []
+    },
+    "client_context": {
+      "device_time": "2026-05-21T16:35:00+08:00",
+      "timezone": "Asia/Shanghai",
+      "app_mode": "child"
+    },
+    "stream_options": {
+      "protocol_version": "stream.v0.1",
+      "text_granularity": "sentence",
+      "include_tts": false,
+      "audio_delivery": "url",
+      "client_turn_id": "curl_smoke_001"
+    }
+  }'
+```
+
+应该看到每行一个 JSON event，大致顺序：
+
+```text
+session_started
+route_decision
+text_delta
+sentence_ready
+text_final
+done
+```
+
+带 TTS 的 smoke 只在本地 TTS mock/cache 或明确允许的 dev 配置下运行：
+
+```bash
+curl -sS --no-buffer \
+  -X POST http://127.0.0.1:8000/api/v1/conversation/stream \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -H 'Accept: application/x-ndjson' \
+  -H 'X-Request-ID: stream-curl-smoke-tts-001' \
+  -d '{
+    "child_id": "stream_demo_child",
+    "session_id": "stream_demo_tts_session",
+    "input": {
+      "type": "text",
+      "text": "我想聊恐龙。再聊三角龙！",
+      "attachments": []
+    },
+    "client_context": {
+      "device_time": "2026-05-21T16:35:00+08:00",
+      "timezone": "Asia/Shanghai",
+      "app_mode": "child"
+    },
+    "stream_options": {
+      "protocol_version": "stream.v0.1",
+      "text_granularity": "sentence",
+      "include_tts": true,
+      "audio_delivery": "url",
+      "client_turn_id": "curl_smoke_tts_001"
+    }
+  }'
+```
+
+TTS provider disabled、blocked 或失败时，预期仍会先看到 `text_final`，随后出现 recoverable `error`，最后 `done.status=completed`。
 
 ### 3.2 Request Schema
 
@@ -240,7 +329,7 @@ FastAPI route 只负责：
 10. split safe reply into text segments
 11. emit text events
 12. generate TTS segment URLs through TtsService and TtsDataPolicyGuard
-13. emit ui_actions and session_state
+13. emit limited route_decision summary only; do not put debug/session_state internals in text_final
 14. record memory/history after safe reply is finalized
 ```
 
@@ -259,15 +348,16 @@ FastAPI route 只负责：
 由于当前 `ChildAgentRuntime.run()` 和 provider 都是同步完整回复，v0.1 推荐保守模式：
 
 ```text
-1. Server 立即 flush turn.started / agent_state(thinking)。
+1. Server 立即 flush `session_started`。
 2. Server 执行完整后端安全链路。
 3. ChildAgentRuntime 返回已安全检查的最终 reply_text。
-4. Server 按 sentence/chunk 输出 text.delta。
-5. Server 同时或随后对每个 sentence/chunk 调用 TTS。
-6. 每个 audio_url ready 后输出 tts.segment_ready。
+4. Server 按 sentence/chunk 输出 `text_delta` 和 `sentence_ready`。
+5. Server 输出 `text_final`。
+6. Server 随后对每个 sentence/chunk 调用 TTS。
+7. 每个 audio_url ready 后输出 `audio_ready`。
 ```
 
-这不会降低模型生成本身的等待，但会去掉“等待完整 TTS 后才显示文字”的体验阻塞。
+这不会降低模型生成本身的等待，也不会让 `text_delta` 早于完整安全回复出现；它只去掉“等待完整 TTS 后才显示文字”的体验阻塞，并让音频可以按句段完成。
 
 ### 3.5 Future True Model Streaming Mode
 
@@ -303,8 +393,9 @@ FastAPI route 只负责：
   "event_id": "turn_abc:0004",
   "turn_id": "turn_abc",
   "seq": 4,
-  "type": "text.delta",
+  "type": "text_delta",
   "created_at": "2026-05-20T20:30:04.123+08:00",
+  "request_id": "stream-curl-smoke-001",
   "payload": {}
 }
 ```
@@ -318,9 +409,12 @@ FastAPI route 只负责：
 | `seq` | yes | 从 1 递增 |
 | `type` | yes | event type |
 | `created_at` | yes | server event time |
+| `request_id` | no | request_id middleware value；用于脱敏排查 |
 | `payload` | yes | event-specific object |
 
 事件分类：
+
+当前 S-Stream-1 后端实现只保证以下 snake_case 事件。表中 dotted event 是早期设计/未来 adapter 可选名称，Android v1 不应依赖 dotted 名称。
 
 | Type | Purpose |
 |---|---|
@@ -378,11 +472,11 @@ mock
 
 不得把 provider API 细节、raw prompt、raw safety evidence 发给儿童端 UI。
 
-### 5.2 `text.delta`
+### 5.2 `text_delta`
 
 ```json
 {
-  "type": "text.delta",
+  "type": "text_delta",
   "payload": {
     "index": 0,
     "delta": "三角龙最厉害的是它头上的三根角，",
@@ -407,12 +501,13 @@ mock
 6. 高风险场景 delta 必须来自 safety.guardian / safe fallback，不使用开放聊天语气。
 ```
 
-### 5.3 `text.done`
+### 5.3 `text_final`
 
 ```json
 {
-  "type": "text.done",
+  "type": "text_final",
   "payload": {
+    "text": "三角龙听起来可以聊。你想先说它有趣的地方，还是说你为什么想到它？",
     "char_count": 54,
     "sentence_count": 2,
     "final_text_hash": "sha256:...",
@@ -442,44 +537,45 @@ TTS 分段输入必须来自最终安全 reply。
 6. 睡前场景优先更短、更平稳的分段。
 ```
 
-### 6.2 `tts.segment_requested`
+### 6.2 `tts_started`
 
-可选事件，用于 Android 提前进入 speaking pending：
+当前实现事件，用于 Android 提前进入 speaking pending：
 
 ```json
 {
-  "type": "tts.segment_requested",
+  "type": "tts_started",
   "payload": {
+    "index": 0,
     "segment_id": "seg_0",
     "sentence_index": 0,
     "text_range": {
       "start": 0,
       "end": 28
     },
-    "emotion": "hint",
-    "voice_version": "xiaobaohu_v01"
+    "play_order": 0,
+    "audio_delivery": "url"
   }
 }
 ```
 
-不得在日志里写出完整 segment text。事件本身是否包含 segment text，v0.1 推荐不包含；Android 可通过已收到的 `text.delta` 和 `text_range` 做 fallback。
+不得在日志里写出完整 segment text。事件本身不需要包含 segment text；Android 可通过已收到的 `text_delta` 和 `text_range` 做 fallback。
 
-### 6.3 `tts.segment_ready`
+### 6.3 `audio_ready`
 
 ```json
 {
-  "type": "tts.segment_ready",
+  "type": "audio_ready",
   "payload": {
+    "index": 0,
     "segment_id": "seg_0",
     "sentence_index": 0,
+    "audioUrl": "/media/tts/xiaobaohu_v01/abc.wav",
     "audio_url": "/media/tts/xiaobaohu_v01/abc.wav",
     "content_type": "audio/wav",
-    "duration_ms": 1800,
     "text_range": {
       "start": 0,
       "end": 28
     },
-    "cache_hit": false,
     "play_order": 0
   }
 }
@@ -495,12 +591,15 @@ TTS 分段输入必须来自最终安全 reply。
 5. Android 按 `play_order` 顺序播放；晚到的前段会阻塞后段播放，避免语音顺序错乱。
 ```
 
-### 6.4 `tts.segment_failed`
+### 6.4 Recoverable TTS `error`
 
 ```json
 {
-  "type": "tts.segment_failed",
+  "type": "error",
   "payload": {
+    "stage": "tts",
+    "code": "tts_failed",
+    "recoverable": true,
     "segment_id": "seg_0",
     "sentence_index": 0,
     "text_range": {
@@ -568,15 +667,15 @@ TTS 分段输入必须来自最终安全 reply。
 ### 8.1 Server Flow
 
 ```text
-1. 建立 stream，发送 turn.started。
+1. 建立 stream，发送 `session_started`。
 2. 完整执行安全、场景和 ChildAgentRuntime。
 3. 得到已安全检查的 reply_text。
 4. 切成 sentence/chunk。
-5. 立即发送第一段 text.delta。
-6. 对第一段启动 TTS 生成。
-7. 继续发送后续 text.delta。
-8. 每段 TTS 完成后发送 tts.segment_ready。
-9. 所有文本和 TTS 尝试完成后发送 turn.completed。
+5. 发送所有 `text_delta` / `sentence_ready`。
+6. 发送 `text_final`。
+7. 再按 sentence/chunk 尝试 TTS。
+8. 每段 TTS 完成后发送 `audio_ready`；失败发送 recoverable `error`。
+9. 所有 TTS 尝试完成后发送 `done`。
 ```
 
 可接受的并发：
@@ -599,11 +698,12 @@ first_audio_ms ~= LLM full reply ms + full TTS ms + Android prepare ms
 pseudo streaming：
 
 ```text
+session_started_ms ~= stream accepted + flush ms
 first_text_ms ~= LLM full reply ms + split/flush ms
 first_audio_ms ~= LLM full reply ms + first sentence TTS ms + Android prepare ms
 ```
 
-也就是说，即使模型文本仍是同步完整生成，也能先解决“文字被完整 TTS 阻塞”的问题。
+也就是说，即使模型文本仍是同步完整生成，也能先解决“文字被完整 TTS 阻塞”的问题；不能把它描述成降低了 LLM 首 token 延迟。
 
 ---
 
@@ -628,7 +728,7 @@ StreamEventParser
   -> unknown event ignored or logged in dev
 
 AudioSegmentQueuePlayer
-  -> 接收 tts.segment_ready
+  -> 接收 audio_ready
   -> 复用 RemoteAudioTtsController / AudioUrlPlayer 能力
   -> 顺序播放 segment
   -> 支持 stop / mute / clear current turn
@@ -654,11 +754,10 @@ VoiceProfile
 1. 记录 child bubble。
 2. 创建一个空 agent bubble，状态为 thinking。
 3. 打开 stream。
-4. 收到 text.delta 后追加到同一个 agent bubble。
-5. 收到 tts.segment_ready 后加入 audio queue。
-6. 收到 ui.actions 后显示快捷动作。
-7. 收到 session.state 后更新内部 session_state。
-8. 收到 turn.completed 后结束 sending 状态。
+4. 收到 `text_delta` 后追加到同一个 agent bubble。
+5. 收到 `audio_ready` 后加入 audio queue。
+6. 收到 `route_decision` 后可更新小白狐状态和必要的内部路由摘要。
+7. 收到 `done` 后结束 sending 状态。
 ```
 
 停止/静音：
@@ -683,9 +782,9 @@ VoiceProfile
 
 ```text
 1. 如果 stream 建立前失败，自动调用旧 /conversation/message，并渲染完整回复。
-2. 如果 stream 已收到至少一个 text.delta，默认不自动再调用旧接口，避免出现两个不同回复；保留已有文本并显示温和提示。
-3. 如果 stream 只收到 turn.started 但没有文本，可 fallback 旧接口。
-4. 如果 tts.segment_ready 播放失败，尝试系统 TTS fallback；仍失败则保留文字。
+2. 如果 stream 已收到至少一个 `text_delta`，默认不自动再调用旧接口，避免出现两个不同回复；保留已有文本并显示温和提示。
+3. 如果 stream 只收到 `session_started` 但没有文本，可 fallback 旧接口。
+4. 如果 `audio_ready` 播放失败，尝试系统 TTS fallback；仍失败则保留文字。
 5. 如果 parser 遇到未知 event，忽略；遇到 malformed line，dev log 脱敏记录并继续下一行。
 ```
 
@@ -702,7 +801,7 @@ VoiceProfile
 | model timeout/error | ChildAgentRuntime fallback，输出安全场景 fallback text |
 | output safety failed | 不输出 raw model text，输出安全 fallback text |
 | learning direct-answer detected | 不输出模型答案，输出学习引导 fallback |
-| TTS provider disabled/blocked/error | 发送 `tts.segment_failed`，文本继续 |
+| TTS provider disabled/blocked/error | 发送 recoverable `error`，文本继续 |
 | client disconnected | 停止后续 event；不要继续为已断开的客户端生成不必要音频 |
 
 ### 10.2 Android Fallback
@@ -737,12 +836,12 @@ VoiceProfile
 
 | Metric | Definition | Source |
 |---|---|---|
-| `first_text_ms` | Android 点击发送 / 确认发送 到第一个 child-visible `text.delta` 追加完成 | Android client timing |
+| `first_text_ms` | Android 点击发送 / 确认发送 到第一个 child-visible `text_delta` 追加完成 | Android client timing |
 | `first_audio_ms` | Android 点击发送 / 确认发送 到第一段音频 `onStart` 或可播放确认 | Android audio queue timing |
-| `server_first_event_ms` | 后端收到 request 到 `turn.started` flush | backend timing |
+| `server_first_event_ms` | 后端收到 request 到 `session_started` flush | backend timing |
 | `server_reply_ready_ms` | 后端收到 request 到 ChildAgentRuntime 得到安全 reply | backend timing |
-| `server_first_audio_ready_ms` | 后端收到 request 到第一段 `tts.segment_ready` | backend timing |
-| `total_turn_ms` | Android 点击发送 到 `turn.completed` 收到 | Android client timing |
+| `server_first_audio_ready_ms` | 后端收到 request 到第一段 `audio_ready` | backend timing |
+| `total_turn_ms` | Android 点击发送 到 `done` 收到 | Android client timing |
 | `total_audio_playback_ms` | Android 点击发送 到最后一段音频播放结束 | Android audio timing |
 | `audio_segment_gap_ms` | 相邻音频段播放结束到下一段播放开始的间隔 | Android audio queue timing |
 | `stream_interrupt_recovery` | stream 中断后是否保留已有文本并温和提示 | manual QA |
@@ -767,11 +866,12 @@ VoiceProfile
 第一轮不硬编码绝对 SLA，先以当前同步链路为 baseline：
 
 ```text
-1. first_text_ms 必须显著低于旧链路 total_turn_ms。
-2. first_audio_ms 必须低于旧链路完整 audio_url 可播放时间，或至少不更差。
-3. total_turn_ms 不应因分段 TTS 明显变差。
-4. TTS 失败率不能影响文本完成率。
-5. stream 中断恢复不能产生两个互相冲突的小白狐回复。
+1. session_started_ms 应明显早于旧链路完整 JSON response，用于确认连接和 request_id。
+2. first_text_ms 只有在旧链路被完整 TTS 明显拖慢时才会改善；它不应被当成 LLM 首 token 指标。
+3. first_audio_ms 应低于旧链路完整 audio_url 可播放时间，或至少不更差。
+4. total_turn_ms 不应因分段 TTS 明显变差。
+5. TTS 失败率不能影响文本完成率。
+6. stream 中断恢复不能产生两个互相冲突的小白狐回复。
 ```
 
 建议记录：

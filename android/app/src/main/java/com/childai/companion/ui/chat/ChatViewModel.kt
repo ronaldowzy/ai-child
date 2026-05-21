@@ -9,7 +9,11 @@ import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationRepository
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.conversation.ConversationUiAction
+import com.childai.companion.voice.AudioSegment
+import com.childai.companion.voice.AudioSegmentQueueCallbacks
+import com.childai.companion.voice.AudioSegmentQueuePlayer
 import com.childai.companion.voice.NoOpTtsController
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
@@ -34,6 +38,7 @@ class ChatViewModel(
     private var nextMessageIndex = 0
     private var baseAgentState = FoxAgentUiState()
     private var ttsToken = 0
+    private var streamingAgentMessageId: String? = null
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
@@ -42,6 +47,56 @@ class ChatViewModel(
         ),
     )
     val uiState: StateFlow<ChatUiState> = _uiState
+    private val audioSegmentQueuePlayer = AudioSegmentQueuePlayer(
+        ttsController = ttsController,
+        backendBaseUrl = DevSettings.conversationApiBaseUrl,
+        isMuted = { _uiState.value.tts.isMuted },
+        callbacks = AudioSegmentQueueCallbacks(
+            onDiagnostics = { diagnostics ->
+                _uiState.update { state ->
+                    state.copy(tts = state.tts.withDiagnostics(diagnostics))
+                }
+            },
+            onStart = {
+                _uiState.update { state ->
+                    state.copy(
+                        agent = baseAgentState.asSpeaking(),
+                        tts = state.tts.copy(
+                            isSpeaking = true,
+                            isSpeakingPending = false,
+                            isAvailable = true,
+                            errorMessage = null,
+                        ),
+                    )
+                }
+            },
+            onQueueDrained = {
+                _uiState.update { state ->
+                    state.copy(
+                        agent = baseAgentState,
+                        tts = state.tts.copy(
+                            isSpeaking = false,
+                            isSpeakingPending = false,
+                        ),
+                    )
+                }
+            },
+            onError = { message ->
+                _uiState.update { state ->
+                    state.copy(
+                        agent = baseAgentState,
+                        tts = state.tts.copy(
+                            isSpeaking = false,
+                            isSpeakingPending = false,
+                            errorMessage = message.ifBlank {
+                                TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE
+                            },
+                        ),
+                    )
+                }
+            },
+        ),
+    )
 
     fun sendText(text: String) {
         val trimmedText = text.trim()
@@ -62,6 +117,13 @@ class ChatViewModel(
         }
 
         viewModelScope.launch {
+            if (DevSettings.USE_STREAMING_CONVERSATION) {
+                val streamed = runCatching {
+                    streamTextWithAttachments(text = text, attachments = attachments)
+                }.getOrDefault(false)
+                if (streamed) return@launch
+            }
+
             runCatching {
                 conversationSender.sendTextMessage(
                     childId = DevSettings.CHILD_ID,
@@ -70,7 +132,10 @@ class ChatViewModel(
                     attachments = attachments,
                 )
             }.onSuccess { response ->
-                renderAgentReply(response)
+                renderAgentReply(
+                    response = response,
+                    replaceMessageId = streamingAgentMessageId,
+                )
             }.onFailure {
                 appendMessage(
                     ChatMessage(
@@ -281,6 +346,7 @@ class ChatViewModel(
         if (ttsController === controller) return
         ttsController.stop()
         ttsController = controller
+        audioSegmentQueuePlayer.updateController(controller)
         _uiState.update { state ->
             state.copy(
                 tts = state.tts.copy(
@@ -344,6 +410,7 @@ class ChatViewModel(
     internal fun renderAgentReply(
         response: ConversationMessageResponse,
         mockPhoto: MockPhotoUiState? = _uiState.value.mockPhoto,
+        replaceMessageId: String? = null,
     ) {
         renderAgentReply(
             reply = response.reply,
@@ -351,6 +418,7 @@ class ChatViewModel(
             sessionState = response.sessionState,
             mockPhoto = mockPhoto,
             pendingImageContext = _uiState.value.pendingImageContext,
+            replaceMessageId = replaceMessageId,
         )
     }
 
@@ -360,8 +428,14 @@ class ChatViewModel(
         sessionState: ConversationSessionState,
         mockPhoto: MockPhotoUiState? = _uiState.value.mockPhoto,
         pendingImageContext: PendingImageContextUiState? = _uiState.value.pendingImageContext,
+        replaceMessageId: String? = null,
     ) {
-        appendAgentMessage(reply.text)
+        if (replaceMessageId.isNullOrBlank()) {
+            appendAgentMessage(reply.text)
+        } else {
+            replaceMessageText(replaceMessageId, reply.text)
+        }
+        streamingAgentMessageId = null
         stopCurrentTts(restoreBaseAgent = false)
 
         val nextAgentState = reply.toFoxAgentUiState()
@@ -385,6 +459,157 @@ class ChatViewModel(
             )
         }
         maybeAutoReadReply(reply)
+    }
+
+    private suspend fun streamTextWithAttachments(
+        text: String,
+        attachments: List<String>,
+    ): Boolean {
+        var doneReceived = false
+        conversationSender.streamTextMessage(
+            childId = DevSettings.CHILD_ID,
+            sessionId = sessionId,
+            text = text,
+            attachments = attachments,
+            includeTts = _uiState.value.tts.isAutoReadEnabled && !_uiState.value.tts.isMuted,
+            onEvent = { event ->
+                applyStreamEvent(event)
+                if (event.type == "done") {
+                    doneReceived = true
+                }
+            },
+        )
+        return doneReceived
+    }
+
+    internal fun applyStreamEvent(event: ConversationStreamEvent) {
+        when (event.type) {
+            "session_started" -> {
+                stopCurrentTts(restoreBaseAgent = false)
+                _uiState.update { state ->
+                    state.copy(
+                        isSending = true,
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.Thinking,
+                            motion = FoxMotion.ThinkingBlink,
+                            statusText = "我先想一想。",
+                        ),
+                    )
+                }
+            }
+            "route_decision" -> applyStreamRoute(event)
+            "text_delta" -> appendToStreamingAgentBubble(event.delta)
+            "sentence_ready" -> Unit
+            "audio_ready" -> enqueueStreamAudio(event)
+            "text_final" -> event.finalText?.let(::replaceStreamingAgentText)
+            "done" -> {
+                streamingAgentMessageId = null
+                _uiState.update { state ->
+                    state.copy(isSending = false)
+                }
+            }
+            "error" -> applyStreamError(event)
+        }
+    }
+
+    private fun applyStreamRoute(event: ConversationStreamEvent) {
+        val activeScene = event.activeScene ?: "conversation.open"
+        val sessionState = ConversationSessionState(
+            baseScene = event.payload.optString("baseScene", event.payload.optString("base_scene", activeScene)),
+            activeScene = activeScene,
+            needsInput = null,
+            requiresParentAttention = event.requiresParentAttention,
+        )
+        val nextAgentState = ConversationReply(
+            type = "agent_message",
+            text = "",
+            voiceEnabled = true,
+            audioUrl = null,
+            emotion = event.emotion,
+            agentMotion = event.agentMotion,
+        ).toFoxAgentUiState()
+        baseAgentState = nextAgentState
+        _uiState.update { state ->
+            state.copy(
+                sessionState = sessionState,
+                agent = nextAgentState,
+            )
+        }
+    }
+
+    private fun appendToStreamingAgentBubble(delta: String) {
+        if (delta.isBlank()) return
+        val messageId = streamingAgentMessageId
+        if (messageId == null) {
+            val newMessage = ChatMessage(
+                id = nextMessageId("agent-stream"),
+                author = MessageAuthor.Agent,
+                text = delta,
+            )
+            streamingAgentMessageId = newMessage.id
+            appendMessage(newMessage)
+            return
+        }
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages.map { message ->
+                    if (message.id == messageId) {
+                        message.copy(text = message.text + delta)
+                    } else {
+                        message
+                    }
+                },
+            )
+        }
+    }
+
+    private fun replaceStreamingAgentText(text: String) {
+        val messageId = streamingAgentMessageId
+        if (messageId == null) {
+            appendToStreamingAgentBubble(text)
+        } else {
+            replaceMessageText(messageId, text)
+        }
+    }
+
+    private fun enqueueStreamAudio(event: ConversationStreamEvent) {
+        val audioUrl = event.audioUrl ?: return
+        if (_uiState.value.tts.isMuted) return
+        audioSegmentQueuePlayer.enqueue(
+            AudioSegment(
+                audioUrl = audioUrl,
+                text = event.audioText,
+                index = event.payload.optInt("index", 0),
+            ),
+        )
+        _uiState.update { state ->
+            state.copy(
+                tts = state.tts.copy(
+                    isSpeakingPending = !state.tts.isSpeaking,
+                    isAvailable = true,
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    private fun applyStreamError(event: ConversationStreamEvent) {
+        val message = event.safeMessage
+            ?: "小白狐这次没有接稳，但已经显示的文字还在这里。"
+        val hasPartialText = streamingAgentMessageId != null
+        if (!hasPartialText) {
+            appendAgentMessage(message)
+        }
+        _uiState.update { state ->
+            state.copy(
+                tts = state.tts.copy(errorMessage = message),
+                agent = if (hasPartialText) state.agent else FoxAgentUiState(
+                    mood = FoxMood.NetworkError,
+                    motion = FoxMotion.NetworkError,
+                    statusText = "我们先等大人检查网络。",
+                ),
+            )
+        }
     }
 
     private fun uploadFailureMessage(imagePurpose: String): String {
@@ -420,6 +645,20 @@ class ChatViewModel(
     private fun appendMessage(message: ChatMessage) {
         _uiState.update { state ->
             state.copy(messages = state.messages + message)
+        }
+    }
+
+    private fun replaceMessageText(messageId: String, text: String) {
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages.map { message ->
+                    if (message.id == messageId) {
+                        message.copy(text = text)
+                    } else {
+                        message
+                    }
+                },
+            )
         }
     }
 
@@ -538,7 +777,7 @@ class ChatViewModel(
 
     private fun stopCurrentTts(restoreBaseAgent: Boolean) {
         nextTtsToken()
-        ttsController.stop()
+        audioSegmentQueuePlayer.stopAndClear()
         _uiState.update { state ->
             state.copy(
                 agent = if (restoreBaseAgent) baseAgentState else state.agent,
@@ -629,6 +868,16 @@ interface ConversationMessageSender {
         attachments: List<String> = emptyList(),
         timezone: String = DevSettings.TIMEZONE,
     ): ConversationMessageResponse
+
+    suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String> = emptyList(),
+        timezone: String = DevSettings.TIMEZONE,
+        includeTts: Boolean = true,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    )
 }
 
 private class ConversationRepositoryMessageSender(
@@ -647,6 +896,26 @@ private class ConversationRepositoryMessageSender(
             text = text,
             attachments = attachments,
             timezone = timezone,
+        )
+    }
+
+    override suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+        includeTts: Boolean,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) {
+        repository.streamTextMessage(
+            childId = childId,
+            sessionId = sessionId,
+            text = text,
+            attachments = attachments,
+            timezone = timezone,
+            includeTts = includeTts,
+            onEvent = onEvent,
         )
     }
 }

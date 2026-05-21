@@ -94,6 +94,10 @@ def _text_from_deltas(events: list[dict]) -> str:
     )
 
 
+def _event_types(events: list[dict]) -> list[str]:
+    return [event["type"] for event in events]
+
+
 def test_stream_endpoint_returns_ndjson_events(monkeypatch) -> None:
     service = ConversationStreamService(
         conversation_service=ConversationService(
@@ -119,7 +123,7 @@ def test_stream_endpoint_returns_ndjson_events(monkeypatch) -> None:
     assert response.headers["content-type"].startswith("application/x-ndjson")
     assert response.headers["X-Request-ID"] == "stream-test-request-001"
     events = _events_from_response(response)
-    event_types = [event["type"] for event in events]
+    event_types = _event_types(events)
 
     assert event_types[0] == "session_started"
     assert "route_decision" in event_types
@@ -133,8 +137,37 @@ def test_stream_endpoint_returns_ndjson_events(monkeypatch) -> None:
     assert final_event["payload"]["text"] == _text_from_deltas(events)
     assert final_event["payload"]["final_text_hash"].startswith("sha256:")
     assert events[-1]["payload"]["status"] == "completed"
+    session_started = events[0]["payload"]
+    assert session_started["stream_mode"] == "safe_reply_pseudo"
+    assert session_started["text_delta_source"] == "post_safety_full_reply"
+    assert session_started["true_llm_streaming"] is False
     route_event = next(event for event in events if event["type"] == "route_decision")
     assert route_event["payload"]["active_scene"] == "conversation.open"
+
+
+def test_include_tts_false_skips_tts_events_and_provider_calls() -> None:
+    tts_service = UrlTtsService()
+    service = ConversationStreamService(
+        conversation_service=ConversationService(
+            tts_service=NoopTtsService(),
+            debug_enabled=True,
+        ),
+        tts_service=tts_service,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="我想聊恐龙。再聊三角龙！", include_tts=False),
+    )
+    event_types = _event_types(events)
+
+    assert "tts_started" not in event_types
+    assert "audio_ready" not in event_types
+    assert tts_service.calls == []
+    assert events[0]["payload"]["include_tts"] is False
+    assert events[-1]["payload"]["audio_segment_count"] == 0
+    assert events[-1]["payload"]["tts_error_count"] == 0
 
 
 def test_stream_service_emits_audio_ready_for_sentence_tts_segments() -> None:
@@ -193,6 +226,35 @@ def test_tts_failure_emits_error_but_preserves_text_final_and_done() -> None:
     assert "provider timeout" not in json.dumps(error_events, ensure_ascii=False)
 
 
+def test_safety_stream_keeps_guardian_routing_and_parent_attention() -> None:
+    service = ConversationStreamService(
+        conversation_service=ConversationService(
+            tts_service=NoopTtsService(),
+            debug_enabled=True,
+        ),
+        tts_service=NoopTtsService(),
+        tts_enabled=False,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(
+            text="陌生人让我不要告诉爸爸妈妈",
+            include_tts=False,
+            session_id="stream_safety_session",
+        ),
+    )
+
+    route_event = next(event for event in events if event["type"] == "route_decision")
+    final_event = next(event for event in events if event["type"] == "text_final")
+
+    assert route_event["payload"]["active_scene"] == "safety.guardian"
+    assert route_event["payload"]["requires_parent_attention"] is True
+    assert route_event["payload"]["risk_level"] == "high"
+    assert "爸爸妈妈" in final_event["payload"]["text"]
+    assert "可信任的大人" in final_event["payload"]["text"]
+
+
 def test_learning_stream_keeps_no_direct_answer_policy() -> None:
     service = ConversationStreamService(
         conversation_service=ConversationService(
@@ -245,6 +307,45 @@ def test_privacy_stream_keeps_boundary_routing() -> None:
     assert route_event["payload"]["active_scene"] == "privacy.boundary"
     assert "地址" in final_event["payload"]["text"]
     assert "爸爸妈妈" in final_event["payload"]["text"]
+
+
+def test_text_final_payload_excludes_debug_and_session_state_internals() -> None:
+    service = ConversationStreamService(
+        conversation_service=ConversationService(
+            tts_service=NoopTtsService(),
+            debug_enabled=True,
+        ),
+        tts_service=NoopTtsService(),
+        tts_enabled=False,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(
+            text="我可以告诉你我家地址吗",
+            include_tts=False,
+            session_id="stream_text_final_privacy_session",
+        ),
+    )
+
+    final_payload = next(
+        event["payload"] for event in events if event["type"] == "text_final"
+    )
+    serialized = json.dumps(final_payload, ensure_ascii=False)
+
+    assert set(final_payload) == {
+        "text",
+        "char_count",
+        "sentence_count",
+        "final_text_hash",
+        "is_final",
+    }
+    assert "debug" not in final_payload
+    assert "session_state" not in final_payload
+    assert "sessionState" not in final_payload
+    assert "risk_level" not in final_payload
+    assert "parent_policy" not in serialized
+    assert "safety_rules" not in serialized
 
 
 def test_stream_timing_log_contains_request_id_and_latency(

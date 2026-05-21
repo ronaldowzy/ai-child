@@ -185,10 +185,10 @@ QA 使用说明：
 4. Streaming v1 QA 继续记录 request_id，并新增 first_text_ms、first_audio_ms、stream_total_ms。
 ```
 
-## Streaming v1 Backend / ASR Intake QA 记录
+## Streaming v1 / MiMo ASR QA 记录
 
 日期：2026-05-21
-范围：后端 `/api/v1/conversation/stream` NDJSON skeleton、MiMo ASR spec intake 和 mock-first ASR skeleton。未做 Android stream client、未做 Android ASR 录音 UI、未做真实 MiMo ASR 外发。
+范围：后端 `/api/v1/conversation/stream` NDJSON skeleton、Android stream client 首版、MiMo ASR spec intake、mock-first ASR skeleton 和 policy-gated MiMo ASR provider。未做 Android ASR 录音 UI、未做真实儿童音频外发。
 
 | 检查项 | 期望 | 结果 |
 |---|---|---|
@@ -204,23 +204,29 @@ QA 使用说明：
 | 旧接口 | `/api/v1/conversation/message` 继续由既有测试覆盖 | pass |
 | ASR spec secret scan | 外部 MiMo ASR spec 未发现真实 API key、真实儿童信息或敏感音频路径 | pass |
 | ASR skeleton policy | MiMo ASR 默认 disabled，policy guard 阻断儿童音频外发 | pass |
+| Android stream parser | NDJSON 多行事件可解析 | pass |
+| Android progressive bubble | `text_delta` 可追加到当前小白狐气泡，`text_final` 可修正文本 | pass |
+| Android audio queue | `audio_ready` 进入 segment queue；stop 清空队列；muted 跳过播放 | pass |
+| MiMo ASR provider | `/chat/completions` payload、response parse、timeout/http stable errors 覆盖 | pass |
+| ASR route mounted | `/api/v1/asr/transcribe` 已挂载；默认 mock/disabled，不自动外发 | code_ready |
 
 本轮命令结果：
 
 | 命令 | 结果 |
 |---|---|
-| `bash scripts/test_backend.sh -q app/tests/test_text_segmenter.py app/tests/test_conversation_stream_api.py app/tests/test_asr_service.py` | 通过：15 passed |
-| `bash scripts/test_backend.sh -q` | 通过：210 passed |
-| `bash scripts/lint_backend.sh` | 通过：All checks passed |
+| `bash scripts/test_backend.sh -q app/tests/test_mimo_asr_provider.py app/tests/test_asr_service.py app/tests/test_asr_api.py app/tests/test_conversation_stream_api.py app/tests/test_text_segmenter.py` | 通过：29 passed |
+| `bash scripts/test_backend.sh -q` | 待最终 closeout 复跑 |
+| `bash scripts/lint_backend.sh` | 待最终 closeout 复跑 |
+| `bash scripts/android_gradle.sh test` | 通过 |
 | `curl --no-buffer -X POST http://127.0.0.1:18090/api/v1/conversation/stream ...` | 通过：返回 NDJSON，包含 session_started、route_decision、text_delta、sentence_ready、text_final、done；本次 `include_tts=false`，未触发 audio_ready |
 
 ASR intake 结论：
 
 ```text
-1. MiMo audio input 只作为云端 ASR 候选；当前确认的是 non-streaming audio input，streaming ASR 未确认。
+1. ASR v1 目标已确认接 MiMo audio input / ASR；当前确认的是 non-streaming audio input，streaming ASR 未确认。
 2. 真实儿童音频不外发；原始音频不入库、不进日志、不提交仓库。
-3. ASR skeleton 默认 mock，MiMo provider disabled，ASR router 不挂载到 main。
-4. 后续如要启用云 ASR，必须先确认 retention/no-training/deletion policy，并写入产品决策。
+3. ASR 默认 mock，MiMo provider disabled；真实外发必须由父亲授权和 ASR policy flags 同时放行。
+4. 后续真实 smoke 只使用 fake/smoke audio，不使用真实儿童录音。
 ```
 
 ## API 联调场景

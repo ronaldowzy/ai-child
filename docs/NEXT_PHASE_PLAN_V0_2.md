@@ -9,7 +9,7 @@
 2. 当前仍需完成完整设备 QA，不能跳过现有文字和安全闭环验收。
 3. 下一阶段优先解决语音交互和小白狐形象体验。
 4. 默认 Mock 优先，真实模型和儿童数据外发仍受后端 gate 约束。
-5. 语音输入第一阶段优先 Android 本地 SpeechRecognizer，不默认上传原始音频到后端。
+5. 语音输入 ASR v1 目标已修订为后端接 MiMo audio input / ASR；Android 不直接调用 MiMo，只负责录音上传和待确认文本 UI。
 6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
 8. 小白狐 v1 候选形象资产已生成，当前静态资源包含 11 个状态；动态 animation_v1 资源包以 `mascot_manifest.json` 为准，当前实际状态也是 11 个：idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
@@ -22,14 +22,14 @@
 15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
 16. Redmi K60 真机反馈显示 MiMo VoiceClone 音频初步跑通、动态小白狐形象已经可见，但同步链路等待时间仍长，下一阶段不能继续依赖增加 read timeout。
 17. 儿童端主界面下一版改为横屏双栏：左侧动态小白狐，右侧聊天交互；手机也进入横屏。
-18. 语音输入开始进入方案准备阶段，优先调研 MiMo ASR / audio input 能力；在接口和儿童语音数据边界确认前，不实现云端 ASR。
+18. 父亲已确认 ASR v1 接 MiMo audio input / ASR；真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制，开发阶段先用 fake/smoke audio。
 19. 下一阶段必须补齐 request_id、结构化日志、provider timing、health 扩展、环境检查和 QA 记录等运行基础组件。
 20. 最新产品方向修订为 freedom-first：默认自由对话，时间、父母寄语、记忆、最近聊天和图片能力作为上下文或工具；高风险安全、隐私边界、明确学习求助、明确睡前收尾和父母强规则作为护栏。
 21. 拍照能力从“拍题目”升级为“拍给小白狐看”的通用图片分享；玩具、画、书、植物、手工和作业都应先理解孩子意图，再分流。
 22. 父母寄语需要支持自由文本，作为 Prompt 背景上下文注入；不能机械复述给孩子，不能覆盖儿童安全底线。
 23. Ops P0 已完成 request_id、JSON 日志、request/model/TTS timing 和 `/api/v1/health/detail`。
-24. Streaming v1 后端 skeleton 已新增 `/api/v1/conversation/stream`，采用 NDJSON 和 sentence-level pseudo streaming；Android stream client 尚未实现。
-25. MiMo ASR spec intake 已完成脱敏归档；云 ASR 默认 disabled，ASR skeleton 不挂载到生产主 app，Android 本地 SpeechRecognizer 仍是 v1 默认路线。
+24. Streaming v1 后端 skeleton 已新增 `/api/v1/conversation/stream`，采用 NDJSON 和 sentence-level pseudo streaming；Android 首版 stream client、progressive bubble 和 audio segment queue 已接入。
+25. MiMo ASR spec intake 已完成脱敏归档；`/api/v1/asr/transcribe` 已挂载，MiMo `/chat/completions` ASR provider 已实现；默认 mock/disabled，真实儿童音频外发仍 policy-blocked。
 ```
 
 ---
@@ -75,26 +75,26 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 
 ## Phase 2：语音输入 v1
 
-目标：让孩子可以用语音辅助输入，但仍由确认后的文字进入后端。v1 是 confirm-before-send，不做 hands-free conversational mode。
+目标：让孩子可以用语音辅助输入，Android 上传短音频到后端 MiMo ASR，仍由确认后的文字进入 conversation。v1 是 confirm-before-send，不做 hands-free conversational mode。
 
 设备顺序：
 
 ```text
-1. 先在高配 Android 手机上跑通：点击语音 -> 本地识别 -> 展示文字 -> 确认/编辑 -> 发送。
-2. 再在 Honor Pad 5 上验证权限申请、中文识别、儿童声音识别、延迟、失败提示和是否可接受。
+1. 先在高配 Android 手机上跑通：点击语音 -> 录音 -> 上传后端 ASR -> 展示文字 -> 确认/编辑 -> 发送。
+2. 再在 Honor Pad 5 上验证权限申请、录音格式、中文识别、儿童声音识别、延迟、失败提示和是否可接受。
 3. Honor Pad 5 不作为第一阶段语音功能开发阻塞设备；如效果不好，允许降级为文字优先并记录 QA。
 ```
 
 范围：
 
 ```text
-1. Android 本地 SpeechRecognizer。
+1. Android 主动录音并上传后端 `/api/v1/asr/transcribe`。
 2. 主动点击后请求 RECORD_AUDIO 权限。
 3. 识别结果先展示为待确认文本。
 4. 支持编辑、重说、取消和确认发送。
 5. 确认后复用现有 /api/v1/conversation/message。
-6. 不上传原始音频，不长期保存原始音频。
-7. 通过可替换的 VoiceEngine / SpeechInputController 抽象接入 SpeechRecognizer。
+6. 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库。
+7. 通过可替换的 VoiceEngine / SpeechInputController 抽象接入录音、上传、确认 UI。
 ```
 
 非目标：
@@ -102,8 +102,8 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. 不做常开麦克风。
 2. 不做唤醒词。
-3. 不做云端 ASR。
-4. 不新增后端音频上传接口。
+3. 不做 Android 直连 MiMo。
+4. 不做真实儿童音频 smoke；开发阶段只用 fake/smoke audio。
 5. 不做 hands-free conversational mode。
 ```
 
@@ -112,7 +112,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. 误识别不会自动触发 AI 回复。
 2. 学习求助和高风险输入仍走后端安全链路。
-3. 权限拒绝、识别失败、无网络都有温和文案和文字输入 fallback。
+3. 权限拒绝、录音失败、ASR policy blocked、识别失败、无网络都有温和文案和文字输入 fallback。
 4. QA 记录识别准确率、延迟、中文效果和儿童声音识别效果。
 ```
 
@@ -190,7 +190,7 @@ child input
 ```text
 1. S-Stream-0：先写 `STREAMING_INTERACTION_DESIGN_V0_1.md`，确认 SSE/NDJSON、事件结构、pseudo streaming 和 QA 指标。
 2. S-Stream-1：已新增 `/api/v1/conversation/stream`，保留旧 `/conversation/message`，不绕过安全、场景、runtime 和 TTS gate。
-3. S-Stream-2：Android 增加 stream client、progressive bubble 和 audio segment queue；stream 失败 fallback 到旧接口。
+3. S-Stream-2：Android 已增加 stream client、progressive bubble 和 audio segment queue；stream 失败 fallback 到旧接口。
 4. UI-Landscape-1：Android 横屏双栏，左侧小白狐，右侧对话；不做完整美术重设计。
 5. Fox-Coverage-1：输出小白狐 11/12 状态资源和业务触发覆盖矩阵，不假装未触发状态已完成。
 ```
@@ -202,7 +202,7 @@ S-Stream-1 当前实现边界（2026-05-21）：
 2. 后端先生成经过安全输出检查的完整 reply，再按句子/短片段 pseudo streaming；当前不假设 MiMo 支持 true streaming。
 3. TTS 按 segment 生成；TTS 失败会发送 recoverable error，不中断 text_final 和 done。
 4. stream timing 日志记录 request_id、session_id_hash、active_scene、first_text_ms、first_audio_ms、stream_total_ms、tts_segment_count 和 error_type。
-5. Android 尚未接入 stream client；旧 `/api/v1/conversation/message` 继续作为正式 fallback。
+5. Android 首版 stream client 已接入；旧 `/api/v1/conversation/message` 继续作为 fallback。
 ```
 
 约束：
@@ -236,11 +236,11 @@ ASR 调研：
 ```text
 1. 已新增 `docs/ASR_INPUT_RESEARCH_V0_1.md`。
 2. 已新增 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`。
-3. 父亲本机 spec 显示 MiMo chat completions audio input 可作为非流式 ASR 候选，候选模型为 `mimo-v2.5` / `mimo-v2-omni`。
+3. 父亲本机 spec 显示 MiMo chat completions audio input 可作为非流式 ASR，目标模型为 `mimo-v2.5` / `mimo-v2-omni`。
 4. 流式 ASR 未确认；儿童音频 retention、删除和 no-training 承诺未确认。
-5. 未确认前不启用云端 ASR，不上传真实儿童原始音频。
+5. ASR v1 目标确定接 MiMo；真实儿童音频外发仍需父亲授权和 policy flags。
 6. Android v1 仍遵守 confirm-before-send，不做 hands-free conversational mode。
-7. 后端已新增 mock-first ASR skeleton 和 AsrDataPolicyGuard；ASR router 当前不挂载到主 app。
+7. 后端已新增 mock-first ASR skeleton、AsrDataPolicyGuard、挂载 `/api/v1/asr/transcribe`，并实现 MiMo provider；默认 policy-blocked。
 ```
 
 ---

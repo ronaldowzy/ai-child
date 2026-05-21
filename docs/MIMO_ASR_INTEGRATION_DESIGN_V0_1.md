@@ -1,11 +1,11 @@
 # MiMo ASR Integration Design v0.1
 
-用途：定义 MiMo audio input 作为云端 ASR 候选能力时的后端接入方式、数据策略和 Coordinator 后续集成事项。本文档不启用真实外部调用。
+用途：定义 MiMo audio input 作为 ASR v1 目标 provider 时的后端接入方式、数据策略和 Coordinator 集成事项。本文档允许实现受控 provider 和 endpoint，但默认仍 policy-blocked，不表示已经允许真实儿童音频外发。
 
 状态：
 
 ```text
-design_only
+implementation_target
 default_provider=mock
 cloud_asr_enabled=false
 conversation_auto_send=false
@@ -16,12 +16,13 @@ conversation_auto_send=false
 ## 1. Decision Summary
 
 ```text
-1. MiMo ASR 不改变 v1 默认语音输入路线：Android 本地 SpeechRecognizer + confirm-before-send。
-2. MiMo audio input 可作为后续 cloud ASR provider 候选。
+1. ASR v1 方案确定接 MiMo audio input / ASR。
+2. Android 不直接调用 MiMo，只负责录音、上传后端和展示待确认文本。
 3. 后端 ASR endpoint 即使存在，也只能返回 pending transcript，不能直接调用 conversation/message。
 4. Android 仍不得持有 MiMo API key。
-5. 真实 provider 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked。
-6. 未确认训练/留存策略前，不允许真实儿童音频外发。
+5. 真实 provider 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
+6. 开发阶段先用 fake audio / smoke audio；未取得父亲授权和 policy flags 前，不允许真实儿童音频外发。
+7. 不做常开麦克风，不做 streaming ASR，不做识别后自动发送。
 ```
 
 ---
@@ -31,7 +32,7 @@ conversation_auto_send=false
 | Field | Value |
 |---|---|
 | Provider | MiMo OpenAI-compatible chat completions |
-| Candidate models | `mimo-v2.5` first, `mimo-v2-omni` fallback |
+| Target models | `mimo-v2.5` first, `mimo-v2-omni` fallback |
 | Unsupported model names | `MiMo-V2.5-ASR`, `mimo-v2.5-asr` |
 | Endpoint | `POST https://token-plan-cn.xiaomimimo.com/v1/chat/completions` |
 | Mode | Non-streaming audio input only; streaming not confirmed |
@@ -90,7 +91,7 @@ Safety classification happens after confirmed text enters the existing conversat
 
 ## 4. Proposed Public API
 
-This API is a future integration contract. The current ASR Spec Agent does not wire it into `backend/app/main.py`.
+This API is the v1 backend ASR contract. It may be mounted while remaining mock/disabled by default; MiMo network calls still require all policy flags.
 
 ```http
 POST /api/v1/asr/transcribe
@@ -222,7 +223,7 @@ The external provider's 25 MB number should not be treated as a product target.
 
 ## 7. Auth And Configuration
 
-Coordinator should add shared config only after product approval:
+Shared config defaults:
 
 ```bash
 CHILD_AI_ASR_PROVIDER=mock
@@ -240,7 +241,7 @@ Rules:
 
 ```text
 1. No real key in `.env.example`, docs, tests, Android or git.
-2. Existing MiMo TTS key may be reused operationally only if Coordinator confirms naming and policy.
+2. Existing MiMo TTS key may be reused operationally only if father/Coordinator confirms naming and ASR child-audio policy.
 3. Android never reads these values.
 4. A missing or false policy flag must block external ASR calls.
 ```
@@ -299,25 +300,25 @@ Child-facing copy remains in `VOICE_INTERACTION_DESIGN_V0_1.md`; backend should 
 
 ## 10. Coordinator Integration Notes
 
-Coordinator has completed the safe shared-config part only:
+Current safe integration status:
 
 ```text
 1. ASR settings now exist in `backend/app/core/config.py` with mock/disabled defaults.
 2. ASR env defaults are documented in `.env.example` and `backend/README.md`.
 3. Backend tests cover mock transcript, unsupported format, default MiMo policy block and router smoke in isolation.
+4. Product decision now confirms MiMo ASR as v1 target, while real child-audio external transmission remains gated.
 ```
 
-Still not done:
+Current implementation tasks:
 
 ```text
-1. ASR router is not included in `backend/app/main.py`.
-2. No real MiMo ASR network call is wired.
-3. Endpoint availability, parent gating and Android usage are not product-approved.
-4. `docs/PRODUCT_DECISIONS_V0_1.md` must be updated before enabling cloud ASR with child audio.
-5. Model id must be confirmed through a policy-gated smoke using fake audio only.
+1. Mount ASR router in `backend/app/main.py` while preserving mock/disabled defaults.
+2. Wire real MiMo ASR network call behind `AsrDataPolicyGuard`.
+3. Confirm model id through a policy-gated smoke using fake/smoke audio only.
+4. Build Android recording upload and confirm UI in a later round.
 ```
 
-Blocked until confirmation:
+Blocked until father authorization and policy flags:
 
 ```text
 Cloud ASR with real child audio.

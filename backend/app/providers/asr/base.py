@@ -22,6 +22,10 @@ class AsrProviderTimeoutError(AsrProviderError):
     pass
 
 
+class AsrProviderHttpError(AsrProviderError):
+    pass
+
+
 class AsrProviderRequest(BaseModel):
     audio_data_uri: str
     audio_format: AsrAudioFormat

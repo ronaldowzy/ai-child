@@ -4,6 +4,7 @@ import time
 from fastapi import FastAPI
 from fastapi import Request
 
+from app.api.v1.asr import router as asr_router
 from app.api.v1.conversation_attachment import router as conversation_attachment_router
 from app.api.v1.conversation import router as conversation_router
 from app.api.v1.conversation_stream import router as conversation_stream_router
@@ -80,3 +81,4 @@ app.include_router(parent_policy_router, prefix=settings.api_v1_prefix)
 app.include_router(parent_report_router, prefix=settings.api_v1_prefix)
 app.include_router(memories_router, prefix=settings.api_v1_prefix)
 app.include_router(tts_router, prefix=settings.api_v1_prefix)
+app.include_router(asr_router, prefix=settings.api_v1_prefix)

@@ -6,7 +6,12 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.asr import router as asr_router
 from app.core.config import get_settings
-from app.domain.schemas.asr import AsrTranscriptStatus, AsrTranscriptionRequest
+from app.domain.schemas.asr import (
+    AsrProviderName,
+    AsrTranscriptStatus,
+    AsrTranscriptionRequest,
+)
+from app.providers.asr.base import AsrProviderRequest, AsrProviderResult, BaseAsrProvider
 from app.services.asr_data_policy_guard import AsrDataPolicyBlockedError
 from app.services.asr_service import AsrRequestValidationError, AsrService
 
@@ -41,6 +46,20 @@ def _request_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
+class StaticAsrProvider(BaseAsrProvider):
+    def __init__(self, transcript: str) -> None:
+        super().__init__(provider_name=AsrProviderName.MOCK, enabled=True)
+        self._transcript = transcript
+
+    def transcribe(self, request: AsrProviderRequest) -> AsrProviderResult:
+        return AsrProviderResult(
+            transcript=self._transcript,
+            provider=self.provider_name,
+            model="static-asr-test",
+            duration_ms=request.duration_ms,
+        )
+
+
 def test_mock_asr_returns_pending_transcript_for_confirmation() -> None:
     response = AsrService().transcribe(
         AsrTranscriptionRequest.model_validate(_request_payload())
@@ -64,6 +83,19 @@ def test_asr_rejects_unsupported_format() -> None:
         AsrService().transcribe(AsrTranscriptionRequest.model_validate(payload))
 
     assert exc_info.value.error_code == "unsupported_audio_format"
+
+
+@pytest.mark.parametrize("transcript", ["", "未听清", "未听清。"])
+def test_empty_or_unclear_asr_transcript_needs_retry(transcript: str) -> None:
+    response = AsrService(provider=StaticAsrProvider(transcript)).transcribe(
+        AsrTranscriptionRequest.model_validate(_request_payload())
+    )
+
+    assert response.status == AsrTranscriptStatus.NEEDS_RETRY
+    assert response.transcript is None
+    assert response.requires_confirmation is True
+    assert response.error_code == "empty_transcript"
+    assert response.fallback_action == "retry_or_type"
 
 
 def test_mimo_asr_is_policy_blocked_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

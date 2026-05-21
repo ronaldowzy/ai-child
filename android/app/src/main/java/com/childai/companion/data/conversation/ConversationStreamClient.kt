@@ -7,58 +7,60 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class ConversationApiClient(
+class ConversationStreamClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = 45_000,
 ) {
-    suspend fun sendMessage(
+    suspend fun streamMessage(
         request: ConversationMessageRequest,
-    ): ConversationMessageResponse = withContext(Dispatchers.IO) {
+        streamOptions: ConversationStreamOptions,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) = withContext(Dispatchers.IO) {
         val connection = openConnection()
         try {
-            val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
+            val requestBody = request
+                .toStreamJsonString(streamOptions)
+                .toByteArray(Charsets.UTF_8)
             connection.outputStream.use { output ->
                 output.write(requestBody)
             }
 
             val statusCode = connection.responseCode
-            val responseBody = connection.readBody(statusCode)
             if (statusCode !in 200..299) {
+                val responseBody = connection.readBody(statusCode)
                 throw ConversationApiException(
-                    "Conversation API returned HTTP $statusCode: $responseBody",
+                    "Conversation stream returned HTTP $statusCode: $responseBody",
                 )
             }
-            ConversationMessageResponse.fromJsonString(responseBody)
+
+            connection.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                lines
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .forEach { line ->
+                        onEvent(ConversationStreamEvent.fromJsonLine(line))
+                    }
+            }
         } catch (exception: IOException) {
-            throw ConversationApiException("Conversation API request failed", exception)
+            throw ConversationApiException("Conversation stream request failed", exception)
         } finally {
             connection.disconnect()
         }
     }
 
     private fun openConnection(): HttpURLConnection {
-        return (URL(messageEndpoint()).openConnection() as HttpURLConnection).apply {
+        return (URL(streamEndpoint()).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Accept", "application/x-ndjson")
         }
     }
 
-    private fun messageEndpoint(): String {
-        return "${baseUrl.trimEnd('/')}/api/v1/conversation/message"
+    private fun streamEndpoint(): String {
+        return "${baseUrl.trimEnd('/')}/api/v1/conversation/stream"
     }
-}
-
-class ConversationApiException(
-    message: String,
-    cause: Throwable? = null,
-) : Exception(message, cause)
-
-internal fun HttpURLConnection.readBody(statusCode: Int): String {
-    val stream = if (statusCode in 200..299) inputStream else errorStream
-    return stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
 }

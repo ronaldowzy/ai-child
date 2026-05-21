@@ -71,6 +71,7 @@ class MockModelProvider(BaseModelProvider):
             sub_scene=scene_route.get("sub_scene"),
             needs_input=scene_route.get("needs_input"),
             parent_policy=request.context.get("parent_policy"),
+            image_context=request.context.get("conversation", {}).get("image_context"),
             fallback_reply_text=(
                 fallback_reply_text
                 if isinstance(fallback_reply_text, str)
@@ -97,6 +98,7 @@ class MockModelProvider(BaseModelProvider):
         sub_scene: object,
         needs_input: object,
         parent_policy: object,
+        image_context: object,
         fallback_reply_text: str | None,
     ) -> tuple[str, str]:
         """Return a deterministic but less scripted child-chat reply.
@@ -140,6 +142,10 @@ class MockModelProvider(BaseModelProvider):
                 "low_energy_support",
             )
 
+        image_reply = self._image_context_reply(normalized, image_context)
+        if image_reply:
+            return image_reply, "image_context_continuity"
+
         if self._contains_any(normalized, ("我回来了", "放学了", "到家了")):
             goal_text = self._compact_parent_goals(parent_policy)
             if "小困难" in goal_text:
@@ -165,6 +171,32 @@ class MockModelProvider(BaseModelProvider):
             "我在听。你可以随便说一件现在想到的小事，我会跟着你的话题慢慢聊。",
             "free_dialogue_default",
         )
+
+    def _image_context_reply(
+        self,
+        normalized: str,
+        image_context: object,
+    ) -> str | None:
+        if not isinstance(image_context, dict):
+            return None
+        recognized_type = image_context.get("recognized_type")
+        if recognized_type == "privacy_sensitive":
+            return (
+                "这张图片里可能有隐私信息，我们先不要继续展开。"
+                "如果需要处理它，请先让爸爸妈妈帮你确认。"
+            )
+        text = str(
+            image_context.get("recognized_text")
+            or image_context.get("child_caption")
+            or ""
+        ).strip()
+        if not text:
+            return None
+        if self._contains_any(normalized, ("故事", "编")):
+            return f"那我们可以把这张图里的“{text}”当成开头，编一个轻轻的小故事。你想让它发生在家里，还是森林里？"
+        if self._contains_any(normalized, ("是什么", "这是什么", "问")):
+            return f"我先按图片描述来猜：这里像是“{text}”。你可以再告诉我一个细节，我们一起判断。"
+        return f"我们继续聊这张图吧。我记得你刚刚分享的是“{text}”。你最想先说它哪里有趣？"
 
     def _compact_parent_goals(self, parent_policy: object) -> str:
         if not isinstance(parent_policy, dict):
@@ -193,10 +225,42 @@ class MockModelProvider(BaseModelProvider):
         return ""
 
     def _intent_output(self, input_text: str) -> tuple[str, dict[str, Any]]:
-        learning_keywords = ("题", "作业", "不会", "数学", "语文", "英语")
+        normalized = input_text.strip().lower().replace(" ", "")
+        learning_keywords = (
+            "我有一道题不会",
+            "有一道题不会",
+            "有题不会",
+            "这道题不会",
+            "这题不会",
+            "这道题怎么做",
+            "这题怎么做",
+            "帮我看看作业",
+            "帮我看作业",
+            "数学题不会",
+            "语文题不会",
+            "英语题不会",
+            "英语作业",
+            "语文作业",
+            "数学作业",
+            "口算题",
+            "应用题",
+            "练习册",
+            "课文作业",
+            "作文作业",
+        )
+        general_not_know = (
+            "不会画",
+            "不会搭",
+            "不会拼",
+            "游戏里",
+            "谜题",
+            "问题考你",
+            "考考你",
+        )
         intent = (
             "learning_help"
-            if any(keyword in input_text for keyword in learning_keywords)
+            if any(keyword in normalized for keyword in learning_keywords)
+            and not any(marker in normalized for marker in general_not_know)
             else "general_checkin"
         )
         return (

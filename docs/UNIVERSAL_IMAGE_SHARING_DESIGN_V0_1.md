@@ -82,6 +82,7 @@ unsafe_unknown
 3. 普通分享走 conversation.open。
 4. 作业题走 learning.homework_help。
 5. 隐私敏感图片描述走 privacy.boundary。
+6. 普通分享成功后暂存 pendingImageContext，后续快捷动作带上 attachment_id 和图片摘要。
 ```
 
 ---
@@ -105,5 +106,21 @@ unsafe_unknown
 孩子拍画 -> 先鼓励观察，不评分、不批评。
 孩子拍题目 -> 进入 learning.homework_help。
 孩子拍含地址/电话/学校名的图片描述 -> privacy.boundary。
+普通图片后续点击“聊聊它 / 编个故事 / 问这是什么” -> conversation.open 且围绕刚才图片继续。
 拍照失败或后端失败 -> network_error，不崩溃。
+```
+
+---
+
+## 7. 第二轮收口：图片上下文连续性
+
+已落实规则：
+
+```text
+1. Android 暂存普通图片 pendingImageContext，包括 attachment_id、图片摘要、image_purpose 和 recognized_type。
+2. 后续“聊聊它 / 编个故事 / 问这是什么”会把图片摘要写入本轮文本，并携带 attachments=[attachment_id]。
+3. 后端 AttachmentService 提供 get_image_context，ConversationService 会把 image_context 传入 ChildAgentRuntime 和 PromptManager。
+4. Prompt 中会说明孩子刚刚分享了一张图片、图片描述和孩子说明；如果不是作业题，不把它当成作业。
+5. 隐私图片的后续追问仍进入 privacy.boundary。
+6. 不保存原始照片；只使用 mock 识别摘要和孩子说明。
 ```

@@ -64,6 +64,7 @@ class PromptManager:
         *,
         parent_policy: Any | None = None,
         time_context: Any | None = None,
+        image_context: Mapping[str, Any] | Any | None = None,
         memory_context: Sequence[Any] | Mapping[str, Any] | str | None = None,
         persona_template_id: str | None = None,
         output_contract_template_id: str | None = None,
@@ -77,6 +78,7 @@ class PromptManager:
             self._build_parent_message_section(parent_policy),
             self._build_parent_policy_section(parent_policy),
             self._build_time_context_section(time_context),
+            self._build_image_context_section(image_context),
             self._load_scene_section(scene_id),
             self._build_memory_context_section(memory_context),
             self._load_template_section(
@@ -169,6 +171,18 @@ class PromptManager:
             content=self._render_time_context(time_context),
         )
 
+    def _build_image_context_section(
+        self,
+        image_context: Mapping[str, Any] | Any | None,
+    ) -> PromptSection:
+        return PromptSection(
+            layer=PromptLayer.IMAGE_CONTEXT,
+            template_id="image_context_runtime",
+            version="runtime",
+            filename=None,
+            content=self._render_image_context(image_context),
+        )
+
     def _build_memory_context_section(
         self,
         memory_context: Sequence[Any] | Mapping[str, Any] | str | None,
@@ -255,6 +269,31 @@ class PromptManager:
             lines.append("睡前语气应更短、更安静、低刺激；只有孩子明确说晚安、困了或要睡觉时，才进入睡前收尾。")
         if period == "after_school":
             lines.append("放学后语气可以轻松低压力，但不要默认强迫孩子汇报学校。")
+        return "\n".join(lines)
+
+    def _render_image_context(self, image_context: Mapping[str, Any] | Any | None) -> str:
+        if image_context is None:
+            return "当前没有图片上下文。不要假装看到了图片。"
+        data = self._to_mapping(image_context)
+        if not data:
+            return "当前没有可用的图片上下文。不要假装看到了图片。"
+
+        text = str(data.get("recognized_text") or data.get("text") or "").strip()
+        child_caption = str(data.get("child_caption") or "").strip()
+        purpose = str(data.get("image_purpose") or "unknown")
+        recognized_type = str(data.get("recognized_type") or "unknown")
+
+        lines = [
+            "孩子刚刚分享了一张图片。请把以下内容作为当前对话上下文，而不是长期原始照片。",
+            f"图片意图：{purpose}。",
+            f"识别类型：{recognized_type}。",
+        ]
+        if text:
+            lines.append(f"图片描述：{text}")
+        if child_caption:
+            lines.append(f"孩子说明：{child_caption}")
+        lines.append("如果不是作业题，请自然围绕图片继续聊，不要把它当成作业。")
+        lines.append("不要声称看到了图片中没有被描述的细节。")
         return "\n".join(lines)
 
     def _render_memory_context(

@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；最新方向修订为 freedom-first 自由对话底座
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮收口已完成代码实现
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏
-下一步：先完成父母寄语、自由优先路由、通用图片分享和对应 Android mock UI；stream、ASR 和 Ops P0 继续排队但不能按旧固定场景假设开发
+下一步：真机复验自由对话、通用图片连续追问、父母寄语持久化和 MiMo audioUrl 播放；stream、ASR 和 Ops P0 继续排队但不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -62,7 +62,7 @@ Mock 拍题：done
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
 | ASR-Research | 语音输入调研 | 调研 MiMo ASR / audio input 能力和儿童语音数据边界 | planned | V1 | 未确认前不实现云端 ASR，不上传原始音频 |
 | Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | planned | DB1/V1 | 不接第三方 APM；日志脱敏 |
-| Freedom-First | 自由对话底座 | 时段/父母寄语/图片/记忆作为上下文，安全/隐私/学习作为护栏 | in_progress | R1/O1 | 新设计文档、父母寄语、自由优先路由、通用图片分享和 Android mock UI |
+| Freedom-First | 自由对话底座 | 时段/父母寄语/图片/记忆作为上下文，安全/隐私/学习作为护栏 | done | R1/O1 | 学习触发已收窄；after_school/bedtime 不再强锁自由话题；父母寄语进入 prompt 并可 DB 持久化；普通图片后续快捷动作可带 image context 进入 LLM 上下文 |
 
 ---
 
@@ -219,7 +219,7 @@ Mock 拍题：done
 | F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧序列；Android test/assemble/lint 通过；debug APK 约 147MB，待真机验证流畅度和低配降级 |
 | O1-01 Open Conversation Mode 小步实现 | done |  | 普通兴趣和日常话题进入 `conversation.open`；ChildAgentRuntime 接收进程内短期 history；普通聊天 quick actions 随上下文轻量变化；安全、隐私、学习、睡前边界保留 |
 | DB1-A PostgreSQL 基础设施 | done |  | 新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local compose、初始 8 张表、migration/reset 脚本和基础测试；业务服务仍未迁移 |
-| DB1-B ParentPolicy 持久化 | todo |  | 从内存策略迁移到 DB repository，API 行为不变 |
+| DB1-B ParentPolicy 持久化 | done |  | ParentPolicyService 已支持 PostgreSQL repository 优先读写；数据库不可用时 dev fallback 到内存；`parent_message_raw` 和 `parent_message_updated_at` 已有迁移 |
 | DB1-C Conversation message 持久化 | todo |  | 保存 child/agent message、audio_url、emotion、agent_motion；不保存 debug、原始音频或照片 |
 | DB1-D MemoryService 持久化 | todo |  | 结构化 memory_items 落库，evidence 继续使用 summary，不保存 full transcript |
 | DB1-E ParentReport 持久化 | todo |  | 日报生成结果可持久化，仍不展示逐字聊天记录 |

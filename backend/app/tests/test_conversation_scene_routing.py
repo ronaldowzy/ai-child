@@ -108,6 +108,57 @@ def test_learning_help_routes_to_homework_help_with_modality_actions() -> None:
     assert body["debug"]["intent"]["intent"] == "learning_help"
 
 
+def test_general_cannot_draw_expression_stays_open_conversation() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_payload(
+            text="我不会画这个小怪兽",
+            device_time="2026-05-18T16:35:00+08:00",
+            session_id="conversation_scene_general_not_know_session",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert body["debug"]["intent"]["intent"] != "learning_help"
+
+
+def test_game_puzzle_stays_open_conversation() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_payload(
+            text="游戏里有一道谜题",
+            device_time="2026-05-18T16:35:00+08:00",
+            session_id="conversation_scene_game_puzzle_session",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert body["debug"]["intent"]["intent"] != "learning_help"
+
+
+def test_homework_phrase_routes_to_learning_help() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_payload(
+            text="帮我看看作业",
+            device_time="2026-05-18T18:30:00+08:00",
+            session_id="conversation_scene_homework_phrase_session",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "learning.homework_help"
+    assert body["debug"]["intent"]["intent"] == "learning_help"
+
+
 def test_bedtime_keyword_routes_to_bedtime_reflection() -> None:
     response = client.post(
         "/api/v1/conversation/message",

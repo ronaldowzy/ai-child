@@ -4,16 +4,39 @@ from app.domain.schemas.parent_policy import (
     ParentPolicy,
     ParentPolicyUpdateRequest,
 )
+from app.repositories.parent_policy_repository import (
+    ParentPolicyRepository,
+    ParentPolicyRepositoryUnavailable,
+)
 
 
 class ParentPolicyService:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        repository: ParentPolicyRepository | None = None,
+        fallback_to_memory: bool = True,
+    ) -> None:
         self._policies: dict[str, ParentPolicy] = {}
+        self._repository = repository or ParentPolicyRepository()
+        self._fallback_to_memory = fallback_to_memory
+        self._repository_available = True
 
     def get_policy(self, child_id: str) -> ParentPolicy:
-        if child_id not in self._policies:
-            self._policies[child_id] = self._build_default_policy(child_id)
-        return self._policies[child_id]
+        if self._repository_available:
+            try:
+                policy = self._repository.get(child_id)
+                if policy is not None:
+                    self._policies[child_id] = policy
+                    return policy
+                policy = self._build_default_policy(child_id)
+                return self._persist_or_remember(policy)
+            except ParentPolicyRepositoryUnavailable:
+                if not self._fallback_to_memory:
+                    raise
+                self._repository_available = False
+
+        return self._get_memory_policy(child_id)
 
     def update_policy(self, request: ParentPolicyUpdateRequest) -> ParentPolicy:
         current = self.get_policy(request.child_id)
@@ -44,8 +67,25 @@ class ParentPolicyService:
             },
             deep=True,
         )
-        self._policies[request.child_id] = updated
-        return updated
+        return self._persist_or_remember(updated)
+
+    def _get_memory_policy(self, child_id: str) -> ParentPolicy:
+        if child_id not in self._policies:
+            self._policies[child_id] = self._build_default_policy(child_id)
+        return self._policies[child_id]
+
+    def _persist_or_remember(self, policy: ParentPolicy) -> ParentPolicy:
+        if self._repository_available:
+            try:
+                saved = self._repository.upsert(policy)
+                self._policies[policy.child_id] = saved
+                return saved
+            except ParentPolicyRepositoryUnavailable:
+                if not self._fallback_to_memory:
+                    raise
+                self._repository_available = False
+        self._policies[policy.child_id] = policy
+        return policy
 
     def _build_default_policy(self, child_id: str) -> ParentPolicy:
         now = datetime.now(timezone.utc)

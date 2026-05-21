@@ -25,6 +25,23 @@ class HomeworkAttachmentContext(BaseModel):
     recognized_content: RecognizedContent
 
 
+class ImageAttachmentContext(BaseModel):
+    attachment_id: str
+    image_purpose: ImagePurpose | None = None
+    recognized_type: str
+    recognized_text: str | None = None
+    child_caption: str | None = None
+
+    def to_prompt_context(self) -> dict[str, str | None]:
+        return {
+            "attachment_id": self.attachment_id,
+            "image_purpose": self.image_purpose.value if self.image_purpose else None,
+            "recognized_type": self.recognized_type,
+            "recognized_text": self.recognized_text,
+            "child_caption": self.child_caption,
+        }
+
+
 class AttachmentService:
     """Business service for mock homework attachments and OCR decisions."""
 
@@ -116,6 +133,31 @@ class AttachmentService:
                 return HomeworkAttachmentContext(
                     attachment_id=attachment.id,
                     recognized_content=attachment.recognized_content,
+                )
+        return None
+
+    def get_image_context(
+        self,
+        attachment_ids: list[str],
+        *,
+        child_id: str,
+        session_id: str,
+    ) -> ImageAttachmentContext | None:
+        for attachment_id in attachment_ids:
+            attachment = self._repository.get(attachment_id)
+            if (
+                attachment
+                and attachment.child_id == child_id
+                and attachment.session_id == session_id
+                and attachment.status in {AttachmentStatus.IMAGE_READY, AttachmentStatus.OCR_READY}
+                and attachment.recognized_content.type != "homework_problem"
+            ):
+                return ImageAttachmentContext(
+                    attachment_id=attachment.id,
+                    image_purpose=attachment.recognized_content.image_purpose,
+                    recognized_type=attachment.recognized_content.type,
+                    recognized_text=attachment.recognized_content.text,
+                    child_caption=attachment.recognized_content.child_caption,
                 )
         return None
 

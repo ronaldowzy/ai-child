@@ -36,6 +36,7 @@ class ChildAgentRuntime:
                 request.route_decision.active_scene.value,
                 parent_policy=request.parent_policy,
                 time_context=request.time_context,
+                image_context=request.conversation_metadata.get("image_context"),
                 memory_context=request.memory_context,
             )
             prompt_versions = composed_prompt.prompt_versions
@@ -184,7 +185,7 @@ class ChildAgentRuntime:
     ) -> dict[str, Any]:
         return {
             "contains_child_data": True,
-            "contains_image": False,
+            "contains_image": bool(request.conversation_metadata.get("contains_image")),
             "contains_audio": False,
             "task_type": ModelTaskType.CHILD_CHAT.value,
             "active_scene": request.route_decision.active_scene.value,

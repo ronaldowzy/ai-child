@@ -10,6 +10,7 @@ class PromptLayer(StrEnum):
     PARENT_MESSAGE = "parent_message"
     PARENT_POLICY = "parent_policy"
     TIME_CONTEXT = "time_context"
+    IMAGE_CONTEXT = "image_context"
     SCENE = "scene"
     MEMORY_CONTEXT = "memory_context"
     OUTPUT_CONTRACT = "output_contract"

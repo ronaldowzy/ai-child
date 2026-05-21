@@ -87,4 +87,39 @@ class AttachmentDtosTest {
         assertFalse(response.hasReadyHomeworkText)
         assertEquals("share", response.recognizedContent.imagePurpose)
     }
+
+    @Test
+    fun genericImageResponsePreservesCaptionForFollowupContext() {
+        val response = AttachmentCreateResponse.fromJsonString(
+            """
+            {
+              "attachment_id": "att_003",
+              "recognized_content": {
+                "type": "image_observation",
+                "text": "孩子搭了一个积木城堡",
+                "confidence": 0.9,
+                "provider_name": "mock_ocr",
+                "image_purpose": "share",
+                "child_caption": "你看我搭的这个"
+              },
+              "reply": {
+                "type": "agent_message",
+                "text": "我看到你想分享的是：孩子搭了一个积木城堡。",
+                "voice_enabled": true,
+                "emotion": "curious"
+              },
+              "ui_actions": [],
+              "session_state": {
+                "base_scene": "conversation.open",
+                "active_scene": "conversation.open"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("att_003", response.attachmentId)
+        assertEquals("孩子搭了一个积木城堡", response.recognizedContent.text)
+        assertEquals("你看我搭的这个", response.recognizedContent.childCaption)
+        assertFalse(response.hasReadyHomeworkText)
+    }
 }

@@ -1386,7 +1386,7 @@ strategy：有效引导策略
 
 ## 11. 数据库设计
 
-当前 v0.1-dev 已确认使用本地 PostgreSQL 作为家庭自用持久化数据库。SQLite 不再作为主开发目标，只可作为未来测试替代方案。DB1-A 已采用 SQLAlchemy 2.x sync + psycopg + Alembic 建立基础设施；业务服务仍需按 ParentPolicy、Conversation、Memory、ParentReport 顺序逐步迁移。
+当前 v0.1-dev 已确认使用本地 PostgreSQL 作为家庭自用持久化数据库。SQLite 不再作为主开发目标，只可作为未来测试替代方案。DB1-A 已采用 SQLAlchemy 2.x sync + psycopg + Alembic 建立基础设施；DB1-B 已让 ParentPolicyService 优先通过 PostgreSQL repository 读写父母寄语和结构化策略，dev/test 数据库不可用时回退内存；Conversation、Memory、ParentReport 仍需后续迁移。
 
 数据边界：
 

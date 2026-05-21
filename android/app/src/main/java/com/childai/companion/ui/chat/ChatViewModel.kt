@@ -47,7 +47,13 @@ class ChatViewModel(
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
 
-        recordChildMessage(trimmedText)
+        sendTextWithAttachments(trimmedText, emptyList())
+    }
+
+    private fun sendTextWithAttachments(text: String, attachments: List<String>) {
+        if (_uiState.value.isSending) return
+
+        recordChildMessage(text)
         _uiState.update {
             it.copy(
                 isSending = true,
@@ -60,7 +66,8 @@ class ChatViewModel(
                 conversationSender.sendTextMessage(
                     childId = DevSettings.CHILD_ID,
                     sessionId = sessionId,
-                    text = trimmedText,
+                    text = text,
+                    attachments = attachments,
                 )
             }.onSuccess { response ->
                 renderAgentReply(response)
@@ -69,7 +76,7 @@ class ChatViewModel(
                     ChatMessage(
                         id = nextMessageId("agent-error"),
                         author = MessageAuthor.Agent,
-                        text = "小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。",
+                        text = followupFailureMessage(attachments),
                     ),
                 )
                 _uiState.update {
@@ -92,6 +99,8 @@ class ChatViewModel(
         when (action.id) {
             "take_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_HOMEWORK)
             "share_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_SHARE)
+            "talk_about_image", "make_story", "ask_what_is_this" ->
+                continuePendingImageConversation(action)
             else -> sendText(action.label)
         }
     }
@@ -179,7 +188,7 @@ class ChatViewModel(
                 handleAttachmentResponse(attachmentResponse)
             }.onFailure {
                 appendAgentMessage(
-                    "这张题目暂时没有传到后端。我们先停一下，请大人检查网络后再试。",
+                    uploadFailureMessage(mockPhoto.imagePurpose),
                 )
                 _uiState.update {
                     it.copy(
@@ -218,6 +227,7 @@ class ChatViewModel(
                 uiActions = attachmentResponse.uiActions,
                 sessionState = attachmentResponse.sessionState,
                 mockPhoto = null,
+                pendingImageContext = attachmentResponse.toPendingImageContext(),
             )
             return
         }
@@ -247,9 +257,24 @@ class ChatViewModel(
                     voice = VoiceUiState(isVoiceInputReserved = true),
                     isSending = false,
                     mockPhoto = null,
+                    pendingImageContext = null,
                 )
             }
         }
+    }
+
+    private fun continuePendingImageConversation(action: QuickActionUi) {
+        val context = _uiState.value.pendingImageContext
+        if (context == null) {
+            sendText(action.label)
+            return
+        }
+        val text = when (action.id) {
+            "make_story" -> "请根据刚才那张图片编一个小故事：${context.summary}"
+            "ask_what_is_this" -> "我想问刚才那张图片里这是什么：${context.summary}"
+            else -> "我们继续聊刚才那张图片：${context.summary}"
+        }
+        sendTextWithAttachments(text, listOf(context.attachmentId))
     }
 
     fun attachTtsController(controller: TtsController) {
@@ -325,6 +350,7 @@ class ChatViewModel(
             uiActions = response.uiActions,
             sessionState = response.sessionState,
             mockPhoto = mockPhoto,
+            pendingImageContext = _uiState.value.pendingImageContext,
         )
     }
 
@@ -333,6 +359,7 @@ class ChatViewModel(
         uiActions: List<ConversationUiAction>,
         sessionState: ConversationSessionState,
         mockPhoto: MockPhotoUiState? = _uiState.value.mockPhoto,
+        pendingImageContext: PendingImageContextUiState? = _uiState.value.pendingImageContext,
     ) {
         appendAgentMessage(reply.text)
         stopCurrentTts(restoreBaseAgent = false)
@@ -354,9 +381,30 @@ class ChatViewModel(
                 ),
                 isSending = false,
                 mockPhoto = mockPhoto,
+                pendingImageContext = pendingImageContext,
             )
         }
         maybeAutoReadReply(reply)
+    }
+
+    private fun uploadFailureMessage(imagePurpose: String): String {
+        return if (imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+            "这道题目暂时没有传到后端。我们先停一下，请大人检查网络后再试。"
+        } else {
+            "这张图片暂时没有传到后端。我们先停一下，请大人检查网络后再试。"
+        }
+    }
+
+    private fun followupFailureMessage(attachments: List<String>): String {
+        val context = _uiState.value.pendingImageContext
+        if (attachments.isEmpty() || context == null) {
+            return "小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。"
+        }
+        return if (context.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+            "题目已经识别到了，但还没有连上后端继续引导。请大人检查网络后再试。"
+        } else {
+            "图片已经识别到了，但还没有连上后端继续聊。请大人检查网络后再试。"
+        }
     }
 
     private fun appendAgentMessage(text: String) {
@@ -517,6 +565,7 @@ data class ChatUiState(
     val tts: TtsUiState = TtsUiState(),
     val isSending: Boolean = false,
     val mockPhoto: MockPhotoUiState? = null,
+    val pendingImageContext: PendingImageContextUiState? = null,
 )
 
 data class QuickActionUi(
@@ -529,6 +578,13 @@ data class MockPhotoUiState(
     val imagePurpose: String = IMAGE_PURPOSE_SHARE,
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
+)
+
+data class PendingImageContextUiState(
+    val attachmentId: String,
+    val summary: String,
+    val imagePurpose: String?,
+    val recognizedType: String,
 )
 
 const val IMAGE_PURPOSE_SHARE = "share"
@@ -545,6 +601,24 @@ private fun List<ConversationUiAction>.toQuickActionUi(): List<QuickActionUi> {
             )
         }
     }
+}
+
+private fun AttachmentCreateResponse.toPendingImageContext(): PendingImageContextUiState? {
+    if (
+        recognizedContent.type == "homework_problem" ||
+        recognizedContent.imagePurpose == IMAGE_PURPOSE_HOMEWORK
+    ) {
+        return null
+    }
+    val summary = recognizedContent.text
+        ?: recognizedContent.childCaption
+        ?: return null
+    return PendingImageContextUiState(
+        attachmentId = attachmentId,
+        summary = summary,
+        imagePurpose = recognizedContent.imagePurpose,
+        recognizedType = recognizedContent.type,
+    )
 }
 
 interface ConversationMessageSender {

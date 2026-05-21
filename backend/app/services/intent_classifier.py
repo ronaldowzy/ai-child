@@ -95,19 +95,7 @@ class IntentClassifier:
                 ],
             )
 
-        learning_markers = (
-            "题",
-            "作业",
-            "不会",
-            "数学",
-            "语文",
-            "英语",
-            "口算",
-            "应用题",
-            "作文",
-            "课文",
-        )
-        if self._contains_any(normalized, learning_markers):
+        if self._is_explicit_learning_help(normalized):
             return IntentClassification(
                 intent=IntentType.LEARNING_HELP,
                 sub_intent="homework_problem_unknown_content",
@@ -115,7 +103,7 @@ class IntentClassifier:
                 needs_modality=True,
                 suggested_modalities=["photo", "voice_description", "text"],
                 confidence=0.94,
-                evidence=["learning_keyword"],
+                evidence=["explicit_learning_help_keyword"],
             )
 
         tired_markers = ("不想说话", "好累", "很烦", "难过", "生气", "害怕")
@@ -207,6 +195,84 @@ class IntentClassifier:
 
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         return any(marker in text for marker in markers)
+
+    def _is_explicit_learning_help(self, normalized: str) -> bool:
+        if self._is_general_not_know_expression(normalized):
+            return False
+
+        explicit_phrases = (
+            "我有一道题不会",
+            "有一道题不会",
+            "有题不会",
+            "这道题不会",
+            "这题不会",
+            "一道题不会",
+            "这道题怎么做",
+            "这题怎么做",
+            "这道题要怎么做",
+            "这题要怎么做",
+            "帮我看看作业",
+            "帮我看作业",
+            "看看作业",
+            "数学题不会",
+            "语文题不会",
+            "英语题不会",
+            "英语作业",
+            "语文作业",
+            "数学作业",
+            "口算题",
+            "应用题",
+            "练习册",
+            "课文作业",
+            "作文作业",
+        )
+        if self._contains_any(normalized, explicit_phrases):
+            return True
+
+        learning_subjects = (
+            "作业",
+            "数学题",
+            "语文题",
+            "英语题",
+            "口算",
+            "应用题",
+            "练习册",
+            "课文",
+            "作文",
+            "课本题",
+        )
+        help_markers = (
+            "不会",
+            "不懂",
+            "怎么做",
+            "要怎么做",
+            "帮我",
+            "帮忙",
+            "看看",
+            "讲讲",
+            "检查",
+        )
+        return self._contains_any(normalized, learning_subjects) and self._contains_any(
+            normalized,
+            help_markers,
+        )
+
+    def _is_general_not_know_expression(self, normalized: str) -> bool:
+        general_markers = (
+            "不会画",
+            "不会搭",
+            "不会拼",
+            "不会玩",
+            "玩具",
+            "积木",
+            "小怪兽",
+            "游戏里",
+            "谜题",
+            "问题考你",
+            "考考你",
+            "想出一个问题",
+        )
+        return self._contains_any(normalized, general_markers)
 
 
 _intent_classifier = IntentClassifier()

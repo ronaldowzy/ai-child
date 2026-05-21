@@ -107,6 +107,7 @@ def _runtime_request(
     *,
     route_decision: SceneRouteDecision | None = None,
     conversation_history: list[ModelMessage] | None = None,
+    conversation_metadata: dict[str, object] | None = None,
 ) -> AgentRuntimeRequest:
     return AgentRuntimeRequest(
         child_id="child_runtime_test",
@@ -121,7 +122,7 @@ def _runtime_request(
         },
         memory_context=[],
         conversation_history=conversation_history or [],
-        conversation_metadata={"message_id": "msg_runtime_test"},
+        conversation_metadata=conversation_metadata or {"message_id": "msg_runtime_test"},
     )
 
 
@@ -390,6 +391,36 @@ def test_child_agent_runtime_sends_recent_conversation_history_to_model() -> Non
     assert registry.last_request.messages[3].content == "我有一道题不会"
     assert registry.last_request.metadata["uses_recent_conversation_history"] is True
     assert registry.last_request.metadata["active_scene"] == "conversation.open"
+
+
+def test_child_agent_runtime_passes_image_context_to_prompt_and_metadata() -> None:
+    registry = CapturingModelRegistry(response=_model_response("这个积木城堡看起来很有想象力。"))
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            conversation_metadata={
+                "message_id": "msg_runtime_image_context",
+                "contains_image": True,
+                "image_context": {
+                    "attachment_id": "att_image_001",
+                    "image_purpose": "share",
+                    "recognized_type": "image_observation",
+                    "recognized_text": "孩子搭了一个积木城堡",
+                    "child_caption": "你看我搭的这个",
+                },
+            },
+        )
+    )
+
+    assert registry.last_request is not None
+    assert registry.last_request.metadata["contains_image"] is True
+    assert "孩子搭了一个积木城堡" in registry.last_request.messages[0].content
+    assert "不要把它当成作业" in registry.last_request.messages[0].content
 
 
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:

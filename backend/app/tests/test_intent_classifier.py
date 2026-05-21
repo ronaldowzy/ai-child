@@ -28,6 +28,55 @@ def test_learning_help_intent_from_homework_blocker() -> None:
     assert "photo" in result.suggested_modalities
 
 
+def test_general_not_know_does_not_route_to_learning_help() -> None:
+    safety = SafetyEngine().classify_input("我不会画这个小怪兽")
+    result = IntentClassifier().classify(
+        "我不会画这个小怪兽",
+        time_context=_time_context(TimePeriod.AFTER_SCHOOL),
+        safety=safety,
+    )
+
+    assert result.intent == IntentType.CASUAL_CHAT
+    assert result.evidence == ["mock_model_fallback"]
+
+
+def test_game_puzzle_does_not_route_to_homework_help() -> None:
+    safety = SafetyEngine().classify_input("游戏里有一道谜题")
+    result = IntentClassifier().classify(
+        "游戏里有一道谜题",
+        time_context=_time_context(TimePeriod.AFTER_SCHOOL),
+        safety=safety,
+    )
+
+    assert result.intent == IntentType.CASUAL_CHAT
+
+
+def test_parent_like_quiz_prompt_stays_casual_chat() -> None:
+    safety = SafetyEngine().classify_input("我想出一个问题考你")
+    result = IntentClassifier().classify(
+        "我想出一个问题考你",
+        time_context=_time_context(TimePeriod.AFTER_SCHOOL),
+        safety=safety,
+    )
+
+    assert result.intent == IntentType.CASUAL_CHAT
+
+
+def test_explicit_homework_phrases_route_to_learning_help() -> None:
+    classifier = IntentClassifier()
+
+    for text in ("这道题怎么做", "帮我看看作业", "数学题不会", "练习册"):
+        safety = SafetyEngine().classify_input(text)
+        result = classifier.classify(
+            text,
+            time_context=_time_context(TimePeriod.HOMEWORK_TIME),
+            safety=safety,
+        )
+
+        assert result.intent == IntentType.LEARNING_HELP
+        assert "explicit_learning_help_keyword" in result.evidence
+
+
 def test_bedtime_keyword_uses_bedtime_context() -> None:
     safety = SafetyEngine().classify_input("晚安")
     result = IntentClassifier().classify(

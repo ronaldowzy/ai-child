@@ -15,11 +15,33 @@
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。语音输入 ASR 仍是后续能力。
 - “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
+- 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
 - 儿童聊天页中的父亲设置和父亲日报入口使用轻量误触保护：点击只提示，长按后输入开发 PIN 才进入。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
 - 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、父母寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
+
+## Freedom-first 第二轮收口
+
+当前 Android 行为：
+
+```text
+1. 父母寄语可在父亲设置页编辑；后端会在 PostgreSQL 可用时持久化，数据库不可用时 dev fallback 到内存。
+2. 父母寄语不会出现在儿童聊天 UI 或 session_state debug 中。
+3. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
+4. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
+5. “拍题目”仍作为学习场景快捷动作保留，但默认图片能力是“拍给小白狐看”。
+```
+
+待 Redmi K60 手动 QA：
+
+```text
+1. 分享积木/玩具图片 -> 点击“聊聊它”后，小白狐继续围绕图片聊，不进入作业。
+2. 分享图片 -> 点击“编个故事”后，小白狐基于图片摘要编故事。
+3. 选择“这是作业题” -> 仍进入 learning.homework_help，不直接给答案。
+4. 断开后端时，普通图片和作业图片分别显示正确失败文案。
+```
 
 ## 下一阶段语音和小白狐方向
 

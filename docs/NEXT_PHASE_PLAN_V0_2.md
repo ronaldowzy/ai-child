@@ -244,6 +244,9 @@ ASR 调研：
 5. SceneOrchestrator 默认回到 `conversation.open`，时段只做语气上下文。
 6. Attachment API 支持通用 image sharing，作业题和隐私敏感图片按意图分流。
 7. Android 父亲设置增加父母寄语，图片入口改为“拍给小白狐看”。
+8. 第二轮收窄学习意图，不再用单独“题 / 不会”触发 homework。
+9. 普通图片后续快捷动作携带 attachment_id 和图片摘要，进入 LLM 上下文。
+10. ParentPolicyService 优先使用 PostgreSQL 持久化父母寄语，dev/test 数据库不可用时回退内存。
 ```
 
 验收：
@@ -253,6 +256,7 @@ after_school + “我想聊恐龙” -> conversation.open。
 bedtime + “我想给你看积木” -> conversation.open + 低刺激上下文。
 “晚安” / “我困了” -> daily.bedtime_reflection。
 普通图片分享不进入 homework_help。
+普通图片后续“聊聊它 / 编个故事 / 问这是什么”能围绕刚才图片继续。
 作业图片仍进入 learning.homework_help。
 父母寄语进入 Prompt，但不出现在儿童 UI debug。
 ```

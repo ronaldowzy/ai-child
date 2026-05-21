@@ -63,6 +63,11 @@ class ParentPolicyRecord(Base, TimestampMixin):
         JSON,
         nullable=True,
     )
+    parent_message_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_message_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     version: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

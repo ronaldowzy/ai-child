@@ -110,6 +110,11 @@ class ConversationService:
             child_id=request.child_id,
             session_id=request.session_id,
         )
+        image_context = self._attachment_service.get_image_context(
+            request.input.attachments,
+            child_id=request.child_id,
+            session_id=request.session_id,
+        )
         use_homework_attachment = (
             homework_context is not None and safety.risk_level == RiskLevel.NONE
         )
@@ -122,6 +127,16 @@ class ConversationService:
                 suggested_modalities=[],
                 confidence=0.96,
                 evidence=["attachment_id_ready"],
+            )
+        elif image_context and image_context.recognized_type == "privacy_sensitive":
+            intent = IntentClassification(
+                intent=IntentType.PRIVACY_QUESTION,
+                sub_intent="privacy_boundary",
+                risk_level=RiskLevel.LOW,
+                needs_modality=False,
+                suggested_modalities=[],
+                confidence=0.9,
+                evidence=["image_privacy_context"],
             )
         else:
             intent = self._intent_classifier.classify(
@@ -184,6 +199,13 @@ class ConversationService:
                     "app_mode": request.client_context.app_mode,
                     "input_type": request.input.type,
                     "attachment_count": len(request.input.attachments),
+                    "contains_image": image_context is not None
+                    or homework_context is not None,
+                    "image_context": (
+                        image_context.to_prompt_context()
+                        if image_context is not None
+                        else None
+                    ),
                 },
             )
         )

@@ -34,6 +34,8 @@ def test_db_metadata_includes_key_columns() -> None:
             "communication_preferences",
             "safety_rules",
             "schedule",
+            "parent_message_raw",
+            "parent_message_updated_at",
             "version",
             "created_at",
             "updated_at",
@@ -154,7 +156,11 @@ def test_db_json_columns_use_sqlalchemy_json_type() -> None:
 def test_db_datetime_columns_are_timezone_aware() -> None:
     datetime_columns = {
         "children": {"created_at", "updated_at"},
-        "parent_policies": {"created_at", "updated_at"},
+        "parent_policies": {
+            "parent_message_updated_at",
+            "created_at",
+            "updated_at",
+        },
         "conversation_sessions": {"started_at", "ended_at", "created_at"},
         "conversation_messages": {"created_at"},
         "routing_decisions": {"created_at"},
@@ -197,3 +203,20 @@ def test_alembic_initial_revision_is_readable() -> None:
     assert "sa.JSON()" in revision_text
     for table_name in EXPECTED_TABLES:
         assert table_name in revision_text
+
+
+def test_alembic_parent_message_revision_is_readable() -> None:
+    backend_dir = Path(__file__).resolve().parents[2]
+    revision_path = (
+        backend_dir
+        / "alembic"
+        / "versions"
+        / "20260521_0002_add_parent_message_to_parent_policies.py"
+    )
+
+    assert revision_path.is_file()
+    revision_text = revision_path.read_text(encoding="utf-8")
+    assert 'revision: str = "20260521_0002"' in revision_text
+    assert 'down_revision: str | None = "20260520_0001"' in revision_text
+    assert "parent_message_raw" in revision_text
+    assert "parent_message_updated_at" in revision_text

@@ -27,6 +27,7 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
         PromptLayer.PARENT_MESSAGE,
         PromptLayer.PARENT_POLICY,
         PromptLayer.TIME_CONTEXT,
+        PromptLayer.IMAGE_CONTEXT,
         PromptLayer.SCENE,
         PromptLayer.MEMORY_CONTEXT,
         PromptLayer.OUTPUT_CONTRACT,
@@ -61,6 +62,25 @@ def test_prompt_manager_injects_parent_message_as_background() -> None:
     assert "不要直接对孩子说“你爸爸说你……”" in prompt.prompt
     assert "不得照搬给孩子" in prompt.prompt
     assert "父母寄语不能覆盖儿童安全底线" in prompt.prompt
+
+
+def test_prompt_manager_injects_image_context_without_homework_assumption() -> None:
+    prompt = PromptManager().compose(
+        "conversation.open",
+        image_context={
+            "attachment_id": "att_image_001",
+            "image_purpose": "share",
+            "recognized_type": "image_observation",
+            "recognized_text": "孩子搭了一个积木城堡",
+            "child_caption": "你看我搭的这个",
+        },
+    )
+
+    assert "## image_context" in prompt.prompt
+    assert "孩子刚刚分享了一张图片" in prompt.prompt
+    assert "孩子搭了一个积木城堡" in prompt.prompt
+    assert "你看我搭的这个" in prompt.prompt
+    assert "不要把它当成作业" in prompt.prompt
 
 
 def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None:

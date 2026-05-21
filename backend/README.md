@@ -209,8 +209,12 @@ return evidence fields, quote summaries, or full chat transcripts.
 ## Local PostgreSQL Persistence
 
 The v0.1-dev persistence target is local PostgreSQL for family testing. DB1-A
-adds the database foundation only; current business services still use their
-existing in-memory repositories until the B2-B5 migration steps wire them in.
+adds the database foundation. DB1-B has started business persistence:
+`ParentPolicyService` reads/writes `parent_policies` through a SQLAlchemy
+repository when PostgreSQL is available, including `parent_message_raw` and
+`parent_message_updated_at`. If the local database is unavailable in dev/test,
+the service falls back to the existing in-memory policy store so conversation
+and Android QA are not blocked.
 
 Local dev database:
 
@@ -244,6 +248,12 @@ parent_reports
 tts_cache_records
 ```
 
+After pulling DB1-B changes, run migrations:
+
+```bash
+bash scripts/db_migrate.sh
+```
+
 Data boundary:
 
 - This is local family-use storage, not a cloud multi-tenant production design.
@@ -253,8 +263,29 @@ Data boundary:
   not be written to PostgreSQL.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
+- Parent free-text notes are stored in `parent_policies.parent_message_raw` for
+  local family testing. They are prompt background only and must not be exposed
+  in child-facing debug/UI.
 - Any future cloud deployment or app-store release requires a separate child
   data compliance review before enabling remote persistence.
+
+## Freedom-first Conversation Notes
+
+The default child conversation mode is `conversation.open`. Time context,
+parent notes, memory, and image context are prompt context, not hard modes.
+Safety, privacy, explicit homework help, and explicit bedtime closeout remain
+guardrails.
+
+Second-round routing fixes:
+
+- Standalone “不会” or generic “题/问题” no longer triggers homework help.
+- “我不会画这个小怪兽”, “游戏里有一道谜题”, and “我想出一个问题考你” stay in
+  open conversation.
+- Explicit homework phrases such as “我有一道题不会”, “这道题怎么做”, “帮我看看作业”,
+  “数学题不会”, “练习册” enter `learning.homework_help`.
+- Generic image sharing can continue into conversation through attachment
+  context. The prompt receives the image summary and child caption, but no raw
+  photo.
 
 ## Optional Xiaomi Mimo Provider
 

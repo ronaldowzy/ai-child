@@ -86,6 +86,17 @@ def test_asr_accepts_m4a_smoke_input() -> None:
     assert response.requires_confirmation is True
 
 
+def test_mock_asr_without_explicit_transcript_needs_retry() -> None:
+    payload = _request_payload()
+    payload.pop("metadata")
+
+    response = AsrService().transcribe(AsrTranscriptionRequest.model_validate(payload))
+
+    assert response.status == AsrTranscriptStatus.NEEDS_RETRY
+    assert response.transcript is None
+    assert response.error_code == "empty_transcript"
+
+
 def test_asr_rejects_unsupported_format() -> None:
     payload = _request_payload()
     payload["audio"]["format"] = "mp3"

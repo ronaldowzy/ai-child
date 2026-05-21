@@ -317,6 +317,17 @@ curl --noproxy '*' http://192.168.1.10:8000/api/v1/health
 
 模拟器继续使用默认 `http://10.0.2.2:8000/`；真机或平板必须使用 Mac mini 的局域网 IP，并确保设备和 Mac 在同一网络。
 
+交付真机 APK 前必须复核：
+
+```bash
+bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://<mac-lan-ip>:8000/
+sed -n '1,40p' android/app/build/generated/source/buildConfig/debug/com/childai/companion/BuildConfig.java
+shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
+curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health
+```
+
+如果 `BuildConfig.CONVERSATION_API_BASE_URL` 仍是 `http://10.0.2.2:8000/`，该 APK 只能用于模拟器，不能交给 Redmi K60 / Honor Pad 5 做真机 QA。
+
 本地开发使用 HTTP 明文访问后端；不要在 Android 端写入任何模型 API key 或真实 secret。
 
 ## 本地运行

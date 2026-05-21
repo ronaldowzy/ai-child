@@ -1,9 +1,11 @@
 import json
 import logging
+import time
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.api.v1 import conversation_stream as conversation_stream_api
 from app.api.v1.conversation_stream import router as conversation_stream_router
 from app.domain.schemas.conversation import (
@@ -46,6 +48,19 @@ class PartiallyFailingTtsService:
         self.calls.append((text, emotion))
         if call_index in self._fail_call_indexes:
             raise RuntimeError("provider timeout with child text hidden")
+        return f"/media/tts/xiaobaohu_v01/segment_{call_index}.wav"
+
+
+class SlowThenFastTtsService:
+    def __init__(self, *, slow_call_indexes: set[int]) -> None:
+        self._slow_call_indexes = slow_call_indexes
+        self.calls: list[tuple[str, str]] = []
+
+    def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
+        call_index = len(self.calls)
+        self.calls.append((text, emotion))
+        if call_index in self._slow_call_indexes:
+            time.sleep(0.2)
         return f"/media/tts/xiaobaohu_v01/segment_{call_index}.wav"
 
 
@@ -310,6 +325,43 @@ def test_one_tts_segment_failure_does_not_stop_later_segments() -> None:
     assert events[-1]["type"] == "done"
     assert events[-1]["payload"]["tts_segment_count"] == 3
     assert events[-1]["payload"]["audio_segment_count"] == 2
+    assert events[-1]["payload"]["tts_error_count"] == 1
+
+
+def test_slow_tts_segment_soft_timeout_does_not_block_later_segments() -> None:
+    tts_service = SlowThenFastTtsService(slow_call_indexes={1})
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段文字已经准备好了。"
+                "第二段声音可能会很慢很慢。"
+                "第三段不能被慢段卡住继续播放。"
+            ),
+        ),
+        tts_service=tts_service,
+        settings=Settings(conversation_stream_tts_soft_timeout_ms=50),
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="请分三段讲", include_tts=True),
+    )
+
+    error_events = [event for event in events if event["type"] == "error"]
+    audio_ready = [event for event in events if event["type"] == "audio_ready"]
+
+    assert len(tts_service.calls) == 3
+    assert len(error_events) == 1
+    assert error_events[0]["payload"]["code"] == "tts_timeout"
+    assert error_events[0]["payload"]["sentence_index"] == 1
+    assert error_events[0]["payload"]["text"] == "第二段声音可能会很慢很慢。"
+    assert {event["payload"]["sentence_index"] for event in audio_ready} == {0, 2}
+    assert _event_index(events, "error", sentence_index=1) < _event_index(
+        events,
+        "audio_ready",
+        sentence_index=2,
+    )
     assert events[-1]["payload"]["tts_error_count"] == 1
 
 

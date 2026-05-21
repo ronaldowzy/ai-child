@@ -625,6 +625,34 @@ key, base64 audio, full transcript, request body, response body, or audio path.
 Do not enable MiMo ASR with real child audio until father authorization,
 retention/deletion/no-training terms, and all ASR policy flags are confirmed.
 
+### ASR QA artifact rule
+
+Android ASR UI code does not mean real ASR is enabled. Before asking for real
+speech-recognition QA, verify the running backend is not using mock ASR:
+
+```bash
+set -a
+source .env
+set +a
+python3 - <<'PY'
+import os
+for key in [
+    "CHILD_AI_ASR_PROVIDER",
+    "CHILD_AI_MIMO_ASR_ENABLED",
+    "CHILD_AI_MIMO_ASR_API_KEY",
+    "CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO",
+    "CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED",
+    "CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED",
+]:
+    value = os.getenv(key, "")
+    print(f"{key}={'present' if 'KEY' in key and value else value or 'missing'}")
+PY
+```
+
+If `CHILD_AI_ASR_PROVIDER` is `mock` or the MiMo flags are incomplete, the
+artifact can only test recording, upload, confirmation UI, and graceful retry or
+policy-blocked messaging. It must not be described as a real MiMo ASR test.
+
 ## Safety Notes
 
 - `high` / `critical` input routes to `safety.guardian` with

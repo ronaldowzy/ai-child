@@ -10,7 +10,7 @@ from app.providers.asr.base import (
 class MockAsrProvider(BaseAsrProvider):
     """ASR placeholder that never calls an external provider."""
 
-    _DEFAULT_TRANSCRIPT = "我想请你帮我听一下这段话。"
+    _DEFAULT_TRANSCRIPT = "未听清"
 
     def __init__(self, *, enabled: bool = True) -> None:
         super().__init__(provider_name=AsrProviderName.MOCK, enabled=enabled)

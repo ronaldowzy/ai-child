@@ -142,7 +142,7 @@ def test_asr_api_accepts_m4a_smoke_input(client: TestClient) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "ok"
+    assert body["status"] == "needs_retry"
     assert body["provider"] == "mock"
     assert body["requiresConfirmation"] is True
 

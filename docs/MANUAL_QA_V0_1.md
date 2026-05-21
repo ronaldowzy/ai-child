@@ -5,6 +5,35 @@
 时区：Asia/Shanghai
 测试数据：仅使用虚构 `child_e2e_s14_001` / `child_demo_001` 和 mock 题目文本；未使用真实儿童数据、真实家庭信息、真实照片或真实音频。
 
+## QA Artifact Readiness Gate
+
+2026-05-21 复盘：
+
+```text
+曾错误交付了一个不满足目标的测试品：
+1. 真机 APK 仍使用模拟器地址 `http://10.0.2.2:8000/`，导致 Redmi 真机无法连接后端。
+2. Android 语音输入 UI 已接录音上传，但后端 ASR 实际仍为 `provider=mock`，父亲无法测试真实 MiMo ASR。
+3. mock ASR 返回固定句子“我想请你帮我听一下这段话。”，误导成真实识别结果。
+```
+
+后续给父亲测试前必须完成以下检查：
+
+| 测试目标 | 必须证明 | 不满足时的交付口径 |
+|---|---|---|
+| 真机聊天 / stream / TTS | APK `BuildConfig.CONVERSATION_API_BASE_URL` 是当前 Mac LAN 地址；LAN `/api/v1/health`、目标 conversation 接口 curl 通过 | 不能交付真机测试；只能说明是模拟器构建 |
+| 真实 MiMo ASR | 后端日志或 health/detail/curl 证明 `provider=mimo`；ASR env flags、API key、child audio authorization、retention policy、no-training confirmed 全部开启；使用非儿童 smoke 音频先通过 | 只能测试录音上传 UI、pending transcript、needs_retry/policy-blocked；不能声明可测真实识别 |
+| Mock ASR | 返回 `needs_retry` 或显式测试 transcript；不得把固定 mock 文案当作真实转写展示给父亲 | 标为 mock/fallback 流程测试 |
+| MiMo VoiceClone TTS | `provider=mimo`、policy flags、voice sample、media URL 可用；至少一次 curl/App 触发后日志有 `tts_call_finished` 和 media GET | 只能测文字和系统 TTS fallback |
+
+最终给 APK 或后端测试地址时，必须写明：
+
+```text
+1. APK 路径、SHA256、base URL。
+2. 后端 URL、运行端口、目标接口 smoke 结果。
+3. ASR/TTS/model provider 当前实际状态：mock 还是 mimo。
+4. 本次能测的能力和不能测的能力。
+```
+
 ## 环境
 
 | 项目 | 结果 |

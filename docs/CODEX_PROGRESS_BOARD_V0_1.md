@@ -236,6 +236,7 @@ Mock 拍题：done
 | ASR-Smoke-1 provider smoke QA | done |  | `scripts/smoke_mimo_asr.sh` 支持 `.wav` / `.m4a` smoke audio 和安全字段输出；新增 `asr_call_finished` timing，不输出 transcript/base64/API key |
 | Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
 | Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
+| QA-Gate-1 测试品目标一致性门槛 | done |  | 固化 2026-05-21 复盘：给父亲 APK/后端测试品前必须核对 APK base URL、运行后端 env、provider/mock 状态和目标接口 smoke；mock ASR 不能声明为真实 MiMo ASR 测试 |
 
 ---
 

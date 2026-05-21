@@ -1,7 +1,7 @@
 package com.childai.companion.voice
 
 data class AudioSegment(
-    val audioUrl: String,
+    val audioUrl: String?,
     val text: String,
     val index: Int,
 )

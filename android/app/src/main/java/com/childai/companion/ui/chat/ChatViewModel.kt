@@ -812,7 +812,7 @@ class ChatViewModel(
 
     private fun enqueueStreamAudio(event: ConversationStreamEvent) {
         val audioUrl = event.audioUrl ?: return
-        if (_uiState.value.tts.isMuted) return
+        if (!_uiState.value.tts.isAutoReadEnabled || _uiState.value.tts.isMuted) return
         audioSegmentQueuePlayer.enqueue(
             AudioSegment(
                 audioUrl = audioUrl,
@@ -835,6 +835,9 @@ class ChatViewModel(
         val message = event.safeMessage
             ?: "小白狐这次没有接稳，但已经显示的文字还在这里。"
         val hasPartialText = streamingAgentMessageId != null
+        if (event.payload.optString("stage") == "tts") {
+            enqueueStreamTtsFallback(event)
+        }
         if (!hasPartialText) {
             appendAgentMessage(message)
         }
@@ -845,6 +848,29 @@ class ChatViewModel(
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
                     statusText = "我们先等大人检查网络。",
+                ),
+            )
+        }
+    }
+
+    private fun enqueueStreamTtsFallback(event: ConversationStreamEvent) {
+        val text = event.audioText.trim()
+        if (text.isBlank()) return
+        val tts = _uiState.value.tts
+        if (!tts.isAutoReadEnabled || tts.isMuted) return
+        audioSegmentQueuePlayer.enqueue(
+            AudioSegment(
+                audioUrl = null,
+                text = text,
+                index = event.payload.optInt("sentence_index", 0),
+            ),
+        )
+        _uiState.update { state ->
+            state.copy(
+                tts = state.tts.copy(
+                    isSpeakingPending = !state.tts.isSpeaking,
+                    isAvailable = true,
+                    errorMessage = null,
                 ),
             )
         }

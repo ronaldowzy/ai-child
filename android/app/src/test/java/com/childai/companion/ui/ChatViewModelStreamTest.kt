@@ -88,6 +88,52 @@ class ChatViewModelStreamTest {
     }
 
     @Test
+    fun ttsErrorUsesSystemFallbackTextWhenNotMuted() {
+        val ttsController = RecordingTtsController()
+        val viewModel = ChatViewModel(
+            conversationSender = NoopConversationSender(),
+            ttsController = ttsController,
+        )
+
+        viewModel.applyStreamEvent(streamEvent("text_delta", "delta" to "前一句。"))
+        viewModel.applyStreamEvent(
+            streamEvent(
+                "error",
+                "stage" to "tts",
+                "code" to "tts_timeout",
+                "text" to "中间这句也应该被读出来。",
+                "sentence_index" to 1,
+            ),
+        )
+
+        assertEquals(1, ttsController.requests.size)
+        assertEquals(null, ttsController.requests.first().audioUrl)
+        assertEquals("中间这句也应该被读出来。", ttsController.requests.first().text)
+    }
+
+    @Test
+    fun mutedStateSkipsTtsErrorFallback() {
+        val ttsController = RecordingTtsController()
+        val viewModel = ChatViewModel(
+            conversationSender = NoopConversationSender(),
+            ttsController = ttsController,
+            initialTtsUiState = TtsUiState(isMuted = true),
+        )
+
+        viewModel.applyStreamEvent(
+            streamEvent(
+                "error",
+                "stage" to "tts",
+                "code" to "tts_timeout",
+                "text" to "静音时不应该 fallback 朗读。",
+                "sentence_index" to 1,
+            ),
+        )
+
+        assertTrue(ttsController.requests.isEmpty())
+    }
+
+    @Test
     fun stopClearsStreamingAudioQueue() {
         val ttsController = RecordingTtsController(autoComplete = false)
         val viewModel = ChatViewModel(

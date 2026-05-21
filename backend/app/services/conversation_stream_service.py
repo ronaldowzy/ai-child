@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from contextvars import copy_context
 from datetime import datetime, timezone
 import hashlib
 import logging
@@ -163,10 +165,17 @@ class ConversationStreamService:
                     first_tts_start_ms = self._elapsed_ms(started_at)
                 yield builder.event("tts_started", self._tts_started_payload(segment))
                 try:
-                    audio_url = self._tts_service.generate_for_conversation(
+                    audio_url = self._generate_tts_with_soft_timeout(
                         text=segment.text,
                         emotion=response.reply.emotion,
                     )
+                except FutureTimeoutError:
+                    tts_error_count += 1
+                    yield builder.event(
+                        "error",
+                        self._tts_error_payload(segment, code="tts_timeout"),
+                    )
+                    continue
                 except Exception:
                     tts_error_count += 1
                     yield builder.event(
@@ -328,10 +337,30 @@ class ConversationStreamService:
             "recoverable": True,
             "segment_id": f"seg_{segment.index}",
             "sentence_index": segment.index,
+            "text": segment.text,
+            "text_chars": len(segment.text),
             "text_range": {"start": segment.start, "end": segment.end},
             "fallback": "system_tts_or_text",
             "safe_message": "这段声音没有放出来，但文字还在这里。",
         }
+
+    def _generate_tts_with_soft_timeout(self, *, text: str, emotion: str) -> str | None:
+        timeout_ms = self._settings.conversation_stream_tts_soft_timeout_ms
+        if timeout_ms <= 0:
+            return self._tts_service.generate_for_conversation(text=text, emotion=emotion)
+
+        context = copy_context()
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stream-tts")
+        future = executor.submit(
+            context.run,
+            self._tts_service.generate_for_conversation,
+            text=text,
+            emotion=emotion,
+        )
+        try:
+            return future.result(timeout=timeout_ms / 1000)
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def _should_generate_tts(
         self,

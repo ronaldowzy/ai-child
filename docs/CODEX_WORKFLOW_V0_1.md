@@ -129,6 +129,25 @@ Codex 不应该擅自：
 6. 最终回复必须说明 commit hash、是否已 push、测试结果和仍需手动 QA 的事项。
 ```
 
+### 1.4 QA artifact readiness gate
+
+给父亲 / 产品负责人安装包、后端服务或 smoke 脚本前，Codex 必须先证明“测试品”和“本轮要测试的目标能力”一致。不能只因为代码里有 UI 或接口就让父亲测试真实能力。
+
+必须逐项核对：
+
+```text
+1. APK base URL 是否指向当前可访问后端。真机 APK 不得使用模拟器专用 `10.0.2.2`，必须使用 Mac 局域网地址并用 BuildConfig 或 APK 产物复核。
+2. 后端实际运行进程是否加载了本轮代码和目标 env。不能只看源码默认值或旧进程。
+3. provider 状态是否匹配测试目标：
+   - 测真实 MiMo ASR 时，`CHILD_AI_ASR_PROVIDER=mimo`、MiMo ASR enabled、API key、child-audio authorization、retention policy、no-training flags 必须全部满足。
+   - 若 ASR 仍是 `provider=mock`，只能让父亲测试录音、上传、待确认 UI 和失败/重说提示，不能声明为真实语音识别测试。
+   - 测 MiMo VoiceClone 时，TTS provider、policy flags、voice sample 和 cache/media URL 必须可用。
+4. 健康检查或 curl smoke 必须覆盖目标接口，而不只是 `/health`。
+5. 最终回复必须明确写出当前 artifact 能测什么、不能测什么、哪些能力仍是 mock/policy-blocked。
+```
+
+如果任一项不满足，Codex 必须停止交付该测试目标，先修配置、重打包或改口径。不得把半配置、mock 产物交给父亲做真实能力 QA。
+
 例外：
 
 ```text

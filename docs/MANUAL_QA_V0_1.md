@@ -185,6 +185,44 @@ QA 使用说明：
 4. Streaming v1 QA 继续记录 request_id，并新增 first_text_ms、first_audio_ms、stream_total_ms。
 ```
 
+## Streaming v1 Backend / ASR Intake QA 记录
+
+日期：2026-05-21
+范围：后端 `/api/v1/conversation/stream` NDJSON skeleton、MiMo ASR spec intake 和 mock-first ASR skeleton。未做 Android stream client、未做 Android ASR 录音 UI、未做真实 MiMo ASR 外发。
+
+| 检查项 | 期望 | 结果 |
+|---|---|---|
+| Stream endpoint | `POST /api/v1/conversation/stream` 返回 `application/x-ndjson` | pass |
+| 第一条事件 | 第一条 event 为 `session_started`，并带 requestId/sessionId | pass |
+| 路由事件 | 输出 `route_decision`，包含 activeScene/riskLevel 等路由摘要 | pass |
+| 文本事件 | 输出 `text_delta`、`sentence_ready`、`text_final` 和 `done` | pass |
+| TTS segment | TTS 成功时输出 `tts_started` / `audio_ready` | pass |
+| TTS 失败 | TTS 异常时输出 recoverable `error`，仍输出 `text_final` / `done` | pass |
+| 安全/隐私 | 隐私输入仍进入 `privacy.boundary` | pass |
+| 学习边界 | 明确作业求助仍进入 `learning.homework_help`，不直接给答案 | pass |
+| Stream timing | `conversation_stream_finished` 记录 request_id、first_text_ms、first_audio_ms、stream_total_ms | pass |
+| 旧接口 | `/api/v1/conversation/message` 继续由既有测试覆盖 | pass |
+| ASR spec secret scan | 外部 MiMo ASR spec 未发现真实 API key、真实儿童信息或敏感音频路径 | pass |
+| ASR skeleton policy | MiMo ASR 默认 disabled，policy guard 阻断儿童音频外发 | pass |
+
+本轮命令结果：
+
+| 命令 | 结果 |
+|---|---|
+| `bash scripts/test_backend.sh -q app/tests/test_text_segmenter.py app/tests/test_conversation_stream_api.py app/tests/test_asr_service.py` | 通过：15 passed |
+| `bash scripts/test_backend.sh -q` | 通过：210 passed |
+| `bash scripts/lint_backend.sh` | 通过：All checks passed |
+| `curl --no-buffer -X POST http://127.0.0.1:18090/api/v1/conversation/stream ...` | 通过：返回 NDJSON，包含 session_started、route_decision、text_delta、sentence_ready、text_final、done；本次 `include_tts=false`，未触发 audio_ready |
+
+ASR intake 结论：
+
+```text
+1. MiMo audio input 只作为云端 ASR 候选；当前确认的是 non-streaming audio input，streaming ASR 未确认。
+2. 真实儿童音频不外发；原始音频不入库、不进日志、不提交仓库。
+3. ASR skeleton 默认 mock，MiMo provider disabled，ASR router 不挂载到 main。
+4. 后续如要启用云 ASR，必须先确认 retention/no-training/deletion policy，并写入产品决策。
+```
+
 ## API 联调场景
 
 | 场景 | 输入/操作 | 期望 | 结果 |

@@ -27,6 +27,9 @@
 20. 最新产品方向修订为 freedom-first：默认自由对话，时间、父母寄语、记忆、最近聊天和图片能力作为上下文或工具；高风险安全、隐私边界、明确学习求助、明确睡前收尾和父母强规则作为护栏。
 21. 拍照能力从“拍题目”升级为“拍给小白狐看”的通用图片分享；玩具、画、书、植物、手工和作业都应先理解孩子意图，再分流。
 22. 父母寄语需要支持自由文本，作为 Prompt 背景上下文注入；不能机械复述给孩子，不能覆盖儿童安全底线。
+23. Ops P0 已完成 request_id、JSON 日志、request/model/TTS timing 和 `/api/v1/health/detail`。
+24. Streaming v1 后端 skeleton 已新增 `/api/v1/conversation/stream`，采用 NDJSON 和 sentence-level pseudo streaming；Android stream client 尚未实现。
+25. MiMo ASR spec intake 已完成脱敏归档；云 ASR 默认 disabled，ASR skeleton 不挂载到生产主 app，Android 本地 SpeechRecognizer 仍是 v1 默认路线。
 ```
 
 ---
@@ -186,10 +189,20 @@ child input
 
 ```text
 1. S-Stream-0：先写 `STREAMING_INTERACTION_DESIGN_V0_1.md`，确认 SSE/NDJSON、事件结构、pseudo streaming 和 QA 指标。
-2. S-Stream-1：新增 `/api/v1/conversation/stream`，保留旧 `/conversation/message`，不绕过安全、场景、runtime 和 TTS gate。
+2. S-Stream-1：已新增 `/api/v1/conversation/stream`，保留旧 `/conversation/message`，不绕过安全、场景、runtime 和 TTS gate。
 3. S-Stream-2：Android 增加 stream client、progressive bubble 和 audio segment queue；stream 失败 fallback 到旧接口。
 4. UI-Landscape-1：Android 横屏双栏，左侧小白狐，右侧对话；不做完整美术重设计。
 5. Fox-Coverage-1：输出小白狐 11/12 状态资源和业务触发覆盖矩阵，不假装未触发状态已完成。
+```
+
+S-Stream-1 当前实现边界（2026-05-21）：
+
+```text
+1. 事件协议为 `application/x-ndjson`，事件包含 session_started、route_decision、text_delta、sentence_ready、tts_started、audio_ready、text_final、done 和 error。
+2. 后端先生成经过安全输出检查的完整 reply，再按句子/短片段 pseudo streaming；当前不假设 MiMo 支持 true streaming。
+3. TTS 按 segment 生成；TTS 失败会发送 recoverable error，不中断 text_final 和 done。
+4. stream timing 日志记录 request_id、session_id_hash、active_scene、first_text_ms、first_audio_ms、stream_total_ms、tts_segment_count 和 error_type。
+5. Android 尚未接入 stream client；旧 `/api/v1/conversation/message` 继续作为正式 fallback。
 ```
 
 约束：
@@ -221,11 +234,13 @@ QA 指标：
 ASR 调研：
 
 ```text
-1. 新增 `docs/ASR_INPUT_RESEARCH_V0_1.md`。
-2. 确认 MiMo 是否提供 speech-to-text / audio input 模型。
-3. 确认是否支持中文儿童语音、流式 ASR、非流式 ASR、音频格式、延迟、费用和数据留存。
-4. 未确认前不实现云端 ASR，不上传原始音频。
-5. Android v1 仍遵守 confirm-before-send，不做 hands-free conversational mode。
+1. 已新增 `docs/ASR_INPUT_RESEARCH_V0_1.md`。
+2. 已新增 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`。
+3. 父亲本机 spec 显示 MiMo chat completions audio input 可作为非流式 ASR 候选，候选模型为 `mimo-v2.5` / `mimo-v2-omni`。
+4. 流式 ASR 未确认；儿童音频 retention、删除和 no-training 承诺未确认。
+5. 未确认前不启用云端 ASR，不上传真实儿童原始音频。
+6. Android v1 仍遵守 confirm-before-send，不做 hands-free conversational mode。
+7. 后端已新增 mock-first ASR skeleton 和 AsrDataPolicyGuard；ASR router 当前不挂载到主 app。
 ```
 
 ---

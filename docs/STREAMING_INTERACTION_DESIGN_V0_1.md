@@ -23,6 +23,31 @@ docs/CODEX_PROGRESS_BOARD_V0_1.md
 6. 流式体验不得放松儿童安全边界：不制造秘密关系，不鼓励隐瞒父母，不直接给作业最终答案。
 ```
 
+当前实现状态：
+
+```text
+S-Stream-1 后端骨架已新增独立 router/service/schema/text segmenter：
+- backend/app/api/v1/conversation_stream.py
+- backend/app/domain/schemas/conversation_stream.py
+- backend/app/services/conversation_stream_service.py
+- backend/app/services/text_segmenter.py
+
+实现方式是 conservative sentence-level pseudo streaming：
+1. 先发送 session_started。
+2. 通过现有 ConversationService 复用 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry 和 ChildAgentRuntime。
+3. ConversationService 内部注入 no-op TTS，避免旧同步完整 TTS 阻塞 stream 文本。
+4. 对已通过输出安全检查的最终回复做 sentence text_delta / sentence_ready。
+5. text_final 先完成，再按句子尝试 TTS。
+6. TTS 成功发送 audio_ready；TTS 失败发送 recoverable error，但不影响 text_final 和 done。
+
+Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/conversation/stream` 可通过后端测试和本地 curl 做 NDJSON 验证。Android stream client 尚未接入，生产 UI 仍使用旧 `/api/v1/conversation/message`。
+
+Ops P0 timing 复用：
+1. 每个 stream 请求仍由 request_id middleware 写入 `X-Request-ID`。
+2. `app.stream_timing` 记录 `conversation_stream_finished`，字段包含 request_id、session_id_hash、active_scene、first_text_ms、first_audio_ms、stream_total_ms、tts_segment_count 和 error_type。
+3. 日志不得记录完整 child text、parent_message_raw、prompt、reply text、TTS segment text、API key 或带签名 query 的 audioUrl。
+```
+
 ---
 
 ## 1. Current Sync Chain Problem
@@ -299,6 +324,15 @@ FastAPI route 只负责：
 
 | Type | Purpose |
 |---|---|
+| `session_started` | stream 已建立；当前 S-Stream-1 实际事件名 |
+| `route_decision` | 后端统一路由后的场景摘要；不包含 prompt、证据原文或 provider 细节 |
+| `text_delta` | 追加安全文本片段；当前 S-Stream-1 实际事件名 |
+| `sentence_ready` | 某个文本句段可用于 TTS 排队 |
+| `tts_started` | 某段 TTS 开始生成 |
+| `audio_ready` | 某段音频 URL 可播放 |
+| `text_final` | 安全文本完整输出完成 |
+| `done` | 整轮完成或失败收口 |
+| `error` | 可恢复或不可恢复错误；TTS 错误必须可恢复 |
 | `turn.started` | stream 已建立 |
 | `agent_state` | Android 小白狐状态提示，如 thinking/speaking/network_error |
 | `reply.started` | 安全 reply 已准备输出 |

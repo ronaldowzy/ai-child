@@ -362,6 +362,7 @@ The Android app never stores model API keys. All model configuration belongs on 
 
 - `GET /api/v1/health`
 - `POST /api/v1/conversation/message`
+- `POST /api/v1/conversation/stream`
 - `POST /api/v1/conversation/attachment`
 - `GET /api/v1/parent/policy`
 - `POST /api/v1/parent/policy`
@@ -466,34 +467,47 @@ text with `audio_url=null`. The conversation integration is also gated by
 
 ## Streaming And Ops Roadmap
 
-The current conversation path is intentionally still synchronous:
+The legacy conversation path is intentionally still synchronous:
 
 ```text
 child input -> full LLM reply -> full TTS audio -> response text + audio_url
 ```
 
-This is good enough for smoke tests, but recent Redmi K60 testing shows that it
-creates visible wait time even after Android's read timeout was raised. The next
-backend milestone is to design and then add a separate streaming endpoint
-without breaking the existing API:
+This remains the Android fallback. The backend now also exposes a separate
+Streaming v1 skeleton without breaking the existing API:
 
 ```text
 POST /api/v1/conversation/stream
 ```
 
-Planned stream behavior:
+Current stream behavior:
 
 ```text
 1. Keep `/api/v1/conversation/message` for fallback and regression safety.
 2. Continue routing through SafetyEngine, IntentClassifier, SceneOrchestrator,
    ChildAgentRuntime, ModelRegistry, and TtsDataPolicyGuard.
-3. Emit text delta events as soon as possible.
+3. Return `application/x-ndjson` events with session_started, route_decision,
+   text_delta, sentence_ready, tts_started, audio_ready, text_final, done/error.
 4. Split text into sentence/chunk events and generate TTS segments.
 5. Emit audio-ready events as each segment becomes available.
-6. If MiMo VoiceClone does not support true audio streaming, use
-   sentence-level pseudo streaming first.
+6. Use sentence-level pseudo streaming first; true MiMo streaming is not assumed.
 7. TTS failure must not fail the text stream.
+8. `app.stream_timing` logs request_id, session_id_hash, active_scene,
+   first_text_ms, first_audio_ms, stream_total_ms, tts_segment_count, and
+   error_type.
 ```
+
+Local stream smoke:
+
+```bash
+curl -sS --no-buffer -X POST http://127.0.0.1:8000/api/v1/conversation/stream \
+  -H 'content-type: application/json' \
+  -H 'X-Request-ID: stream-readme-smoke-001' \
+  -d '{"child_id":"stream_demo_child","session_id":"stream_demo_session","input":{"type":"text","text":"我想聊恐龙","attachments":[]},"client_context":{"device_time":"2026-05-21T16:35:00+08:00","timezone":"Asia/Shanghai","app_mode":"child"},"stream_options":{"include_tts":false,"client_turn_id":"readme_smoke_001"}}'
+```
+
+Android stream client, progressive bubble rendering, and audio segment queue are
+not implemented in this backend slice.
 
 The first backend Ops P0 slice is now in place. It is intentionally local-first
 and does not use a third-party APM or external log platform:
@@ -546,6 +560,41 @@ voice sample contents.
 
 Streaming v1 will reuse the same request_id and provider timing fields, then add
 stream-specific `first_text_ms`, `first_audio_ms`, and `stream_total_ms`.
+
+## ASR Spec Intake
+
+MiMo ASR / audio-input research is documented in:
+
+```text
+docs/ASR_INPUT_RESEARCH_V0_1.md
+docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md
+```
+
+Current backend status:
+
+```text
+1. ASR schema/service/provider skeleton exists for design validation and tests.
+2. The ASR router is not mounted in `backend/app/main.py`.
+3. Default provider is mock; MiMo ASR is disabled and policy-blocked by default.
+4. Android local SpeechRecognizer + confirm-before-send remains the v1 default.
+5. No real child audio should be uploaded or stored during this phase.
+```
+
+ASR environment defaults:
+
+```bash
+export CHILD_AI_ASR_PROVIDER=mock
+export CHILD_AI_MIMO_ASR_ENABLED=false
+export CHILD_AI_MIMO_ASR_API_KEY=""
+export CHILD_AI_MIMO_ASR_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
+export CHILD_AI_MIMO_ASR_MODEL=mimo-v2.5
+export CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=false
+export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
+export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
+```
+
+Do not enable MiMo ASR with real child audio until retention, deletion and
+no-training terms are confirmed and the product decision is written down.
 
 ## Safety Notes
 

@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     tts_cache_dir: str = "backend/storage/tts_cache"
     tts_public_base_url: str = "/media/tts"
     tts_max_text_chars: int = 600
+    asr_provider: str = "mock"
+    mimo_asr_enabled: bool = False
+    mimo_asr_api_key: str = ""
+    mimo_asr_base_url: str = "https://token-plan-cn.xiaomimimo.com/v1"
+    mimo_asr_model: str = "mimo-v2.5"
+    mimo_asr_timeout_ms: int = 30000
+    mimo_asr_allow_child_audio: bool = False
+    mimo_asr_retention_policy_checked: bool = False
+    mimo_asr_no_training_confirmed: bool = False
     database_url: str = (
         "postgresql+psycopg://child_ai:child_ai@localhost:5432/child_ai_dev"
     )

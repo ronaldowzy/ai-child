@@ -43,7 +43,7 @@ PD-027：小白狐正式品牌音色方案改为后端 MiMo VoiceClone；VoiceDe
 4. `audio_url` 不可用时，Android fallback 到系统 TextToSpeech；系统 TTS 不再作为正式小白狐音色方案。
 5. 后端不接收孩子原始音频上传；语音输入仍只发送确认后的文本消息和必要的轻量 metadata。
 6. Hands-free conversational mode 是 future，不进入 v1。
-7. 语音输入下一步先调研 MiMo ASR / audio input 能力；在接口和儿童语音数据边界确认前，不实现云端 ASR。
+7. MiMo ASR / audio input 已完成第一轮规格调研，结论见 `docs/ASR_INPUT_RESEARCH_V0_1.md` 和 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；在留存、训练和儿童音频外发策略确认前，不启用云端 ASR。
 8. 语音输出下一步转向文本流式和 TTS 分句/分段播放，不能继续依赖增加同步 read timeout。
 ```
 
@@ -91,6 +91,16 @@ VoiceEngine
 2. 未确认 API、留存策略和儿童语音处理边界前，不实现云端 ASR，不上传原始音频。
 3. 即使未来使用 MiMo ASR，Android 仍不得保存模型 API key，后端必须提供独立数据策略 gate。
 4. v1 继续坚持 confirm-before-send；hands-free conversational mode 仍是 future。
+```
+
+补充结论（2026-05-21）：
+
+```text
+1. 外部规格显示 MiMo chat completions audio input 可作为非流式 ASR 候选，候选模型为 `mimo-v2.5` / `mimo-v2-omni`。
+2. 外部规格未提供可验证的儿童音频 retention、删除和 no-training 承诺，因此真实 provider 继续默认 disabled。
+3. 云 ASR 如后续启用，也只能返回待确认文本；孩子确认或编辑后，才走 `/api/v1/conversation/message`。
+4. 云 ASR 不进入 v1 默认路线；Android 本地 SpeechRecognizer 仍是第一实现路径。
+5. 不做 streaming ASR、常开麦克风、唤醒词或 hands-free conversational mode。
 ```
 
 v1 流程：
@@ -366,6 +376,16 @@ Android system TextToSpeech 只是 fallback 和诊断能力，不作为最终儿
 3. 返回 reply.voice_enabled、reply.audio_url、reply.emotion、reply.agent_motion。
 4. 通过 `POST /api/v1/tts/xiaobaohu` 按需生成小白狐语音音频。
 5. 保持音频和儿童相关文本外发 gate 默认关闭，真实 provider 不默认接收 child text 或 child audio。
+```
+
+ASR 研究后的后端边界：
+
+```text
+1. 可保留 mock/disabled 的 ASR skeleton，但不得在未确认策略前启用真实 MiMo ASR。
+2. 如后续新增 `/api/v1/asr/transcribe`，该接口只能返回 `requiresConfirmation=true` 的 pending transcript。
+3. ASR endpoint 不得直接调用 conversation runtime，也不得绕过 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager 或 ModelRegistry。
+4. 原始音频 base64 不写日志、不写数据库、不进入 memory、不写测试 fixture。
+5. 真实 provider 需要独立 AsrDataPolicyGuard；MiMo TTS 的 child text 许可不能自动等同于 child audio 许可。
 ```
 
 只有满足以下条件时，才考虑后端音频上传或云端 ASR：

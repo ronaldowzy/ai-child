@@ -1,6 +1,7 @@
 package com.childai.companion.ui.chat
 
 import com.childai.companion.data.conversation.ConversationReply
+import java.io.File
 
 data class FoxAgentUiState(
     val mood: FoxMood = FoxMood.Warm,
@@ -39,14 +40,52 @@ data class VoiceUiState(
     val isVoiceInputReserved: Boolean = true,
     val isTtsAvailable: Boolean = false,
     val audioUrl: String? = null,
+    val inputMode: VoiceInputMode = VoiceInputMode.Idle,
+    val pendingTranscript: String = "",
+    val errorMessage: String? = null,
+    val actions: VoiceInputActions = VoiceInputActions(),
 ) {
+    val hasPendingTranscript: Boolean
+        get() = inputMode == VoiceInputMode.PendingTranscript
+
+    val isRecording: Boolean
+        get() = inputMode == VoiceInputMode.Listening
+
+    val isUploading: Boolean
+        get() = inputMode == VoiceInputMode.Uploading
+
     val statusText: String
         get() = when {
+            errorMessage != null -> errorMessage
+            inputMode == VoiceInputMode.Listening -> "小白狐正在听，点一下说完。"
+            inputMode == VoiceInputMode.Uploading -> "小白狐正在把声音转成文字。"
+            inputMode == VoiceInputMode.PendingTranscript -> "可以先改文字，再发送。"
+            inputMode == VoiceInputMode.NeedsRetry -> "我刚才没听清，可以重说或打字。"
+            inputMode == VoiceInputMode.PermissionDenied -> "没关系，可以继续打字。"
             isTtsAvailable -> "朗读稍后接上"
-            isVoiceInputReserved -> "现在先用文字说"
+            isVoiceInputReserved -> "可以点语音，也可以打字"
             else -> "文字交流"
         }
 }
+
+enum class VoiceInputMode {
+    Idle,
+    Listening,
+    Uploading,
+    PendingTranscript,
+    NeedsRetry,
+    PermissionDenied,
+    Failed,
+}
+
+data class VoiceInputActions(
+    val onStartRecording: (File) -> Unit = {},
+    val onStopRecordingAndUpload: () -> Unit = {},
+    val onPermissionDenied: () -> Unit = {},
+    val onPendingTranscriptChange: (String) -> Unit = {},
+    val onSendPendingTranscript: () -> Unit = {},
+    val onCancelVoiceInput: () -> Unit = {},
+)
 
 fun ConversationReply.toFoxAgentUiState(): FoxAgentUiState {
     val mood = emotion.toFoxMood()
@@ -63,6 +102,14 @@ fun ConversationReply.toVoiceUiState(): VoiceUiState {
         isVoiceInputReserved = true,
         isTtsAvailable = voiceEnabled && !audioUrl.isNullOrBlank(),
         audioUrl = audioUrl,
+    )
+}
+
+fun VoiceUiState.withReplyVoice(reply: ConversationReply): VoiceUiState {
+    return copy(
+        isVoiceInputReserved = true,
+        isTtsAvailable = reply.voiceEnabled && !reply.audioUrl.isNullOrBlank(),
+        audioUrl = reply.audioUrl,
     )
 }
 

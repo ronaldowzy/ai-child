@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入
-当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；流式链路先以后端 NDJSON pseudo streaming + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：真机复验自由对话、通用图片连续追问、父母寄语持久化、MiMo audioUrl 播放和 stream fallback；Android ASR 录音确认 UI、MiMo ASR fake audio smoke 和 DB conversation message 持久化继续排队，不能按旧固定场景假设开发
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 录音确认 UI 已接入
+当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
+下一步：Redmi K60 / Honor Pad 5 真机复验 stream 首音频延迟、分段播放、停止/静音、ASR 权限、录音、上传、待确认文本和失败 fallback；MiMo ASR fake/smoke audio 和 DB conversation message 持久化继续排队，不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -52,12 +52,12 @@ Mock 拍题：done
 | R4 | 安全场景细分 | 细分高风险类别和父亲提醒策略 | done | M5/M6/R1 | 高风险优先，WATCH/PRIVACY 分流可测，固定安全回复不完全依赖模型 |
 | R5 | 父亲入口保护 | Android 父亲页访问保护 | done | A4/E2E | 长按父亲入口 + dev PIN 轻量保护，避免儿童轻易进入父亲设置和日报 |
 | R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
-| R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、系统 ASR/TTS 评估和 3D/fallback 待验收项 |
+| R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、后端 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
-| V1 | 语音交互 v1 | 后端 MiMo ASR confirm-before-send + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为后端 MiMo audio input，provider 和 endpoint 已接入但默认 policy-blocked；Android ASR 录音确认 UI 仍 todo |
+| V1 | 语音交互 v1 | 后端 MiMo ASR confirm-before-send + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为后端 MiMo audio input，provider 和 endpoint 已接入但默认 policy-blocked；Android ASR 录音确认 UI 已接入，待真机 QA |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 PNG 序列帧已接入 Android assets；保留静态 PNG 和 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
 | DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
-| S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | in_progress | V1/F1/R1 | 后端 NDJSON skeleton 已接入；Android 首版 stream client、渐进 agent bubble 和 audio segment queue 已接入；旧 `/conversation/message` 保留为 fallback |
+| S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | in_progress | V1/F1/R1 | 后端 NDJSON skeleton 已接入；segment-level interleaved TTS 已完成；Android 首版 stream client、渐进 agent bubble 和 audio segment queue 已接入；旧 `/conversation/message` 保留为 fallback |
 | UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
 | ASR-Research | 语音输入调研 | 调研 MiMo ASR / audio input 能力和儿童语音数据边界 | done | V1 | 父亲已确认 ASR v1 接 MiMo；已读取 MiMo ASR spec 并生成脱敏设计；真实儿童音频外发仍默认 disabled/policy-blocked |
@@ -179,7 +179,7 @@ Mock 拍题：done
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
 | E2E-02 Android 模拟器基础 smoke | done |  | AVD 启动、App 安装、聊天 API、父亲日报读取通过 |
 | E2E-03 Android 完整手动 QA | in_progress |  | QA1 通过窗口模式模拟器验证基础聊天、放学后、学习入口动作、父亲入口普通点击不进入、错误 PIN 不进入和后端不可达温和错误；正确 PIN、父亲设置修改、设备侧完整 mock 拍题和真实平板仍待复验 |
-| E2E-04 Android 表达层 smoke | in_progress |  | 儿童端主要可见文案已改为“小白狐”；PNG 候选资源和 TTS speaking 联动已接入；仍需设备侧验证默认自动朗读、停止/静音、VoiceProfile 听感、系统 ASR、3D 资源/fallback 和低配降级 |
+| E2E-04 Android 表达层 smoke | in_progress |  | 儿童端主要可见文案已改为“小白狐”；PNG 候选资源、TTS speaking 联动和后端 ASR confirm-before-send 已接入；仍需设备侧验证默认自动朗读、停止/静音、VoiceProfile 听感、录音上传、3D 资源/fallback 和低配降级 |
 
 ### 家庭内测前加固
 
@@ -196,7 +196,7 @@ Mock 拍题：done
 | R5-01 父亲入口保护 | done |  | Android 父亲设置/日报入口需长按并输入 dev PIN，不做账号系统但避免儿童误入 |
 | R6-01 真实模型输出质量加固 | done |  | Prompt 和 ChildAgentRuntime 输出规整改为 voice-first、短句、少 Markdown/列表、通常只保留一个主问题 |
 | R6-02 输出依赖/秘密关系拦截 | done |  | SafetyEngine.classify_output 会拦截“唯一朋友”“只有我懂你”“不要告诉可信成人”等风险话术并 fallback |
-| R6-03 Android 小白狐状态预留 | done |  | Android 将 `reply.emotion` / `reply.agent_motion` 映射为轻量状态；语音入口仍是文字阶段占位 |
+| R6-03 Android 小白狐状态预留 | done |  | Android 将 `reply.emotion` / `reply.agent_motion` 映射为轻量状态；语音入口已推进到后端 ASR 录音上传和待确认文本，仍需真机 QA |
 | R7-01 完整设备 QA | in_progress |  | QA1 已补充 MANUAL_QA_V0_1.md 当前结果；后续采用双设备策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容和大屏验证 |
 | R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；默认仍 Mock 优先 |
 
@@ -207,9 +207,9 @@ Mock 拍题：done
 | R8-01 Product Decision Sync 机制 | done |  | 父亲确认的新产品想法先写入 PRODUCT_DECISIONS；子会话实现前检查 confirmed decision |
 | R8-02 语音交互设计文档 | done |  | 明确 confirm-before-send、后端 MiMo ASR、默认自动 TTS、VoiceProfile、可替换抽象、原始音频策略、权限、错误文案、安全边界和 QA 指标 |
 | R8-03 下一阶段计划文档 | done |  | 拆分完整设备 QA、语音输入、TTS、小白狐视觉资源、小白狐动画状态机、真实平板家庭内测准备 |
-| V1-01 Android 语音上传确认 v1 | todo |  | Android 录音上传后端 ASR 后先展示可确认文本；确认后才发送 conversation；不直接调用 MiMo；future hands-free conversational mode 不进 v1 |
+| V1-01 Android 语音上传确认 v1 | done |  | Android 录音上传后端 ASR 后先展示可确认文本；确认后才发送 conversation stream；不直接调用 MiMo；future hands-free conversational mode 不进 v1；待真机权限和录音 QA |
 | V1-02 Android TTS 朗读 v1 | in_progress |  | Android 已优先播放 `reply.audio_url`，播放失败时 fallback 系统 TTS 或文字；系统 TTS 已有诊断和停止/静音基础；待 Redmi K60 听感和网络播放 QA |
-| V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / backend ASR upload 抽象仍 todo；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
+| V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / backend ASR upload 抽象已接入；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
 | V1-05 TTS-D1 可观测性与故障修复 | done |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段；新增 TTS 设置/语音数据入口 |
 | V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发；真实 smoke 已确认 `/chat/completions` + `choices[0].message.audio.data` 可生成 RIFF/WAV |
@@ -226,11 +226,14 @@ Mock 拍题：done
 | S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |
 | S-Stream-1 后端 stream endpoint | done |  | 新增 `/api/v1/conversation/stream` NDJSON skeleton；保留旧接口；复用 ConversationService/Runtime 安全链路；按句子 pseudo streaming 和可恢复 TTS segment error |
 | S-Stream-2 Android stream client | done |  | 新增 NDJSON stream client、progressive agent bubble、audio segment queue、stop/mute 处理；stream 失败 fallback 旧接口；待 Redmi K60/Honor Pad 5 手动 QA |
+| S-Stream-3 interleaved TTS quick win | done |  | 后端 stream 现在按 segment 输出 text_delta/sentence_ready 后立即 tts_started/audio_ready；text_final 在所有 segment 处理后输出；新增 first_tts_start_ms、text_segment_count、tts_error_count timing |
 | UI-Landscape-1 横屏双栏布局 | done |  | Android 主界面已改为 sensorLandscape 横屏：左侧约 41% 小白狐，右侧约 59% 消息和输入；Android test/assemble/lint 通过，待真机视觉 QA |
 | Fox-Coverage-1 动态小白狐覆盖矩阵 | done |  | 新增 `FOX_AGENT_STATE_COVERAGE_V0_1.md`；manifest 确认 11 个状态，每状态 24 帧；记录 oneshot_hold 后续 QA 风险 |
 | ASR-Research-0 MiMo ASR 调研 | done |  | 新增 `ASR_INPUT_RESEARCH_V0_1.md` 和 `MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；确认 v1 目标 provider、目标模型、非流式 audio input、格式、30s 上限和数据留存缺口 |
 | ASR-Skeleton-0 后端 mock skeleton | done |  | 新增 ASR schema/service/provider/policy guard；默认 mock，MiMo ASR disabled，真实儿童音频外发仍被 policy guard 阻断 |
 | ASR-Provider-1 MiMo ASR provider | done |  | `/api/v1/asr/transcribe` 已挂载；MiMo `/chat/completions` provider 已实现；默认 policy-blocked；新增 fake-audio smoke 脚本，不使用真实儿童录音 |
+| ASR-Android-1 录音上传确认 UI | done |  | Android 已接入 RECORD_AUDIO 点击触发、短 WAV 录音、上传后端 ASR、待确认文本、发送/重说/取消；不常开麦克风、不自动发送 |
+| ASR-Smoke-1 provider smoke QA | done |  | `scripts/smoke_mimo_asr.sh` 支持 `.wav` / `.m4a` smoke audio 和安全字段输出；新增 `asr_call_finished` timing，不输出 transcript/base64/API key |
 | Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
 | Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
 
@@ -241,12 +244,12 @@ Mock 拍题：done
 ### 日期：2026-05-21
 
 ```text
-今日目标：先完成 Ops v1 P0 thin slice，为 Streaming v1 后端实现提供 request_id、provider timing 和 health/detail 诊断骨架；随后启动 Streaming v1 后端 skeleton、ASR spec intake/design lock、Android stream client 和 MiMo ASR provider。
-完成任务：后端新增 request_id middleware，支持安全 `X-Request-ID` 透传和非法/超长值替换；日志改为单行 JSON structured log；request timing 记录 `request_finished` / `request_failed`；ModelRegistry 记录 `model_call_finished`；TtsService 记录 `tts_call_finished`；新增 `/api/v1/health/detail`，覆盖 postgres、tts_cache、小白狐 voice sample 和 MiMo TTS 配置状态；新增测试覆盖 request_id、日志脱敏、model/TTS timing、health/detail API key 不泄露、postgres degraded 和 tts_cache degraded。后续新增 `/api/v1/conversation/stream` NDJSON skeleton，事件覆盖 session_started、route_decision、text_delta、sentence_ready、tts_started、audio_ready、text_final、done/error；stream 复用现有 ConversationService/Runtime 安全链路，保留旧 `/conversation/message`。Android 已接入 NDJSON stream client、progressive agent bubble、audio segment queue、stop/mute 和旧 `/message` fallback。已读取父亲本机 MiMo ASR spec，未发现真实 API key、真实儿童信息或敏感音频路径；生成脱敏 ASR 研究和集成设计文档；父亲确认 ASR v1 接 MiMo 后，已挂载 `/api/v1/asr/transcribe`，实现 MiMo `/chat/completions` ASR provider 和 fake-audio smoke 脚本；默认仍 mock/disabled，真实儿童音频外发被 ASR data policy flags 阻断。
-阻塞问题：无代码阻塞；Android 端尚未生成 `X-Request-ID`，后续 Android 诊断任务再接；Android ASR 录音确认 UI 仍未实现。
-Codex 偏差：无；本轮未做 Android ASR 录音 UI、未做真实儿童音频 smoke、未改 UI 美术、未做 DB 全量迁移。
+今日目标：解决父亲反馈的两个 P0 体验问题：降低 stream 首音频等待，并让语音输入尽快进入真实录音上传确认流程。
+完成任务：后端 `/api/v1/conversation/stream` 从“全部文字事件后再统一 TTS”改为 segment-level interleaved TTS：每个 segment 依次输出 text_delta、sentence_ready、tts_started、audio_ready/error；`text_final` 和 done 保持在最后；新增 `first_tts_start_ms`、`text_segment_count`、`tts_error_count` 等 timing。Android 已接入语音输入 v1：点击请求 RECORD_AUDIO、短 WAV 录音、最长 30 秒自动停止、上传 `/api/v1/asr/transcribe`、展示可编辑 pending transcript、发送/重说/取消；确认后走现有 conversation stream，失败 fallback 旧接口。ASR smoke 脚本支持 `.wav` / `.m4a` smoke audio，输出只包含 status/provider/model/duration/confidence/errorCode；后端新增 `asr_call_finished` timing，m4a smoke input 放行，mp3 仍禁用。
+阻塞问题：无代码阻塞；没有连接 Android 真机/模拟器，录音权限、真实麦克风采集、Redmi K60 首音频延迟和 Honor Pad 5 性能仍需手动 QA；真实 MiMo ASR smoke 需父亲确认 env flags 和使用非儿童 smoke 音频。
+Codex 偏差：无；本轮未做常开麦克风、未自动发送 ASR 结果、未保存原始音频、未做 DB 全量迁移、未破坏横屏布局或 animation_v1。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：在 Redmi K60 / Honor Pad 5 上手动 QA stream 渐进文本、audio segment queue、stop/mute 和 fallback；下一轮做 Android ASR 录音上传 + confirm UI，并用 fake/smoke audio 做 MiMo ASR smoke，不使用真实儿童录音。
+明日第一任务：在 Redmi K60 上手动 QA stream 首音频延迟、分段 audio queue、停止/静音、语音权限、录音上传、pending transcript 编辑发送、重说/取消和 ASR policy blocked/needs_retry；Honor Pad 5 复验横屏、animation_v1 与录音性能。
 ```
 
 ### 日期：2026-05-19

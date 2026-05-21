@@ -1,5 +1,7 @@
 import base64
 import binascii
+import logging
+import time
 
 from app.core.config import Settings, get_settings
 from app.domain.schemas.asr import (
@@ -13,9 +15,11 @@ from app.providers.asr.base import (
     AsrProviderRequest,
     BaseAsrProvider,
 )
+from app.middleware.request_id import get_request_id
 from app.providers.asr.mimo_asr_provider import MimoAsrProvider
 from app.providers.asr.mock_asr_provider import MockAsrProvider
 from app.services.asr_data_policy_guard import (
+    AsrDataPolicyBlockedError,
     AsrDataPolicyGuard,
     AsrDataPolicySettings,
 )
@@ -40,6 +44,7 @@ TRANSCRIBE_ONLY_PROMPT = (
 class AsrService:
     MAX_DURATION_MS = 30_000
     MAX_DECODED_AUDIO_BYTES = 10 * 1024 * 1024
+    SUPPORTED_AUDIO_FORMATS = {AsrAudioFormat.WAV, AsrAudioFormat.M4A}
     _UNCLEAR_MARKERS = {"未听清", "没听清", "听不清", "听不清楚", "无法听清"}
 
     def __init__(
@@ -59,59 +64,90 @@ class AsrService:
         self,
         request: AsrTranscriptionRequest,
     ) -> AsrTranscriptionResponse:
-        decoded_size = self._validate_audio(request)
-        self._policy_guard.validate(self._policy_settings)
+        started_at = time.perf_counter()
+        provider: AsrProviderName | None = self._provider.provider_name
+        model: str | None = self._model_name(provider)
+        duration_ms = request.audio.duration_ms
+        decoded_size: int | None = None
+        response_status: AsrTranscriptStatus | None = None
+        error_type: str | None = None
+        try:
+            decoded_size = self._validate_audio(request)
+            self._policy_guard.validate(self._policy_settings)
 
-        result = self._provider.transcribe(
-            AsrProviderRequest(
-                audio_data_uri=request.audio.data,
-                audio_format=request.audio.format,
-                language=request.language,
-                duration_ms=request.audio.duration_ms,
-                prompt=TRANSCRIBE_ONLY_PROMPT,
-                metadata={
-                    "decoded_audio_bytes": decoded_size,
-                    "mock_transcript": request.metadata.get("mock_transcript"),
-                },
+            result = self._provider.transcribe(
+                AsrProviderRequest(
+                    audio_data_uri=request.audio.data,
+                    audio_format=request.audio.format,
+                    language=request.language,
+                    duration_ms=request.audio.duration_ms,
+                    prompt=TRANSCRIBE_ONLY_PROMPT,
+                    metadata={
+                        "decoded_audio_bytes": decoded_size,
+                        "mock_transcript": request.metadata.get("mock_transcript"),
+                    },
+                )
             )
-        )
-        transcript = result.transcript.strip()
-        if not transcript or self._is_unclear_marker(transcript):
+            provider = result.provider
+            model = result.model
+            duration_ms = result.duration_ms
+            transcript = result.transcript.strip()
+            if not transcript or self._is_unclear_marker(transcript):
+                response_status = AsrTranscriptStatus.NEEDS_RETRY
+                return AsrTranscriptionResponse(
+                    status=response_status,
+                    transcript=None,
+                    requiresConfirmation=True,
+                    provider=result.provider,
+                    model=result.model,
+                    language=request.language,
+                    durationMs=result.duration_ms,
+                    confidence=result.confidence,
+                    errorCode="empty_transcript",
+                    fallbackAction="retry_or_type",
+                )
+            if len(transcript) > 2000:
+                raise AsrRequestValidationError(
+                    "transcript_too_long",
+                    "ASR transcript is too long for confirmation UI",
+                )
+
+            response_status = AsrTranscriptStatus.OK
             return AsrTranscriptionResponse(
-                status=AsrTranscriptStatus.NEEDS_RETRY,
-                transcript=None,
+                status=response_status,
+                transcript=transcript,
                 requiresConfirmation=True,
                 provider=result.provider,
                 model=result.model,
                 language=request.language,
                 durationMs=result.duration_ms,
                 confidence=result.confidence,
-                errorCode="empty_transcript",
-                fallbackAction="retry_or_type",
             )
-        if len(transcript) > 2000:
-            raise AsrRequestValidationError(
-                "transcript_too_long",
-                "ASR transcript is too long for confirmation UI",
+        except AsrDataPolicyBlockedError as exc:
+            response_status = AsrTranscriptStatus.BLOCKED
+            error_type = exc.__class__.__name__
+            raise
+        except Exception as exc:
+            response_status = AsrTranscriptStatus.FAILED
+            error_type = exc.__class__.__name__
+            raise
+        finally:
+            self._log_asr_call_finished(
+                started_at=started_at,
+                provider=provider,
+                model=model,
+                duration_ms=duration_ms,
+                audio_bytes=decoded_size,
+                status=response_status,
+                error_type=error_type,
             )
-
-        return AsrTranscriptionResponse(
-            status=AsrTranscriptStatus.OK,
-            transcript=transcript,
-            requiresConfirmation=True,
-            provider=result.provider,
-            model=result.model,
-            language=request.language,
-            durationMs=result.duration_ms,
-            confidence=result.confidence,
-        )
 
     def _validate_audio(self, request: AsrTranscriptionRequest) -> int:
         audio = request.audio
-        if audio.format != AsrAudioFormat.WAV:
+        if audio.format not in self.SUPPORTED_AUDIO_FORMATS:
             raise AsrRequestValidationError(
                 "unsupported_audio_format",
-                "Only wav ASR input is enabled in the backend skeleton",
+                "Only wav and m4a ASR input are enabled in the backend skeleton",
             )
         if audio.duration_ms and audio.duration_ms > self.MAX_DURATION_MS:
             raise AsrRequestValidationError(
@@ -148,12 +184,45 @@ class AsrService:
             )
         return encoded
 
+    def _log_asr_call_finished(
+        self,
+        *,
+        started_at: float,
+        provider: AsrProviderName | None,
+        model: str | None,
+        duration_ms: int | None,
+        audio_bytes: int | None,
+        status: AsrTranscriptStatus | None,
+        error_type: str | None,
+    ) -> None:
+        logging.getLogger("app.asr_timing").info(
+            "asr_call_finished",
+            extra={
+                "event": "asr_call_finished",
+                "request_id": get_request_id(),
+                "provider": provider.value if provider else None,
+                "model": model,
+                "duration_ms": duration_ms,
+                "audio_bytes": audio_bytes,
+                "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                "status": status.value if status else None,
+                "error_type": error_type,
+            },
+        )
+
     def _is_unclear_marker(self, transcript: str) -> bool:
         normalized = transcript.strip().strip("。.!！?？[]【】()（） ")
         return normalized.lower() in self._UNCLEAR_MARKERS or normalized.lower() in {
             "unclear",
             "unable_to_hear",
         }
+
+    def _model_name(self, provider: AsrProviderName | None) -> str | None:
+        if provider == AsrProviderName.MIMO:
+            return self._settings.mimo_asr_model
+        if provider == AsrProviderName.MOCK:
+            return "mock-asr-v0"
+        return None
 
     def _build_provider(self) -> BaseAsrProvider:
         if self._settings.asr_provider == AsrProviderName.MIMO.value:

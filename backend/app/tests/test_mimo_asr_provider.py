@@ -38,10 +38,13 @@ def _provider() -> MimoAsrProvider:
     )
 
 
-def _request(audio_data_uri: str = "data:audio/wav;base64,UklGRi1mYWtl") -> AsrProviderRequest:
+def _request(
+    audio_data_uri: str = "data:audio/wav;base64,UklGRi1mYWtl",
+    audio_format: AsrAudioFormat = AsrAudioFormat.WAV,
+) -> AsrProviderRequest:
     return AsrProviderRequest(
         audio_data_uri=audio_data_uri,
-        audio_format=AsrAudioFormat.WAV,
+        audio_format=audio_format,
         language="zh-CN",
         duration_ms=1200,
         prompt="只返回转写结果。听不清时返回：未听清。",
@@ -75,6 +78,17 @@ def test_mimo_asr_provider_builds_payload_without_logging_audio(caplog) -> None:
     }
     assert "UklGRi1zbW9rZS1hdWRpbw" not in caplog.text
     assert "data:audio/wav;base64" not in caplog.text
+
+
+def test_mimo_asr_provider_preserves_m4a_audio_data_uri() -> None:
+    audio_data_uri = "data:audio/m4a;base64,ZmFrZS1tNGE="
+
+    payload = _provider().build_payload(
+        _request(audio_data_uri, audio_format=AsrAudioFormat.M4A)
+    )
+
+    input_audio = payload["messages"][0]["content"][0]["input_audio"]
+    assert input_audio["data"] == audio_data_uri
 
 
 def test_mimo_asr_provider_calls_chat_completions_and_parses_success(

@@ -27,7 +27,7 @@ conversation_auto_send=false
 
 ---
 
-## 2. Candidate Provider Contract
+## 2. Provider Contract
 
 | Field | Value |
 |---|---|
@@ -65,7 +65,7 @@ POST /api/v1/asr/transcribe
        - MiMoAsrProvider only when explicitly enabled
   -> transcript response with requiresConfirmation=true
   -> Android shows editable text
-  -> confirmed text goes to /api/v1/conversation/message
+  -> confirmed text goes to /api/v1/conversation/stream, with /message fallback
 ```
 
 Important boundary:
@@ -199,8 +199,8 @@ Provider adapter must treat missing, non-string or empty content as `empty_trans
 
 | Requirement | Initial Policy |
 |---|---|
-| Formats | `wav` first; optionally `mp3`, `m4a` after QA |
-| WAV data URI | `data:audio/wav;base64,` prefix required for WAV |
+| Formats | `wav` and `m4a` for smoke/backend v1; `mp3` still disabled |
+| Data URI | `data:audio/<format>;base64,` prefix must match `audio.format` |
 | Sample rate | 16 kHz or higher |
 | Channels | mono preferred |
 | Bit depth | 16 bit preferred |
@@ -274,7 +274,7 @@ no_training_not_confirmed
 Logging policy:
 
 ```text
-1. Log provider, model, request_id, duration_ms, decoded_size_bytes, elapsed_ms and error_code.
+1. Log event=asr_call_finished with request_id, provider, model, duration_ms, audio_bytes, elapsed_ms, status and error_type.
 2. Do not log audio data URI, base64, raw transcript before confirmation, API key or child real identity.
 3. If transcript preview is needed for debugging, keep it disabled by default and never use real child speech.
 ```
@@ -312,11 +312,37 @@ Current safe integration status:
 Current implementation tasks:
 
 ```text
-1. Mount ASR router in `backend/app/main.py` while preserving mock/disabled defaults.
-2. Wire real MiMo ASR network call behind `AsrDataPolicyGuard`.
-3. Confirm model id through a policy-gated smoke using fake/smoke audio only.
-4. Build Android recording upload and confirm UI in a later round.
+1. Mount ASR router in `backend/app/main.py` while preserving mock/disabled defaults. [done]
+2. Wire real MiMo ASR network call behind `AsrDataPolicyGuard`. [done]
+3. Confirm model id through a policy-gated smoke using fake/smoke audio only. [manual smoke only]
+4. Build Android recording upload and confirm UI. [code_ready_device_qa]
 ```
+
+Smoke script contract:
+
+```bash
+CHILD_AI_ASR_PROVIDER=mimo
+CHILD_AI_MIMO_ASR_ENABLED=true
+CHILD_AI_MIMO_ASR_API_KEY=<shell-only>
+CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true
+CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true
+CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true
+CHILD_AI_ASR_SMOKE_WAV=/path/to/fake-or-smoke.wav-or.m4a
+bash scripts/smoke_mimo_asr.sh
+```
+
+Script output is intentionally limited to:
+
+```text
+status
+provider
+model
+duration
+confidence
+errorCode
+```
+
+It must not print the audio path, base64, transcript text, API key, request body or response body.
 
 Blocked until father authorization and policy flags:
 

@@ -494,13 +494,15 @@ Current stream behavior:
    ChildAgentRuntime, ModelRegistry, and TtsDataPolicyGuard.
 3. Return `application/x-ndjson` events with session_started, route_decision,
    text_delta, sentence_ready, tts_started, audio_ready, text_final, done/error.
-4. Split text into sentence/chunk events and generate TTS segments.
-5. Emit audio-ready events as each segment becomes available.
+4. Split text into sentence/chunk events and interleave TTS per segment:
+   `text_delta`, `sentence_ready`, `tts_started`, `audio_ready/error`.
+5. Emit `text_final` after all segment TTS attempts, then `done`.
 6. Use sentence-level pseudo streaming first; true MiMo streaming is not assumed.
 7. TTS failure must not fail the text stream.
 8. `app.stream_timing` logs request_id, session_id_hash, active_scene,
-   first_text_ms, first_audio_ms, stream_total_ms, tts_segment_count, and
-   error_type.
+   first_text_ms, first_tts_start_ms, first_audio_ms, stream_total_ms,
+   text_segment_count, tts_segment_count, audio_segment_count,
+   tts_error_count, and error_type.
 ```
 
 Local stream smoke:
@@ -565,7 +567,8 @@ missing key/policy configuration. It never returns the API key, database URL, or
 voice sample contents.
 
 Streaming v1 will reuse the same request_id and provider timing fields, then add
-stream-specific `first_text_ms`, `first_audio_ms`, and `stream_total_ms`.
+stream-specific `first_text_ms`, `first_tts_start_ms`, `first_audio_ms`, and
+`stream_total_ms`.
 
 ## MiMo ASR v1
 
@@ -610,15 +613,14 @@ CHILD_AI_MIMO_ASR_API_KEY="<temporary key>" \
 CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true \
 CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true \
 CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true \
-CHILD_AI_MIMO_ASR_FAKE_AUDIO_PATH=/path/to/fake_smoke_audio.wav \
-CHILD_AI_MIMO_ASR_FAKE_AUDIO_CONFIRMED=true \
+CHILD_AI_ASR_SMOKE_WAV=/path/to/fake_or_smoke_audio.wav \
 ASR_SMOKE_BASE_URL=http://127.0.0.1:8000 \
 bash scripts/smoke_mimo_asr.sh
 ```
 
-The smoke script prints only fake audio metadata, provider/model, status,
-`requiresConfirmation`, transcript length and stable error fields. It does not
-print the API key, base64 audio, or full transcript.
+The smoke script accepts `.wav` or `.m4a` smoke audio. It prints only
+status/provider/model/duration/confidence/errorCode. It does not print the API
+key, base64 audio, full transcript, request body, response body, or audio path.
 
 Do not enable MiMo ASR with real child audio until father authorization,
 retention/deletion/no-training terms, and all ASR policy flags are confirmed.

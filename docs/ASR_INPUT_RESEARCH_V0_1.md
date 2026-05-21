@@ -152,10 +152,10 @@ tap voice
 |---|---|---|
 | permission_denied | 麦克风权限被拒绝 | 继续打字，不阻断聊天。 |
 | backend_asr_unavailable | 后端 ASR disabled 或不可达 | 改用打字，或稍后重试。 |
-| asr_policy_blocked | 未允许儿童音频外发或未确认留存策略 | 不上传音频，回到本地识别或文字输入。 |
+| asr_policy_blocked | 未允许儿童音频外发或未确认留存策略 | 不外发音频，提示先打字或由父亲开启受控 ASR。 |
 | audio_too_long | 超过 30 秒 | 请短一点再说，或直接打字。 |
 | audio_too_large | 超过大小上限 | 请重新说短一点。 |
-| unsupported_format | 格式不在白名单 | 客户端转 WAV 或改用本地识别。 |
+| unsupported_format | 格式不在白名单 | 客户端转 WAV，或提示重录/打字。 |
 | provider_timeout | 供应商超时 | 不自动重发原始音频；提示稍后重试或打字。 |
 | provider_http_error | 外部 HTTP 错误 | 记录脱敏 provider error code，返回温和失败。 |
 | empty_transcript | 没有识别出文本 | 提示“我刚才没听清”。 |

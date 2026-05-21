@@ -72,11 +72,25 @@ def test_mock_asr_returns_pending_transcript_for_confirmation() -> None:
     assert response.model == "mock-asr-v0"
 
 
-def test_asr_rejects_unsupported_format() -> None:
+def test_asr_accepts_m4a_smoke_input() -> None:
     payload = _request_payload()
     payload["audio"]["format"] = "m4a"
     payload["audio"]["data"] = "data:audio/m4a;base64," + base64.b64encode(
         b"fake-m4a"
+    ).decode("ascii")
+
+    response = AsrService().transcribe(AsrTranscriptionRequest.model_validate(payload))
+
+    assert response.status == AsrTranscriptStatus.OK
+    assert response.provider == "mock"
+    assert response.requires_confirmation is True
+
+
+def test_asr_rejects_unsupported_format() -> None:
+    payload = _request_payload()
+    payload["audio"]["format"] = "mp3"
+    payload["audio"]["data"] = "data:audio/mp3;base64," + base64.b64encode(
+        b"fake-mp3"
     ).decode("ascii")
 
     with pytest.raises(AsrRequestValidationError) as exc_info:

@@ -1,6 +1,6 @@
 # Streaming Interaction Design v0.1
 
-用途：定义 ai-child 下一阶段流式交互方案。本文档只做架构设计，不代表后端或 Android 代码已经实现。
+用途：定义并记录 ai-child 流式交互方案、当前实现边界和后续 true streaming 计划。
 
 关联事实源：
 
@@ -37,19 +37,19 @@ S-Stream-1 后端骨架已新增独立 router/service/schema/text segmenter：
 2. 通过现有 ConversationService 复用 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry 和 ChildAgentRuntime。
 3. ConversationService 内部注入 no-op TTS，避免旧同步完整 TTS 阻塞 stream 文本。
 4. `text_delta` 不是 raw LLM token，也不是 true LLM streaming；它必须等待 ChildAgentRuntime 得到完整回复并通过输出安全检查后，才按 sentence/chunk 伪流式输出。
-5. text_final 先完成，再按句子尝试 TTS。
-6. TTS 成功发送 audio_ready；TTS 失败发送 recoverable error，但不影响 text_final 和 done。
+5. P0-A 延迟优化后，segment 按 `text_delta -> sentence_ready -> tts_started -> audio_ready/error` interleave 输出；不再等所有文字和 `text_final` 发完后才开始 TTS。
+6. 所有 segment 处理后再发送 `text_final` 和 `done`；TTS 失败发送 recoverable error，但不影响 text_final 和 done。
 
-Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/conversation/stream` 可通过后端测试和本地 curl 做 NDJSON 验证。Android stream client 尚未接入，生产 UI 仍使用旧 `/api/v1/conversation/message`。
+Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/conversation/stream` 可通过后端测试和本地 curl 做 NDJSON 验证。Android stream client 已接入，生产 UI 默认优先使用 stream，失败时 fallback 到旧 `/api/v1/conversation/message`。
 
 当前延迟口径：
 1. `session_started` 可立即出现，适合客户端进入 thinking 状态和记录 request_id。
 2. 首个 child-visible `text_delta` 仍等待完整安全 LLM/mock reply，不降低模型生成本身耗时。
-3. 当前收益主要是：文字不再等待完整 TTS；音频可按句段生成，而不是等整段回复 TTS 完成。
+3. 当前收益主要是：文字不再等待完整 TTS；首段 TTS 在首个 segment ready 后立即启动，音频按句段生成，而不是等整段回复 TTS 完成。
 
 Ops P0 timing 复用：
 1. 每个 stream 请求仍由 request_id middleware 写入 `X-Request-ID`。
-2. `app.stream_timing` 记录 `conversation_stream_finished`，字段包含 request_id、session_id_hash、active_scene、first_text_ms、first_audio_ms、stream_total_ms、tts_segment_count 和 error_type。
+2. `app.stream_timing` 记录 `conversation_stream_finished`，字段包含 request_id、session_id_hash、active_scene、first_text_ms、first_tts_start_ms、first_audio_ms、stream_total_ms、text_segment_count、tts_segment_count、audio_segment_count、tts_error_count 和 error_type。
 3. 日志不得记录完整 child text、parent_message_raw、prompt、reply text、TTS segment text、API key 或带签名 query 的 audioUrl。
 ```
 
@@ -267,7 +267,7 @@ curl -sS --no-buffer \
   }'
 ```
 
-TTS provider disabled、blocked 或失败时，预期仍会先看到 `text_final`，随后出现 recoverable `error`，最后 `done.status=completed`。
+TTS provider disabled、blocked 或失败时，预期仍会看到文本事件和 `text_final`；若某个 segment TTS 失败，会在对应 `sentence_ready` 后出现 recoverable `error`，后续 segment 继续，最后 `done.status=completed`。
 
 ### 3.2 Request Schema
 

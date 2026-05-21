@@ -48,7 +48,7 @@ class AgentPresentationTest {
 
         assertTrue(voice.isVoiceInputReserved)
         assertFalse(voice.isTtsAvailable)
-        assertEquals("现在先用文字说", voice.statusText)
+        assertEquals("可以点语音，也可以打字", voice.statusText)
     }
 
     @Test

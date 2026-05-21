@@ -11,8 +11,7 @@ required_vars=(
   CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO
   CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED
   CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED
-  CHILD_AI_MIMO_ASR_FAKE_AUDIO_PATH
-  CHILD_AI_MIMO_ASR_FAKE_AUDIO_CONFIRMED
+  CHILD_AI_ASR_SMOKE_WAV
 )
 
 for var_name in "${required_vars[@]}"; do
@@ -47,115 +46,119 @@ if [[ "${CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED}" != "true" ]]; then
   exit 1
 fi
 
-if [[ "${CHILD_AI_MIMO_ASR_FAKE_AUDIO_CONFIRMED}" != "true" ]]; then
-  echo "Set CHILD_AI_MIMO_ASR_FAKE_AUDIO_CONFIRMED=true after confirming the file is fake/smoke audio, not a real child recording." >&2
-  exit 1
-fi
-
-fake_audio_path="${CHILD_AI_MIMO_ASR_FAKE_AUDIO_PATH}"
-fake_audio_name="$(basename "${fake_audio_path}" | tr '[:upper:]' '[:lower:]')"
-case "${fake_audio_name}" in
+smoke_audio_path="${CHILD_AI_ASR_SMOKE_WAV}"
+smoke_audio_name="$(basename "${smoke_audio_path}" | tr '[:upper:]' '[:lower:]')"
+case "${smoke_audio_name}" in
   *fake*|*smoke*|*test*|*fixture*|*sample*) ;;
   *)
-    echo "Fake ASR smoke audio filename must include fake, smoke, test, fixture, or sample." >&2
+    echo "ASR smoke audio filename must include fake, smoke, test, fixture, or sample." >&2
     exit 1
     ;;
 esac
 
-if [[ ! -f "${fake_audio_path}" ]]; then
-  echo "Missing fake ASR audio file: ${fake_audio_path}" >&2
+if [[ ! -f "${smoke_audio_path}" ]]; then
+  echo "Missing ASR smoke audio file." >&2
   exit 1
 fi
 
-if [[ "${fake_audio_name}" != *.wav ]]; then
-  echo "MiMo ASR smoke currently requires a .wav fake audio file." >&2
-  exit 1
-fi
+case "${smoke_audio_name}" in
+  *.wav) audio_format="wav" ;;
+  *.m4a) audio_format="m4a" ;;
+  *)
+    echo "MiMo ASR smoke currently supports .wav or .m4a smoke audio." >&2
+    exit 1
+    ;;
+esac
 
-audio_size="$(wc -c < "${fake_audio_path}" | tr -d ' ')"
+audio_size="$(wc -c < "${smoke_audio_path}" | tr -d ' ')"
 if [[ "${audio_size}" -le 0 ]]; then
-  echo "Fake ASR audio file is empty." >&2
+  echo "ASR smoke audio file is empty." >&2
   exit 1
 fi
 if [[ "${audio_size}" -gt 10485760 ]]; then
-  echo "Fake ASR audio file exceeds the 10MB backend ASR smoke limit." >&2
+  echo "ASR smoke audio file exceeds the 10MB backend ASR smoke limit." >&2
   exit 1
 fi
 
-audio_sha="$(shasum -a 256 "${fake_audio_path}" | awk '{print $1}')"
+duration_ms="${CHILD_AI_ASR_SMOKE_DURATION_MS:-${CHILD_AI_MIMO_ASR_FAKE_AUDIO_DURATION_MS:-1000}}"
+if ! [[ "${duration_ms}" =~ ^[0-9]+$ ]]; then
+  echo "CHILD_AI_ASR_SMOKE_DURATION_MS must be a positive integer when set." >&2
+  exit 1
+fi
+if [[ "${duration_ms}" -le 0 || "${duration_ms}" -gt 30000 ]]; then
+  echo "CHILD_AI_ASR_SMOKE_DURATION_MS must be between 1 and 30000." >&2
+  exit 1
+fi
+
 mkdir -p "${TMP_DIR}"
 request_file="${TMP_DIR}/request.json"
 response_file="${TMP_DIR}/response.json"
 trap 'rm -f "${request_file}" "${response_file}"' EXIT
 
-python3 - "${fake_audio_path}" "${request_file}" <<'PY'
+python3 - "${smoke_audio_path}" "${request_file}" "${audio_format}" "${duration_ms}" <<'PY'
 import base64
 import json
-import os
 import sys
 
 audio_path = sys.argv[1]
 request_path = sys.argv[2]
-duration_ms = int(os.environ.get("CHILD_AI_MIMO_ASR_FAKE_AUDIO_DURATION_MS", "1000"))
+audio_format = sys.argv[3]
+duration_ms = int(sys.argv[4])
 with open(audio_path, "rb") as audio_file:
-    data_uri = "data:audio/wav;base64," + base64.b64encode(audio_file.read()).decode("ascii")
+    data_uri = (
+        f"data:audio/{audio_format};base64,"
+        + base64.b64encode(audio_file.read()).decode("ascii")
+    )
 
 payload = {
-    "childId": "asr_smoke_fake_child",
+    "childId": "asr_smoke_child",
     "sessionId": "asr-smoke-session",
     "audio": {
         "data": data_uri,
-        "format": "wav",
-        "sampleRateHz": 16000,
-        "channelCount": 1,
+        "format": audio_format,
         "durationMs": duration_ms,
     },
     "language": "zh-CN",
     "mode": "confirm_before_send",
 }
+if audio_format == "wav":
+    payload["audio"]["sampleRateHz"] = 16000
+    payload["audio"]["channelCount"] = 1
 with open(request_path, "w", encoding="utf-8") as request_file:
     json.dump(payload, request_file, ensure_ascii=False)
 PY
-
-echo "fake_audio=${fake_audio_path}"
-echo "fake_audio_bytes=${audio_size}"
-echo "fake_audio_sha256=${audio_sha}"
-echo "base_url=${BASE_URL}"
-echo "asr_provider=mimo"
-echo "asr_model=${CHILD_AI_MIMO_ASR_MODEL:-mimo-v2.5}"
-echo "asr_api_key=set(len=${#CHILD_AI_MIMO_ASR_API_KEY})"
 
 http_code="$(
   curl --noproxy '*' -sS -o "${response_file}" -w '%{http_code}' \
     -X POST "${BASE_URL%/}/api/v1/asr/transcribe" \
     -H 'content-type: application/json' \
-    -d @"${request_file}"
+    -d @"${request_file}" 2>/dev/null || true
 )"
+if [[ -z "${http_code}" ]]; then
+  http_code="000"
+fi
 
 if [[ "${http_code}" != "200" ]]; then
-  echo "ASR endpoint failed: http_status=${http_code}" >&2
-  python3 - "${response_file}" <<'PY' >&2
+  python3 - "${response_file}" "${http_code}" <<'PY'
 import json
 import sys
 
 path = sys.argv[1]
-
-def scrub(value):
-    if isinstance(value, dict):
-        return {key: scrub(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [scrub(item) for item in value]
-    if isinstance(value, str):
-        if value.startswith("data:audio/") or len(value) > 300:
-            return f"<redacted len={len(value)}>"
-    return value
-
+http_code = sys.argv[2]
 try:
     body = json.load(open(path, encoding="utf-8"))
 except Exception:
-    print("<non-json response redacted>")
-else:
-    print(json.dumps(scrub(body), ensure_ascii=False)[:1000])
+    body = {}
+
+def field(value):
+    return "" if value is None else value
+
+print(f"status={body.get('status') or 'failed'}")
+print(f"provider={body.get('provider') or ''}")
+print(f"model={body.get('model') or ''}")
+print(f"duration={field(body.get('durationMs'))}")
+print(f"confidence={field(body.get('confidence'))}")
+print(f"errorCode={body.get('errorCode') or 'http_' + http_code}")
 PY
   exit 1
 fi
@@ -168,19 +171,20 @@ body = json.load(open(sys.argv[1], encoding="utf-8"))
 status = body.get("status", "")
 provider = body.get("provider", "")
 model = body.get("model", "")
+duration = body.get("durationMs")
+confidence = body.get("confidence")
 requires_confirmation = body.get("requiresConfirmation")
-transcript = body.get("transcript")
-transcript_chars = len(transcript) if isinstance(transcript, str) else 0
 error_code = body.get("errorCode") or ""
-fallback_action = body.get("fallbackAction") or ""
+
+def field(value):
+    return "" if value is None else value
 
 print(f"status={status}")
 print(f"provider={provider}")
 print(f"model={model}")
-print(f"requiresConfirmation={requires_confirmation}")
-print(f"transcript_chars={transcript_chars}")
+print(f"duration={field(duration)}")
+print(f"confidence={field(confidence)}")
 print(f"errorCode={error_code}")
-print(f"fallbackAction={fallback_action}")
 
 if provider != "mimo":
     raise SystemExit(f"Expected provider=mimo, got provider={provider}")
@@ -189,5 +193,3 @@ if requires_confirmation is not True:
 if status not in {"ok", "needs_retry"}:
     raise SystemExit(f"Unexpected ASR status={status}")
 PY
-
-echo "MIMO_ASR_SMOKE: PASS"

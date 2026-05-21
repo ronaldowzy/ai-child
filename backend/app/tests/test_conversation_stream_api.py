@@ -6,6 +6,11 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import conversation_stream as conversation_stream_api
 from app.api.v1.conversation_stream import router as conversation_stream_router
+from app.domain.schemas.conversation import (
+    ConversationMessageResponse,
+    Reply,
+    SessionState,
+)
 from app.domain.schemas.conversation_stream import ConversationStreamRequest
 from app.middleware.request_id import RequestIdMiddleware
 from app.services.conversation_service import ConversationService
@@ -29,6 +34,43 @@ class UrlTtsService:
 class FailingTtsService:
     def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
         raise RuntimeError("provider timeout with child text hidden")
+
+
+class PartiallyFailingTtsService:
+    def __init__(self, *, fail_call_indexes: set[int]) -> None:
+        self._fail_call_indexes = fail_call_indexes
+        self.calls: list[tuple[str, str]] = []
+
+    def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
+        call_index = len(self.calls)
+        self.calls.append((text, emotion))
+        if call_index in self._fail_call_indexes:
+            raise RuntimeError("provider timeout with child text hidden")
+        return f"/media/tts/xiaobaohu_v01/segment_{call_index}.wav"
+
+
+class StaticConversationService:
+    def __init__(self, *, reply_text: str, voice_enabled: bool = True) -> None:
+        self._reply_text = reply_text
+        self._voice_enabled = voice_enabled
+
+    def handle_message(
+        self,
+        request: ConversationStreamRequest,
+    ) -> ConversationMessageResponse:
+        return ConversationMessageResponse(
+            reply=Reply(
+                text=self._reply_text,
+                voice_enabled=self._voice_enabled,
+                emotion="warm",
+                agent_motion="listening_tail",
+            ),
+            ui_actions=[],
+            session_state=SessionState(
+                base_scene="conversation.open",
+                active_scene="conversation.open",
+            ),
+        )
 
 
 def _client() -> TestClient:
@@ -96,6 +138,26 @@ def _text_from_deltas(events: list[dict]) -> str:
 
 def _event_types(events: list[dict]) -> list[str]:
     return [event["type"] for event in events]
+
+
+def _event_index(
+    events: list[dict],
+    event_type: str,
+    *,
+    sentence_index: int | None = None,
+) -> int:
+    for index, event in enumerate(events):
+        if event["type"] != event_type:
+            continue
+        if (
+            sentence_index is not None
+            and event["payload"].get("sentence_index") != sentence_index
+        ):
+            continue
+        return index
+    raise AssertionError(
+        f"missing event type={event_type} sentence_index={sentence_index}"
+    )
 
 
 def test_stream_endpoint_returns_ndjson_events(monkeypatch) -> None:
@@ -196,6 +258,59 @@ def test_stream_service_emits_audio_ready_for_sentence_tts_segments() -> None:
         "/media/tts/xiaobaohu_v01/"
     )
     assert events[-1]["payload"]["audio_segment_count"] == len(audio_ready)
+    assert _event_index(events, "audio_ready") < _event_index(events, "text_final")
+    assert events[-1]["type"] == "done"
+
+    sentence_ready_0 = _event_index(events, "sentence_ready", sentence_index=0)
+    assert events[sentence_ready_0 + 1]["type"] == "tts_started"
+    assert events[sentence_ready_0 + 1]["payload"]["sentence_index"] == 0
+
+    final_event = next(event for event in events if event["type"] == "text_final")
+    assert final_event["payload"]["text"] == _text_from_deltas(events)
+
+
+def test_one_tts_segment_failure_does_not_stop_later_segments() -> None:
+    tts_service = PartiallyFailingTtsService(fail_call_indexes={1})
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段文字已经准备好了。"
+                "第二段声音现在开始合成。"
+                "第三段也应该继续播放。"
+            ),
+        ),
+        tts_service=tts_service,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="请分三段讲", include_tts=True),
+    )
+
+    tts_started = [event for event in events if event["type"] == "tts_started"]
+    error_events = [event for event in events if event["type"] == "error"]
+    audio_ready = [event for event in events if event["type"] == "audio_ready"]
+
+    assert len(tts_started) == 3
+    assert len(tts_service.calls) == 3
+    assert len(error_events) == 1
+    assert error_events[0]["payload"]["stage"] == "tts"
+    assert error_events[0]["payload"]["sentence_index"] == 1
+    assert {event["payload"]["sentence_index"] for event in audio_ready} == {0, 2}
+    assert _event_index(events, "error", sentence_index=1) < _event_index(
+        events,
+        "audio_ready",
+        sentence_index=2,
+    )
+    assert _event_index(events, "audio_ready", sentence_index=2) < _event_index(
+        events,
+        "text_final",
+    )
+    assert events[-1]["type"] == "done"
+    assert events[-1]["payload"]["tts_segment_count"] == 3
+    assert events[-1]["payload"]["audio_segment_count"] == 2
+    assert events[-1]["payload"]["tts_error_count"] == 1
 
 
 def test_tts_failure_emits_error_but_preserves_text_final_and_done() -> None:
@@ -384,7 +499,11 @@ def test_stream_timing_log_contains_request_id_and_latency(
     assert record.active_scene == "conversation.open"
     assert record.session_id_hash
     assert record.first_text_ms is not None
+    assert record.first_tts_start_ms is not None
     assert record.first_audio_ms is not None
+    assert record.text_segment_count >= 1
     assert record.stream_total_ms >= record.first_text_ms
     assert record.tts_segment_count >= 1
+    assert record.audio_segment_count >= 1
+    assert record.tts_error_count == 0
     assert "我想聊恐龙。再聊三角龙！" not in caplog.text

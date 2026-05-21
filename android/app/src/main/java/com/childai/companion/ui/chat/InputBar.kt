@@ -1,15 +1,21 @@
 package com.childai.companion.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,8 +25,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.childai.companion.config.DevSettings
 import com.childai.companion.voice.TtsUiState
 
@@ -36,11 +44,33 @@ fun InputBar(
     onOpenTtsSettings: () -> Unit = {},
     onInstallTtsData: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     var draft by rememberSaveable { mutableStateOf("") }
     val trimmedDraft = draft.trim()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            voice.actions.onPermissionDenied()
+        }
+    }
+
+    fun startVoiceRecordingWithPermission() {
+        val isGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     fun sendDraft() {
-        if (enabled && trimmedDraft.isNotEmpty()) {
+        if (enabled && !voice.hasPendingTranscript && trimmedDraft.isNotEmpty()) {
             onSend(trimmedDraft)
             draft = ""
         }
@@ -50,6 +80,17 @@ fun InputBar(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (voice.hasPendingTranscript) {
+            PendingVoiceTranscriptPanel(
+                transcript = voice.pendingTranscript,
+                errorMessage = voice.errorMessage,
+                enabled = enabled,
+                onTranscriptChange = voice.actions.onPendingTranscriptChange,
+                onSend = voice.actions.onSendPendingTranscript,
+                onResay = { startVoiceRecordingWithPermission() },
+                onCancel = voice.actions.onCancelVoiceInput,
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -58,7 +99,7 @@ fun InputBar(
             OutlinedTextField(
                 value = draft,
                 onValueChange = { draft = it },
-                enabled = enabled,
+                enabled = enabled && !voice.hasPendingTranscript,
                 modifier = Modifier.weight(1f),
                 placeholder = {
                     Text(text = "说点什么")
@@ -69,15 +110,21 @@ fun InputBar(
                 keyboardActions = KeyboardActions(onSend = { sendDraft() }),
             )
             TextButton(
-                onClick = {},
-                enabled = false,
+                onClick = {
+                    if (voice.isRecording) {
+                        voice.actions.onStopRecordingAndUpload()
+                    } else {
+                        startVoiceRecordingWithPermission()
+                    }
+                },
+                enabled = enabled && !voice.isUploading,
                 modifier = Modifier.widthIn(min = 64.dp),
             ) {
-                Text(text = "语音")
+                Text(text = if (voice.isRecording) "说完了" else "语音")
             }
             Button(
                 onClick = { sendDraft() },
-                enabled = enabled && trimmedDraft.isNotEmpty(),
+                enabled = enabled && !voice.hasPendingTranscript && trimmedDraft.isNotEmpty(),
                 modifier = Modifier.widthIn(min = 88.dp),
             ) {
                 Text(text = if (enabled) "发送" else "发送中")
@@ -97,6 +144,11 @@ fun InputBar(
             if (tts.isSpeaking || tts.isSpeakingPending) {
                 TextButton(onClick = onStopTts) {
                     Text(text = "停止")
+                }
+            }
+            if (voice.isRecording) {
+                TextButton(onClick = voice.actions.onCancelVoiceInput) {
+                    Text(text = "取消语音")
                 }
             }
             TextButton(onClick = onToggleTtsMuted) {
@@ -124,6 +176,75 @@ fun InputBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
             )
+        }
+    }
+}
+
+@Composable
+private fun PendingVoiceTranscriptPanel(
+    transcript: String,
+    errorMessage: String?,
+    enabled: Boolean,
+    onTranscriptChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onResay: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = transcript,
+                onValueChange = onTranscriptChange,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                label = {
+                    Text(text = "先确认这句话")
+                },
+                textStyle = MaterialTheme.typography.bodyLarge,
+                minLines = 1,
+                maxLines = 3,
+            )
+            errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = onSend,
+                    enabled = enabled && transcript.trim().isNotEmpty(),
+                    modifier = Modifier.widthIn(min = 82.dp),
+                ) {
+                    Text(text = "发送")
+                }
+                TextButton(
+                    onClick = onResay,
+                    enabled = enabled,
+                ) {
+                    Text(text = "重说")
+                }
+                TextButton(
+                    onClick = onCancel,
+                    enabled = enabled,
+                ) {
+                    Text(text = "取消")
+                }
+            }
         }
     }
 }

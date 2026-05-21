@@ -1,5 +1,6 @@
 import base64
 import io
+import logging
 import socket
 from urllib.error import HTTPError
 
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.asr import router as asr_router
 from app.core.config import get_settings
+from app.middleware.request_id import RequestIdMiddleware
 
 
 @pytest.fixture(autouse=True)
@@ -21,12 +23,16 @@ def reset_settings_cache():
 @pytest.fixture
 def client() -> TestClient:
     app = FastAPI()
+    app.add_middleware(RequestIdMiddleware)
     app.include_router(asr_router, prefix="/api/v1")
     return TestClient(app)
 
 
-def _audio_data_uri(raw: bytes = b"RIFF-fake-wav") -> str:
-    return "data:audio/wav;base64," + base64.b64encode(raw).decode("ascii")
+def _audio_data_uri(raw: bytes = b"RIFF-fake-wav", audio_format: str = "wav") -> str:
+    return (
+        f"data:audio/{audio_format};base64,"
+        + base64.b64encode(raw).decode("ascii")
+    )
 
 
 def _request_payload() -> dict[str, object]:
@@ -122,3 +128,60 @@ def test_asr_api_http_error_maps_to_stable_502_without_raw_body(
     assert "test-api-key" not in response.text
     assert "data:audio/wav;base64" not in response.text
     assert "private transcript" not in response.text
+
+
+def test_asr_api_accepts_m4a_smoke_input(client: TestClient) -> None:
+    payload = _request_payload()
+    payload["audio"] = {
+        "data": _audio_data_uri(b"fake-m4a-smoke-audio", audio_format="m4a"),
+        "format": "m4a",
+        "durationMs": 1200,
+    }
+
+    response = client.post("/api/v1/asr/transcribe", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["provider"] == "mock"
+    assert body["requiresConfirmation"] is True
+
+
+def test_asr_call_finished_log_does_not_include_audio_or_transcript(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    client: TestClient,
+) -> None:
+    secret_key = "test-secret-mimo-asr-key"
+    secret_transcript = "这段识别文字不应该进入 ASR timing 日志。"
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_API_KEY", secret_key)
+    get_settings.cache_clear()
+    caplog.set_level(logging.INFO, logger="app.asr_timing")
+    payload = _request_payload()
+    payload["metadata"] = {"mock_transcript": secret_transcript}
+
+    response = client.post(
+        "/api/v1/asr/transcribe",
+        json=payload,
+        headers={"X-Request-ID": "asr-log-request-001"},
+    )
+
+    assert response.status_code == 200
+    assert secret_transcript in response.text
+    assert secret_key not in caplog.text
+    assert secret_transcript not in caplog.text
+    assert "data:audio/wav;base64" not in caplog.text
+    assert "UklGRi1mYWtlLXdhdg" not in caplog.text
+    records = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "asr_call_finished"
+    ]
+    assert records
+    assert records[-1].request_id == "asr-log-request-001"
+    assert records[-1].provider == "mock"
+    assert records[-1].model == "mock-asr-v0"
+    assert records[-1].duration_ms == 1200
+    assert records[-1].audio_bytes == len(b"RIFF-fake-wav")
+    assert records[-1].status == "ok"
+    assert records[-1].error_type is None

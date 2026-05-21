@@ -14,7 +14,11 @@ import com.childai.companion.data.conversation.ConversationUiAction
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
+import com.childai.companion.voice.AndroidWavAudioRecorder
+import com.childai.companion.voice.BackendSpeechInputController
 import com.childai.companion.voice.NoOpTtsController
+import com.childai.companion.voice.SpeechInputController
+import com.childai.companion.voice.SpeechInputResult
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
@@ -23,10 +27,13 @@ import com.childai.companion.voice.VoiceProfile
 import com.childai.companion.voice.previewForDiagnostics
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 
 class ChatViewModel(
@@ -34,6 +41,12 @@ class ChatViewModel(
         ConversationRepositoryMessageSender(),
     private val attachmentRepository: AttachmentRepository = AttachmentRepository(),
     private var ttsController: TtsController = NoOpTtsController,
+    private var speechInputController: SpeechInputController? = null,
+    private val speechInputControllerFactory: (File) -> SpeechInputController = { cacheDirectory ->
+        BackendSpeechInputController(
+            recorder = AndroidWavAudioRecorder(cacheDirectory = cacheDirectory),
+        )
+    },
     initialTtsUiState: TtsUiState = TtsUiState(),
     private val sendDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
@@ -42,10 +55,12 @@ class ChatViewModel(
     private var baseAgentState = FoxAgentUiState()
     private var ttsToken = 0
     private var streamingAgentMessageId: String? = null
+    private var voiceRecordingAutoStopJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
             messages = initialChatMessages(),
+            voice = createVoiceUiState(),
             tts = initialTtsUiState,
         ),
     )
@@ -108,6 +123,141 @@ class ChatViewModel(
         sendTextWithAttachments(trimmedText, emptyList())
     }
 
+    fun startVoiceRecording(cacheDirectory: File) {
+        val state = _uiState.value
+        if (state.isSending || state.voice.isUploading || state.voice.isRecording) return
+
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update {
+            it.copy(
+                quickActions = emptyList(),
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.Listening,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Listening,
+                    motion = FoxMotion.ListeningTail,
+                    statusText = "我在听你说。",
+                ),
+            )
+        }
+
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                activeSpeechInputController(cacheDirectory).startRecording()
+                scheduleVoiceRecordingAutoStop()
+            }.onFailure {
+                voiceRecordingAutoStopJob?.cancel()
+                _uiState.update { current ->
+                    current.copy(
+                        voice = current.voice.copy(
+                            inputMode = VoiceInputMode.Failed,
+                            errorMessage = "这次麦克风没有准备好，可以先打字。",
+                        ),
+                        agent = baseAgentState,
+                    )
+                }
+            }
+        }
+    }
+
+    fun stopVoiceRecordingAndUpload() {
+        if (!_uiState.value.voice.isRecording) return
+
+        voiceRecordingAutoStopJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isSending = true,
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.Uploading,
+                    errorMessage = null,
+                ),
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Thinking,
+                    motion = FoxMotion.ThinkingBlink,
+                    statusText = "我先把声音转成文字。",
+                ),
+            )
+        }
+
+        viewModelScope.launch(sendDispatcher) {
+            val result = runCatching {
+                requireNotNull(speechInputController) {
+                    "Speech input controller is not ready"
+                }.stopAndTranscribe(
+                    childId = DevSettings.CHILD_ID,
+                    sessionId = sessionId,
+                    timezone = DevSettings.TIMEZONE,
+                )
+            }.getOrElse {
+                SpeechInputResult.Failed("这次语音没有转成文字，我们先用打字说。")
+            }
+            applySpeechInputResult(result)
+        }
+    }
+
+    fun onVoicePermissionDenied() {
+        _uiState.update {
+            it.copy(
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.PermissionDenied,
+                    errorMessage = null,
+                    pendingTranscript = "",
+                ),
+            )
+        }
+    }
+
+    fun updatePendingVoiceTranscript(text: String) {
+        _uiState.update { state ->
+            if (!state.voice.hasPendingTranscript) return@update state
+            state.copy(
+                voice = state.voice.copy(
+                    pendingTranscript = text,
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    fun sendPendingVoiceTranscript() {
+        val transcript = _uiState.value.voice.pendingTranscript.trim()
+        if (transcript.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    voice = it.voice.copy(
+                        errorMessage = "先留下一句文字，再发送给小白狐。",
+                    ),
+                )
+            }
+            return
+        }
+        clearVoiceInputState()
+        sendText(transcript)
+    }
+
+    fun cancelVoiceInput() {
+        val wasRecording = _uiState.value.voice.isRecording
+        voiceRecordingAutoStopJob?.cancel()
+        _uiState.update {
+            it.copy(
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+                agent = if (wasRecording) baseAgentState else it.agent,
+            )
+        }
+        if (wasRecording) {
+            viewModelScope.launch(sendDispatcher) {
+                runCatching { speechInputController?.cancel() }
+            }
+        }
+    }
+
     private fun sendTextWithAttachments(text: String, attachments: List<String>) {
         if (_uiState.value.isSending) return
 
@@ -155,7 +305,11 @@ class ChatViewModel(
                             motion = FoxMotion.NetworkError,
                             statusText = "我们先等大人检查网络。",
                         ),
-                        voice = VoiceUiState(isVoiceInputReserved = true),
+                        voice = it.voice.copy(
+                            inputMode = VoiceInputMode.Idle,
+                            pendingTranscript = "",
+                            errorMessage = null,
+                        ),
                         isSending = false,
                     )
                 }
@@ -322,7 +476,11 @@ class ChatViewModel(
                         motion = FoxMotion.NetworkError,
                         statusText = "题目在这里，我们等后端恢复。",
                     ),
-                    voice = VoiceUiState(isVoiceInputReserved = true),
+                    voice = it.voice.copy(
+                        inputMode = VoiceInputMode.Idle,
+                        pendingTranscript = "",
+                        errorMessage = null,
+                    ),
                     isSending = false,
                     mockPhoto = null,
                     pendingImageContext = null,
@@ -343,6 +501,81 @@ class ChatViewModel(
             else -> "我们继续聊刚才那张图片：${context.summary}"
         }
         sendTextWithAttachments(text, listOf(context.attachmentId))
+    }
+
+    private fun activeSpeechInputController(cacheDirectory: File): SpeechInputController {
+        val existing = speechInputController
+        if (existing != null) return existing
+        return speechInputControllerFactory(cacheDirectory).also {
+            speechInputController = it
+        }
+    }
+
+    private fun applySpeechInputResult(result: SpeechInputResult) {
+        when (result) {
+            is SpeechInputResult.Transcript -> {
+                _uiState.update { state ->
+                    state.copy(
+                        isSending = false,
+                        voice = state.voice.copy(
+                            inputMode = VoiceInputMode.PendingTranscript,
+                            pendingTranscript = result.text,
+                            errorMessage = null,
+                        ),
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.Listening,
+                            motion = FoxMotion.ListeningTail,
+                            statusText = "我听到了这句，你可以先改一改。",
+                        ),
+                    )
+                }
+            }
+            is SpeechInputResult.NeedsRetry -> {
+                _uiState.update { state ->
+                    state.copy(
+                        isSending = false,
+                        voice = state.voice.copy(
+                            inputMode = VoiceInputMode.NeedsRetry,
+                            pendingTranscript = "",
+                            errorMessage = result.message,
+                        ),
+                        agent = baseAgentState,
+                    )
+                }
+            }
+            is SpeechInputResult.PolicyBlocked -> {
+                appendAgentMessage(result.message)
+                _uiState.update { state ->
+                    state.copy(
+                        isSending = false,
+                        voice = state.voice.copy(
+                            inputMode = VoiceInputMode.Failed,
+                            pendingTranscript = "",
+                            errorMessage = result.message,
+                        ),
+                        agent = baseAgentState,
+                    )
+                }
+            }
+            is SpeechInputResult.Failed -> {
+                appendAgentMessage(result.message)
+                _uiState.update { state ->
+                    state.copy(
+                        isSending = false,
+                        voice = state.voice.copy(
+                            inputMode = VoiceInputMode.Failed,
+                            pendingTranscript = "",
+                            errorMessage = result.message,
+                        ),
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.NetworkError,
+                            motion = FoxMotion.NetworkError,
+                            statusText = "我们先用打字说。",
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     fun attachTtsController(controller: TtsController) {
@@ -396,7 +629,9 @@ class ChatViewModel(
     }
 
     override fun onCleared() {
+        voiceRecordingAutoStopJob?.cancel()
         shutdownTts()
+        speechInputController?.shutdown()
         super.onCleared()
     }
 
@@ -448,7 +683,7 @@ class ChatViewModel(
                 quickActions = uiActions.toQuickActionUi(),
                 sessionState = sessionState,
                 agent = nextAgentState,
-                voice = reply.toVoiceUiState(),
+                voice = state.voice.withReplyVoice(reply),
                 tts = state.tts.copy(
                     isSpeaking = false,
                     isSpeakingPending = false,
@@ -795,6 +1030,41 @@ class ChatViewModel(
     private fun nextTtsToken(): Int {
         ttsToken += 1
         return ttsToken
+    }
+
+    private fun clearVoiceInputState() {
+        _uiState.update {
+            it.copy(
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    private fun scheduleVoiceRecordingAutoStop() {
+        voiceRecordingAutoStopJob?.cancel()
+        voiceRecordingAutoStopJob = viewModelScope.launch(sendDispatcher) {
+            delay(AndroidWavAudioRecorder.MAX_DURATION_MS)
+            if (_uiState.value.voice.isRecording) {
+                stopVoiceRecordingAndUpload()
+            }
+        }
+    }
+
+    private fun createVoiceUiState(): VoiceUiState {
+        return VoiceUiState(
+            actions = VoiceInputActions(
+                onStartRecording = ::startVoiceRecording,
+                onStopRecordingAndUpload = ::stopVoiceRecordingAndUpload,
+                onPermissionDenied = ::onVoicePermissionDenied,
+                onPendingTranscriptChange = ::updatePendingVoiceTranscript,
+                onSendPendingTranscript = ::sendPendingVoiceTranscript,
+                onCancelVoiceInput = ::cancelVoiceInput,
+            ),
+        )
     }
 }
 

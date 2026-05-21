@@ -92,9 +92,9 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 2. 主动点击后请求 RECORD_AUDIO 权限。
 3. 识别结果先展示为待确认文本。
 4. 支持编辑、重说、取消和确认发送。
-5. 确认后复用现有 /api/v1/conversation/message。
+5. 确认后复用现有 conversation 发送链路；Android 当前默认优先走 `/api/v1/conversation/stream`，失败时 fallback `/api/v1/conversation/message`。
 6. 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库。
-7. 通过可替换的 VoiceEngine / SpeechInputController 抽象接入录音、上传、确认 UI。
+7. 通过可替换的 VoiceEngine / SpeechInputController 抽象接入录音、上传、确认 UI；Android 代码已接入，仍需真机 QA。
 ```
 
 非目标：
@@ -191,8 +191,9 @@ child input
 1. S-Stream-0：先写 `STREAMING_INTERACTION_DESIGN_V0_1.md`，确认 SSE/NDJSON、事件结构、pseudo streaming 和 QA 指标。
 2. S-Stream-1：已新增 `/api/v1/conversation/stream`，保留旧 `/conversation/message`，不绕过安全、场景、runtime 和 TTS gate。
 3. S-Stream-2：Android 已增加 stream client、progressive bubble 和 audio segment queue；stream 失败 fallback 到旧接口。
-4. UI-Landscape-1：Android 横屏双栏，左侧小白狐，右侧对话；不做完整美术重设计。
-5. Fox-Coverage-1：输出小白狐 11/12 状态资源和业务触发覆盖矩阵，不假装未触发状态已完成。
+4. S-Stream-3：后端已完成 P0-A latency quick win，segment 级 interleaved TTS 会在 `sentence_ready` 后立即启动，不再等 `text_final`。
+5. UI-Landscape-1：Android 横屏双栏，左侧小白狐，右侧对话；不做完整美术重设计。
+6. Fox-Coverage-1：输出小白狐 11/12 状态资源和业务触发覆盖矩阵，不假装未触发状态已完成。
 ```
 
 S-Stream-1 当前实现边界（2026-05-21）：
@@ -200,8 +201,8 @@ S-Stream-1 当前实现边界（2026-05-21）：
 ```text
 1. 事件协议为 `application/x-ndjson`，事件包含 session_started、route_decision、text_delta、sentence_ready、tts_started、audio_ready、text_final、done 和 error。
 2. 后端先生成经过安全输出检查的完整 reply，再按句子/短片段 pseudo streaming；当前不假设 MiMo 支持 true streaming。
-3. TTS 按 segment 生成；TTS 失败会发送 recoverable error，不中断 text_final 和 done。
-4. stream timing 日志记录 request_id、session_id_hash、active_scene、first_text_ms、first_audio_ms、stream_total_ms、tts_segment_count 和 error_type。
+3. TTS 按 segment interleave 生成：`text_delta` / `sentence_ready` 后立即 `tts_started`，随后 `audio_ready` 或 recoverable error；TTS 失败不阻断后续 segment、text_final 和 done。
+4. stream timing 日志记录 request_id、session_id_hash、active_scene、first_text_ms、first_tts_start_ms、first_audio_ms、stream_total_ms、text_segment_count、tts_segment_count、audio_segment_count、tts_error_count 和 error_type。
 5. Android 首版 stream client 已接入；旧 `/api/v1/conversation/message` 继续作为 fallback。
 ```
 
@@ -219,10 +220,11 @@ QA 指标：
 
 ```text
 1. first_text_ms：孩子发送后到首个文本 delta 的时间。
-2. first_audio_ms：孩子发送后到首段音频可播放的时间。
-3. total_turn_ms：整轮文本和音频完成时间。
-4. stream_interrupt_recovery：stream 中断时是否保留已有文本并温和提示。
-5. audio_segment_gap：分段音频之间是否有明显断裂。
+2. first_tts_start_ms：孩子发送后到首段 TTS 生成开始的时间。
+3. first_audio_ms：孩子发送后到首段音频可播放的时间。
+4. total_turn_ms：整轮文本和音频完成时间。
+5. stream_interrupt_recovery：stream 中断时是否保留已有文本并温和提示。
+6. audio_segment_gap：分段音频之间是否有明显断裂。
 ```
 
 ---

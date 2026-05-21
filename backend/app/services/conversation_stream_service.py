@@ -80,10 +80,12 @@ class ConversationStreamService:
     ) -> Iterator[ConversationStreamEvent]:
         started_at = time.perf_counter()
         first_text_ms: float | None = None
+        first_tts_start_ms: float | None = None
         first_audio_ms: float | None = None
         active_scene: str | None = None
         error_type: str | None = None
         audio_segment_count = 0
+        tts_segment_count = 0
         tts_error_count = 0
         turn_id = self._turn_id(request)
         builder = _StreamEventBuilder(turn_id=turn_id, request_id=get_request_id())
@@ -128,8 +130,12 @@ class ConversationStreamService:
                 started_at=started_at,
                 active_scene=active_scene,
                 first_text_ms=first_text_ms,
+                first_tts_start_ms=first_tts_start_ms,
                 first_audio_ms=first_audio_ms,
+                text_segment_count=0,
+                tts_segment_count=tts_segment_count,
                 audio_segment_count=audio_segment_count,
+                tts_error_count=tts_error_count,
                 error_type=error_type,
             )
             return
@@ -142,26 +148,19 @@ class ConversationStreamService:
             hard_max_chars=self._settings.tts_max_text_chars,
         )
         final_text = "".join(segment.text for segment in segments)
+        should_generate_tts = self._should_generate_tts(
+            request=request,
+            response=response,
+        )
         for segment in segments:
             if first_text_ms is None:
                 first_text_ms = self._elapsed_ms(started_at)
             yield builder.event("text_delta", self._text_delta_payload(segment))
             yield builder.event("sentence_ready", self._sentence_ready_payload(segment))
-
-        final_text_hash = self._text_hash(final_text)
-        yield builder.event(
-            "text_final",
-            {
-                "text": final_text,
-                "char_count": len(final_text),
-                "sentence_count": len(segments),
-                "final_text_hash": final_text_hash,
-                "is_final": True,
-            },
-        )
-
-        if self._should_generate_tts(request=request, response=response):
-            for segment in segments:
+            if should_generate_tts:
+                tts_segment_count += 1
+                if first_tts_start_ms is None:
+                    first_tts_start_ms = self._elapsed_ms(started_at)
                 yield builder.event("tts_started", self._tts_started_payload(segment))
                 try:
                     audio_url = self._tts_service.generate_for_conversation(
@@ -194,12 +193,25 @@ class ConversationStreamService:
                     ),
                 )
 
+        final_text_hash = self._text_hash(final_text)
+        yield builder.event(
+            "text_final",
+            {
+                "text": final_text,
+                "char_count": len(final_text),
+                "sentence_count": len(segments),
+                "final_text_hash": final_text_hash,
+                "is_final": True,
+            },
+        )
+
         yield builder.event(
             "done",
             {
                 "status": "completed",
                 "final_text_hash": final_text_hash,
                 "text_segment_count": len(segments),
+                "tts_segment_count": tts_segment_count,
                 "audio_segment_count": audio_segment_count,
                 "tts_error_count": tts_error_count,
             },
@@ -209,8 +221,12 @@ class ConversationStreamService:
             started_at=started_at,
             active_scene=active_scene,
             first_text_ms=first_text_ms,
+            first_tts_start_ms=first_tts_start_ms,
             first_audio_ms=first_audio_ms,
+            text_segment_count=len(segments),
+            tts_segment_count=tts_segment_count,
             audio_segment_count=audio_segment_count,
+            tts_error_count=tts_error_count,
             error_type="tts_segment_failed" if tts_error_count else error_type,
         )
 
@@ -343,8 +359,12 @@ class ConversationStreamService:
         started_at: float,
         active_scene: str | None,
         first_text_ms: float | None,
+        first_tts_start_ms: float | None,
         first_audio_ms: float | None,
+        text_segment_count: int,
+        tts_segment_count: int,
         audio_segment_count: int,
+        tts_error_count: int,
         error_type: str | None,
     ) -> None:
         logging.getLogger("app.stream_timing").info(
@@ -355,9 +375,13 @@ class ConversationStreamService:
                 "session_id_hash": hash_identifier(request.session_id),
                 "active_scene": active_scene,
                 "first_text_ms": first_text_ms,
+                "first_tts_start_ms": first_tts_start_ms,
                 "first_audio_ms": first_audio_ms,
                 "stream_total_ms": self._elapsed_ms(started_at),
-                "tts_segment_count": audio_segment_count,
+                "text_segment_count": text_segment_count,
+                "tts_segment_count": tts_segment_count,
+                "audio_segment_count": audio_segment_count,
+                "tts_error_count": tts_error_count,
                 "error_type": error_type,
             },
         )

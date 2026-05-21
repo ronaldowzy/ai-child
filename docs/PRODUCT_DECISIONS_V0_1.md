@@ -57,6 +57,16 @@ deprecated：已废弃，不再作为实现依据。
 | PD-025 | confirmed | Redmi K60 截图中的 TTS 失败先按代码链路不可用处理，而不是按“系统音色不好”处理。 | Android TTS、Manifest、InputBar、QA |
 | PD-026 | confirmed | 当前阶段不读取或保存完整逐字聊天数据库；普通聊天只使用进程内短期 history 给模型补上下文。 | ConversationHistoryService、Memory、Parent report |
 | PD-027 | confirmed | 小白狐正式品牌音色方案改为后端 MiMo VoiceClone：VoiceDesign 只用于音色筛选且已完成，VoiceClone 用已下载 wav 样本生成 App 语音，普通 MiMo TTS 只做测试/兜底。 | 后端 TTS、Android remote audio、数据策略、QA |
+| PD-028 | confirmed | 产品底座修订为 freedom-first：默认自由对话，时间、父母寄语、记忆和图片作为上下文或能力，安全/隐私/学习/睡前强边界作为护栏。 | 后端路由、Prompt、Android 入口、QA |
+| PD-029 | confirmed | 拍照从“拍作业”升级为“拍给小白狐看”的通用图片分享能力；作业题只是图片能力的一个分支。 | Attachment API、Android mock 图片、Prompt、QA |
+| PD-030 | confirmed | 父母寄语需要支持自由文本，作为 Prompt 重要上下文；不能机械复述给孩子，不能覆盖儿童安全底线。 | ParentPolicy、PromptManager、Android 父亲设置、QA |
+
+新增执行依据：
+
+```text
+PD-028 / PD-029 / PD-030 是当前下一轮实现的最高优先级产品方向修正。
+不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
+```
 
 ### 2.1 Structured Decision Records
 

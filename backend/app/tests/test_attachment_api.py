@@ -17,9 +17,11 @@ def test_conversation_attachment_accepts_high_confidence_homework_photo() -> Non
         json={
             "child_id": "child_attachment_api_test",
             "session_id": "attachment_api_high_session",
-            "attachment_type": "homework_photo",
+            "attachment_type": "image",
+            "image_purpose": "learning_homework",
             "file_id": "mock_homework_photo",
             "mock_ocr_text": "小明有24个苹果，平均分给6个同学，每人几个？",
+            "mock_vision_text": "小明有24个苹果，平均分给6个同学，每人几个？",
             "mock_confidence": 0.93,
         },
     )
@@ -65,3 +67,50 @@ def test_conversation_attachment_low_confidence_requests_retry_or_speech() -> No
     assert body["session_state"]["needs_input"] == "problem_content"
     assert action_ids == {"take_photo", "speak_problem"}
     assert "没看清楚" in body["reply"]["text"]
+
+
+def test_conversation_attachment_accepts_generic_image_share() -> None:
+    response = client.post(
+        "/api/v1/conversation/attachment",
+        json={
+            "child_id": "child_attachment_api_test",
+            "session_id": "attachment_api_share_session",
+            "attachment_type": "image",
+            "image_purpose": "share",
+            "file_id": "mock_toy_photo",
+            "mock_vision_text": "孩子搭了一个积木城堡",
+            "child_caption": "你看我搭的这个",
+            "mock_confidence": 0.9,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["recognized_content"]["type"] == "image_observation"
+    assert body["recognized_content"]["image_purpose"] == "share"
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert "积木城堡" in body["reply"]["text"]
+    assert "这道题" not in body["reply"]["text"]
+
+
+def test_conversation_attachment_privacy_image_routes_to_boundary() -> None:
+    response = client.post(
+        "/api/v1/conversation/attachment",
+        json={
+            "child_id": "child_attachment_api_test",
+            "session_id": "attachment_api_privacy_session",
+            "attachment_type": "image",
+            "image_purpose": "share",
+            "file_id": "mock_address_photo",
+            "mock_vision_text": "照片里有家庭地址和电话号码",
+            "mock_confidence": 0.9,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["recognized_content"]["type"] == "privacy_sensitive"
+    assert body["session_state"]["active_scene"] == "privacy.boundary"
+    assert "隐私信息" in body["reply"]["text"]

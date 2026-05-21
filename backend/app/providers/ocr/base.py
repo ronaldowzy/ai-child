@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.domain.attachment import AttachmentType, RecognizedContent
+from app.domain.attachment import AttachmentType, ImagePurpose, RecognizedContent
 
 
 class OCRProviderError(RuntimeError):
@@ -16,8 +16,11 @@ class OCRProviderDisabledError(OCRProviderError):
 
 class OCRRequest(BaseModel):
     attachment_type: AttachmentType
+    image_purpose: ImagePurpose | None = None
     file_id: str | None = None
     mock_ocr_text: str | None = None
+    mock_vision_text: str | None = None
+    child_caption: str | None = None
     mock_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

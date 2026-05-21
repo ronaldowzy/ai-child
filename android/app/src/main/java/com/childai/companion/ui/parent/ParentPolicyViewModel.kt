@@ -61,6 +61,10 @@ class ParentPolicyViewModel(
         updateForm { it.copy(goalsText = value) }
     }
 
+    fun updateParentMessageRaw(value: String) {
+        updateForm { it.copy(parentMessageRaw = value) }
+    }
+
     fun updateOfferChoices(value: Boolean) {
         updateForm { it.copy(offerChoices = value) }
     }
@@ -126,6 +130,7 @@ class ParentPolicyViewModel(
             )
         val request = ParentPolicyUpdateRequest(
             childId = DevSettings.CHILD_ID,
+            parentMessageRaw = form.parentMessageRaw.trim(),
             goals = form.goals(),
             communicationPreferences = form.communicationPreferences(
                 basePolicy?.communicationPreferences.orEmpty(),
@@ -179,6 +184,7 @@ data class ParentPolicyUiState(
 )
 
 data class ParentPolicyFormState(
+    val parentMessageRaw: String = "",
     val goalsText: String = "鼓励孩子每天说一件学校小事\n学习问题先引导思路，不直接给答案",
     val offerChoices: Boolean = true,
     val doNotForceExpression: Boolean = true,
@@ -223,6 +229,7 @@ data class ParentPolicyFormState(
 private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
     val schedule = scheduleWithDefaults(schedule)
     return ParentPolicyFormState(
+        parentMessageRaw = parentMessageRaw.orEmpty(),
         goalsText = goals.joinToString(separator = "\n"),
         offerChoices = communicationPreferences.booleanValue(
             key = "offer_choices_before_open_questions",

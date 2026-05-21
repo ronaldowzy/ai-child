@@ -136,19 +136,19 @@ class MockModelProvider(BaseModelProvider):
 
         if self._contains_any(normalized, ("不想说话", "好累", "很烦")):
             return (
-                "可以的，我们先不聊很多。你可以想安静一会儿；等你想说时，我再听你说一句。",
+                "可以的，我们先不聊很多。你可以安静一会儿，我就在这里等你。等你想说时，只说一个字也可以。",
                 "low_energy_support",
             )
 
-        goal_text = self._compact_parent_goals(parent_policy)
-        if "小困难" in goal_text:
-            return (
-                "我在这里。今天如果愿意，可以只说一个小困难；也可以先选想安静一会儿。",
-                "parent_goal_small_difficulty",
-            )
         if self._contains_any(normalized, ("我回来了", "放学了", "到家了")):
+            goal_text = self._compact_parent_goals(parent_policy)
+            if "小困难" in goal_text:
+                return (
+                    "回来啦。我们不用急着汇报学校。如果你愿意，可以从一个很小的地方开始：今天有没有一个小困难，或者一个让你停了一下的瞬间？",
+                    "after_school_arrival_parent_goal",
+                )
             return (
-                "回来啦。你可以先选一个小入口：开心的事、遇到的难题，或者想安静一会儿。",
+                "回来啦。我们不用急着汇报学校。你想先聊刚想到的事，还是先安静一小会儿？",
                 "after_school_arrival",
             )
 

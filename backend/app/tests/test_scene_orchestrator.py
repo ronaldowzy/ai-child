@@ -43,7 +43,7 @@ def _request(
     )
 
 
-def test_after_school_checkin_replaces_base_scene() -> None:
+def test_after_school_arrival_stays_open_without_fixed_menu() -> None:
     repository = InMemoryRoutingDecisionRepository()
     orchestrator = SceneOrchestrator(routing_decision_repository=repository)
 
@@ -51,10 +51,12 @@ def test_after_school_checkin_replaces_base_scene() -> None:
         _request(text="我回来了", intent=IntentType.AFTER_SCHOOL_CHECKIN)
     )
 
-    assert decision.active_scene == SceneId.DAILY_AFTER_SCHOOL_CHECKIN
-    assert decision.base_scene == SceneId.DAILY_AFTER_SCHOOL_CHECKIN
+    assert decision.active_scene == SceneId.OPEN_CONVERSATION
+    assert decision.base_scene == SceneId.OPEN_CONVERSATION
     assert decision.transition == SceneTransitionType.REPLACE
-    assert decision.needs_input == "child_choice"
+    assert decision.needs_input is None
+    assert decision.quick_actions == []
+    assert decision.side_context == ["after_school_arrival"]
     assert repository.latest_for_session("scene_orchestrator_session") is not None
 
 
@@ -79,11 +81,11 @@ def test_learning_help_pushes_from_after_school_and_requests_problem_input() -> 
         )
     )
 
-    assert decision.base_scene == SceneId.DAILY_AFTER_SCHOOL_CHECKIN
+    assert decision.base_scene == SceneId.OPEN_CONVERSATION
     assert decision.active_scene == SceneId.LEARNING_HOMEWORK_HELP
     assert decision.transition == SceneTransitionType.PUSH
     assert decision.scene_stack == [
-        SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        SceneId.OPEN_CONVERSATION,
         SceneId.LEARNING_HOMEWORK_HELP,
     ]
     assert decision.needs_input == "problem_content"
@@ -224,7 +226,7 @@ def test_learning_completion_pops_back_to_after_school() -> None:
         )
     )
 
-    assert decision.active_scene == SceneId.DAILY_AFTER_SCHOOL_CHECKIN
+    assert decision.active_scene == SceneId.OPEN_CONVERSATION
     assert decision.transition == SceneTransitionType.POP
-    assert decision.scene_stack == [SceneId.DAILY_AFTER_SCHOOL_CHECKIN]
+    assert decision.scene_stack == [SceneId.OPEN_CONVERSATION]
     assert len(repository.list_by_session(session_id)) == 3

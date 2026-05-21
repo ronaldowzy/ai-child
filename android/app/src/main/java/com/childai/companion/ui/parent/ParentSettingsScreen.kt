@@ -51,6 +51,7 @@ fun ParentSettingsScreen(
         onBack = onBack,
         onReload = viewModel::loadPolicy,
         onSave = viewModel::savePolicy,
+        onParentMessageChange = viewModel::updateParentMessageRaw,
         onGoalsTextChange = viewModel::updateGoalsText,
         onOfferChoicesChange = viewModel::updateOfferChoices,
         onDoNotForceExpressionChange = viewModel::updateDoNotForceExpression,
@@ -71,6 +72,7 @@ private fun ParentSettingsScreenContent(
     onBack: () -> Unit,
     onReload: () -> Unit,
     onSave: () -> Unit,
+    onParentMessageChange: (String) -> Unit,
     onGoalsTextChange: (String) -> Unit,
     onOfferChoicesChange: (Boolean) -> Unit,
     onDoNotForceExpressionChange: (Boolean) -> Unit,
@@ -124,6 +126,21 @@ private fun ParentSettingsScreenContent(
                     CircularProgressIndicator()
                     Text(text = "正在读取设置")
                 }
+            }
+            SettingsSection(title = "父母寄语 / 小白狐了解孩子") {
+                OutlinedTextField(
+                    value = uiState.form.parentMessageRaw,
+                    onValueChange = onParentMessageChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 4,
+                    maxLines = 8,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = {
+                        Text(
+                            text = "可以写孩子的小名、性格特点、最近状态、希望小白狐怎么陪他说话，以及哪些说法要避免。小白狐会把这些作为背景来理解孩子，不会机械复述给孩子。",
+                        )
+                    },
+                )
             }
             SettingsSection(title = "本周目标") {
                 OutlinedTextField(
@@ -345,6 +362,7 @@ private fun ParentSettingsScreenPreview() {
             onBack = {},
             onReload = {},
             onSave = {},
+            onParentMessageChange = {},
             onGoalsTextChange = {},
             onOfferChoicesChange = {},
             onDoNotForceExpressionChange = {},

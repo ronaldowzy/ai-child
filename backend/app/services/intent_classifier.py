@@ -77,18 +77,22 @@ class IntentClassifier:
                 evidence=["direct_answer_request_keyword"],
             )
 
-        bedtime_markers = ("晚安", "睡觉", "困了", "要睡")
-        if (
-            time_context
-            and time_context.time_period == TimePeriod.BEDTIME
-            and self._contains_any(normalized, bedtime_markers)
-        ):
+        bedtime_markers = ("晚安", "困了", "要睡", "想睡觉", "我要睡觉", "准备睡")
+        if self._contains_any(normalized, bedtime_markers):
             return IntentClassification(
                 intent=IntentType.BEDTIME_REFLECTION,
                 sub_intent="bedtime_closeout",
                 risk_level=safety.risk_level if safety else RiskLevel.NONE,
                 confidence=0.92,
-                evidence=["bedtime_keyword", "bedtime_context"],
+                evidence=[
+                    "bedtime_keyword",
+                    *(
+                        ["bedtime_context"]
+                        if time_context
+                        and time_context.time_period == TimePeriod.BEDTIME
+                        else []
+                    ),
+                ],
             )
 
         learning_markers = (

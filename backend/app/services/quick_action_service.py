@@ -39,7 +39,15 @@ class QuickActionService:
         if "开心" in normalized or "高兴" in normalized:
             return self._actions("说开心原因", "发生了什么", "换个小话题")
         if "画" in normalized:
-            return self._actions("说画面", "加个角色", "换种颜色")
+            return [
+                SceneAction(id="share_photo", label="拍给小白狐看"),
+                *self._actions("说画面", "加个角色")[:2],
+            ]
+        if any(marker in normalized for marker in ("给你看", "拍", "积木", "玩具")):
+            return [
+                SceneAction(id="share_photo", label="拍给小白狐看"),
+                *self._actions("聊聊它", "编个故事")[:2],
+            ]
         if "游戏" in normalized:
             return self._actions("说玩法", "说角色", "休息一下")
 

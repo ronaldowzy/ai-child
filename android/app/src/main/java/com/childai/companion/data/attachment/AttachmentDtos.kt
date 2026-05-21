@@ -9,9 +9,12 @@ import org.json.JSONObject
 data class AttachmentCreateRequest(
     val childId: String,
     val sessionId: String,
-    val attachmentType: String = "homework_photo",
-    val fileId: String? = "android_mock_homework_photo",
-    val mockOcrText: String,
+    val attachmentType: String = "image",
+    val imagePurpose: String = "share",
+    val fileId: String? = "android_mock_image",
+    val mockOcrText: String? = null,
+    val mockVisionText: String,
+    val childCaption: String? = null,
     val mockConfidence: Double = 0.94,
 ) {
     fun toJsonString(): String {
@@ -19,8 +22,11 @@ data class AttachmentCreateRequest(
             .put("child_id", childId)
             .put("session_id", sessionId)
             .put("attachment_type", attachmentType)
+            .put("image_purpose", imagePurpose)
             .put("file_id", fileId)
             .put("mock_ocr_text", mockOcrText)
+            .put("mock_vision_text", mockVisionText)
+            .put("child_caption", childCaption)
             .put("mock_confidence", mockConfidence)
             .put(
                 "metadata",
@@ -41,6 +47,7 @@ data class AttachmentCreateResponse(
 ) {
     val hasReadyHomeworkText: Boolean
         get() = !recognizedContent.text.isNullOrBlank() &&
+            recognizedContent.type == "homework_problem" &&
             recognizedContent.confidence >= HOMEWORK_READY_CONFIDENCE
 
     companion object {
@@ -69,6 +76,8 @@ data class RecognizedContent(
     val confidence: Double,
     val providerName: String,
     val fallbackAction: String?,
+    val imagePurpose: String?,
+    val childCaption: String?,
 ) {
     companion object {
         fun fromJson(json: JSONObject): RecognizedContent {
@@ -78,6 +87,8 @@ data class RecognizedContent(
                 confidence = json.getDouble("confidence"),
                 providerName = json.optString("provider_name"),
                 fallbackAction = json.optNullableString("fallback_action"),
+                imagePurpose = json.optNullableString("image_purpose"),
+                childCaption = json.optNullableString("child_caption"),
             )
         }
     }

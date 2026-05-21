@@ -24,6 +24,9 @@
 17. 儿童端主界面下一版改为横屏双栏：左侧动态小白狐，右侧聊天交互；手机也进入横屏。
 18. 语音输入开始进入方案准备阶段，优先调研 MiMo ASR / audio input 能力；在接口和儿童语音数据边界确认前，不实现云端 ASR。
 19. 下一阶段必须补齐 request_id、结构化日志、provider timing、health 扩展、环境检查和 QA 记录等运行基础组件。
+20. 最新产品方向修订为 freedom-first：默认自由对话，时间、父母寄语、记忆、最近聊天和图片能力作为上下文或工具；高风险安全、隐私边界、明确学习求助、明确睡前收尾和父母强规则作为护栏。
+21. 拍照能力从“拍题目”升级为“拍给小白狐看”的通用图片分享；玩具、画、书、植物、手工和作业都应先理解孩子意图，再分流。
+22. 父母寄语需要支持自由文本，作为 Prompt 背景上下文注入；不能机械复述给孩子，不能覆盖儿童安全底线。
 ```
 
 ---
@@ -223,6 +226,35 @@ ASR 调研：
 3. 确认是否支持中文儿童语音、流式 ASR、非流式 ASR、音频格式、延迟、费用和数据留存。
 4. 未确认前不实现云端 ASR，不上传原始音频。
 5. Android v1 仍遵守 confirm-before-send，不做 hands-free conversational mode。
+```
+
+---
+
+## Phase 10：Freedom-First Conversation And Universal Image Sharing
+
+目标：把系统从固定场景驱动调整为“自由对话为底座，护栏按需介入，多模态能力按需调用”。
+
+实施顺序：
+
+```text
+1. 新增 `FREEDOM_FIRST_INTERACTION_DESIGN_V0_1.md`。
+2. 新增 `UNIVERSAL_IMAGE_SHARING_DESIGN_V0_1.md`。
+3. ParentPolicy 增加 `parent_message_raw` 和更新时间。
+4. PromptManager 增加 Child Profile、Parent Message、Time Context 层。
+5. SceneOrchestrator 默认回到 `conversation.open`，时段只做语气上下文。
+6. Attachment API 支持通用 image sharing，作业题和隐私敏感图片按意图分流。
+7. Android 父亲设置增加父母寄语，图片入口改为“拍给小白狐看”。
+```
+
+验收：
+
+```text
+after_school + “我想聊恐龙” -> conversation.open。
+bedtime + “我想给你看积木” -> conversation.open + 低刺激上下文。
+“晚安” / “我困了” -> daily.bedtime_reflection。
+普通图片分享不进入 homework_help。
+作业图片仍进入 learning.homework_help。
+父母寄语进入 Prompt，但不出现在儿童 UI debug。
 ```
 
 运行基础组件：

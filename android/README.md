@@ -14,11 +14,12 @@
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。语音输入 ASR 仍是后续能力。
-- 点击“拍题目”走 mock attachment 流程，不接真实 CameraX，不保存真实图片。
-- 父亲设置页可读取和保存目标、沟通偏好、放学后/作业/睡前时间段。
+- “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
+- 父亲设置页可读取和保存父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
 - 儿童聊天页中的父亲设置和父亲日报入口使用轻量误触保护：点击只提示，长按后输入开发 PIN 才进入。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
+- 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、父母寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
 
 ## 下一阶段语音和小白狐方向
 

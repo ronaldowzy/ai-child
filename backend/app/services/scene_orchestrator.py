@@ -7,7 +7,6 @@ from app.domain.scene import (
     SceneRouteRequest,
     SceneTransitionType,
 )
-from app.domain.time import TimePeriod
 from app.repositories.routing_decision_repository import (
     InMemoryRoutingDecisionRepository,
     get_routing_decision_repository,
@@ -119,7 +118,7 @@ class SceneOrchestrator:
         elif request.intent == IntentType.AFTER_SCHOOL_CHECKIN:
             decision = self._after_school_checkin(request)
         elif request.intent == IntentType.EMOTION_EXPRESSION:
-            decision = self._fallback_checkin(request, current_stack)
+            decision = self._emotion_open_support(request, current_stack)
         else:
             decision = self._open_conversation(request, current_stack)
 
@@ -373,16 +372,30 @@ class SceneOrchestrator:
         )
 
     def _after_school_checkin(self, request: SceneRouteRequest) -> SceneRouteDecision:
-        scene_id = SceneId.DAILY_AFTER_SCHOOL_CHECKIN
-        return self._checkin_decision(
-            request,
-            scene_id=scene_id,
+        scene_id = SceneId.OPEN_CONVERSATION
+        return SceneRouteDecision(
+            message_id=request.message_id,
+            session_id=request.session_id,
+            primary_intent=request.intent,
+            base_scene=scene_id,
+            active_scene=scene_id,
             transition=SceneTransitionType.REPLACE,
-            reason="after_school_checkin_intent",
+            scene_stack=[scene_id],
+            risk_level=request.risk_level,
             confidence=max(request.intent_confidence, 0.9),
+            reason="arrival_context_open_conversation",
+            side_context=["after_school_arrival"],
+            needs_input=None,
+            reply_text=(
+                "回来啦。我们不用急着汇报学校，你想先聊刚想到的事，"
+                "还是先安静一小会儿？"
+            ),
+            reply_emotion="listening",
+            quick_actions=[],
+            signals=self._signals(request, transition=SceneTransitionType.REPLACE),
         )
 
-    def _fallback_checkin(
+    def _emotion_open_support(
         self, request: SceneRouteRequest, current_stack: list[SceneId]
     ) -> SceneRouteDecision:
         if current_stack:
@@ -392,12 +405,27 @@ class SceneOrchestrator:
             if active_scene == SceneId.DAILY_BEDTIME_REFLECTION:
                 return self._bedtime_reflection(request)
 
-        return self._checkin_decision(
-            request,
-            scene_id=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        scene_id = SceneId.OPEN_CONVERSATION
+        return SceneRouteDecision(
+            message_id=request.message_id,
+            session_id=request.session_id,
+            primary_intent=request.intent,
+            base_scene=scene_id,
+            active_scene=scene_id,
             transition=SceneTransitionType.REPLACE,
-            reason="default_low_pressure_checkin",
+            scene_stack=[scene_id],
+            risk_level=request.risk_level,
             confidence=max(request.intent_confidence, 0.72),
+            reason="emotion_context_open_conversation",
+            side_context=["low_pressure_emotion_support"],
+            needs_input=None,
+            reply_text=(
+                "可以的，我们先不聊很多。你可以安静一会儿，"
+                "也可以只说一个字或一个小表情。"
+            ),
+            reply_emotion="calm",
+            quick_actions=[],
+            signals=self._signals(request, transition=SceneTransitionType.REPLACE),
         )
 
     def _open_conversation(
@@ -432,8 +460,26 @@ class SceneOrchestrator:
     def _pop_to_previous_scene(
         self, request: SceneRouteRequest, current_stack: list[SceneId]
     ) -> SceneRouteDecision:
-        next_stack = current_stack[:-1] or [SceneId.DAILY_AFTER_SCHOOL_CHECKIN]
+        next_stack = current_stack[:-1] or [SceneId.OPEN_CONVERSATION]
         active_scene = next_stack[-1]
+        if active_scene == SceneId.OPEN_CONVERSATION:
+            return SceneRouteDecision(
+                message_id=request.message_id,
+                session_id=request.session_id,
+                primary_intent=request.intent,
+                base_scene=SceneId.OPEN_CONVERSATION,
+                active_scene=SceneId.OPEN_CONVERSATION,
+                transition=SceneTransitionType.POP,
+                scene_stack=[SceneId.OPEN_CONVERSATION],
+                risk_level=request.risk_level,
+                confidence=max(request.intent_confidence, 0.86),
+                reason="learning_scene_completed",
+                needs_input=None,
+                reply_text="好，我们先把这道题放回作业本里。接下来你想聊什么都可以。",
+                reply_emotion="warm",
+                quick_actions=[],
+                signals=self._signals(request, transition=SceneTransitionType.POP),
+            )
         return self._checkin_decision(
             request,
             scene_id=active_scene,
@@ -441,7 +487,7 @@ class SceneOrchestrator:
             reason="learning_scene_completed",
             confidence=max(request.intent_confidence, 0.86),
             scene_stack=next_stack,
-            reply_text="好，我们先把这道题放回作业本里。现在可以选一个轻松的小话题收一下尾。",
+            reply_text="好，我们先把这道题放回作业本里。现在可以轻轻收一下尾。",
         )
 
     def _checkin_decision(
@@ -506,11 +552,7 @@ class SceneOrchestrator:
     ) -> SceneId:
         if current_stack:
             return current_stack[0]
-        if request.intent in {IntentType.CASUAL_CHAT, IntentType.INTEREST_EXPLORATION}:
-            return SceneId.OPEN_CONVERSATION
-        if request.time_context.time_period == TimePeriod.BEDTIME:
-            return SceneId.DAILY_BEDTIME_REFLECTION
-        return SceneId.DAILY_AFTER_SCHOOL_CHECKIN
+        return SceneId.OPEN_CONVERSATION
 
     def _signals(
         self,

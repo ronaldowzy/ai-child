@@ -42,3 +42,26 @@ def test_parent_policy_post_updates_goals() -> None:
 
     assert get_response.status_code == 200
     assert get_response.json()["goals"] == goals
+
+
+def test_parent_policy_post_updates_parent_message_raw() -> None:
+    child_id = "child_policy_parent_message_test"
+    parent_message = "小名叫豆豆，最近喜欢恐龙。不要说孩子胆小。"
+
+    update_response = client.post(
+        "/api/v1/parent/policy",
+        json={
+            "child_id": child_id,
+            "parent_message_raw": parent_message,
+        },
+    )
+
+    assert update_response.status_code == 200
+    body = update_response.json()
+    assert body["parent_message_raw"] == parent_message
+    assert body["parent_message_updated_at"] is not None
+
+    get_response = client.get(f"/api/v1/parent/policy/{child_id}")
+
+    assert get_response.status_code == 200
+    assert get_response.json()["parent_message_raw"] == parent_message

@@ -75,7 +75,7 @@ def _action_ids(body: dict) -> set[str]:
     }
 
 
-def test_scenario_after_school_checkin_uses_low_pressure_choices() -> None:
+def test_scenario_after_school_arrival_uses_open_low_pressure_greeting() -> None:
     response = client.post(
         "/api/v1/conversation/message",
         json=_message_payload(
@@ -89,11 +89,11 @@ def test_scenario_after_school_checkin_uses_low_pressure_choices() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
+    assert body["session_state"]["active_scene"] == "conversation.open"
     assert body["debug"]["time_context"]["time_period"] == "after_school"
     assert body["debug"]["intent"]["intent"] == "after_school_checkin"
-    assert {"happy_moment", "hard_thing", "quiet_time"} <= _action_ids(body)
-    assert "选" in body["reply"]["text"]
+    assert {"happy_moment", "hard_thing", "quiet_time"}.isdisjoint(_action_ids(body))
+    assert "急着汇报学校" in body["reply"]["text"]
     assert "学习" not in body["reply"]["text"]
     assert body["reply"]["voice_enabled"] is True
     assert body["reply"]["agent_motion"] == "listening_tail"
@@ -195,12 +195,12 @@ def test_scenario_child_does_not_want_to_talk_is_not_forced() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
+    assert body["session_state"]["active_scene"] == "conversation.open"
     assert body["debug"]["intent"]["emotion"] == "tired"
     assert body["debug"]["safety"]["risk_level"] == "low"
     assert body["debug"]["safety"]["requires_parent_attention"] is False
-    assert "想安静一会儿" in body["reply"]["text"]
-    assert "quiet_time" in _action_ids(body)
+    assert "安静一会儿" in body["reply"]["text"]
+    assert "quiet_time" not in _action_ids(body)
 
 
 def test_scenario_watch_bullying_uses_gentle_checkin_not_guardian() -> None:
@@ -324,9 +324,8 @@ def test_scenario_parent_goal_changes_after_school_reply() -> None:
     body = response.json()
 
     assert body["debug"]["parent_policy"]["goals"] == goals
-    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
-    assert "小困难" in body["reply"]["text"]
-    assert "不用说很多" not in body["reply"]["text"]
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert "急着汇报学校" in body["reply"]["text"]
 
 
 def test_scenario_model_registry_fallback_uses_mock_provider() -> None:

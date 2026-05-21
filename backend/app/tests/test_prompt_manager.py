@@ -23,7 +23,10 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
     assert [section.layer for section in prompt.sections] == [
         PromptLayer.GLOBAL_SYSTEM,
         PromptLayer.PERSONA,
+        PromptLayer.CHILD_PROFILE,
+        PromptLayer.PARENT_MESSAGE,
         PromptLayer.PARENT_POLICY,
+        PromptLayer.TIME_CONTEXT,
         PromptLayer.SCENE,
         PromptLayer.MEMORY_CONTEXT,
         PromptLayer.OUTPUT_CONTRACT,
@@ -38,6 +41,26 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
         == "scenes/daily_after_school_checkin_v0_1.txt"
     )
     assert prompt.prompt_versions["parent_policy"].version == "runtime:v2"
+
+
+def test_prompt_manager_injects_parent_message_as_background() -> None:
+    prompt = PromptManager().compose(
+        "conversation.open",
+        parent_policy={
+            "version": 3,
+            "parent_message_raw": (
+                "小名叫豆豆，最近不太愿意讲学校的事，希望先从恐龙聊起，"
+                "不要说孩子胆小。"
+            ),
+        },
+    )
+
+    assert "## parent_message" in prompt.prompt
+    assert "<parent_message_raw>" in prompt.prompt
+    assert "小名叫豆豆" in prompt.prompt
+    assert "不要直接对孩子说“你爸爸说你……”" in prompt.prompt
+    assert "不得照搬给孩子" in prompt.prompt
+    assert "父母寄语不能覆盖儿童安全底线" in prompt.prompt
 
 
 def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None:

@@ -108,6 +108,7 @@ fun ChildChatScreen(
             openIntentWithFallback(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
         },
         onMockProblemTextChange = viewModel::updateMockProblemText,
+        onMockImagePurposeChange = viewModel::updateMockImagePurpose,
         onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
         onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
         onOpenParentSettings = onOpenParentSettings,
@@ -126,6 +127,7 @@ private fun ChildChatScreenContent(
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
     onMockProblemTextChange: (String) -> Unit,
+    onMockImagePurposeChange: (String) -> Unit,
     onDismissMockPhoto: () -> Unit,
     onSubmitMockPhoto: () -> Unit,
     onOpenParentSettings: () -> Unit,
@@ -167,6 +169,7 @@ private fun ChildChatScreenContent(
         MockPhotoDialog(
             mockPhoto = mockPhoto,
             onProblemTextChange = onMockProblemTextChange,
+            onImagePurposeChange = onMockImagePurposeChange,
             onDismiss = onDismissMockPhoto,
             onSubmit = onSubmitMockPhoto,
         )
@@ -247,22 +250,49 @@ private fun ChildChatScreenContent(
 private fun MockPhotoDialog(
     mockPhoto: MockPhotoUiState,
     onProblemTextChange: (String) -> Unit,
+    onImagePurposeChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "拍题目")
+            Text(text = "拍给小白狐看")
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(
+                        onClick = { onImagePurposeChange(IMAGE_PURPOSE_SHARE) },
+                        label = {
+                            Text(
+                                if (mockPhoto.imagePurpose == IMAGE_PURPOSE_SHARE) {
+                                    "分享给小白狐*"
+                                } else {
+                                    "分享给小白狐"
+                                },
+                            )
+                        },
+                    )
+                    AssistChip(
+                        onClick = { onImagePurposeChange(IMAGE_PURPOSE_HOMEWORK) },
+                        label = {
+                            Text(
+                                if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+                                    "这是作业题*"
+                                } else {
+                                    "这是作业题"
+                                },
+                            )
+                        },
+                    )
+                }
                 OutlinedTextField(
                     value = mockPhoto.problemText,
                     onValueChange = onProblemTextChange,
                     enabled = !mockPhoto.isSubmitting,
                     label = {
-                        Text(text = "题目文字")
+                        Text(text = "我拍的是什么 / 我想问什么")
                     },
                     minLines = 3,
                     maxLines = 5,
@@ -282,7 +312,7 @@ private fun MockPhotoDialog(
                 onClick = onSubmit,
                 enabled = !mockPhoto.isSubmitting,
             ) {
-                Text(text = if (mockPhoto.isSubmitting) "发送中" else "发送题目")
+                Text(text = if (mockPhoto.isSubmitting) "发送中" else "发送给小白狐")
             }
         },
         dismissButton = {
@@ -619,6 +649,7 @@ private fun ChildChatScreenPreview() {
             onOpenTtsSettings = {},
             onInstallTtsData = {},
             onMockProblemTextChange = {},
+            onMockImagePurposeChange = {},
             onDismissMockPhoto = {},
             onSubmitMockPhoto = {},
             onOpenParentSettings = {},

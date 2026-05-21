@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field
 class PromptLayer(StrEnum):
     GLOBAL_SYSTEM = "global_system"
     PERSONA = "persona"
+    CHILD_PROFILE = "child_profile"
+    PARENT_MESSAGE = "parent_message"
     PARENT_POLICY = "parent_policy"
+    TIME_CONTEXT = "time_context"
     SCENE = "scene"
     MEMORY_CONTEXT = "memory_context"
     OUTPUT_CONTRACT = "output_contract"

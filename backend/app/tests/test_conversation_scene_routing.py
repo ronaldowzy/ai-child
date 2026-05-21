@@ -29,7 +29,7 @@ def _payload(
     }
 
 
-def test_after_school_time_routes_to_after_school_checkin() -> None:
+def test_after_school_arrival_routes_to_open_conversation_context() -> None:
     response = client.post(
         "/api/v1/conversation/message",
         json=_payload(
@@ -42,10 +42,44 @@ def test_after_school_time_routes_to_after_school_checkin() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["session_state"]["active_scene"] == "daily.after_school_checkin"
-    assert body["session_state"]["base_scene"] == "daily.after_school_checkin"
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert body["session_state"]["base_scene"] == "conversation.open"
     assert body["debug"]["time_context"]["time_period"] == "after_school"
     assert body["debug"]["intent"]["intent"] == "after_school_checkin"
+
+
+def test_after_school_interest_chat_stays_open_conversation() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_payload(
+            text="我想聊恐龙",
+            device_time="2026-05-18T16:30:00+08:00",
+            session_id="conversation_scene_after_school_interest_session",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert body["debug"]["time_context"]["time_period"] == "after_school"
+
+
+def test_bedtime_free_image_topic_stays_open_with_bedtime_context() -> None:
+    response = client.post(
+        "/api/v1/conversation/message",
+        json=_payload(
+            text="我想给你看我的积木",
+            device_time="2026-05-18T20:45:00+08:00",
+            session_id="conversation_scene_bedtime_free_topic_session",
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert body["debug"]["time_context"]["time_period"] == "bedtime"
 
 
 def test_learning_help_routes_to_homework_help_with_modality_actions() -> None:
@@ -69,7 +103,7 @@ def test_learning_help_routes_to_homework_help_with_modality_actions() -> None:
     assert body["session_state"]["active_scene"] == "learning.homework_help"
     assert body["session_state"]["needs_input"] == "problem_content"
     assert action_ids == {"take_photo", "speak_problem"}
-    assert "拍一张题目的照片" in body["reply"]["text"]
+    assert "题目" in body["reply"]["text"]
     assert "答案是" not in body["reply"]["text"]
     assert body["debug"]["intent"]["intent"] == "learning_help"
 

@@ -36,7 +36,7 @@ def test_conversation_message_returns_learning_help_mock_reply() -> None:
     assert "答案" in body["reply"]["text"]
     assert "拍题目" in str(body["ui_actions"])
     assert body["session_state"] == {
-        "base_scene": "daily.after_school_checkin",
+        "base_scene": "conversation.open",
         "active_scene": "learning.homework_help",
         "needs_input": "problem_content",
     }

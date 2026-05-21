@@ -10,6 +10,7 @@ class ParentPolicyDtosTest {
     fun parentPolicyUpdateSerializesBackendScheduleShape() {
         val request = ParentPolicyUpdateRequest(
             childId = "child_demo_001",
+            parentMessageRaw = "小名叫豆豆，最近喜欢恐龙。",
             goals = listOf("数学题先复述题意"),
             communicationPreferences = mapOf(
                 "offer_choices_before_open_questions" to true,
@@ -25,6 +26,7 @@ class ParentPolicyDtosTest {
         val json = request.toJsonString()
 
         assertTrue(json.contains("\"daily_schedule\""))
+        assertTrue(json.contains("\"parent_message_raw\":\"小名叫豆豆"))
         assertTrue(json.contains("\"period\":\"after_school\""))
         assertTrue(json.contains("\"period\":\"bedtime\""))
         assertFalse(json.contains("\"safety_rules\""))
@@ -36,6 +38,7 @@ class ParentPolicyDtosTest {
             """
             {
               "child_id": "child_demo_001",
+              "parent_message_raw": "小名叫豆豆，最近喜欢恐龙。",
               "goals": ["数学题先复述题意"],
               "communication_preferences": {
                 "offer_choices_before_open_questions": true
@@ -63,6 +66,7 @@ class ParentPolicyDtosTest {
         )
 
         assertEquals(listOf("数学题先复述题意"), response.goals)
+        assertEquals("小名叫豆豆，最近喜欢恐龙。", response.parentMessageRaw)
         assertEquals("15:30", response.schedule.entry("after_school")?.start)
         assertEquals(2, response.version)
     }

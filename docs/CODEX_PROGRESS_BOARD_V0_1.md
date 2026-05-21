@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone 与动态小白狐初步跑通，进入流式交互、横屏布局、语音输入准备和运行基础组件补齐阶段
-当前目标：降低同步等待体验；设计并分阶段实现 conversation stream、分句/分段 TTS、Android 横屏双栏、小白狐状态覆盖验证、ASR 调研和基础可观测性
-下一步：第一批已完成 S-Stream-0 流式设计、UI-Landscape-1 横屏双栏、Fox-Coverage-1 状态覆盖矩阵和 Ops-Foundation-1 缺口分析；下一步启动后端 stream endpoint、Android stream client、ASR 调研和 Ops P0 小步实现
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；最新方向修订为 freedom-first 自由对话底座
+当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏
+下一步：先完成父母寄语、自由优先路由、通用图片分享和对应 Android mock UI；stream、ASR 和 Ops P0 继续排队但不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -62,6 +62,7 @@ Mock 拍题：done
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
 | ASR-Research | 语音输入调研 | 调研 MiMo ASR / audio input 能力和儿童语音数据边界 | planned | V1 | 未确认前不实现云端 ASR，不上传原始音频 |
 | Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | planned | DB1/V1 | 不接第三方 APM；日志脱敏 |
+| Freedom-First | 自由对话底座 | 时段/父母寄语/图片/记忆作为上下文，安全/隐私/学习作为护栏 | in_progress | R1/O1 | 新设计文档、父母寄语、自由优先路由、通用图片分享和 Android mock UI |
 
 ---
 

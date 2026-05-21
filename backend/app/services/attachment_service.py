@@ -7,6 +7,7 @@ from app.domain.attachment import (
     AttachmentCreateResponse,
     AttachmentRecord,
     AttachmentStatus,
+    ImagePurpose,
     RecognizedContent,
 )
 from app.domain.schemas.conversation import Reply, SessionState, UiAction
@@ -44,19 +45,23 @@ class AttachmentService:
         recognized_content = self._ocr_provider.recognize(
             OCRRequest(
                 attachment_type=request.attachment_type,
+                image_purpose=request.image_purpose,
                 file_id=request.file_id,
                 mock_ocr_text=request.mock_ocr_text,
+                mock_vision_text=request.mock_vision_text,
+                child_caption=request.child_caption,
                 mock_confidence=request.mock_confidence,
                 metadata=request.metadata,
             )
         )
-        decision = self._modality_manager.decide_homework_photo(recognized_content)
+        decision = self._modality_manager.decide_image_attachment(recognized_content)
         attachment = self._repository.save(
             AttachmentRecord(
                 id=f"att_{uuid4().hex}",
                 child_id=request.child_id,
                 session_id=request.session_id,
                 attachment_type=request.attachment_type,
+                image_purpose=request.image_purpose,
                 file_id=request.file_id,
                 status=decision.status,
                 recognized_content=decision.recognized_content,
@@ -64,6 +69,11 @@ class AttachmentService:
                     "mock": True,
                     "has_file_id": bool(request.file_id),
                     "ocr_provider": decision.recognized_content.provider_name,
+                    "image_purpose": (
+                        decision.recognized_content.image_purpose.value
+                        if decision.recognized_content.image_purpose
+                        else None
+                    ),
                 },
             )
         )
@@ -71,15 +81,15 @@ class AttachmentService:
         return AttachmentCreateResponse(
             attachment_id=attachment.id,
             recognized_content=attachment.recognized_content,
-            reply=Reply(text=decision.reply_text),
+            reply=Reply(text=decision.reply_text, emotion=decision.reply_emotion),
             ui_actions=[
                 UiAction(actions=decision.quick_actions)
             ]
             if decision.quick_actions
             else [],
             session_state=SessionState(
-                base_scene="daily.after_school_checkin",
-                active_scene="learning.homework_help",
+                base_scene="conversation.open",
+                active_scene=decision.active_scene,
                 needs_input=decision.needs_input,
             ),
         )
@@ -98,6 +108,9 @@ class AttachmentService:
                 and attachment.child_id == child_id
                 and attachment.session_id == session_id
                 and attachment.status == AttachmentStatus.OCR_READY
+                and attachment.recognized_content.type == "homework_problem"
+                and attachment.recognized_content.image_purpose
+                in {None, ImagePurpose.LEARNING_HOMEWORK}
                 and attachment.recognized_content.text
             ):
                 return HomeworkAttachmentContext(

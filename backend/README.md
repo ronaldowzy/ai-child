@@ -18,6 +18,14 @@ The current backend is intentionally local-first and mock-first:
 - Treats child chat as open-ended conversation. Time periods and scenes provide
   context, safety boundaries, and fallback replies; they should not force every
   ordinary message into a fixed script.
+- Current direction is freedom-first: `conversation.open` is the default base.
+  Time context, parent free-form guidance, memory, recent turns, and images are
+  prompt/context inputs; safety, privacy, explicit learning help, explicit
+  bedtime closeout, and confirmed parent hard rules are guardrails.
+- Attachment is moving from homework-only to universal image sharing. The
+  existing homework flow remains available, but generic image attachments can
+  represent toys, drawings, books, plants, handmade work, or homework and are
+  routed by image intent.
 - Uses `ConversationHistoryService` for short-term, in-memory recent turns so
   ordinary chat can keep context within one running backend process. This is not
   a durable chat database; service restart clears it, and full chat transcripts

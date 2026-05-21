@@ -35,6 +35,7 @@ class ChildAgentRuntime:
             composed_prompt = self._prompt_manager.compose(
                 request.route_decision.active_scene.value,
                 parent_policy=request.parent_policy,
+                time_context=request.time_context,
                 memory_context=request.memory_context,
             )
             prompt_versions = composed_prompt.prompt_versions

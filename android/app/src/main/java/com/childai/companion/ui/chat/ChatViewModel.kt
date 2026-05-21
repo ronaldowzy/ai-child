@@ -90,7 +90,8 @@ class ChatViewModel(
 
     fun onQuickAction(action: QuickActionUi) {
         when (action.id) {
-            "take_photo" -> showMockPhotoCapture()
+            "take_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_HOMEWORK)
+            "share_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_SHARE)
             else -> sendText(action.label)
         }
     }
@@ -99,6 +100,23 @@ class ChatViewModel(
         _uiState.update { state ->
             val current = state.mockPhoto ?: return@update state
             state.copy(mockPhoto = current.copy(problemText = text, errorMessage = null))
+        }
+    }
+
+    fun updateMockImagePurpose(imagePurpose: String) {
+        _uiState.update { state ->
+            val current = state.mockPhoto ?: return@update state
+            state.copy(
+                mockPhoto = current.copy(
+                    imagePurpose = imagePurpose,
+                    problemText = if (imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+                        DEFAULT_MOCK_HOMEWORK_TEXT
+                    } else {
+                        DEFAULT_MOCK_IMAGE_SHARE_TEXT
+                    },
+                    errorMessage = null,
+                ),
+            )
         }
     }
 
@@ -114,7 +132,7 @@ class ChatViewModel(
             _uiState.update { state ->
                 state.copy(
                     mockPhoto = mockPhoto.copy(
-                        errorMessage = "请先保留题目文字，再发送给小白狐。",
+                        errorMessage = "请先写一点这张图片里有什么，再发送给小白狐。",
                     ),
                 )
             }
@@ -125,7 +143,11 @@ class ChatViewModel(
             ChatMessage(
                 id = nextMessageId("child-photo"),
                 author = MessageAuthor.Child,
-                text = "我拍了一道题目。",
+                text = if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+                    "我拍了一道题目。"
+                } else {
+                    "我拍了一张图片给小白狐看。"
+                },
             ),
         )
         _uiState.update {
@@ -138,11 +160,21 @@ class ChatViewModel(
 
         viewModelScope.launch {
             runCatching {
-                attachmentRepository.createMockHomeworkPhoto(
-                    childId = DevSettings.CHILD_ID,
-                    sessionId = sessionId,
-                    mockOcrText = problemText,
-                )
+                if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+                    attachmentRepository.createMockHomeworkPhoto(
+                        childId = DevSettings.CHILD_ID,
+                        sessionId = sessionId,
+                        mockOcrText = problemText,
+                    )
+                } else {
+                    attachmentRepository.createMockImageShare(
+                        childId = DevSettings.CHILD_ID,
+                        sessionId = sessionId,
+                        mockVisionText = problemText,
+                        imagePurpose = mockPhoto.imagePurpose,
+                        childCaption = problemText,
+                    )
+                }
             }.onSuccess { attachmentResponse ->
                 handleAttachmentResponse(attachmentResponse)
             }.onFailure {
@@ -160,11 +192,18 @@ class ChatViewModel(
         }
     }
 
-    private fun showMockPhotoCapture() {
+    private fun showMockPhotoCapture(imagePurpose: String = IMAGE_PURPOSE_SHARE) {
         if (_uiState.value.isSending) return
         _uiState.update {
             it.copy(
-                mockPhoto = MockPhotoUiState(),
+                mockPhoto = MockPhotoUiState(
+                    imagePurpose = imagePurpose,
+                    problemText = if (imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
+                        DEFAULT_MOCK_HOMEWORK_TEXT
+                    } else {
+                        DEFAULT_MOCK_IMAGE_SHARE_TEXT
+                    },
+                ),
                 quickActions = emptyList(),
             )
         }
@@ -486,11 +525,15 @@ data class QuickActionUi(
 )
 
 data class MockPhotoUiState(
-    val problemText: String = DEFAULT_MOCK_HOMEWORK_TEXT,
+    val problemText: String = DEFAULT_MOCK_IMAGE_SHARE_TEXT,
+    val imagePurpose: String = IMAGE_PURPOSE_SHARE,
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
 )
 
+const val IMAGE_PURPOSE_SHARE = "share"
+const val IMAGE_PURPOSE_HOMEWORK = "learning_homework"
+const val DEFAULT_MOCK_IMAGE_SHARE_TEXT = "我搭了一个积木城堡，想给小白狐看看。"
 const val DEFAULT_MOCK_HOMEWORK_TEXT = "小明有24个苹果，平均分给6个同学，每人几个？"
 
 private fun List<ConversationUiAction>.toQuickActionUi(): List<QuickActionUi> {

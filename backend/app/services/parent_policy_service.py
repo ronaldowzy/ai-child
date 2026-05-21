@@ -21,6 +21,12 @@ class ParentPolicyService:
 
         updated = current.model_copy(
             update={
+                "parent_message_raw": request.parent_message_raw
+                if request.parent_message_raw is not None
+                else current.parent_message_raw,
+                "parent_message_updated_at": now
+                if request.parent_message_raw is not None
+                else current.parent_message_updated_at,
                 "goals": request.goals
                 if request.goals is not None
                 else current.goals,

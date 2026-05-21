@@ -3,11 +3,14 @@ set -euo pipefail
 
 BASE_URL="${ASR_SMOKE_BASE_URL:-http://127.0.0.1:8000}"
 TMP_DIR="${TMPDIR:-/tmp}/child-ai-mimo-asr-smoke"
+converted_audio_path=""
+request_file="${TMP_DIR}/request.json"
+response_file="${TMP_DIR}/response.json"
+trap 'rm -f "${request_file}" "${response_file}" "${converted_audio_path}"' EXIT
 
 required_vars=(
   CHILD_AI_ASR_PROVIDER
   CHILD_AI_MIMO_ASR_ENABLED
-  CHILD_AI_MIMO_ASR_API_KEY
   CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO
   CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED
   CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED
@@ -20,6 +23,11 @@ for var_name in "${required_vars[@]}"; do
     exit 1
   fi
 done
+
+if [[ -z "${CHILD_AI_MIMO_ASR_API_KEY:-}" && -z "${CHILD_AI_MIMO_API_KEY:-}" && -z "${CHILD_AI_MIMO_TTS_API_KEY:-}" ]]; then
+  echo "Missing MiMo API key: set CHILD_AI_MIMO_ASR_API_KEY, CHILD_AI_MIMO_API_KEY, or CHILD_AI_MIMO_TTS_API_KEY." >&2
+  exit 1
+fi
 
 if [[ "${CHILD_AI_ASR_PROVIDER}" != "mimo" ]]; then
   echo "CHILD_AI_ASR_PROVIDER must be mimo for real MiMo ASR smoke." >&2
@@ -61,6 +69,8 @@ if [[ ! -f "${smoke_audio_path}" ]]; then
   exit 1
 fi
 
+mkdir -p "${TMP_DIR}"
+
 case "${smoke_audio_name}" in
   *.wav) audio_format="wav" ;;
   *.m4a) audio_format="m4a" ;;
@@ -80,6 +90,27 @@ if [[ "${audio_size}" -gt 10485760 ]]; then
   exit 1
 fi
 
+if [[ "${audio_format}" == "m4a" ]]; then
+  converted_audio_path="${TMP_DIR}/asr-smoke-converted.wav"
+  if command -v afconvert >/dev/null 2>&1; then
+    afconvert -f WAVE -d LEI16@16000 -c 1 \
+      "${smoke_audio_path}" "${converted_audio_path}" >/dev/null
+  elif command -v ffmpeg >/dev/null 2>&1; then
+    ffmpeg -y -loglevel error -i "${smoke_audio_path}" \
+      -ac 1 -ar 16000 -sample_fmt s16 "${converted_audio_path}" >/dev/null
+  else
+    echo "M4A smoke audio must be converted to 16k mono WAV first; install ffmpeg or run on macOS with afconvert." >&2
+    exit 1
+  fi
+  smoke_audio_path="${converted_audio_path}"
+  audio_format="wav"
+  audio_size="$(wc -c < "${smoke_audio_path}" | tr -d ' ')"
+  if [[ "${audio_size}" -gt 10485760 ]]; then
+    echo "Converted ASR smoke WAV exceeds the 10MB backend ASR smoke limit." >&2
+    exit 1
+  fi
+fi
+
 duration_ms="${CHILD_AI_ASR_SMOKE_DURATION_MS:-${CHILD_AI_MIMO_ASR_FAKE_AUDIO_DURATION_MS:-1000}}"
 if ! [[ "${duration_ms}" =~ ^[0-9]+$ ]]; then
   echo "CHILD_AI_ASR_SMOKE_DURATION_MS must be a positive integer when set." >&2
@@ -89,11 +120,6 @@ if [[ "${duration_ms}" -le 0 || "${duration_ms}" -gt 30000 ]]; then
   echo "CHILD_AI_ASR_SMOKE_DURATION_MS must be between 1 and 30000." >&2
   exit 1
 fi
-
-mkdir -p "${TMP_DIR}"
-request_file="${TMP_DIR}/request.json"
-response_file="${TMP_DIR}/response.json"
-trap 'rm -f "${request_file}" "${response_file}"' EXIT
 
 python3 - "${smoke_audio_path}" "${request_file}" "${audio_format}" "${duration_ms}" <<'PY'
 import base64

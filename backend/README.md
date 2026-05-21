@@ -604,23 +604,31 @@ export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
 export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
 ```
 
+ASR uses `mimo-v2.5` by default. Do not use the text conversation model
+`mimo-v2.5-pro` for ASR.
+
 Fake-audio smoke script:
 
 ```bash
+set -a
+source .env
+set +a
 CHILD_AI_ASR_PROVIDER=mimo \
 CHILD_AI_MIMO_ASR_ENABLED=true \
-CHILD_AI_MIMO_ASR_API_KEY="<temporary key>" \
 CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true \
 CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true \
 CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true \
-CHILD_AI_ASR_SMOKE_WAV=/path/to/fake_or_smoke_audio.wav \
+CHILD_AI_ASR_SMOKE_WAV=/path/to/fake_or_smoke_audio.wav-or.m4a \
 ASR_SMOKE_BASE_URL=http://127.0.0.1:8000 \
 bash scripts/smoke_mimo_asr.sh
 ```
 
-The smoke script accepts `.wav` or `.m4a` smoke audio. It prints only
-status/provider/model/duration/confidence/errorCode. It does not print the API
-key, base64 audio, full transcript, request body, response body, or audio path.
+The smoke script accepts `.wav` or `.m4a` smoke audio. `.m4a` is converted to
+16 kHz mono WAV before upload so the smoke path matches the Android recorder
+and the MiMo spec's `data:audio/wav;base64,...` input requirement. The script
+prints only status/provider/model/duration/confidence/errorCode. It does not
+print the API key, base64 audio, full transcript, request body, response body,
+or audio path.
 
 Do not enable MiMo ASR with real child audio until father authorization,
 retention/deletion/no-training terms, and all ASR policy flags are confirmed.
@@ -640,6 +648,9 @@ for key in [
     "CHILD_AI_ASR_PROVIDER",
     "CHILD_AI_MIMO_ASR_ENABLED",
     "CHILD_AI_MIMO_ASR_API_KEY",
+    "CHILD_AI_MIMO_API_KEY",
+    "CHILD_AI_MIMO_TTS_API_KEY",
+    "CHILD_AI_MIMO_ASR_MODEL",
     "CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO",
     "CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED",
     "CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED",
@@ -652,6 +663,19 @@ PY
 If `CHILD_AI_ASR_PROVIDER` is `mock` or the MiMo flags are incomplete, the
 artifact can only test recording, upload, confirmation UI, and graceful retry or
 policy-blocked messaging. It must not be described as a real MiMo ASR test.
+For real ASR QA, verify the smoke output shows `provider=mimo` and
+`model=mimo-v2.5`.
+
+ASR does not require a separate key by default. The backend resolves MiMo ASR
+credentials in this order:
+
+```text
+1. CHILD_AI_MIMO_ASR_API_KEY
+2. CHILD_AI_MIMO_API_KEY
+3. CHILD_AI_MIMO_TTS_API_KEY
+```
+
+Use `CHILD_AI_MIMO_ASR_API_KEY` only when ASR needs an explicit override.
 
 ## Safety Notes
 

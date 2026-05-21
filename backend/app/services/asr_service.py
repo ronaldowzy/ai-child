@@ -228,7 +228,7 @@ class AsrService:
         if self._settings.asr_provider == AsrProviderName.MIMO.value:
             return MimoAsrProvider(
                 base_url=self._settings.mimo_asr_base_url,
-                api_key=self._settings.mimo_asr_api_key,
+                api_key=self._settings.effective_mimo_asr_api_key,
                 model=self._settings.mimo_asr_model,
                 timeout_ms=self._settings.mimo_asr_timeout_ms,
                 enabled=self._settings.mimo_asr_enabled,
@@ -239,7 +239,7 @@ class AsrService:
         return AsrDataPolicySettings(
             provider=self._provider.provider_name,
             provider_enabled=self._provider.enabled,
-            api_key_present=bool(self._settings.mimo_asr_api_key),
+            api_key_present=bool(self._settings.effective_mimo_asr_api_key),
             allow_child_audio=self._settings.mimo_asr_allow_child_audio,
             retention_policy_checked=(
                 self._settings.mimo_asr_retention_policy_checked

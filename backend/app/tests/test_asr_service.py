@@ -12,6 +12,7 @@ from app.domain.schemas.asr import (
     AsrTranscriptionRequest,
 )
 from app.providers.asr.base import AsrProviderRequest, AsrProviderResult, BaseAsrProvider
+from app.providers.asr.mimo_asr_provider import MimoAsrProvider
 from app.services.asr_data_policy_guard import AsrDataPolicyBlockedError
 from app.services.asr_service import AsrRequestValidationError, AsrService
 
@@ -139,6 +140,26 @@ def test_mimo_asr_is_policy_blocked_by_default(monkeypatch: pytest.MonkeyPatch) 
 
     assert "mimo_asr_disabled" in str(exc_info.value)
     assert "child_audio_not_allowed" in str(exc_info.value)
+
+
+def test_mimo_asr_reuses_shared_mimo_key_and_default_asr_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHILD_AI_ASR_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_ENABLED", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_API_KEY", "")
+    monkeypatch.setenv("CHILD_AI_MIMO_API_KEY", "shared-mimo-key")
+    monkeypatch.setenv("CHILD_AI_MIMO_TTS_API_KEY", "tts-fallback-key")
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED", "true")
+    get_settings.cache_clear()
+
+    service = AsrService()
+
+    assert isinstance(service._provider, MimoAsrProvider)
+    assert service._provider.api_key == "shared-mimo-key"
+    assert service._provider.model == "mimo-v2.5"
 
 
 def test_asr_router_mock_smoke() -> None:

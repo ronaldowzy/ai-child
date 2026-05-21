@@ -61,11 +61,12 @@ deprecated：已废弃，不再作为实现依据。
 | PD-029 | confirmed | 拍照从“拍作业”升级为“拍给小白狐看”的通用图片分享能力；作业题只是图片能力的一个分支。 | Attachment API、Android mock 图片、Prompt、QA |
 | PD-030 | confirmed | 父母寄语需要支持自由文本，作为 Prompt 重要上下文；不能机械复述给孩子，不能覆盖儿童安全底线。 | ParentPolicy、PromptManager、Android 父亲设置、QA |
 | PD-034 | confirmed | ASR v1 方案确定接 MiMo audio input / ASR：Android 不直接调用 MiMo，不常开麦克风，不自动发送识别文本；真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制，开发阶段只用 fake/smoke audio。 | Android voice、backend ASR、MiMo provider、ASR policy guard、QA |
+| PD-035 | confirmed | MiMo ASR 复用当前 MiMo key：优先 `CHILD_AI_MIMO_ASR_API_KEY`，为空时使用 `CHILD_AI_MIMO_API_KEY`，再 fallback 到 `CHILD_AI_MIMO_TTS_API_KEY`；ASR 默认模型是 `mimo-v2.5`，不是文本对话的 `mimo-v2.5-pro`。 | backend config、ASR provider、QA artifact gate、docs、smoke script |
 
 新增执行依据：
 
 ```text
-PD-028 / PD-029 / PD-030 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-034 是 ASR v1 的最高优先级语音输入修正。
+PD-028 / PD-029 / PD-030 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-034 / PD-035 是 ASR v1 的最高优先级语音输入修正。
 不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
 ```
 
@@ -512,6 +513,19 @@ Affected modules: backend ASR provider、ASR API、AsrDataPolicyGuard、Android 
 Implementation notes: 真实儿童音频外发必须同时满足 `CHILD_AI_ASR_PROVIDER=mimo`、`CHILD_AI_MIMO_ASR_ENABLED=true`、API key 存在、`CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true`、`CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true`、`CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true`。开发阶段只用 fake audio / smoke audio；原始音频不入长期库、不进日志、不提交仓库。
 Docs updated: `docs/ASR_INPUT_RESEARCH_V0_1.md`、`docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`、`docs/VOICE_INTERACTION_DESIGN_V0_1.md`、`backend/README.md`。
 Tests or QA needed: ASR policy-blocked 默认路径、fake audio MiMo smoke、Redmi K60 / Honor Pad 5 录音上传与 confirm-before-send UI、secret/base64 scan。
+
+#### PD-035
+
+Decision ID: PD-035
+Date: 2026-05-21
+Status: confirmed
+Source: father / MiMo ASR key and model correction
+Decision: MiMo ASR 复用当前 MiMo key：优先 `CHILD_AI_MIMO_ASR_API_KEY`，为空时使用 `CHILD_AI_MIMO_API_KEY`，再 fallback 到 `CHILD_AI_MIMO_TTS_API_KEY`；ASR 默认模型是 `mimo-v2.5`，不是文本对话的 `mimo-v2.5-pro`。
+Rationale: ASR 是 MiMo chat completions 的 audio input 能力，不需要因单独 ASR key 为空而阻塞真实语音识别测试；但 ASR 与文本对话模型名不同，必须防止把 `mimo-v2.5-pro` 套到 ASR。
+Affected modules: backend config、AsrService、MiMo ASR provider、smoke script、QA artifact readiness gate、docs。
+Implementation notes: 交付语音输入测试包前必须用真实 smoke 或日志确认 `provider=mimo`、`model=mimo-v2.5`；如果仍是 `provider=mock`，不得让父亲按真实 ASR 测试。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_WORKFLOW_V0_1.md`、`docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 单元测试覆盖 ASR key fallback 和默认模型；smoke 脚本输出 provider/model，不输出 key、base64 或 transcript。
 
 ---
 

@@ -649,10 +649,11 @@ Android：14
 Mimo 真实 provider 复验说明：
 
 ```text
-1. Mimo 已在本机用临时 env smoke 通过，模型 id 必须是 mimo-v2.5-pro。
-2. 真实 key 只能放在当前 shell 临时环境变量中，不得写入 .env、.env.example、README、docs、测试或 Android。
-3. 默认 QA 仍优先使用 MockModelProvider；只有主控明确要求时才做真实 provider smoke。
-4. Mimo smoke 记录只写结果和模型 id，不记录真实 token、账号、计费信息或真实儿童数据。
+1. Mimo 文本对话 provider 已在本机用临时 env smoke 通过，文本模型 id 必须是 mimo-v2.5-pro。
+2. MiMo ASR 是单独的 audio-input 路径，默认模型必须是 mimo-v2.5，不能使用文本对话的 mimo-v2.5-pro。
+3. 真实 key 只能放在当前 shell 临时环境变量中，不得写入 .env、.env.example、README、docs、测试或 Android。
+4. 默认 QA 仍优先使用 MockModelProvider；只有主控明确要求时才做真实 provider smoke。
+5. Mimo smoke 记录只写结果和模型 id，不记录真实 token、账号、计费信息或真实儿童数据。
 ```
 
 ## 家庭内测前剩余 QA
@@ -689,7 +690,7 @@ Mimo 真实 provider 复验说明：
 4. 父亲 policy 和日报素材仍为内存态；后端重启后会丢失，v0.1 联调可接受，后续家庭内测前应明确持久化策略。
 5. 模拟器 `AndroidWifi` 可能保存但未连接，必须先连接后再验证 `10.0.2.2:8000`。
 6. `adb shell input text` 不能可靠输入中文；手动用 Gboard 中文拼音，自动化用 emulator 内 ADBKeyBoard。
-7. Mimo 真实调用必须使用 `mimo-v2.5-pro`；`mimo-v2.5pro` 会返回 HTTP 400 `Not supported model`。
+7. Mimo 文本对话真实调用必须使用 `mimo-v2.5-pro`；`mimo-v2.5pro` 会返回 HTTP 400 `Not supported model`。MiMo ASR 真实调用必须使用 `mimo-v2.5`。
 8. Mimo 真实 key 只能使用临时 env，不得写入仓库任何文件；默认测试和家庭内测前 QA 仍优先使用 MockModelProvider。
 
 ## 结论

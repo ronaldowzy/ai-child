@@ -36,7 +36,7 @@ conversation_auto_send=false
 | Unsupported model names | `MiMo-V2.5-ASR`, `mimo-v2.5-asr` |
 | Endpoint | `POST https://token-plan-cn.xiaomimimo.com/v1/chat/completions` |
 | Mode | Non-streaming audio input only; streaming not confirmed |
-| Auth | `Authorization: Bearer <env-provided-key>` |
+| Auth | `Authorization: Bearer <env-provided-key>`; default key order is `CHILD_AI_MIMO_ASR_API_KEY`, then shared `CHILD_AI_MIMO_API_KEY`, then `CHILD_AI_MIMO_TTS_API_KEY` |
 | Audio input field | user content item with `type=input_audio` and audio data URI |
 | Transcript output | assistant message text content |
 | Timeout | Project should start lower than the external spec's generous timeout, then tune by QA |
@@ -45,9 +45,10 @@ Model naming caution:
 
 ```text
 The existing project has a separate MiMo text-provider note that `mimo-v2.5-pro`
-is the valid text model for that path. This ASR source spec names `mimo-v2.5`
-and `mimo-v2-omni` for audio input. Treat ASR model names as unverified until
-policy-gated smoke tests are run.
+is the valid text model for that path. ASR is a separate audio-input path and
+must use `mimo-v2.5` by default, not the text `-pro` model. The local
+policy-gated smoke on 2026-05-21 confirmed `provider=mimo` and
+`model=mimo-v2.5`.
 ```
 
 ---
@@ -241,9 +242,10 @@ Rules:
 
 ```text
 1. No real key in `.env.example`, docs, tests, Android or git.
-2. Existing MiMo TTS key may be reused operationally only if father/Coordinator confirms naming and ASR child-audio policy.
+2. ASR does not require a separate key by default. Reuse `CHILD_AI_MIMO_API_KEY` when `CHILD_AI_MIMO_ASR_API_KEY` is empty; fall back to `CHILD_AI_MIMO_TTS_API_KEY` only for local operational compatibility.
 3. Android never reads these values.
 4. A missing or false policy flag must block external ASR calls.
+5. ASR model default is `mimo-v2.5`; do not use `mimo-v2.5-pro` for ASR.
 ```
 
 ---
@@ -323,13 +325,18 @@ Smoke script contract:
 ```bash
 CHILD_AI_ASR_PROVIDER=mimo
 CHILD_AI_MIMO_ASR_ENABLED=true
-CHILD_AI_MIMO_ASR_API_KEY=<shell-only>
+# Optional override only; ASR otherwise reuses CHILD_AI_MIMO_API_KEY.
+CHILD_AI_MIMO_ASR_API_KEY=<shell-only-override>
 CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true
 CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true
 CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true
 CHILD_AI_ASR_SMOKE_WAV=/path/to/fake-or-smoke.wav-or.m4a
 bash scripts/smoke_mimo_asr.sh
 ```
+
+For `.m4a` smoke files, the script converts to 16 kHz mono WAV before calling
+the backend so the smoke artifact matches the Android recording path and the
+MiMo spec's `data:audio/wav;base64,...` requirement.
 
 Script output is intentionally limited to:
 

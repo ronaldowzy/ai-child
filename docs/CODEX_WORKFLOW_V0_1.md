@@ -139,7 +139,8 @@ Codex 不应该擅自：
 1. APK base URL 是否指向当前可访问后端。真机 APK 不得使用模拟器专用 `10.0.2.2`，必须使用 Mac 局域网地址并用 BuildConfig 或 APK 产物复核。
 2. 后端实际运行进程是否加载了本轮代码和目标 env。不能只看源码默认值或旧进程。
 3. provider 状态是否匹配测试目标：
-   - 测真实 MiMo ASR 时，`CHILD_AI_ASR_PROVIDER=mimo`、MiMo ASR enabled、API key、child-audio authorization、retention policy、no-training flags 必须全部满足。
+   - 测真实 MiMo ASR 时，`CHILD_AI_ASR_PROVIDER=mimo`、MiMo ASR enabled、effective MiMo key、child-audio authorization、retention policy、no-training flags 必须全部满足；effective key 顺序是 `CHILD_AI_MIMO_ASR_API_KEY`、`CHILD_AI_MIMO_API_KEY`、`CHILD_AI_MIMO_TTS_API_KEY`。
+   - MiMo ASR 默认模型必须是 `mimo-v2.5`；`mimo-v2.5-pro` 只属于文本对话 provider，不能用于 ASR。
    - 若 ASR 仍是 `provider=mock`，只能让父亲测试录音、上传、待确认 UI 和失败/重说提示，不能声明为真实语音识别测试。
    - 测 MiMo VoiceClone 时，TTS provider、policy flags、voice sample 和 cache/media URL 必须可用。
 4. 健康检查或 curl smoke 必须覆盖目标接口，而不只是 `/health`。

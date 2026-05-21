@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Child AI Growth Agent Backend"
     api_v1_prefix: str = "/api/v1"
     environment: str = "dev"
+    mimo_api_key: str = ""
     tts_provider: str = "mock"
     conversation_tts_enabled: bool = False
     mimo_tts_enabled: bool = False
@@ -38,6 +39,14 @@ class Settings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(env_prefix="CHILD_AI_", extra="ignore")
+
+    @property
+    def effective_mimo_asr_api_key(self) -> str:
+        return (
+            self.mimo_asr_api_key
+            or self.mimo_api_key
+            or self.mimo_tts_api_key
+        )
 
     def resolve_repo_path(self, path: str) -> Path:
         candidate = Path(path)

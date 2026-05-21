@@ -233,10 +233,11 @@ Mock 拍题：done
 | ASR-Skeleton-0 后端 mock skeleton | done |  | 新增 ASR schema/service/provider/policy guard；默认 mock，MiMo ASR disabled，真实儿童音频外发仍被 policy guard 阻断 |
 | ASR-Provider-1 MiMo ASR provider | done |  | `/api/v1/asr/transcribe` 已挂载；MiMo `/chat/completions` provider 已实现；默认 policy-blocked；新增 fake-audio smoke 脚本，不使用真实儿童录音 |
 | ASR-Android-1 录音上传确认 UI | done |  | Android 已接入 RECORD_AUDIO 点击触发、短 WAV 录音、上传后端 ASR、待确认文本、发送/重说/取消；不常开麦克风、不自动发送 |
-| ASR-Smoke-1 provider smoke QA | done |  | `scripts/smoke_mimo_asr.sh` 支持 `.wav` / `.m4a` smoke audio 和安全字段输出；新增 `asr_call_finished` timing，不输出 transcript/base64/API key |
+| ASR-Smoke-1 provider smoke QA | done |  | `scripts/smoke_mimo_asr.sh` 支持 `.wav` 和本地 `.m4a` 转 16k mono WAV smoke；真实 smoke 已确认 `provider=mimo`、`model=mimo-v2.5`；新增 `asr_call_finished` timing，不输出 transcript/base64/API key |
 | Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
 | Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
 | QA-Gate-1 测试品目标一致性门槛 | done |  | 固化 2026-05-21 复盘：给父亲 APK/后端测试品前必须核对 APK base URL、运行后端 env、provider/mock 状态和目标接口 smoke；mock ASR 不能声明为真实 MiMo ASR 测试 |
+| QA-Gate-2 ASR key/model 对齐 | done |  | 固化 2026-05-21 复盘：MiMo ASR 默认复用当前 MiMo key，effective key 顺序为 ASR key -> shared MiMo key -> TTS key；ASR 模型必须是 `mimo-v2.5`，不是文本对话 `mimo-v2.5-pro` |
 
 ---
 
@@ -246,7 +247,7 @@ Mock 拍题：done
 
 ```text
 今日目标：解决父亲反馈的两个 P0 体验问题：降低 stream 首音频等待，并让语音输入尽快进入真实录音上传确认流程。
-完成任务：后端 `/api/v1/conversation/stream` 从“全部文字事件后再统一 TTS”改为 segment-level interleaved TTS：每个 segment 依次输出 text_delta、sentence_ready、tts_started、audio_ready/error；`text_final` 和 done 保持在最后；新增 `first_tts_start_ms`、`text_segment_count`、`tts_error_count` 等 timing。Android 已接入语音输入 v1：点击请求 RECORD_AUDIO、短 WAV 录音、最长 30 秒自动停止、上传 `/api/v1/asr/transcribe`、展示可编辑 pending transcript、发送/重说/取消；确认后走现有 conversation stream，失败 fallback 旧接口。ASR smoke 脚本支持 `.wav` / `.m4a` smoke audio，输出只包含 status/provider/model/duration/confidence/errorCode；后端新增 `asr_call_finished` timing，m4a smoke input 放行，mp3 仍禁用。
+完成任务：后端 `/api/v1/conversation/stream` 从“全部文字事件后再统一 TTS”改为 segment-level interleaved TTS：每个 segment 依次输出 text_delta、sentence_ready、tts_started、audio_ready/error；`text_final` 和 done 保持在最后；新增 `first_tts_start_ms`、`text_segment_count`、`tts_error_count` 等 timing。Android 已接入语音输入 v1：点击请求 RECORD_AUDIO、短 WAV 录音、最长 30 秒自动停止、上传 `/api/v1/asr/transcribe`、展示可编辑 pending transcript、发送/重说/取消；确认后走现有 conversation stream，失败 fallback 旧接口。ASR smoke 脚本支持 `.wav` 和本地 `.m4a` 转 16k mono WAV，输出只包含 status/provider/model/duration/confidence/errorCode；后端新增 `asr_call_finished` timing，真实 MiMo ASR smoke 已确认 `provider=mimo`、`model=mimo-v2.5`，mp3 仍禁用。
 阻塞问题：无代码阻塞；没有连接 Android 真机/模拟器，录音权限、真实麦克风采集、Redmi K60 首音频延迟和 Honor Pad 5 性能仍需手动 QA；真实 MiMo ASR smoke 需父亲确认 env flags 和使用非儿童 smoke 音频。
 Codex 偏差：无；本轮未做常开麦克风、未自动发送 ASR 结果、未保存原始音频、未做 DB 全量迁移、未破坏横屏布局或 animation_v1。
 需要补充到 AGENTS.md 的规则：暂无。

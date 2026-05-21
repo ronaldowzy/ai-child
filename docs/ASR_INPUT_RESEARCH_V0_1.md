@@ -49,7 +49,7 @@ MiMo ASR / audio input 的定位：
 
 | Topic | Finding | Project Interpretation |
 |---|---|---|
-| Model names | 外部规格称 `mimo-v2.5` 和 `mimo-v2-omni` 支持音频输入转写。 | 作为 ASR v1 目标模型记录；真实接入前必须在本项目受控 env 下用 fake/smoke audio 验证。 |
+| Model names | 外部规格称 `mimo-v2.5` 和 `mimo-v2-omni` 支持音频输入转写。 | ASR v1 默认 `mimo-v2.5`；2026-05-21 受控 smoke 已确认 `provider=mimo`、`model=mimo-v2.5`。不要使用文本对话模型 `mimo-v2.5-pro` 做 ASR。 |
 | Unsupported ASR-only names | 外部规格称 `MiMo-V2.5-ASR` / `mimo-v2.5-asr` 未开放或不可用。 | 不把 ASR-only 名称写成默认配置。 |
 | Endpoint | OpenAI-compatible chat completions endpoint，路径为 `/v1/chat/completions`。 | 后端 provider 层适配，不让 Android 直连供应商。 |
 | Mode | 当前规格只证明非流式整段音频输入。 | v1 不做边说边转；streaming audio input 仍是 future research。 |
@@ -59,7 +59,7 @@ MiMo ASR / audio input 的定位：
 | Audio params | 建议 16 kHz+、mono、16 bit。 | Android 侧如进入云 ASR，应尽量产出 16 kHz mono WAV。 |
 | Duration | 外部规格建议不超过 30 秒。 | 本项目先采用 30 秒硬上限，儿童端也应限制。 |
 | Size | 外部规格建议不超过 25 MB。 | 本项目可先采用更保守上限；不允许长录音上传。 |
-| Auth | Bearer token；key 从环境变量读取。 | 只能后端临时 env / config 管理，不能进 Android、docs、tests 或 git。 |
+| Auth | Bearer token；key 从环境变量读取。 | 只能后端临时 env / config 管理，不能进 Android、docs、tests 或 git。ASR 默认复用当前 MiMo key：ASR key -> shared MiMo key -> TTS key。 |
 | Retention/training | 外部规格没有给出可验证的留存、删除和训练承诺。 | 默认 policy-blocked；真实儿童音频外发必须由父亲授权并显式打开 retention/no-training 相关 flags。 |
 | Performance | 外部规格给出 20 秒级测试音频的数秒级延迟。 | 只能作为参考；儿童语音、网络和设备需独立 QA。 |
 
@@ -185,11 +185,10 @@ tap voice
 ## 8. Open Questions
 
 ```text
-1. MiMo audio input 的正式模型名是否应使用 `mimo-v2.5`、`mimo-v2-omni`，还是与现有文本模型配置统一到其他 model id。
-2. MiMo 是否提供明确的儿童音频 retention / no-training / deletion policy。
-3. MiMo 是否支持真正的 streaming audio input。
-4. 父亲设置中是否需要显式展示 ASR provider、授权状态和 policy flags。
-5. 云 ASR 生成的 pending transcript 是否需要短暂 request_id 级审计字段，且如何避免保存正文。
+1. MiMo 是否提供明确的儿童音频 retention / no-training / deletion policy。
+2. MiMo 是否支持真正的 streaming audio input。
+3. 是否需要在父亲设置页显示当前 ASR provider、effective key 来源和 policy flags。
+4. 云 ASR 生成的 pending transcript 是否需要短暂 request_id 级审计字段，且如何避免保存正文。
 ```
 
 当前实现方向：

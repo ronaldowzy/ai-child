@@ -7,6 +7,7 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.ui.chat.ChatViewModel
 import com.childai.companion.ui.chat.ConversationMessageSender
 import com.childai.companion.ui.chat.MessageAuthor
+import com.childai.companion.ui.chat.PendingImageContextUiState
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
@@ -172,6 +173,42 @@ class ChatViewModelStreamTest {
         assertFalse(state.isSending)
         assertEquals("fallback reply", state.messages.last().text)
     }
+
+    @Test
+    fun textAfterImageUploadCarriesPendingAttachmentContext() {
+        val sender = AttachmentRecordingConversationSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.renderAgentReply(
+            reply = ConversationReply(
+                type = "agent_message",
+                text = "我看到这张图片了。",
+                voiceEnabled = false,
+                audioUrl = null,
+                emotion = "curious",
+                agentMotion = "gentle_idle",
+            ),
+            uiActions = emptyList(),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+            ),
+            pendingImageContext = PendingImageContextUiState(
+                attachmentId = "att_camera_001",
+                summary = "一张测试图片",
+                imagePurpose = "share",
+                recognizedType = "image_observation",
+            ),
+        )
+
+        viewModel.sendText("我们继续聊这张图")
+
+        assertEquals(listOf("att_camera_001"), sender.streamAttachments.single())
+    }
 }
 
 private fun streamEvent(type: String, vararg payloadValues: Pair<String, Any>): ConversationStreamEvent {
@@ -260,6 +297,33 @@ private class StreamFailureConversationSender : ConversationMessageSender {
         onEvent(streamEvent("session_started"))
         onEvent(streamEvent("text_delta", "delta" to "partial"))
         error("stream failed")
+    }
+}
+
+private class AttachmentRecordingConversationSender : ConversationMessageSender {
+    val streamAttachments = mutableListOf<List<String>>()
+
+    override suspend fun sendTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+    ): ConversationMessageResponse {
+        error("stream should handle this test")
+    }
+
+    override suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+        includeTts: Boolean,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) {
+        streamAttachments += attachments
+        onEvent(streamEvent("done"))
     }
 }
 

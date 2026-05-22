@@ -11,9 +11,10 @@ data class AttachmentCreateRequest(
     val sessionId: String,
     val attachmentType: String = "image",
     val imagePurpose: String = "share",
-    val fileId: String? = "android_mock_image",
+    val fileId: String? = null,
+    val imageDataUri: String? = null,
     val mockOcrText: String? = null,
-    val mockVisionText: String,
+    val mockVisionText: String? = null,
     val childCaption: String? = null,
     val mockConfidence: Double = 0.94,
 ) {
@@ -24,6 +25,7 @@ data class AttachmentCreateRequest(
             .put("attachment_type", attachmentType)
             .put("image_purpose", imagePurpose)
             .put("file_id", fileId)
+            .put("image_data_uri", imageDataUri)
             .put("mock_ocr_text", mockOcrText)
             .put("mock_vision_text", mockVisionText)
             .put("child_caption", childCaption)
@@ -31,7 +33,14 @@ data class AttachmentCreateRequest(
             .put(
                 "metadata",
                 JSONObject()
-                    .put("source", "android_mock_photo_flow")
+                    .put(
+                        "source",
+                        if (imageDataUri == null) {
+                            "android_text_photo_flow"
+                        } else {
+                            "android_camera_capture"
+                        },
+                    )
                     .put("stores_original_image", false),
             )
             .toString()

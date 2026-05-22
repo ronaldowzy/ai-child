@@ -139,7 +139,11 @@ class ChatViewModel(
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
 
-        sendTextWithAttachments(trimmedText, emptyList())
+        val imageContext = _uiState.value.pendingImageContext
+        sendTextWithAttachments(
+            trimmedText,
+            imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
+        )
     }
 
     fun startVoiceRecording(cacheDirectory: File) {
@@ -442,6 +446,81 @@ class ChatViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun submitCapturedPhoto(
+        imageDataUri: String,
+        imagePurpose: String = IMAGE_PURPOSE_SHARE,
+    ) {
+        if (_uiState.value.isSending || imageDataUri.isBlank()) return
+        childInteractionStarted = true
+        appendMessage(
+            ChatMessage(
+                id = nextMessageId("child-photo"),
+                author = MessageAuthor.Child,
+                text = "我拍了一张图片给小白狐看。",
+            ),
+        )
+        _uiState.update {
+            it.copy(
+                isSending = true,
+                quickActions = emptyList(),
+                mockPhoto = null,
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Thinking,
+                    motion = FoxMotion.ThinkingBlink,
+                    statusText = "我在看这张图片。",
+                ),
+                voice = it.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                attachmentRepository.createCapturedImage(
+                    childId = DevSettings.CHILD_ID,
+                    sessionId = sessionId,
+                    imageDataUri = imageDataUri,
+                    imagePurpose = imagePurpose,
+                    childCaption = "我拍了一张图片给小白狐看。",
+                )
+            }.onSuccess { attachmentResponse ->
+                handleAttachmentResponse(attachmentResponse)
+            }.onFailure {
+                appendAgentMessage(uploadFailureMessage(imagePurpose))
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        quickActions = emptyList(),
+                        mockPhoto = null,
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.NetworkError,
+                            motion = FoxMotion.NetworkError,
+                            statusText = "这张图片没有传好。",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun onPhotoCaptureFailed(message: String) {
+        appendAgentMessage(message)
+        _uiState.update {
+            it.copy(
+                isSending = false,
+                mockPhoto = null,
+                agent = FoxAgentUiState(
+                    mood = FoxMood.NetworkError,
+                    motion = FoxMotion.NetworkError,
+                    statusText = "我们再拍一次。",
+                ),
+            )
         }
     }
 

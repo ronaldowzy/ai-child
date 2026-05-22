@@ -3,6 +3,7 @@ package com.childai.companion.data.attachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.json.JSONObject
 import org.junit.Test
 
 class AttachmentDtosTest {
@@ -20,6 +21,22 @@ class AttachmentDtosTest {
         assertTrue(json.contains("\"mock_vision_text\""))
         assertTrue(json.contains("\"stores_original_image\":false"))
         assertFalse(json.contains("CameraX"))
+    }
+
+    @Test
+    fun requestCanSendCameraImageDataUriWithoutOriginalStorage() {
+        val json = AttachmentCreateRequest(
+            childId = "child_demo_001",
+            sessionId = "session_001",
+            imagePurpose = "share",
+            imageDataUri = "data:image/jpeg;base64,ZmFrZV9pbWFnZQ==",
+            childCaption = "我拍了一张图片给小白狐看。",
+        ).toJsonString()
+
+        assertTrue(json.contains("\"image_data_uri\":\"data:image/jpeg;base64,ZmFrZV9pbWFnZQ==\""))
+        assertTrue(json.contains("\"source\":\"android_camera_capture\""))
+        assertTrue(json.contains("\"stores_original_image\":false"))
+        assertTrue(JSONObject(json).isNull("file_id"))
     }
 
     @Test

@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,9 +47,12 @@ fun InputBar(
     onToggleTtsMuted: () -> Unit = {},
     onOpenTtsSettings: () -> Unit = {},
     onInstallTtsData: () -> Unit = {},
+    onPhotoCaptured: (String) -> Unit = {},
+    onPhotoCaptureFailed: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var draft by rememberSaveable { mutableStateOf("") }
+    var showImageSourceDialog by rememberSaveable { mutableStateOf(false) }
     val trimmedDraft = draft.trim()
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -58,6 +63,10 @@ fun InputBar(
             voice.actions.onPermissionDenied()
         }
     }
+    val imageInputLaunchers = rememberImageInputLaunchers(
+        onCaptured = { imageDataUri, _ -> onPhotoCaptured(imageDataUri) },
+        onFailed = onPhotoCaptureFailed,
+    )
 
     fun startVoiceRecordingWithPermission() {
         val isGranted = ContextCompat.checkSelfPermission(
@@ -92,6 +101,43 @@ fun InputBar(
         }
     }
 
+    if (showImageSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showImageSourceDialog = false },
+            title = {
+                Text(text = "拍给小白狐看")
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            showImageSourceDialog = false
+                            imageInputLaunchers.capturePhoto(IMAGE_PURPOSE_SHARE)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "拍照")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showImageSourceDialog = false
+                            imageInputLaunchers.pickFromGallery(IMAGE_PURPOSE_SHARE)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "从相册选")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showImageSourceDialog = false }) {
+                    Text(text = "取消")
+                }
+            },
+        )
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -108,23 +154,39 @@ fun InputBar(
             )
         }
         if (useChildVoiceFirstInput) {
-            Button(
-                onClick = {
-                    if (voice.isRecording) {
-                        voice.actions.onStopRecordingAndUpload()
-                    } else {
-                        startVoiceRecordingWithPermission()
-                    }
-                },
-                enabled = inputBarPrimaryVoiceButtonEnabled(enabled, voice.inputMode),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 58.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = inputBarPrimaryVoiceButtonText(voice.inputMode),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Button(
+                    onClick = {
+                        if (voice.isRecording) {
+                            voice.actions.onStopRecordingAndUpload()
+                        } else {
+                            startVoiceRecordingWithPermission()
+                        }
+                    },
+                    enabled = inputBarPrimaryVoiceButtonEnabled(enabled, voice.inputMode),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 58.dp),
+                ) {
+                    Text(
+                        text = inputBarPrimaryVoiceButtonText(voice.inputMode),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                OutlinedButton(
+                    onClick = { showImageSourceDialog = true },
+                    enabled = enabled && !voice.isRecording && !voice.isUploading,
+                    modifier = Modifier.heightIn(min = 58.dp),
+                ) {
+                    Text(
+                        text = "拍给小白狐看",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
         } else {
             Row(

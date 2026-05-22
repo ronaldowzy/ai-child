@@ -116,6 +116,8 @@ fun ChildChatScreen(
         onMockImagePurposeChange = viewModel::updateMockImagePurpose,
         onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
         onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
+        onPhotoCaptured = viewModel::submitCapturedPhoto,
+        onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
         modifier = modifier,
@@ -135,6 +137,8 @@ private fun ChildChatScreenContent(
     onMockImagePurposeChange: (String) -> Unit,
     onDismissMockPhoto: () -> Unit,
     onSubmitMockPhoto: () -> Unit,
+    onPhotoCaptured: (String) -> Unit,
+    onPhotoCaptureFailed: (String) -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
     modifier: Modifier = Modifier,
@@ -243,6 +247,8 @@ private fun ChildChatScreenContent(
                     onToggleTtsMuted = onToggleTtsMuted,
                     onOpenTtsSettings = onOpenTtsSettings,
                     onInstallTtsData = onInstallTtsData,
+                    onPhotoCaptured = onPhotoCaptured,
+                    onPhotoCaptureFailed = onPhotoCaptureFailed,
                     modifier = Modifier
                         .weight(0.59f)
                         .fillMaxHeight(),
@@ -338,15 +344,18 @@ private fun ChatConversationPanel(
     onQuickAction: (QuickActionUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val visibleQuickActions = uiState.quickActions.filterNot { action ->
+        action.id == "take_photo" || action.id == "share_photo"
+    }
     Column(modifier = modifier) {
         MessageList(
             messages = uiState.messages,
             modifier = Modifier.weight(1f),
         )
-        if (uiState.quickActions.isNotEmpty()) {
+        if (visibleQuickActions.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
             QuickActionsRow(
-                actions = uiState.quickActions,
+                actions = visibleQuickActions,
                 enabled = !uiState.isSending,
                 onQuickAction = onQuickAction,
             )
@@ -372,6 +381,8 @@ private fun ChatPanel(
     onToggleTtsMuted: () -> Unit,
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
+    onPhotoCaptured: (String) -> Unit,
+    onPhotoCaptureFailed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val panelGap = if (compactLandscape) 8.dp else 12.dp
@@ -412,6 +423,8 @@ private fun ChatPanel(
             onToggleTtsMuted = onToggleTtsMuted,
             onOpenTtsSettings = onOpenTtsSettings,
             onInstallTtsData = onInstallTtsData,
+            onPhotoCaptured = onPhotoCaptured,
+            onPhotoCaptureFailed = onPhotoCaptureFailed,
         )
     }
 }
@@ -732,6 +745,8 @@ private fun ChildChatScreenPreview() {
             onToggleTtsMuted = {},
             onOpenTtsSettings = {},
             onInstallTtsData = {},
+            onPhotoCaptured = {},
+            onPhotoCaptureFailed = {},
             onMockProblemTextChange = {},
             onMockImagePurposeChange = {},
             onDismissMockPhoto = {},

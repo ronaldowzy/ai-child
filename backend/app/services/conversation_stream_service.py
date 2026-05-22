@@ -15,6 +15,10 @@ from app.domain.schemas.conversation_stream import (
     ConversationStreamRequest,
 )
 from app.middleware.request_id import get_request_id
+from app.services.conversation_persistence_service import (
+    ConversationPersistenceService,
+    get_conversation_persistence_service,
+)
 from app.services.conversation_service import ConversationService
 from app.services.text_segmenter import TextSegment, TextSegmenter
 from app.services.tts_service import TtsService, get_tts_service
@@ -53,6 +57,7 @@ class ConversationStreamService:
         conversation_service: ConversationService | None = None,
         tts_service: TtsService | None = None,
         text_segmenter: TextSegmenter | None = None,
+        conversation_persistence_service: ConversationPersistenceService | None = None,
         settings: Settings | None = None,
         debug_enabled: bool = True,
         tts_enabled: bool | None = None,
@@ -66,6 +71,10 @@ class ConversationStreamService:
         self._tts_service = tts_service or get_tts_service()
         self._text_segmenter = text_segmenter or TextSegmenter(
             hard_max_chars=self._settings.tts_max_text_chars
+        )
+        self._conversation_persistence_service = (
+            conversation_persistence_service
+            or get_conversation_persistence_service()
         )
         self._tts_enabled = (
             self._settings.conversation_tts_enabled
@@ -90,6 +99,7 @@ class ConversationStreamService:
         audio_segment_count = 0
         tts_segment_count = 0
         tts_error_count = 0
+        first_audio_url: str | None = None
         turn_id = self._turn_id(request)
         builder = _StreamEventBuilder(turn_id=turn_id, request_id=get_request_id())
         yield builder.event(
@@ -194,6 +204,8 @@ class ConversationStreamService:
                 audio_segment_count += 1
                 if first_audio_ms is None:
                     first_audio_ms = self._elapsed_ms(started_at)
+                if first_audio_url is None:
+                    first_audio_url = audio_url
                 yield builder.event(
                     "audio_ready",
                     self._audio_ready_payload(
@@ -226,6 +238,16 @@ class ConversationStreamService:
                 "tts_error_count": tts_error_count,
             },
         )
+        self._record_stream_turn_best_effort(
+            request=request,
+            response=response,
+            final_text=final_text,
+            text_segment_count=len(segments),
+            tts_segment_count=tts_segment_count,
+            audio_segment_count=audio_segment_count,
+            tts_error_count=tts_error_count,
+            first_audio_url=first_audio_url,
+        )
         self._log_stream_finished(
             request=request,
             started_at=started_at,
@@ -239,6 +261,41 @@ class ConversationStreamService:
             tts_error_count=tts_error_count,
             error_type="tts_segment_failed" if tts_error_count else error_type,
         )
+
+    def _record_stream_turn_best_effort(
+        self,
+        *,
+        request: ConversationStreamRequest,
+        response: ConversationMessageResponse,
+        final_text: str,
+        text_segment_count: int,
+        tts_segment_count: int,
+        audio_segment_count: int,
+        tts_error_count: int,
+        first_audio_url: str | None,
+    ) -> None:
+        try:
+            self._conversation_persistence_service.record_stream_turn(
+                request=request,
+                response=response,
+                final_text=final_text,
+                text_segment_count=text_segment_count,
+                tts_segment_count=tts_segment_count,
+                audio_segment_count=audio_segment_count,
+                tts_error_count=tts_error_count,
+                first_audio_url=first_audio_url,
+            )
+        except Exception as exc:
+            logging.getLogger("app.conversation_persistence").warning(
+                "conversation_stream_persistence_failed",
+                extra={
+                    "event": "conversation_stream_persistence_failed",
+                    "request_id": get_request_id(),
+                    "child_id_hash": hash_identifier(request.child_id),
+                    "session_id_hash": hash_identifier(request.session_id),
+                    "error_type": exc.__class__.__name__,
+                },
+            )
 
     def _turn_id(self, request: ConversationStreamRequest) -> str:
         if request.stream_options.client_turn_id:

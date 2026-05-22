@@ -15,6 +15,8 @@ from app.domain.schemas.conversation import (
 )
 from app.domain.schemas.conversation_stream import ConversationStreamRequest
 from app.middleware.request_id import RequestIdMiddleware
+from app.repositories.conversation_persistence_repository import ConversationTurnWrite
+from app.services.conversation_persistence_service import ConversationPersistenceService
 from app.services.conversation_service import ConversationService
 from app.services.conversation_stream_service import ConversationStreamService
 
@@ -86,6 +88,27 @@ class StaticConversationService:
                 active_scene="conversation.open",
             ),
         )
+
+
+class CapturingStreamPersistenceService:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def record_stream_turn(self, **kwargs: object) -> None:
+        self.calls.append(kwargs)
+
+
+class FailingStreamPersistenceService:
+    def record_stream_turn(self, **_kwargs: object) -> None:
+        raise RuntimeError("simulated stream persistence failure")
+
+
+class CapturingTurnRepository:
+    def __init__(self) -> None:
+        self.turn: ConversationTurnWrite | None = None
+
+    def save_turn(self, turn_write: ConversationTurnWrite) -> None:
+        self.turn = turn_write
 
 
 def _client() -> TestClient:
@@ -282,6 +305,170 @@ def test_stream_service_emits_audio_ready_for_sentence_tts_segments() -> None:
 
     final_event = next(event for event in events if event["type"] == "text_final")
     assert final_event["payload"]["text"] == _text_from_deltas(events)
+
+
+def test_stream_service_persists_one_completed_turn_after_done() -> None:
+    persistence = CapturingStreamPersistenceService()
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text="你好呀，我是小白狐。我们可以聊恐龙。"
+        ),
+        tts_service=NoopTtsService(),
+        conversation_persistence_service=persistence,
+        tts_enabled=False,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="我想聊恐龙", include_tts=False),
+    )
+
+    text_delta_count = len([event for event in events if event["type"] == "text_delta"])
+    final_text = next(
+        event["payload"]["text"] for event in events if event["type"] == "text_final"
+    )
+
+    assert events[-1]["type"] == "done"
+    assert len(persistence.calls) == 1
+    call = persistence.calls[0]
+    assert call["request"].input.text == "我想聊恐龙"
+    assert call["final_text"] == final_text
+    assert call["response"].session_state.active_scene == "conversation.open"
+    assert call["text_segment_count"] == text_delta_count
+    assert call["audio_segment_count"] == 0
+    assert "segments" not in call
+
+
+def test_stream_persistence_records_audio_segment_summary_once() -> None:
+    persistence = CapturingStreamPersistenceService()
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段声音已经准备好了。"
+                "第二段声音也应该排队播放。"
+                "第三段声音继续验证顺序。"
+            )
+        ),
+        tts_service=UrlTtsService(),
+        conversation_persistence_service=persistence,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="请分段讲", include_tts=True),
+    )
+    audio_ready = [event for event in events if event["type"] == "audio_ready"]
+
+    assert len(audio_ready) == 3
+    assert len(persistence.calls) == 1
+    call = persistence.calls[0]
+    assert call["audio_segment_count"] == 3
+    assert call["first_audio_url"] == audio_ready[0]["payload"]["audio_url"]
+    assert call["tts_error_count"] == 0
+    assert "segment_texts" not in call
+
+
+def test_stream_persistence_records_tts_error_stats_for_partial_failures() -> None:
+    persistence = CapturingStreamPersistenceService()
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段音频现在应该可以正常播放出来。"
+                "第二段音频会模拟一次失败但不能影响后面。"
+                "第三段音频仍然需要继续生成并播放出来。"
+            )
+        ),
+        tts_service=PartiallyFailingTtsService(fail_call_indexes={1}),
+        conversation_persistence_service=persistence,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="请分三段讲", include_tts=True),
+    )
+    audio_ready = [event for event in events if event["type"] == "audio_ready"]
+    tts_errors = [
+        event for event in events
+        if event["type"] == "error" and event["payload"].get("stage") == "tts"
+    ]
+
+    assert len(audio_ready) == 2
+    assert len(tts_errors) == 1
+    assert len(persistence.calls) == 1
+    call = persistence.calls[0]
+    assert call["audio_segment_count"] == 2
+    assert call["tts_error_count"] == 1
+    assert call["first_audio_url"] == audio_ready[0]["payload"]["audio_url"]
+
+
+def test_stream_persistence_failure_does_not_block_text_final_or_done(
+    caplog,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="app.conversation_persistence")
+    child_text = "这句孩子输入不应该出现在持久化失败日志"
+    final_text = "这句最终回复也不应该出现在持久化失败日志。"
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(reply_text=final_text),
+        tts_service=NoopTtsService(),
+        conversation_persistence_service=FailingStreamPersistenceService(),
+        tts_enabled=False,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text=child_text, include_tts=False),
+    )
+    event_types = _event_types(events)
+
+    assert "text_final" in event_types
+    assert event_types[-1] == "done"
+    assert "conversation_stream_persistence_failed" in caplog.text
+    assert child_text not in caplog.text
+    assert final_text not in caplog.text
+
+
+def test_stream_persistence_debug_disabled_uses_unknown_intent_and_risk() -> None:
+    repository = CapturingTurnRepository()
+    persistence = ConversationPersistenceService(repository=repository)
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text="没有 debug 时也要能保存最终文本。"
+        ),
+        tts_service=UrlTtsService(),
+        conversation_persistence_service=persistence,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="debug 关闭测试", include_tts=True),
+    )
+    audio_ready = [event for event in events if event["type"] == "audio_ready"]
+
+    assert events[-1]["type"] == "done"
+    assert repository.turn is not None
+    assert repository.turn.routing_decision.primary_intent == "unknown"
+    assert repository.turn.routing_decision.risk_level == "unknown"
+    assert repository.turn.agent_message.normalized_text == (
+        "没有 debug 时也要能保存最终文本。"
+    )
+    assert repository.turn.agent_message.input_items == [
+        {
+            "type": "stream_audio_summary",
+            "has_audio": True,
+            "audio_segment_count": len(audio_ready),
+            "tts_segment_count": len(audio_ready),
+            "tts_error_count": 0,
+            "text_segment_count": len(
+                [event for event in events if event["type"] == "text_delta"]
+            ),
+        }
+    ]
+    assert repository.turn.agent_message.audio_url == (
+        audio_ready[0]["payload"]["audio_url"]
+    )
 
 
 def test_one_tts_segment_failure_does_not_stop_later_segments() -> None:

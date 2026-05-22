@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -84,6 +85,7 @@ class ModelRegistry:
         primary_profile: ModelProfile | None = None
         response: ModelResponse | None = None
         error_type: str | None = None
+        error_detail: str | None = None
         policy_blocked = False
         try:
             primary_profile = self._get_primary_profile(request.task_type)
@@ -95,6 +97,7 @@ class ModelRegistry:
             response = provider.generate(request, profile=primary_profile)
         except ModelDataPolicyBlockedError as exc:
             error_type = exc.__class__.__name__
+            error_detail = self._safe_error_detail(str(exc))
             policy_blocked = True
             if primary_profile is None:
                 self._log_model_call_finished(
@@ -105,6 +108,7 @@ class ModelRegistry:
                     fallback_used=False,
                     policy_blocked=policy_blocked,
                     error_type=error_type,
+                    error_detail=error_detail,
                 )
                 raise
             fallback_profile = self._mock_fallback_profile_for(
@@ -123,6 +127,7 @@ class ModelRegistry:
                     fallback_used=False,
                     policy_blocked=policy_blocked,
                     error_type=registry_error.__class__.__name__,
+                    error_detail=self._safe_error_detail(str(registry_error)),
                 )
                 raise registry_error from exc
 
@@ -139,6 +144,7 @@ class ModelRegistry:
             )
         except (ModelProviderError, ModelRegistryError) as exc:
             error_type = exc.__class__.__name__
+            error_detail = self._safe_error_detail(str(exc))
             if primary_profile is None:
                 self._log_model_call_finished(
                     request=request,
@@ -148,6 +154,7 @@ class ModelRegistry:
                     fallback_used=False,
                     policy_blocked=False,
                     error_type=error_type,
+                    error_detail=error_detail,
                 )
                 raise
             fallback_profile = self._fallback_profile_for(
@@ -165,6 +172,7 @@ class ModelRegistry:
                     fallback_used=False,
                     policy_blocked=False,
                     error_type=registry_error.__class__.__name__,
+                    error_detail=self._safe_error_detail(str(registry_error)),
                 )
                 raise registry_error from exc
 
@@ -187,6 +195,7 @@ class ModelRegistry:
             policy_blocked=policy_blocked
             or bool(response and response.metadata.get("policy_blocked")),
             error_type=error_type,
+            error_detail=error_detail,
         )
         return response
 
@@ -200,6 +209,7 @@ class ModelRegistry:
         fallback_used: bool,
         policy_blocked: bool,
         error_type: str | None,
+        error_detail: str | None,
     ) -> None:
         conversation_context = self._conversation_context(request.context)
         logging.getLogger("app.model_timing").info(
@@ -218,6 +228,7 @@ class ModelRegistry:
                 "fallback_used": fallback_used,
                 "policy_blocked": policy_blocked,
                 "error_type": error_type,
+                "error_detail": error_detail,
                 "child_id_hash": hash_identifier(conversation_context.get("child_id")),
                 "session_id_hash": hash_identifier(
                     conversation_context.get("session_id")
@@ -234,6 +245,24 @@ class ModelRegistry:
             for key, value in raw_context.items()
             if key in {"child_id", "session_id"} and isinstance(value, str)
         }
+
+    def _safe_error_detail(self, detail: str) -> str | None:
+        if not detail:
+            return None
+        redacted = detail.replace("\n", " ").replace("\r", " ")
+        redacted = re.sub(
+            r"Bearer\s+[A-Za-z0-9._~+/=-]+",
+            "Bearer [redacted]",
+            redacted,
+            flags=re.IGNORECASE,
+        )
+        redacted = re.sub(
+            r"(api[-_ ]?key\s*[:=]\s*)[^,\s;}]+",
+            r"\1[redacted]",
+            redacted,
+            flags=re.IGNORECASE,
+        )
+        return redacted[:220]
 
     def _get_primary_profile(self, task_type: ModelTaskType | str) -> ModelProfile:
         normalized_task_type = ModelTaskType(task_type)
@@ -410,7 +439,7 @@ class ModelRegistry:
                 profile_name="mimo_vision",
                 model_name=os.getenv(
                     "CHILD_AI_MIMO_VISION_MODEL",
-                    os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
+                    "mimo-v2.5",
                 ),
                 task_type=ModelTaskType.VISION,
                 vision=True,
@@ -420,7 +449,7 @@ class ModelRegistry:
                 profile_name="mimo_ocr",
                 model_name=os.getenv(
                     "CHILD_AI_MIMO_OCR_MODEL",
-                    os.getenv("CHILD_AI_MIMO_VISION_MODEL", "mimo-v2.5-pro"),
+                    os.getenv("CHILD_AI_MIMO_VISION_MODEL", "mimo-v2.5"),
                 ),
                 task_type=ModelTaskType.OCR,
                 vision=True,

@@ -29,7 +29,7 @@
 1. true LLM streaming 未实现。
 2. CameraX / real OCR 未实现。
 3. MiMo ASR real provider smoke 已用临时 env overlay + synthetic fake wav 执行并 PASS；这只验证 provider 请求链路，不验证中文识别准确率。
-4. MiMo vision/OCR real provider smoke 已用临时 env overlay + fake/test image 执行，当前 FAIL：真实 provider 请求未成功，后端 fallback 到 mock 被脚本拦截。
+4. MiMo vision/OCR real provider smoke 已用临时 env overlay + fake/test image 执行并 PASS；这只验证 provider 请求链路和图片理解返回，不接 CameraX。
 5. Redmi K60 / Honor Pad 5 真机 QA 仍待用户或开发者执行。
 ```
 
@@ -137,7 +137,7 @@ notes:
   - No API key, audio base64, transcript text, or raw provider response was printed.
 
 bash scripts/smoke_vision_model_opt_in.sh
-result: FAIL
+result: PASS
 coverage:
   - OpenAI-compatible multimodal vision path
   - AttachmentService vision recognition with image_data_uri
@@ -149,14 +149,17 @@ observed:
   - smoke_env_overlay=applied
   - smoke_image=generated_fake_test_image
   - VISION_STATUS=mimo_ready
-  - model_call_finished logged fallback_used=true, provider=mock, error_type=ModelProviderError
-  - VISION_STATUS=mimo_smoke_fail
-  - provider=mock
-  - model=mimo-v2.5-pro
-  - error_type=provider_fallback_or_policy_blocked
+  - model_call_finished logged fallback_used=false, provider=mimo, model=mimo-v2.5
+  - VISION_STATUS=mimo_smoke_pass
+  - provider=mimo
+  - model=mimo-v2.5
+  - latest observed recognized_type=privacy_sensitive
+  - latest observed text_length=176
 notes:
   - This is not blocked by missing image or missing image policy; the script generated a fake/test PNG and applied temporary opt-in image policy.
-  - The smoke made a real MiMo vision attempt, but ModelRegistry fell back after a provider error. The script rejects that fallback as a failed real-provider smoke.
+  - The generated fake image can produce different recognized_type values; this smoke validates real MiMo provider routing and output redaction, not classification quality.
+  - Root cause fixed: vision profile must use MiMo multimodal model `mimo-v2.5`; global text model `mimo-v2.5-pro` is not an image endpoint.
+  - MiMo provider payload uses `max_completion_tokens`, matching official MiMo chat completions docs.
   - No API key, image base64, full image description, or provider raw response was printed.
 ```
 

@@ -50,15 +50,16 @@ class OpenAICompatibleProvider(BaseModelProvider):
         model_name = self._resolve_model_name(profile)
         timeout_seconds = self._timeout_seconds(profile)
 
+        max_tokens_key = self._max_tokens_payload_key()
         payload = {
             "model": model_name,
             "messages": self._messages(request),
             "temperature": (
                 profile.default_params.temperature if profile is not None else 0.0
             ),
-            "max_tokens": (
-                profile.default_params.max_tokens if profile is not None else 800
-            ),
+            max_tokens_key: profile.default_params.max_tokens
+            if profile is not None
+            else 800,
         }
         response_json = self._post_chat_completion(
             base_url=base_url,
@@ -100,8 +101,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
 
     def _resolve_model_name(self, profile: ModelProfile | None) -> str:
         model_name = (
-            os.getenv(self.model_name_env or "")
-            or (profile.model_name if profile is not None else None)
+            (profile.model_name if profile is not None else None)
+            or os.getenv(self.model_name_env or "")
             or self.default_model_name
         )
         if not model_name:
@@ -113,6 +114,11 @@ class OpenAICompatibleProvider(BaseModelProvider):
     def _timeout_seconds(self, profile: ModelProfile | None) -> float:
         timeout_ms = profile.default_params.timeout_ms if profile is not None else 5000
         return max(timeout_ms / 1000, 0.001)
+
+    def _max_tokens_payload_key(self) -> str:
+        if self.provider_name == "mimo":
+            return "max_completion_tokens"
+        return "max_tokens"
 
     def _messages(self, request: ModelRequest) -> list[dict[str, Any]]:
         image_data_uri = self._image_data_uri(request)
@@ -166,8 +172,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
         image_data_uri: str,
     ) -> list[dict[str, Any]]:
         return [
-            {"type": "text", "text": text},
             {"type": "image_url", "image_url": {"url": image_data_uri}},
+            {"type": "text", "text": text},
         ]
 
     def _post_chat_completion(
@@ -198,10 +204,8 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 f"Provider {self.provider_name} timed out"
             ) from exc
         except HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="replace")
             raise ModelProviderError(
-                f"Provider {self.provider_name} returned HTTP {exc.code}: "
-                f"{error_body[:300]}"
+                self._http_error_detail(exc)
             ) from exc
         except URLError as exc:
             raise ModelProviderError(
@@ -219,6 +223,28 @@ class OpenAICompatibleProvider(BaseModelProvider):
                 f"Provider {self.provider_name} returned unexpected JSON"
             )
         return parsed
+
+    def _http_error_detail(self, exc: HTTPError) -> str:
+        raw_body = exc.read().decode("utf-8", errors="replace")
+        detail = ""
+        try:
+            parsed = json.loads(raw_body)
+        except json.JSONDecodeError:
+            detail = raw_body[:160]
+        else:
+            if isinstance(parsed, dict):
+                error = parsed.get("error")
+                if isinstance(error, dict):
+                    code = error.get("code") or error.get("type") or ""
+                    message = error.get("message") or ""
+                    detail = f"code={code}, message={str(message)[:160]}"
+                else:
+                    message = parsed.get("message") or parsed.get("detail") or ""
+                    detail = str(message)[:160]
+        return (
+            f"Provider {self.provider_name} returned HTTP {exc.code}"
+            + (f": {detail}" if detail else "")
+        )
 
     def _extract_response_text(self, response_json: dict[str, Any]) -> str:
         choice = self._first_choice(response_json)

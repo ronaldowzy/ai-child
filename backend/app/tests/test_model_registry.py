@@ -326,6 +326,8 @@ def test_model_registry_allows_mimo_child_data_when_policy_is_complete(
     )
     assert captured["timeout"] == 5.0
     assert captured["body"]["model"] == "mimo-v2.5-pro"
+    assert captured["body"]["max_completion_tokens"] == 800
+    assert "max_tokens" not in captured["body"]
     assert response.provider_name == "mimo"
     assert response.response_text == "fake mimo response"
     assert "policy_blocked" not in response.metadata
@@ -400,7 +402,10 @@ def test_model_registry_can_route_vision_to_mimo_with_multimodal_policy(
 
     content = captured["body"]["messages"][0]["content"]
     assert isinstance(content, list)
-    assert content[1]["type"] == "image_url"
+    assert captured["body"]["model"] == "mimo-v2.5"
+    assert captured["body"]["max_completion_tokens"] == 800
+    assert content[0]["type"] == "image_url"
+    assert content[1]["type"] == "text"
     assert response.provider_name == "mimo"
 
 

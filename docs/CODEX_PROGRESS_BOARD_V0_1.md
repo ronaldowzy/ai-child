@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：使用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR real smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已真实尝试但当前 FAIL，后端因 ModelProviderError fallback 到 mock，后续需核对 MiMo vision 请求格式/模型支持
+下一步：使用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR real smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5，未接 CameraX
 ```
 
 第一轮已完成能力快照：
@@ -241,7 +241,7 @@ Mock 拍题：done
 | QA-Gate-1 测试品目标一致性门槛 | done |  | 固化 2026-05-21 复盘：给父亲 APK/后端测试品前必须核对 APK base URL、运行后端 env、provider/mock 状态和目标接口 smoke；mock ASR 不能声明为真实 MiMo ASR 测试 |
 | QA-Gate-2 ASR key/model 对齐 | done |  | 固化 2026-05-21 复盘：MiMo ASR 默认复用当前 MiMo key，effective key 顺序为 ASR key -> shared MiMo key -> TTS key；ASR 模型必须是 `mimo-v2.5`，不是文本对话 `mimo-v2.5-pro` |
 | QA-Smoke-1 家庭内测前 smoke 打包 | done |  | 新增 backend local、voice stack、DB persistence 和 MiMo ASR opt-in smoke 脚本；新增 release smoke 记录和 Redmi K60 / Honor Pad 5 QA checklist；本轮 debug APK 构建成功但使用默认 emulator base URL，真机 QA 仍需重新构建并执行 |
-| QA-Smoke-2 本地 DB/ASR/Vision smoke 收口 | done |  | `setup_local_postgres.sh` 在本机无 Docker CLI 时自动使用 Homebrew postgresql@16，并完成 migration + DB persistence smoke PASS；`check_asr_real_status.sh` 已改为读取 `.env` 后施加临时 MiMo ASR overlay，自动生成 synthetic fake wav，真实 smoke PASS：provider=mimo、model=mimo-v2.5、status=needs_retry；`smoke_vision_model_opt_in.sh` 已改为临时 MiMo image overlay 并自动生成 fake/test PNG，真实 smoke 已执行但 FAIL：provider request 触发 ModelProviderError 后 fallback 到 mock，被脚本按失败拦截 |
+| QA-Smoke-2 本地 DB/ASR/Vision smoke 收口 | done |  | `setup_local_postgres.sh` 在本机无 Docker CLI 时自动使用 Homebrew postgresql@16，并完成 migration + DB persistence smoke PASS；`check_asr_real_status.sh` 已改为读取 `.env` 后施加临时 MiMo ASR overlay，自动生成 synthetic fake wav，真实 smoke PASS：provider=mimo、model=mimo-v2.5、status=needs_retry；`smoke_vision_model_opt_in.sh` 已改为临时 MiMo image overlay 并自动生成 fake/test PNG，真实 smoke PASS：provider=mimo、model=mimo-v2.5；latest observed recognized_type=privacy_sensitive/text_length=176，分类值随 fake image 可变，smoke 只验证真实 provider 路由与脱敏输出 |
 
 ---
 
@@ -272,10 +272,10 @@ Codex 偏差：无；本轮未改 Android runtime、Android assets、ASR/TTS pro
 ```text
 今日目标：不要等用户晚上手测，补齐本地 PostgreSQL 自动 setup、ASR real status 核对、MiMo vision/OCR 最小真实 smoke。
 完成任务：新增本地 PostgreSQL setup 脚本，优先 Docker Compose，Docker 不可用时在 macOS 尝试 Homebrew postgresql@16，并在成功后自动运行 migration 与 DB persistence smoke；新增 ASR 状态检查脚本，真实 smoke 目标会用临时 overlay 推进到 MiMo ready / pass / fail / policy blocked；新增 OpenAI-compatible multimodal image payload 支持、AttachmentService image_data_uri 最小 vision path 和 vision opt-in smoke 脚本。默认仍为 MockOCR，不接 CameraX，不保存 raw image/base64。
-阻塞问题：ASR real smoke 已不再被默认 mock 配置阻塞，脚本会使用临时 env overlay 和 synthetic fake wav；本轮真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Vision real smoke 也已不再被缺 image policy 或缺图片路径阻塞，脚本会生成 fake/test PNG 并使用临时 image overlay；本轮真实执行结果 FAIL，ModelProviderError 后 fallback 到 mock 被脚本拦截。Redmi K60 / Honor Pad 5 仍未真机 QA。
+阻塞问题：ASR real smoke 已不再被默认 mock 配置阻塞，脚本会使用临时 env overlay 和 synthetic fake wav；本轮真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Vision real smoke 也已不再被缺 image policy 或缺图片路径阻塞，脚本会生成 fake/test PNG 并使用临时 image overlay；已修正全局文本模型覆盖 vision profile 的问题，真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Redmi K60 / Honor Pad 5 仍未真机 QA。
 Codex 偏差：无；本轮未修改 Android runtime、Android assets、stream 协议、TTS provider 主逻辑、DB schema/migration、true LLM streaming 或 CameraX。
 需要补充到 AGENTS.md 的规则：暂无。
-明日第一任务：核对 MiMo vision/image_url data URI 请求格式和目标模型是否支持视觉输入；保持 ASR real smoke 脚本使用临时 overlay，不把 ASR policy flags 固化进 `.env`；随后进入 Redmi K60 / Honor Pad 5 真机 QA。
+明日第一任务：保持 ASR/Vision real smoke 脚本使用临时 overlay，不把 policy flags 固化进 `.env`；随后进入 Redmi K60 / Honor Pad 5 真机 QA。
 ```
 
 ### 日期：2026-05-22

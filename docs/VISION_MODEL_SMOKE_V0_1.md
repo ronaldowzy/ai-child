@@ -12,6 +12,8 @@
 4. AttachmentService 默认仍走 MockOCRProvider；只有 CHILD_AI_VISION_PROVIDER=mimo 或 CHILD_AI_MODEL_PROVIDER=mimo 时才进入 ModelRegistry vision path。
 5. ModelDataPolicyGuard 要求 image 外发必须 CHILD_AI_MIMO_ALLOW_IMAGE=true 且 CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true。
 6. scripts/smoke_vision_model_opt_in.sh 提供真实 MiMo vision opt-in smoke。
+7. 2026-05-22 真实 smoke 已确认：MiMo image understanding 必须使用 `mimo-v2.5` / `mimo-v2-omni` 这类 multimodal model；`mimo-v2.5-pro` 会触发 `No endpoints found that support image input`。
+8. MiMo OpenAI-compatible chat completions 对 MiMo provider 使用 `max_completion_tokens`；不要用 `max_tokens` 作为 MiMo vision 请求参数。
 ```
 
 ```text
@@ -31,6 +33,7 @@ CHILD_AI_VISION_PROVIDER=mimo
 CHILD_AI_MIMO_ENABLED=true
 CHILD_AI_MIMO_ALLOW_IMAGE=true
 CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
+CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5
 CHILD_AI_MIMO_API_KEY=<shell env only>
 CHILD_AI_VISION_SMOKE_IMAGE=/path/to/fake-smoke-test-image.png
 ```
@@ -57,6 +60,29 @@ image base64
 完整图片描述
 provider raw response
 真实儿童或家庭身份信息
+```
+
+## Verified Smoke
+
+```text
+2026-05-22:
+  result: PASS
+  provider: mimo
+  model: mimo-v2.5
+  input: generated fake/test PNG data URI
+  latest_observed_recognized_type: privacy_sensitive
+  latest_observed_text_length: 176
+  printed text: length only, no full image description
+  note: recognized_type may vary with the generated fake image; this smoke validates real provider routing and redaction, not classification quality.
+```
+
+关键修正：
+
+```text
+1. OpenAICompatibleProvider 现在优先使用 ModelProfile.model_name，避免全局 CHILD_AI_MIMO_MODEL=mimo-v2.5-pro 覆盖 vision profile。
+2. vision / ocr profile 默认模型改为 mimo-v2.5。
+3. MiMo provider payload 使用 max_completion_tokens。
+4. smoke 脚本默认临时设置 CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5。
 ```
 
 ## Attachment Boundary

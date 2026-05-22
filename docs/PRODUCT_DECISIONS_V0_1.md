@@ -555,6 +555,19 @@ Implementation notes: 交付语音输入测试包前必须用真实 smoke 或日
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_WORKFLOW_V0_1.md`、`docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 单元测试覆盖 ASR key fallback 和默认模型；smoke 脚本输出 provider/model，不输出 key、base64 或 transcript。
 
+#### PD-038
+
+Decision ID: PD-038
+Date: 2026-05-22
+Status: confirmed
+Source: father / MiMo vision smoke correction
+Decision: 普通文字对话调用 MiMo `mimo-v2.5-pro`；带图片的 conversation attachment / vision / OCR 链路调用 MiMo `mimo-v2.5`，不使用 `mimo-v2.5-pro` 做图片理解。
+Rationale: MiMo 官方图像理解文档只列出 `mimo-v2.5` / `mimo-v2-omni` 支持 image understanding。实测 `mimo-v2.5-pro` 会返回 `No endpoints found that support image input`；切到 `mimo-v2.5` 并使用 `max_completion_tokens` 后，fake/test image smoke 返回 `provider=mimo`、`model=mimo-v2.5`。
+Affected modules: ModelRegistry、OpenAICompatibleProvider、AttachmentService vision path、vision smoke script、backend docs、QA gate。
+Implementation notes: `mimo_child_chat` 继续使用 `CHILD_AI_MIMO_MODEL=mimo-v2.5-pro`；`mimo_vision` / `mimo_ocr` 使用 `CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5`。Provider 必须优先使用 selected profile 的 model，不能让全局文本模型覆盖 vision profile。真实 smoke 仍只使用 fake/test image，不使用真实儿童或家庭图片。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/VISION_MODEL_SMOKE_V0_1.md`、`docs/RELEASE_SMOKE_V0_1.md`、`backend/README.md`。
+Tests or QA needed: smoke 脚本输出 `provider=mimo` / `model=mimo-v2.5`，不输出 API key、image base64 或完整图片描述；后续 CameraX 仍需单独设计。
+
 ---
 
 ## 3. Current Product Direction

@@ -191,6 +191,7 @@ export CHILD_AI_MIMO_ENABLED="true"
 export CHILD_AI_MIMO_ALLOW_IMAGE="true"
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED="true"
 export CHILD_AI_MIMO_TIMEOUT_MS="${CHILD_AI_MIMO_TIMEOUT_MS:-30000}"
+export CHILD_AI_MIMO_VISION_MODEL="${CHILD_AI_MIMO_VISION_MODEL:-mimo-v2.5}"
 
 image_path="$(safe_image_path)"
 mime="$(image_mime "${image_path}")"

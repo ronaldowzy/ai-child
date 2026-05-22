@@ -110,6 +110,8 @@ def test_openai_compatible_provider_calls_chat_completions_without_real_network(
     assert captured["timeout"] == 5.0
     assert captured["body"]["model"] == "mimo-v2.5-pro"
     assert captured["body"]["messages"] == [{"role": "user", "content": "你好"}]
+    assert captured["body"]["max_completion_tokens"] == 800
+    assert "max_tokens" not in captured["body"]
     assert response.provider_name == "mimo"
     assert response.model_name == "mimo-v2.5-pro"
     assert response.response_text == "你好，我在这里。"
@@ -187,7 +189,7 @@ def test_openai_compatible_provider_builds_multimodal_payload(
 
     content = captured["body"]["messages"][0]["content"]
     assert isinstance(content, list)
-    assert content[0] == {"type": "text", "text": "请简短描述图片。"}
-    assert content[1] == {"type": "image_url", "image_url": {"url": image_data_uri}}
+    assert content[0] == {"type": "image_url", "image_url": {"url": image_data_uri}}
+    assert content[1] == {"type": "text", "text": "请简短描述图片。"}
     assert response.response_text == "看到一张测试图。"
     assert image_data_uri not in caplog.text

@@ -254,49 +254,39 @@ Coverage:
   the `child_ai` role and `child_ai_dev` database idempotently. If Docker,
   Homebrew, or permissions are unavailable, it reports `POSTGRES_SETUP: BLOCKED`
   with a concrete reason.
-- `check_asr_real_status.sh` distinguishes `ASR_STATUS=mock_only`,
-  `policy_blocked`, `mimo_ready`, `mimo_smoke_pass`, and `mimo_smoke_fail`.
-  It may generate a synthetic non-child fake WAV only to validate the provider
-  request chain when all MiMo ASR policy flags and key are present but no smoke
-  audio path was provided.
+- `check_asr_real_status.sh` sources `.env`, applies a temporary MiMo ASR
+  smoke overlay, starts a temporary backend, and generates a synthetic
+  non-child fake WAV when no safe smoke audio path was provided. This validates
+  the real provider request chain without permanently changing `.env`.
 - `smoke_vision_model_opt_in.sh` verifies the OpenAI-compatible MiMo vision path
-  only when image external-transmission env flags, key, and a fake/smoke/test
-  image path are all present. It never prints image base64, the full image
-  description, API keys, or provider raw response.
+  by sourcing `.env`, applying a temporary MiMo image smoke overlay, starting a
+  temporary backend, and generating a fake/test PNG when no safe image path was
+  provided. It never prints image base64, the full image description, API keys,
+  or provider raw response.
 
-MiMo ASR real smoke is opt-in only:
+MiMo ASR real smoke:
 
 ```bash
-ASR_PROVIDER=mimo \
-MIMO_ASR_ENABLED=true \
-MIMO_ASR_ALLOW_CHILD_AUDIO=true \
-MIMO_ASR_RETENTION_POLICY_CHECKED=true \
-MIMO_ASR_NO_TRAINING_CONFIRMED=true \
-CHILD_AI_MIMO_KEY="$CHILD_AI_MIMO_KEY" \
-MIMO_ASR_SMOKE_AUDIO=/path/to/non-child-smoke-audio.wav \
-bash scripts/smoke_mimo_asr_opt_in.sh
+bash scripts/check_asr_real_status.sh
 ```
 
-The MiMo opt-in smoke must use developer-provided non-child test audio. It must
-not print API keys, audio base64, transcript text, or provider raw response, and
-it must not be run with real child recordings during development smoke.
+The ASR smoke must not print API keys, audio base64, transcript text, or
+provider raw response, and it must not be run with real child recordings during
+development smoke.
 
-MiMo vision/OCR smoke is opt-in only:
+MiMo vision/OCR smoke:
 
 ```bash
-CHILD_AI_VISION_PROVIDER=mimo \
-CHILD_AI_MIMO_ENABLED=true \
-CHILD_AI_MIMO_ALLOW_IMAGE=true \
-CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true \
-CHILD_AI_MIMO_API_KEY="$CHILD_AI_MIMO_API_KEY" \
-CHILD_AI_VISION_SMOKE_IMAGE=/path/to/fake-smoke-test-image.png \
-VISION_SMOKE_BASE_URL=http://127.0.0.1:8000 \
 bash scripts/smoke_vision_model_opt_in.sh
 ```
 
 The vision smoke path posts a data URI to `/api/v1/conversation/attachment`.
 The backend does not store the raw image data URI and still defaults to
 MockOCR unless the provider and policy env explicitly opt in to MiMo.
+Normal text chat uses `CHILD_AI_MIMO_MODEL=mimo-v2.5-pro`; image/vision/OCR
+uses `CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5` because MiMo image understanding is
+served by the native multimodal model, not the pro text model. The MiMo provider
+uses `max_completion_tokens` for MiMo chat completions.
 
 ## Local PostgreSQL Persistence
 

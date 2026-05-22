@@ -27,7 +27,7 @@ class CapturingModelRegistry:
             response_text="图片里是一只测试用的玩具，不包含真实儿童信息。",
             structured_output={},
             provider_name=self.provider_name,
-            model_name="mimo-v2.5-pro",
+            model_name="mimo-v2.5",
         )
 
 

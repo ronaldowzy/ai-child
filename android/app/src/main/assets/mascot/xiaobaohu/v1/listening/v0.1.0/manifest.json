@@ -6,94 +6,13 @@
   "fps": 12,
   "frameCount": 24,
   "loop": true,
-  "width": 1536,
-  "height": 1024,
+  "width": 512,
+  "height": 341,
   "anchor": {
-    "x": 768,
-    "y": 814
+    "x": 256,
+    "y": 274
   },
-  "framePattern": "frames/fox_listening_%04d.png",
-  "preview": "fox_listening_preview.webp",
-  "fallbackPreview": "fox_listening_preview.gif",
-  "spritesheet": {
-    "file": "fox_listening_spritesheet.png",
-    "columns": 6,
-    "rows": 4,
-    "frameWidth": 1536,
-    "frameHeight": 1024
-  },
-  "features": {
-    "breathing": true,
-    "blink": true,
-    "mouthMovement": false,
-    "tailMovement": false
-  },
-  "source": "assets/source/fox_listening_clean.png",
-  "generation": {
-    "animation": {
-      "breathing": {
-        "enabled": true,
-        "scaleMin": 1.0,
-        "scaleMax": 1.006,
-        "yOffsetMax": 1.0
-      },
-      "listeningMotion": {
-        "enabled": false,
-        "description": "very subtle attentive motion, disabled for v0.1.0 until the clean source is confirmed",
-        "headTiltDegreesMax": 0,
-        "xOffsetMax": 0,
-        "yOffsetMax": 0
-      },
-      "blink": {
-        "enabled": true,
-        "frames": [
-          10,
-          11,
-          12
-        ],
-        "style": "gentle_half_blink",
-        "closureByFrame": {
-          "10": 0.5,
-          "11": 0.92,
-          "12": 0.5
-        },
-        "eyeBoxes": {
-          "screenLeft": [
-            615,
-            338,
-            704,
-            430
-          ],
-          "screenRight": [
-            745,
-            370,
-            850,
-            462
-          ]
-        },
-        "eyelidFill": [
-          250,
-          244,
-          229,
-          255
-        ],
-        "lineColor": [
-          43,
-          38,
-          35,
-          230
-        ],
-        "lineWidth": 4,
-        "softenRadius": 0.0
-      },
-      "mouthMovement": {
-        "enabled": false
-      },
-      "tailMovement": {
-        "enabled": false
-      }
-    },
-    "generatedAt": "2026-05-20T07:01:44.049686+00:00"
-  },
-  "notes": "Little White Fox listening loop prepared for subtle breathing and one gentle slow blink. Listening-specific motion is disabled for the first stable pass."
+  "framePattern": "frames_webp/fox_listening_%04d.webp",
+  "format": "webp",
+  "runtimeOnly": true
 }

@@ -339,7 +339,7 @@ ASR intake 结论：
 | 14. 父亲日报读取自动记忆素材 | E2E API | pass：同进程 E2E 生成结构化观察后，父亲日报返回摘要且不展示 evidence、quote_summary 或逐字聊天记录；设备侧待读取有素材状态 |
 | 15. 后端断开时 Android 温和错误 | 窗口模式模拟器 | pass：模拟器网络短暂不可达时，App 显示“小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。” |
 | 16. `session_state` 默认不展示给儿童 | 窗口模式模拟器 UI dump | pass：儿童界面未展示 `base=...` / `active=...` 等内部 session_state 调试文本 |
-| 17. 小白狐状态随 `emotion` / `motion` 轻量变化 | 窗口模式模拟器 | partial：当前 UI 已接入 animation_v1 PNG 序列帧、静态 PNG 和 Canvas fallback；仍需 Redmi K60 / Honor Pad 5 设备侧验证流畅度和降级 |
+| 17. 小白狐状态随 `emotion` / `motion` 轻量变化 | 窗口模式模拟器 | partial：当前 UI 已接入 animation_v1 WebP 序列帧、静态 WebP 和 Canvas fallback；仍需 Redmi K60 / Honor Pad 5 设备侧验证流畅度和降级 |
 | 18. 语音按钮旧版本行为 | 窗口模式模拟器 | superseded：旧 APK 中按钮 disabled；当前代码已改为点击触发麦克风权限、短录音、后端 ASR 上传和儿童默认自动发送，需新 APK 真机复验 |
 
 ### QA1 新决策后的新增待验收项
@@ -355,8 +355,8 @@ ASR intake 结论：
 | Android remote audioUrl 播放 | code_ready_device_qa | `reply.audio_url` 非空时优先播放后端 WAV；失败 fallback 系统 TTS 或文字；待 Redmi K60 验证 MiMo 音色 |
 | VoiceProfile | code_done / device_todo | 代码已使用 `zh-CN`、稍慢 `speechRate`、略高 `pitch` 和系统中文 fallback；仍需设备听感和缺失 voice 验证 |
 | MiMo ASR / Android TTS 效果评估 | todo | 需要真实设备或人工听感记录：后端 ASR 识别准确率、延迟、中文效果、儿童声音识别效果、TTS 自然度、孩子接受度 |
-| animation_v1 小白狐序列帧显示 | code_ready_device_qa | 当前已导入 11 个状态 PNG 序列帧 assets，使用 manifest-driven loader 播放；需在高配手机和 Honor Pad 5 上验证 idle/listening/thinking/speaking/network_error、性能和不强刺激 |
-| 3D 资源缺失时 fallback | partial / current fallback ok | 当前 fallback 链为 animation_v1 -> 静态 PNG -> Canvas；后续需在 manifest 缺失、frame 加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
+| animation_v1 小白狐序列帧显示 | code_ready_device_qa | 当前已导入 11 个状态 WebP 序列帧 runtime assets，使用 manifest-driven loader 播放；需在高配手机和 Honor Pad 5 上验证 idle/listening/thinking/speaking/network_error、性能和不强刺激 |
+| 3D 资源缺失时 fallback | partial / current fallback ok | 当前 fallback 链为 animation_v1 -> 静态 WebP -> Canvas；后续需在 manifest 缺失、frame 加载失败、低性能模式和 Honor Pad 5 上验证 fallback 正常 |
 
 ## V2 TTS v1 代码验证
 
@@ -458,18 +458,18 @@ Redmi K60 复验记录待补：
 ## 小白狐 animation_v1 序列帧验证
 
 日期：2026-05-20
-范围：Android 本地 PNG 序列帧小白狐动画。未接 Rive、实时 3D 引擎或大型动画依赖；未删除旧静态 PNG 和 Canvas fallback。
+范围：Android 本地 WebP 序列帧小白狐动画。未接 Rive、实时 3D 引擎或大型动画依赖；未删除旧静态 WebP 和 Canvas fallback。
 
 资源事实：
 
 ```text
 来源：/Users/wzy/Downloads/fox
 Android runtime：android/app/src/main/assets/mascot/xiaobaohu/v1/
-运行时文件：mascot_manifest.json、每个状态 manifest.json、frames/*.png
+运行时文件：mascot_manifest.json、每个状态 manifest.json、frames_webp/*.webp
 状态数量：11
 帧数：每个状态 24 帧
 FPS：12
-运行时 assets 体积：约 117MB
+运行时 assets 体积：约 4.9MB
 fallback：animation_v1 -> png_static -> canvas
 ```
 
@@ -486,10 +486,10 @@ fallback：animation_v1 -> png_static -> canvas
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-大小：147M
-SHA256：0f2df15d2731a662156162089195efbe1ae7eddccdeab073534942c70848aa9f
+大小：15M
+SHA256：7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10
 base URL：http://192.168.0.118:8000/
-说明：包体增大主要来自 117MB animation_v1 PNG frames。
+说明：上一版包体增大主要来自 117MB animation_v1 PNG frames；当前 runtime 已改为 512px WebP sequence，静态 drawable fallback 也已压缩为 WebP，clean assemble 后 debug APK 为 15M，仍需真机复核画质和流畅度。
 ```
 
 ## Redmi K60 后端连接误报排查
@@ -550,7 +550,7 @@ idle
 4. 网络错误切 network_error。
 5. safety_concern / privacy_boundary 优先级高于 speaking。
 6. jumping_happy 作为 short_loop，播放后回到 base state 或 idle。
-7. manifest 或 frames 加载失败时 fallback 到静态 PNG，再 fallback 到 Canvas。
+7. manifest 或 frames 加载失败时 fallback 到静态 WebP，再 fallback 到 Canvas。
 8. 儿童正常界面不显示复杂调试面板。
 ```
 
@@ -563,7 +563,7 @@ idle
 | Redmi K60 / Android 14 | network_error | 后端断开时切 network_error 或稳定 fallback | todo |
 | Redmi K60 / Android 14 | 安全 / 隐私优先级 | safety / privacy 不被 speaking 覆盖 | todo |
 | Honor Pad 5 / Android 9 / 4GB | 低配性能 | 记录卡顿、发热、掉帧、是否需要低性能模式 | todo |
-| Honor Pad 5 / Android 9 / 4GB | fallback | 低性能或资源失败时静态 PNG / Canvas 可用 | todo |
+| Honor Pad 5 / Android 9 / 4GB | fallback | 低性能或资源失败时静态 WebP / Canvas 可用 | todo |
 
 ## 下一阶段设备 QA 清单
 

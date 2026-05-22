@@ -142,7 +142,7 @@
 
 ## 7. 资源格式和命名
 
-第一批资源优先目标是 Android 可直接使用的 3D rendered PNG/WebP 静态状态图和本地 PNG 序列帧。当前小白狐 v1 候选静态资产已经导入仓库，包含 11 个状态；父亲随后提供的 animation_v1 动态资源包也已进入 Android assets。它们仍不是最终完整视觉系统，需继续在真实设备上验证资源质量、内存占用、切换流畅度和低配降级。
+第一批资源优先目标是 Android 可直接使用的 3D rendered PNG/WebP 静态状态图和本地 WebP 序列帧。当前小白狐 v1 候选静态资产已经导入仓库，包含 11 个状态；父亲随后提供的 animation_v1 动态资源包也已进入 Android assets，并已从验收 PNG 全量包转换为 runtime WebP sequence。它们仍不是最终完整视觉系统，需继续在真实设备上验证资源质量、内存占用、切换流畅度和低配降级。
 
 当前候选资产：
 
@@ -164,18 +164,18 @@ docs/assets/fox/v1/network_error.png
 建议 Android drawable 路径：
 
 ```text
-android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.png
-android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.png
-android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
-android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
-android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
-android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
-android/app/src/main/res/drawable-nodpi/fox_3d_calm.png
-android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.png
-android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.png
-android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.png
-android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.png
-android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
+android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_listening.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_speaking.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_thinking.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_calm.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_network_error.webp
 ```
 
 当前 Android 动态序列帧路径：
@@ -189,7 +189,7 @@ android/app/src/main/assets/mascot/xiaobaohu/v1/
 ```text
 mascot_manifest.json
 每个状态 manifest.json
-每个状态 frames/*.png
+每个状态 frames_webp/*.webp
 ```
 
 当前 manifest 声明 11 个动态状态：
@@ -208,7 +208,7 @@ jumping_happy
 idle
 ```
 
-所有状态当前均为 24 帧、12 FPS。运行时 assets 约 117MB。preview html、gif/webp 预览和 spritesheet 调试资料不作为 Android 运行时依赖。详细清单见：
+所有状态当前均为 24 帧、12 FPS，长边压到 512px，使用透明 WebP sequence。运行时 assets 约 4.9MB。验收全量包、PNG frames、preview html、gif/webp 预览和 spritesheet 调试资料不作为 Android 运行时依赖。详细清单见：
 
 ```text
 docs/assets/fox/animation_v1/README.md
@@ -261,16 +261,16 @@ jumping_happy：鼓励、答对、正向反馈后的短循环
 设计交付包中可同步保留源资产路径：
 
 ```text
-assets/fox/v1/3d/fox_3d_neutral_idle.png
-assets/fox/v1/3d/fox_3d_listening.png
-assets/fox/v1/3d/fox_3d_thinking.png
+assets/fox/v1/3d/fox_3d_neutral_idle.webp
+assets/fox/v1/3d/fox_3d_listening.webp
+assets/fox/v1/3d/fox_3d_thinking.webp
 assets/fox/v1/3d/fox_3d_encouraging.png
-assets/fox/v1/3d/fox_3d_calm.png
-assets/fox/v1/3d/fox_3d_sleepy.png
-assets/fox/v1/3d/fox_3d_safety_concern.png
-assets/fox/v1/3d/fox_3d_privacy_boundary.png
-assets/fox/v1/3d/fox_3d_homework_focus.png
-assets/fox/v1/3d/fox_3d_network_error.png
+assets/fox/v1/3d/fox_3d_calm.webp
+assets/fox/v1/3d/fox_3d_sleepy.webp
+assets/fox/v1/3d/fox_3d_safety_concern.webp
+assets/fox/v1/3d/fox_3d_privacy_boundary.webp
+assets/fox/v1/3d/fox_3d_homework_focus.webp
+assets/fox/v1/3d/fox_3d_network_error.webp
 ```
 
 每个文件要求：
@@ -302,15 +302,15 @@ assets/fox/v1/3d/fox_3d_network_error.png
 当前 Android 端已有 Compose Canvas fallback，并根据后端 `reply.emotion` 和 `reply.agent_motion` 做轻量状态映射。第一版资源接入原则如下：
 
 ```text
-1. 最终方向是三维立体小白狐形象，优先接入 animation_v1 PNG 序列帧。
-2. 旧静态 `fox_3d_*` drawable-nodpi PNG/WebP 作为第二层 fallback。
+1. 最终方向是三维立体小白狐形象，优先接入 animation_v1 WebP 序列帧。
+2. 旧静态 `fox_3d_*` drawable-nodpi WebP 作为第二层 fallback。
 3. 当前 Compose Canvas fallback 必须保留，作为资源缺失、资源加载失败、低性能设备或 3D 资源未交付时的最后显示。
 4. 2D 静态图也只作为前期替代，不应取代最终 3D / soft 3D 方向。
 5. 资源进入仓库前不要硬编码临时图片，不要引用本地设计软件路径。
 6. 不为了动画引入复杂依赖，除非主会话确认。
 7. 后端仍只输出语义状态和动作 ID，Android 负责展示映射。
 8. 图片不承载业务逻辑、安全判断、学习答案或父亲策略。
-9. 不硬塞低质量临时图片；资源质量不达标时继续使用静态 PNG 或 Canvas fallback。
+9. 不硬塞低质量临时图片；资源质量不达标时继续使用静态 WebP 或 Canvas fallback。
 10. 使用 `MascotController` / `AssetManifestLoader` / `FrameSequencePlayer` 播放 animation_v1。
 11. 使用 `FoxAgentAssetMapper` 做旧静态资源选择：输入 `FoxAgentUiState` / `FoxMood` / `FoxMotion`，输出 drawable resource id 或 Canvas fallback。
 12. 使用 `DevSettings.FOX_RENDER_MODE` 控制渲染模式：`animation_v1` / `png_static` / `canvas` / `auto`。
@@ -321,17 +321,17 @@ assets/fox/v1/3d/fox_3d_network_error.png
 
 | 后端/界面语义 | 推荐 drawable | 推荐动作 |
 |---|---|---|
-| 默认、温和 | `fox_3d_neutral_idle.png` | `gentle_blink` |
-| 倾听、孩子输入中 | `fox_3d_listening.png` | `listening_tail` |
-| TTS speaking / future speaking state | `fox_3d_speaking.png` | 轻量 speaking 状态 |
-| 思考、拆题 | `fox_3d_thinking.png` | `thinking_nod` |
-| 鼓励、小进步 | `fox_3d_jumping_happy.png` | `small_encourage` |
-| 安静、低能量 | `fox_3d_calm.png` | `calm_breathe` |
-| 睡前 | `fox_3d_sleepy.png` | `sleepy_blink` |
-| 高风险关注 | `fox_3d_safety_concern.png` | `concerned_still` |
-| 隐私边界 | `fox_3d_privacy_boundary.png` | `steady_boundary` |
-| 学习聚焦 | `fox_3d_homework_focus.png` | `thinking_nod` |
-| 网络错误 | `fox_3d_network_error.png` | `gentle_blink` |
+| 默认、温和 | `fox_3d_neutral_idle.webp` | `gentle_blink` |
+| 倾听、孩子输入中 | `fox_3d_listening.webp` | `listening_tail` |
+| TTS speaking / future speaking state | `fox_3d_speaking.webp` | 轻量 speaking 状态 |
+| 思考、拆题 | `fox_3d_thinking.webp` | `thinking_nod` |
+| 鼓励、小进步 | `fox_3d_jumping_happy.webp` | `small_encourage` |
+| 安静、低能量 | `fox_3d_calm.webp` | `calm_breathe` |
+| 睡前 | `fox_3d_sleepy.webp` | `sleepy_blink` |
+| 高风险关注 | `fox_3d_safety_concern.webp` | `concerned_still` |
+| 隐私边界 | `fox_3d_privacy_boundary.webp` | `steady_boundary` |
+| 学习聚焦 | `fox_3d_homework_focus.webp` | `thinking_nod` |
+| 网络错误 | `fox_3d_network_error.webp` | `gentle_blink` |
 
 资源缺失、低性能设备或 QA 发现图像不合适时，继续使用最接近状态或 Canvas fallback，不阻塞 TTS / 对话链路调试。
 
@@ -366,7 +366,7 @@ assets/fox/v1/3d/fox_3d_network_error.png
 资源进入仓库或接入 Android 前，至少检查：
 
 ```text
-1. 文件名和路径符合 android/app/src/main/res/drawable/fox_3d_*.png 规范。
+1. 文件名和路径符合 android/app/src/main/res/drawable-nodpi/fox_3d_*.webp 规范。
 2. 所有 PNG 是 1024x1024，透明背景，sRGB。
 3. 10 个状态角色比例、主色、边距、灯光和视角一致。
 4. 主体是白色或浅奶白色小白狐，亲和、温和、聪明、好奇。

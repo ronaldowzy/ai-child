@@ -6,87 +6,13 @@
   "fps": 12,
   "frameCount": 24,
   "loop": true,
-  "width": 1024,
-  "height": 1024,
+  "width": 512,
+  "height": 512,
   "anchor": {
-    "x": 512,
-    "y": 823
+    "x": 256,
+    "y": 412
   },
-  "framePattern": "frames/fox_idle_%04d.png",
-  "preview": "fox_idle_preview.webp",
-  "fallbackPreview": "fox_idle_preview.gif",
-  "spritesheet": {
-    "file": "fox_idle_spritesheet.png",
-    "columns": 6,
-    "rows": 4,
-    "frameWidth": 1024,
-    "frameHeight": 1024
-  },
-  "features": {
-    "breathing": true,
-    "blink": true,
-    "mouthMovement": false,
-    "tailMovement": false
-  },
-  "source": "assets/source/fox_idle_clean.png",
-  "generation": {
-    "animation": {
-      "breathing": {
-        "enabled": true,
-        "scaleMin": 1.0,
-        "scaleMax": 1.01,
-        "yOffsetMax": 1.5
-      },
-      "blink": {
-        "enabled": true,
-        "frames": [
-          10,
-          11,
-          12
-        ],
-        "closureByFrame": {
-          "10": 0.58,
-          "11": 1.0,
-          "12": 0.58
-        },
-        "style": "gentle_slow_blink",
-        "eyeBoxes": {
-          "screenLeft": [
-            365,
-            342,
-            472,
-            452
-          ],
-          "screenRight": [
-            523,
-            342,
-            630,
-            452
-          ]
-        },
-        "eyelidFill": [
-          248,
-          244,
-          226,
-          255
-        ],
-        "lineColor": [
-          43,
-          38,
-          35,
-          230
-        ],
-        "lineWidth": 4,
-        "softenRadius": 0.0
-      },
-      "mouthMovement": {
-        "enabled": false
-      },
-      "tailMovement": {
-        "enabled": false
-      }
-    },
-    "generatedAt": "2026-05-20T06:50:27.944598+00:00"
-  },
-  "notes": "Little White Fox neutral idle loop with subtle breathing and one gentle slow blink."
+  "framePattern": "frames_webp/fox_idle_%04d.webp",
+  "format": "webp",
+  "runtimeOnly": true
 }

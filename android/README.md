@@ -13,7 +13,7 @@
 - 默认优先调用后端 `POST /api/v1/conversation/stream`；失败时 fallback 到 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
-  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
+  `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存孩子小名 / 显示名、父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。小白狐 opening greeting 优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
@@ -67,10 +67,10 @@
 - Android 可以使用平台录音 / `TextToSpeech`，但必须通过可替换抽象：`VoiceEngine` / `SpeechInputController` / `TtsController`。
 - 小白狐形象应温和、好奇、活泼开朗，视觉目标优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback，不阻塞语音开发。
 - 小白狐 v1 候选资源已导入，当前包含 11 个状态：`neutral_idle`、`listening`、`speaking`、`jumping_happy`、`thinking`、`calm`、`sleepy`、`safety_concern`、`privacy_boundary`、`homework_focus`、`network_error`。
-- Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 PNG 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
-- 小白狐动态序列帧放在 `android/app/src/main/assets/mascot/xiaobaohu/v1/`，由 manifest-driven loader 读取；旧静态 PNG fallback 保留在 `android/app/src/main/res/drawable-nodpi/`。
+- Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 WebP 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+- 小白狐动态序列帧放在 `android/app/src/main/assets/mascot/xiaobaohu/v1/`，由 manifest-driven loader 读取；旧静态 fallback 已压缩为 WebP 并保留在 `android/app/src/main/res/drawable-nodpi/`。
 - `FoxAgentAssetMapper` 负责把 `FoxAgentUiState` / `FoxMood` / `FoxMotion` 映射到 drawable 或 Canvas fallback。
-- `DevSettings.FOX_RENDER_MODE` 当前支持 `animation_v1` / `png_static` / `canvas` / `auto` 语义；`DevSettings.FOX_ASSET_MODE` 继续控制旧静态 PNG fallback；低配设备可强制 Canvas 或静态状态。
+- `DevSettings.FOX_RENDER_MODE` 当前支持 `animation_v1` / `png_static` / `canvas` / `auto` 语义；`png_static` 是兼容旧模式名，实际静态资源已压缩为 WebP；低配设备可强制 Canvas 或静态状态。
 - TTS speaking 会优先映射到 animation_v1 的 `speaking` 序列帧；朗读结束或停止后恢复后端 reply 对应的基础状态。
 - UI、产品、设计和测试说明统一称为“小白狐”；代码 class 名 `FoxAgent` 暂可保留，后续如要改代码命名单独 refactor。
 - 小白狐表现层不得制造“唯一朋友”“只有我懂你”等依赖感，不做排行榜、连击奖励或上瘾式动画。
@@ -121,10 +121,10 @@ android/app/src/main/assets/mascot/xiaobaohu/v1/
 ```text
 mascot_manifest.json
 每个状态目录下的 manifest.json
-每个状态目录下的 frames/*.png
+每个状态目录下的 frames_webp/*.webp
 ```
 
-当前没有把 preview html、gif/webp 预览和 spritesheet 调试资料作为运行时依赖。完整资源记录见：
+当前没有把验收全量包、PNG frames、preview html、gif/webp 预览和 spritesheet 调试资料作为运行时依赖。完整资源记录见：
 
 ```text
 docs/assets/fox/animation_v1/README.md
@@ -149,8 +149,8 @@ idle
 渲染策略：
 
 ```text
-1. `animation_v1`：优先使用 manifest + PNG frames 播放。
-2. `png_static`：animation manifest 或 frames 失败时使用旧静态 PNG。
+1. `animation_v1`：优先使用 manifest + WebP frames 播放。
+2. `png_static`：animation manifest 或 frames 失败时使用旧静态 WebP fallback。
 3. `canvas`：静态资源也不可用或低性能模式时使用 Compose Canvas fallback。
 ```
 
@@ -163,14 +163,14 @@ DevSettings.FOX_ANIMATION_LOW_PERFORMANCE_MODE = false
 DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 ```
 
-当前 animation_v1 assets 约 117MB，会显著增加 APK 体积。Redmi K60 作为功能主验证设备，Honor Pad 5 Android 9 / 4GB 作为低配性能和降级验证设备。
+当前 animation_v1 runtime assets 约 4.9MB，采用 512px WebP sequence；静态 drawable fallback 约 1.5MB，也已压缩为 WebP。验收全量包只作为美术源包、QA 留档和重新导出母包，不应整体放入 App。Redmi K60 作为功能主验证设备，Honor Pad 5 Android 9 / 4GB 作为低配性能和降级验证设备。
 
 最新 animation_v1 debug APK：
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-大小：147M
-SHA256：0f2df15d2731a662156162089195efbe1ae7eddccdeab073534942c70848aa9f
+大小：15M
+SHA256：7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10
 base URL：http://192.168.0.118:8000/
 ```
 
@@ -198,18 +198,18 @@ docs/assets/fox/v1/network_error.png
 Android 运行时资源位于：
 
 ```text
-android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.png
-android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.png
-android/app/src/main/res/drawable-nodpi/fox_3d_listening.png
-android/app/src/main/res/drawable-nodpi/fox_3d_speaking.png
-android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.png
-android/app/src/main/res/drawable-nodpi/fox_3d_thinking.png
-android/app/src/main/res/drawable-nodpi/fox_3d_calm.png
-android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.png
-android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.png
-android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.png
-android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.png
-android/app/src/main/res/drawable-nodpi/fox_3d_network_error.png
+android/app/src/main/res/drawable-nodpi/fox_3d_character_sheet_v1.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_neutral_idle.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_listening.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_speaking.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_jumping_happy.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_thinking.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_calm.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_sleepy.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_safety_concern.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_privacy_boundary.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_homework_focus.webp
+android/app/src/main/res/drawable-nodpi/fox_3d_network_error.webp
 ```
 
 当前状态映射：
@@ -474,7 +474,7 @@ bash scripts/e2e_local_api_check.sh
 5. 语音输入已接入 Android 录音上传后端 ASR + 儿童默认自动发送；下一步在 Redmi K60 / Honor Pad 5 做权限、录音、上传、自动发送、DevSettings 确认模式和失败 fallback 手动 QA。
 ```
 
-横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 PNG 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。
+横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 WebP 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。
 
 ## 父亲日报说明
 

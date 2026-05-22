@@ -55,7 +55,7 @@ Mock 拍题：done
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、后端 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
 | V1 | 语音交互 v1 | 后端 MiMo ASR voice-first 自动发送 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为后端 MiMo audio input，provider 和 endpoint 已接入但默认 policy-blocked；Android ASR 录音上传和儿童默认自动发送已接入，调试确认模式保留，待真机 QA |
-| F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 PNG 序列帧已接入 Android assets；保留静态 PNG 和 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
+| F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 runtime 已优化为 512px WebP 序列帧，Android assets 约 4.9MB；静态 fallback 已压缩为 WebP，保留 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
 | DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
 | S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | in_progress | V1/F1/R1 | 后端 NDJSON skeleton 已接入；segment-level interleaved TTS 已完成；Android 首版 stream client、渐进 agent bubble 和 audio segment queue 已接入；旧 `/conversation/message` 保留为 fallback |
 | UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
@@ -215,8 +215,8 @@ Mock 拍题：done
 | V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发；真实 smoke 已确认 `/chat/completions` + `choices[0].message.audio.data` 可生成 RIFF/WAV |
 | V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；Android conversation read timeout 已从 12s 调整为 45s，避免 MiMo TTS 同步生成接近 10s 时误报断网 |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
-| F1-02 小白狐 PNG 资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
-| F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧序列；Android test/assemble/lint 通过；debug APK 约 147MB，待真机验证流畅度和低配降级 |
+| F1-02 小白狐静态资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；静态资源已压缩为 WebP 并保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
+| F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧 WebP 序列；Android runtime assets 约 4.9MB，静态 fallback 约 1.5MB，clean assemble debug APK 约 15MB；待真机验证画质、流畅度和低配降级 |
 | O1-01 Open Conversation Mode 小步实现 | done |  | 普通兴趣和日常话题进入 `conversation.open`；ChildAgentRuntime 接收进程内短期 history；普通聊天 quick actions 随上下文轻量变化；安全、隐私、学习、睡前边界保留 |
 | DB1-A PostgreSQL 基础设施 | done |  | 新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local compose、初始 8 张表、migration/reset 脚本和基础测试；业务服务仍未迁移 |
 | DB1-B ParentPolicy 持久化 | done |  | ParentPolicyService 已支持 PostgreSQL repository 优先读写；数据库不可用时 dev fallback 到内存；`parent_message_raw` 和 `parent_message_updated_at` 已有迁移 |

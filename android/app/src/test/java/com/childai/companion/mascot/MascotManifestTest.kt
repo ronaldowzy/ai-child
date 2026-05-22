@@ -16,6 +16,7 @@ class MascotManifestTest {
         assertTrue(manifest.states.containsKey(MascotState.Speaking))
         assertTrue(manifest.states.containsKey(MascotState.NetworkError))
         assertEquals(12, manifest.defaultFps)
+        assertEquals("0.1.1-runtime-webp", manifest.assetPackageVersion)
     }
 
     @Test
@@ -32,13 +33,33 @@ class MascotManifestTest {
 
         assertEquals(24, paths.size)
         assertEquals(
-            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames/fox_speaking_0001.png",
+            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames_webp/fox_speaking_0001.webp",
             paths.first(),
         )
         assertEquals(
-            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames/fox_speaking_0024.png",
+            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames_webp/fox_speaking_0024.webp",
             paths.last(),
         )
+        assertEquals(512, spec.width)
+        assertEquals(341, spec.height)
+    }
+
+    @Test
+    fun runtimeAssetsUseWebpFramesOnly() {
+        val files = TEST_ASSET_ROOT.walkTopDown().filter { it.isFile }.toList()
+
+        assertEquals(264, files.count { it.extension == "webp" })
+        assertEquals(0, files.count { it.extension == "png" })
+        assertTrue(files.none { it.path.contains("/frames/") })
+        assertTrue(files.all { !it.name.endsWith(".gif") && !it.name.endsWith(".html") })
+    }
+
+    @Test
+    fun staticFallbackDrawablesUseWebpOnly() {
+        val files = STATIC_FALLBACK_ROOT.listFiles()?.filter { it.isFile } ?: emptyList()
+
+        assertEquals(12, files.count { it.extension == "webp" && it.name.startsWith("fox_3d_") })
+        assertEquals(0, files.count { it.extension == "png" && it.name.startsWith("fox_3d_") })
     }
 
     @Test
@@ -100,5 +121,6 @@ class MascotManifestTest {
 
     private companion object {
         val TEST_ASSET_ROOT = File("src/main/assets/mascot/xiaobaohu/v1")
+        val STATIC_FALLBACK_ROOT = File("src/main/res/drawable-nodpi")
     }
 }

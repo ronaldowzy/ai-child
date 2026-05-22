@@ -13,10 +13,10 @@
 6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
 8. 小白狐 v1 候选形象资产已生成，当前静态资源包含 11 个状态；动态 animation_v1 资源包以 `mascot_manifest.json` 为准，当前实际状态也是 11 个：idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
-9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 PNG 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
+9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 WebP 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
 10. 采用双设备测试策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容性、大屏和降级验证。
 11. Redmi K60 / Android 14 截图显示上一版系统 TTS 为 `SKIPPED_UNAVAILABLE`，系统 TTS 不再作为正式小白狐音色方案。
-12. 小白狐 animation_v1 PNG 序列帧资源已导入 Android assets，当前运行时体积约 117MB，fallback 链为 animation_v1 -> png_static -> canvas。
+12. 小白狐 animation_v1 已按运行时包优化为 512px WebP 序列帧，Android assets 约 4.9MB，fallback 链为 animation_v1 -> png_static -> canvas；验收全量包不应整体进入 APK。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
 15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
@@ -405,7 +405,7 @@ Ops P0 当前能力（2026-05-21）：
 1. 基础静态形象资源。
 2. 优先探索 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感资源。
 3. 当前 v1 候选资产：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
-4. 当前 animation_v1 动态资源：manifest-driven PNG frames，11 个状态，每状态 24 帧，12 FPS。
+4. 当前 animation_v1 动态资源：manifest-driven WebP frames，11 个状态，每状态 24 帧，12 FPS。
 5. 与 reply.emotion / reply.agent_motion 的映射表。
 6. Android 静态资源命名、drawable-nodpi 和尺寸规范。
 7. Android 动态资源放在 `android/app/src/main/assets/mascot/xiaobaohu/v1/`，保留 manifest 包结构。
@@ -446,11 +446,11 @@ Ops P0 当前能力（2026-05-21）：
 ```text
 1. Android 本地 `MascotController`。
 2. `AssetManifestLoader` 从 assets 读取 `mascot_manifest.json` 和状态 manifest。
-3. `FrameSequencePlayer` 按 fps 播放 PNG frames，支持 loop、oneshot_hold、short_loop。
+3. `FrameSequencePlayer` 按 fps 播放 WebP frames，支持 loop、oneshot_hold、short_loop。
 4. 输入中、识别中、自动发送中、调试待确认、后端请求中、opening greeting、回复中、TTS 播放中、错误状态。
 5. 后端 reply.emotion / reply.agent_motion 映射到温和表现。
 6. 动画时长和循环次数受控，`jumping_happy` 等正反馈不做上瘾式循环。
-7. 低性能设备上可降级为静态 PNG 或 Canvas。
+7. 低性能设备上可降级为静态 WebP 或 Canvas。
 ```
 
 非目标：
@@ -468,7 +468,7 @@ Ops P0 当前能力（2026-05-21）：
 2. 高风险场景表现稳定、克制，不戏剧化。
 3. 后端断开或 TTS 失败时状态可恢复。
 4. safety_concern / privacy_boundary 优先级高于 speaking。
-5. manifest 或 frames 缺失时不崩溃，fallback 到静态 PNG 或 Canvas。
+5. manifest 或 frames 缺失时不崩溃，fallback 到静态 WebP 或 Canvas。
 ```
 
 ---

@@ -1,6 +1,10 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.base import Base
 from app.domain.agent_runtime import (
     AgentRuntimeRequest,
     AgentRuntimeResult,
@@ -18,6 +22,7 @@ from app.domain.schemas.conversation import (
     ConversationMessageRequest,
 )
 from app.repositories.memory_repository import InMemoryMemoryRepository
+from app.repositories.memory_sql_repository import SqlAlchemyMemoryRepository
 from app.services.conversation_memory_hooks import ConversationMemoryHooks
 from app.services.conversation_service import ConversationService
 from app.services.memory_service import MemoryService
@@ -77,6 +82,41 @@ def _conversation_stack(
         debug_enabled=True,
     )
     return memory_service, report_service, conversation_service, runtime
+
+
+def _sqlite_session_factory():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    return sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+
+
+def _db_memory_service() -> tuple[MemoryService, SqlAlchemyMemoryRepository]:
+    repository = SqlAlchemyMemoryRepository(session_factory=_sqlite_session_factory())
+    memory_service = MemoryService(
+        repository=repository,
+        now_provider=_fixed_now,
+    )
+    return memory_service, repository
+
+
+def _conversation_stack_with_memory_service(
+    memory_service: MemoryService,
+    *,
+    runtime: CapturingRuntime | None = None,
+) -> tuple[ConversationService, CapturingRuntime]:
+    runtime = runtime or CapturingRuntime()
+    conversation_service = ConversationService(
+        scene_orchestrator=SceneOrchestrator(),
+        child_agent_runtime=runtime,
+        memory_hooks=ConversationMemoryHooks(memory_service=memory_service),
+        debug_enabled=True,
+    )
+    return conversation_service, runtime
 
 
 def _message(
@@ -165,6 +205,28 @@ def test_learning_help_creates_learning_memory() -> None:
     assert response.session_state.active_scene == "learning.homework_help"
     assert any(memory.memory_type == MemoryType.LEARNING_PATTERN for memory in memories)
     assert any("先说明题目在问什么" in memory.content for memory in memories)
+    _assert_summary_evidence(memories)
+
+
+def test_conversation_memory_hooks_persist_structured_memory_to_sql_repository() -> None:
+    child_id = "child_auto_memory_sql_learning"
+    memory_service, repository = _db_memory_service()
+    conversation_service, _ = _conversation_stack_with_memory_service(memory_service)
+
+    response = conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_auto_memory_sql_learning",
+            text="我有一道题不会",
+        )
+    )
+    memories = repository.list_by_child(child_id)
+    serialized = " ".join(memory.model_dump_json() for memory in memories)
+
+    assert response.session_state.active_scene == "learning.homework_help"
+    assert any(memory.memory_type == MemoryType.LEARNING_PATTERN for memory in memories)
+    assert "先说明题目在问什么" in serialized
+    assert "我有一道题不会" not in serialized
     _assert_summary_evidence(memories)
 
 
@@ -344,6 +406,39 @@ def test_conversation_passes_retrieved_non_safety_memory_context_to_runtime() ->
         _message(
             child_id=child_id,
             session_id="session_auto_memory_runtime_context",
+            text="我有一道题不会",
+        )
+    )
+
+    memory_context = runtime.requests[0].memory_context
+    assert isinstance(memory_context, list)
+    assert len(memory_context) == 1
+    assert memory_context[0]["memory_type"] == "learning_pattern"
+    assert "题意" in memory_context[0]["content"]
+    assert "evidence" not in memory_context[0]
+
+
+def test_conversation_retrieves_db_backed_memory_context_to_runtime() -> None:
+    child_id = "child_auto_memory_sql_runtime_context"
+    runtime = CapturingRuntime()
+    memory_service, _ = _db_memory_service()
+    conversation_service, _ = _conversation_stack_with_memory_service(
+        memory_service,
+        runtime=runtime,
+    )
+    memory_service.create(
+        _manual_memory_request(
+            child_id=child_id,
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="孩子最近学习求助时适合先复述题意。",
+            tags=["学习求助", "题", "题意复述"],
+        )
+    )
+
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_auto_memory_sql_runtime_context",
             text="我有一道题不会",
         )
     )

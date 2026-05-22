@@ -1,4 +1,32 @@
+from typing import Protocol
+
+import logging
+
 from app.domain.memory import MemoryItem
+
+
+logger = logging.getLogger("app.memory_repository")
+
+
+class MemoryRepositoryUnavailable(RuntimeError):
+    pass
+
+
+class MemoryRepository(Protocol):
+    def save(self, memory: MemoryItem) -> MemoryItem:
+        ...
+
+    def get(self, memory_id: str) -> MemoryItem | None:
+        ...
+
+    def list_by_child(self, child_id: str) -> list[MemoryItem]:
+        ...
+
+    def delete(self, memory_id: str) -> bool:
+        ...
+
+    def clear(self) -> None:
+        ...
 
 
 class InMemoryMemoryRepository:
@@ -38,5 +66,30 @@ class InMemoryMemoryRepository:
 _memory_repository = InMemoryMemoryRepository()
 
 
-def get_memory_repository() -> InMemoryMemoryRepository:
+def get_memory_repository() -> MemoryRepository:
     return _memory_repository
+
+
+def configure_default_memory_repository() -> MemoryRepository:
+    global _memory_repository
+    try:
+        from app.repositories.memory_sql_repository import (
+            SqlAlchemyMemoryRepository,
+        )
+
+        repository = SqlAlchemyMemoryRepository()
+        repository.ensure_available()
+        _memory_repository = repository
+    except Exception as exc:
+        logger.warning(
+            "memory_repository_fallback",
+            extra={
+                "event": "memory_repository_fallback",
+                "error_type": exc.__class__.__name__,
+            },
+        )
+        _memory_repository = InMemoryMemoryRepository()
+    return _memory_repository
+
+
+configure_default_memory_repository()

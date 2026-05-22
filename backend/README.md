@@ -240,6 +240,14 @@ per-segment TTS text are not stored. If the local database is unavailable in
 dev/test, persistence failures are logged with hashed identifiers and the
 conversation response or stream output is not blocked.
 
+DB1-B4 records structured `MemoryService` items in `memory_items` when
+PostgreSQL is available. The service keeps the same validation boundary as the
+in-memory repository: memory content must be structured summary material,
+evidence must be short `quote_summary` style evidence, safety memories remain
+parent-visible, and forbidden raw evidence sources are rejected before storage.
+If PostgreSQL is unavailable, MemoryService falls back to the process-local
+repository without blocking conversation or Android QA.
+
 Local dev database:
 
 ```bash
@@ -292,10 +300,14 @@ Data boundary:
   not be written to PostgreSQL.
 - Prompt text, `parent_message_raw`, provider raw responses, audio base64, and
   raw image/OCR debug data must not be written to conversation persistence.
+- `memory_items` stores structured summaries, tags, short evidence summaries,
+  sensitivity, visibility flags, parent-attention flags, expiry, and optional
+  embedding ids. It must not store raw media, full chat transcripts, prompts,
+  debug internals, provider raw responses, or API keys.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
-- `memory_items` and `parent_reports` tables exist, but `MemoryService` and
-  `ParentReportService` runtime persistence are still pending.
+- `parent_reports` exists, but `ParentReportService` runtime persistence is
+  still pending.
 - Parent free-text notes are stored in `parent_policies.parent_message_raw` for
   local family testing. They are prompt background only and must not be exposed
   in child-facing debug/UI.

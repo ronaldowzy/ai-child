@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
+from app.db.base import Base
 from app.domain.memory import (
     MemoryCreateRequest,
     MemoryEvidence,
@@ -9,7 +12,11 @@ from app.domain.memory import (
     MemoryType,
     MemoryUpdateRequest,
 )
-from app.repositories.memory_repository import InMemoryMemoryRepository
+from app.repositories.memory_repository import (
+    InMemoryMemoryRepository,
+    MemoryRepositoryUnavailable,
+)
+from app.repositories.memory_sql_repository import SqlAlchemyMemoryRepository
 from app.services.memory_service import MemoryService, UnsafeMemoryError
 
 
@@ -54,6 +61,17 @@ def _service() -> MemoryService:
     )
 
 
+def _sqlite_session_factory():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    return sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+
+
 def test_memory_service_creates_and_retrieves_active_memory() -> None:
     service = _service()
 
@@ -67,6 +85,21 @@ def test_memory_service_creates_and_retrieves_active_memory() -> None:
     assert created.confidence == 0.82
     assert created.expires_at == _fixed_now() + timedelta(days=180)
     assert [memory.id for memory in retrieved] == [created.id]
+
+
+def test_memory_service_create_can_read_back_from_sql_repository() -> None:
+    repository = SqlAlchemyMemoryRepository(
+        session_factory=_sqlite_session_factory()
+    )
+    service = MemoryService(repository=repository, now_provider=_fixed_now)
+
+    created = service.create(_request())
+    reloaded = repository.get(created.id)
+
+    assert reloaded is not None
+    assert reloaded.id == created.id
+    assert reloaded.content == created.content
+    assert reloaded.evidence[0].quote_summary == "孩子主动讲到霸王龙和三角龙。"
 
 
 def test_memory_service_filters_expired_memories_from_retrieve() -> None:
@@ -84,6 +117,31 @@ def test_memory_service_filters_expired_memories_from_retrieve() -> None:
 
     assert [memory.id for memory in retrieved] == [active.id]
     assert {memory.id for memory in all_memories} == {expired.id, active.id}
+
+
+def test_memory_service_retrieve_sorts_by_query_score_importance_and_confidence() -> None:
+    service = _service()
+    lower_rank = service.create(
+        _request(
+            content="孩子也有学习求助记录。",
+            tags=["学习求助"],
+            memory_type=MemoryType.LEARNING_PATTERN,
+        ).model_copy(update={"importance": 0.4, "confidence": 0.4})
+    )
+    higher_rank = service.create(
+        _request(
+            content="孩子最近学习求助时适合先复述题意。",
+            tags=["学习求助", "题意"],
+            memory_type=MemoryType.LEARNING_PATTERN,
+        ).model_copy(update={"importance": 0.8, "confidence": 0.8})
+    )
+
+    retrieved = service.retrieve(
+        "child_memory_service_test",
+        query="学习求助 题意",
+    )
+
+    assert [memory.id for memory in retrieved] == [higher_rank.id, lower_rank.id]
 
 
 def test_memory_service_marks_critical_memory_for_parent_attention() -> None:
@@ -162,3 +220,42 @@ def test_memory_service_rejects_raw_media_or_fixed_negative_labels() -> None:
                 tags=["表达"],
             )
         )
+
+
+def test_memory_service_repository_failure_falls_back_without_sensitive_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FailingRepository:
+        def save(self, _memory):
+            raise MemoryRepositoryUnavailable("contains raw child details")
+
+        def get(self, _memory_id):
+            raise MemoryRepositoryUnavailable("contains raw child details")
+
+        def list_by_child(self, _child_id):
+            raise MemoryRepositoryUnavailable("contains raw child details")
+
+        def delete(self, _memory_id):
+            raise MemoryRepositoryUnavailable("contains raw child details")
+
+        def clear(self):
+            raise MemoryRepositoryUnavailable("contains raw child details")
+
+    caplog.set_level("WARNING", logger="app.memory_service")
+    service = MemoryService(
+        repository=FailingRepository(),
+        fallback_repository=InMemoryMemoryRepository(),
+        now_provider=_fixed_now,
+    )
+    request = _request(
+        content="孩子最近对植物话题感兴趣，可以作为表达切入点。"
+    )
+
+    created = service.create(request)
+    retrieved = service.retrieve("child_memory_service_test", query="植物")
+
+    assert [memory.id for memory in retrieved] == [created.id]
+    assert "memory_repository_fallback" in caplog.text
+    assert "孩子最近对植物话题感兴趣" not in caplog.text
+    assert "孩子主动讲到霸王龙和三角龙" not in caplog.text
+    assert "contains raw child details" not in caplog.text

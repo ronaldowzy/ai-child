@@ -165,13 +165,22 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 
 当前 animation_v1 runtime assets 约 4.9MB，采用 512px WebP sequence；静态 drawable fallback 约 1.5MB，也已压缩为 WebP。验收全量包只作为美术源包、QA 留档和重新导出母包，不应整体放入 App。Redmi K60 作为功能主验证设备，Honor Pad 5 Android 9 / 4GB 作为低配性能和降级验证设备。
 
-最新 animation_v1 debug APK：
+最新 family smoke debug APK：
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-大小：15M
+构建时间 UTC：2026-05-22T04:00:54Z
+大小：16047291 bytes / 15M
 SHA256：7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10
-base URL：http://192.168.0.118:8000/
+base URL：http://10.0.2.2:8000/
+```
+
+这个 APK 使用默认模拟器 base URL。交给 Redmi K60 / Honor Pad 5 前必须用
+Mac LAN IP 重新构建并重新记录 sha256：
+
+```bash
+bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://<mac-lan-ip>:8000/
+shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 MiMo VoiceClone 开启后，`/api/v1/conversation/message` 会同步等待“对话模型 + TTS 音频生成”。Redmi K60 真机测试中出现过旧版 App 误报“没有连上后端”的情况；后端日志显示一轮请求耗时约 10.5 秒，接近旧版 12 秒 read timeout。当前 Android conversation read timeout 已调为 45 秒，后端也增加了 `app.request_timing` 请求耗时日志。
@@ -255,7 +264,7 @@ Redmi K60 / Android 14 真机反馈：
 7. 当前 Android 不接第三方 TTS、不直接调用 MiMo；后端受控 TTS endpoint 已通过真实 MiMo VoiceClone smoke，Android 已优先播放 `reply.audio_url`，失败时 fallback 到系统 TTS 或文字。
 ```
 
-最新真机 APK：
+历史真机 APK记录（非本轮 family smoke build）：
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
@@ -332,6 +341,27 @@ curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health
 如果 `BuildConfig.CONVERSATION_API_BASE_URL` 仍是 `http://10.0.2.2:8000/`，该 APK 只能用于模拟器，不能交给 Redmi K60 / Honor Pad 5 做真机 QA。
 
 本地开发使用 HTTP 明文访问后端；不要在 Android 端写入任何模型 API key 或真实 secret。
+
+## 家庭内测前 QA
+
+当前可运行的自动检查：
+
+```bash
+bash scripts/android_gradle.sh test
+bash scripts/android_gradle.sh assembleDebug
+bash scripts/smoke_backend_local.sh
+bash scripts/smoke_voice_stack.sh
+```
+
+真机前置检查：
+
+```text
+1. 后端用 `--host 0.0.0.0` 启动，设备可访问 `http://<mac-lan-ip>:8000/api/v1/health`。
+2. APK 使用真机 LAN base URL 构建，不使用默认 `http://10.0.2.2:8000/`。
+3. MiMo key 只放后端环境变量，不放 Android、docs、tests 或截图。
+4. ASR 真实 provider smoke 只用非儿童测试音频和 opt-in policy env；真机儿童语音 QA 不等于 provider smoke。
+5. 详细 Redmi K60 / Honor Pad 5 手动步骤见 `docs/QA_DEVICE_CHECKLIST_V0_1.md`。
+```
 
 ## 本地运行
 
@@ -484,4 +514,4 @@ bash scripts/e2e_local_api_check.sh
 GET /api/v1/parent/reports/{child_id}?date=YYYY-MM-DD
 ```
 
-Android 端按只读页展示后端 summary、学习观察、表达观察、情绪/社交观察、建议父亲动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。当前后端日报素材来自内存态结构化 memory；如果重启后端或当天没有 memory，日报会显示空摘要，这不是 Android stub。
+Android 端按只读页展示后端 summary、学习观察、表达观察、情绪/社交观察、建议父亲动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。当前后端日报素材来自结构化 memory；PostgreSQL 可用时 parent_reports 会本地持久化，数据库不可用时后端仍可即时生成 fallback 报告。

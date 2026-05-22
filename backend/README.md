@@ -224,6 +224,45 @@ With automatic memory enabled, the parent report step may include structured
 conversation summaries generated during the same process. It still does not
 return evidence fields, quote summaries, or full chat transcripts.
 
+## Family Test Smoke
+
+Family-test smoke scripts live under `scripts/` and are designed to catch
+configuration drift before handing an APK to device QA.
+
+```bash
+bash scripts/smoke_backend_local.sh
+bash scripts/smoke_voice_stack.sh
+bash scripts/smoke_db_persistence.sh
+```
+
+Coverage:
+
+- `smoke_backend_local.sh` starts a temporary mock backend by default and checks
+  `/api/v1/health/detail`, `/conversation/message`, `/conversation/stream`,
+  parent policy save/read, and parent report read.
+- `smoke_voice_stack.sh` starts a temporary mock backend and checks mock ASR,
+  mock TTS, and stream `include_tts=true` through `audio_ready`.
+- `smoke_db_persistence.sh` requires local PostgreSQL and migrations. If the
+  database is unavailable, it prints a clear `SKIP` with the docker compose
+  command and must not be counted as pass.
+
+MiMo ASR real smoke is opt-in only:
+
+```bash
+ASR_PROVIDER=mimo \
+MIMO_ASR_ENABLED=true \
+MIMO_ASR_ALLOW_CHILD_AUDIO=true \
+MIMO_ASR_RETENTION_POLICY_CHECKED=true \
+MIMO_ASR_NO_TRAINING_CONFIRMED=true \
+CHILD_AI_MIMO_KEY="$CHILD_AI_MIMO_KEY" \
+MIMO_ASR_SMOKE_AUDIO=/path/to/non-child-smoke-audio.wav \
+bash scripts/smoke_mimo_asr_opt_in.sh
+```
+
+The MiMo opt-in smoke must use developer-provided non-child test audio. It must
+not print API keys, audio base64, transcript text, or provider raw response, and
+it must not be run with real child recordings during development smoke.
+
 ## Local PostgreSQL Persistence
 
 The v0.1-dev persistence target is local PostgreSQL for family testing. DB1-A

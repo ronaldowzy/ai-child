@@ -26,9 +26,9 @@
 ```text
 1. ASR v1 目标是后端接 MiMo audio input / ASR。
 2. Android 不直接调用 MiMo，不保存 MiMo API key。
-3. Android 只负责主动点击录音、上传到后端 ASR endpoint、展示待确认文本。
-4. 识别文本必须 confirm-before-send，不自动进入对话回复。
-5. 不做常开麦克风，不做唤醒词，不做识别后自动发送。
+3. Android 只负责主动点击录音、上传到后端 ASR endpoint 和儿童端语音状态。
+4. 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
+5. 不做常开麦克风，不做唤醒词，不做后端 ASR 自动调用 conversation。
 6. 真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制。
 7. 开发阶段先用 fake audio / smoke audio 验证，不用真实儿童录音。
 8. 不保存原始音频、长篇逐字转写或真实儿童身份信息到长期记忆。
@@ -40,7 +40,7 @@ MiMo ASR / audio input 的定位：
 1. 是 ASR v1 的目标 provider。
 2. 后端统一调用 MiMo，Android 永不直连供应商。
 3. 必须在父亲授权、儿童音频外发、供应商留存和训练策略 flags 全部满足后才能真实外发。
-4. 即使启用，也只返回待确认文本，不能绕过 confirm-before-send。
+4. 即使启用，后端也只返回 transcript；儿童默认是否自动发送由 Android voice-first 产品逻辑决定。
 ```
 
 ---
@@ -128,8 +128,9 @@ MiMo ASR provider remains configured but policy-blocked; use text input or fake/
 2. 不后台录音，不常开麦克风，不做唤醒词。
 3. 权限拒绝后继续支持文字输入。
 4. 识别失败时温和提示重试或改用打字。
-5. 识别文本必须可编辑、可取消、可重说。
-6. 不因 ASR 结果直接触发小白狐回复。
+5. 儿童默认不展示可编辑 transcript；重说、取消和停止录音必须可用。
+6. DevSettings / 父亲调试模式可恢复可编辑确认面板。
+7. 后端 ASR 只返回 transcript，不直接触发小白狐回复；儿童默认自动发送由 Android conversation 链路完成。
 ```
 
 儿童端流程仍是：
@@ -139,9 +140,9 @@ tap voice
   -> record short audio
   -> upload to backend ASR
   -> backend calls MiMo only when ASR policy flags allow it
-  -> show editable transcript
-  -> confirm / retry / cancel
-  -> confirmed text to conversation API
+  -> ASR ok: Android child mode auto-sends transcript to conversation API
+  -> needs_retry / failure: retry or cancel
+  -> debug/father mode: show editable transcript and require confirmation
 ```
 
 ---
@@ -159,7 +160,7 @@ tap voice
 | provider_timeout | 供应商超时 | 不自动重发原始音频；提示稍后重试或打字。 |
 | provider_http_error | 外部 HTTP 错误 | 记录脱敏 provider error code，返回温和失败。 |
 | empty_transcript | 没有识别出文本 | 提示“我刚才没听清”。 |
-| unsafe_pending_text | 待确认文本包含高风险内容 | 仍需确认；确认发送后进入后端安全场景。 |
+| unsafe_transcript | ASR transcript 可能包含高风险内容 | 自动发送后仍进入后端安全场景；调试确认模式下可先取消。 |
 
 ---
 

@@ -8,7 +8,8 @@
 implementation_target
 default_provider=mock
 cloud_asr_enabled=false
-conversation_auto_send=false
+android_child_mode_auto_send=true
+confirm_before_send_debug_mode=true
 ```
 
 ---
@@ -17,12 +18,13 @@ conversation_auto_send=false
 
 ```text
 1. ASR v1 方案确定接 MiMo audio input / ASR。
-2. Android 不直接调用 MiMo，只负责录音、上传后端和展示待确认文本。
-3. 后端 ASR endpoint 即使存在，也只能返回 pending transcript，不能直接调用 conversation/message。
+2. Android 不直接调用 MiMo，只负责录音、上传后端和儿童端语音状态。
+3. 后端 ASR endpoint 即使存在，也只能返回 transcript，不能直接调用 conversation/message 或 conversation/stream。
 4. Android 仍不得持有 MiMo API key。
 5. 真实 provider 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
 6. 开发阶段先用 fake audio / smoke audio；未取得父亲授权和 policy flags 前，不允许真实儿童音频外发。
-7. 不做常开麦克风，不做 streaming ASR，不做识别后自动发送。
+7. Android 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation stream；确认面板仅保留为 DevSettings / 父亲调试模式。
+8. 不做常开麦克风，不做 streaming ASR，不做后端 ASR 自动调用 conversation。
 ```
 
 ---
@@ -64,9 +66,10 @@ POST /api/v1/asr/transcribe
   -> AsrProvider
        - MockAsrProvider by default
        - MiMoAsrProvider only when explicitly enabled
-  -> transcript response with requiresConfirmation=true
-  -> Android shows editable text
-  -> confirmed text goes to /api/v1/conversation/stream, with /message fallback
+  -> transcript response with requiresConfirmation=true as backend safety metadata
+  -> Android child mode auto-sends non-empty transcript by default
+  -> DevSettings / father debug mode can show editable confirmation text
+  -> text goes to /api/v1/conversation/stream, with /message fallback
 ```
 
 Important boundary:
@@ -141,10 +144,10 @@ Response:
 Rules:
 
 ```text
-1. `requiresConfirmation` must always be true for child voice input.
+1. `requiresConfirmation` remains true as backend metadata because ASR itself is transcribe-only; Android child mode may still auto-send per product decision.
 2. `audio.data` must never be logged.
-3. `transcript` must be short enough for a confirmation UI; long audio should be rejected before provider call.
-4. ASR response is not a child message until the user confirms or edits it.
+3. `transcript` must be short enough for direct child conversation or the optional confirmation UI; long audio should be rejected before provider call.
+4. ASR response is not a child message inside the backend until Android explicitly sends it to conversation.
 ```
 
 ---
@@ -277,7 +280,7 @@ Logging policy:
 
 ```text
 1. Log event=asr_call_finished with request_id, provider, model, duration_ms, audio_bytes, elapsed_ms, status and error_type.
-2. Do not log audio data URI, base64, raw transcript before confirmation, API key or child real identity.
+2. Do not log audio data URI, base64, raw transcript, API key or child real identity.
 3. If transcript preview is needed for debugging, keep it disabled by default and never use real child speech.
 ```
 
@@ -317,7 +320,7 @@ Current implementation tasks:
 1. Mount ASR router in `backend/app/main.py` while preserving mock/disabled defaults. [done]
 2. Wire real MiMo ASR network call behind `AsrDataPolicyGuard`. [done]
 3. Confirm model id through a policy-gated smoke using fake/smoke audio only. [manual smoke only]
-4. Build Android recording upload and confirm UI. [code_ready_device_qa]
+4. Build Android recording upload, child-mode auto-send, and optional DevSettings confirm UI. [code_ready_device_qa]
 ```
 
 Smoke script contract:

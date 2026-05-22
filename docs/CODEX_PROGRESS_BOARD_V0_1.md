@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist 和 debug APK metadata 已补齐
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；MiMo ASR fake/smoke audio、家庭内测前 DB persistence smoke 和 QA 收口继续排队，不能按旧固定场景假设开发
+下一步：使用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；本地 PostgreSQL 启动后复跑 DB persistence smoke；MiMo ASR real smoke 仅在 opt-in env 和非儿童测试音频满足时执行，不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -240,6 +240,7 @@ Mock 拍题：done
 | Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
 | QA-Gate-1 测试品目标一致性门槛 | done |  | 固化 2026-05-21 复盘：给父亲 APK/后端测试品前必须核对 APK base URL、运行后端 env、provider/mock 状态和目标接口 smoke；mock ASR 不能声明为真实 MiMo ASR 测试 |
 | QA-Gate-2 ASR key/model 对齐 | done |  | 固化 2026-05-21 复盘：MiMo ASR 默认复用当前 MiMo key，effective key 顺序为 ASR key -> shared MiMo key -> TTS key；ASR 模型必须是 `mimo-v2.5`，不是文本对话 `mimo-v2.5-pro` |
+| QA-Smoke-1 家庭内测前 smoke 打包 | done |  | 新增 backend local、voice stack、DB persistence 和 MiMo ASR opt-in smoke 脚本；新增 release smoke 记录和 Redmi K60 / Honor Pad 5 QA checklist；本轮 debug APK 构建成功但使用默认 emulator base URL，真机 QA 仍需重新构建并执行 |
 
 ---
 
@@ -254,6 +255,17 @@ Mock 拍题：done
 Codex 偏差：无；本轮未做常开麦克风、未保存原始音频、未做真实 LLM streaming、未做 DB 全量迁移、未破坏横屏布局或 animation_v1。
 需要补充到 AGENTS.md 的规则：暂无。
 明日第一任务：在 Redmi K60 上手动 QA opening greeting、语音权限、录音上传、ASR 自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段 audio queue、停止/静音和 ASR policy blocked/needs_retry；Honor Pad 5 复验横屏、animation_v1、opening 和录音性能。
+```
+
+### 日期：2026-05-22
+
+```text
+今日目标：完成家庭内测前 smoke + QA 打包轮，不继续扩展 DB 新功能。
+完成任务：新增 `scripts/smoke_backend_local.sh`、`scripts/smoke_voice_stack.sh`、`scripts/smoke_db_persistence.sh` 和 `scripts/smoke_mimo_asr_opt_in.sh`；新增 smoke 契约测试，确保脚本可执行、mock ASR 不把 data URI/transcript 写日志、stream include_tts 持久化只存 audio summary 不存完整 event list。新增 `docs/RELEASE_SMOKE_V0_1.md` 和 `docs/QA_DEVICE_CHECKLIST_V0_1.md`，记录 backend/voice smoke、DB smoke skip 原因、APK path/size/sha256、Redmi K60 与 Honor Pad 5 手动 QA 清单。Android debug APK 构建成功：`android/app/build/outputs/apk/debug/app-debug.apk`，size=16047291 bytes / 15M，sha256=`7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10`。
+阻塞问题：本机 PostgreSQL 未启动，`smoke_db_persistence.sh` 按设计输出 SKIP，不计为通过；MiMo ASR real smoke 未执行，因为本轮未设置全部 opt-in policy env、MiMo key 和非儿童测试音频路径；真机 base URL APK 未构建，Redmi K60 / Honor Pad 5 未安装验证。
+Codex 偏差：无；本轮未改 Android runtime、Android assets、ASR/TTS provider 主逻辑、stream 协议、DB schema/migration、true LLM streaming 或 CameraX/real OCR。
+需要补充到 AGENTS.md 的规则：暂无。
+明日第一任务：启动本地 PostgreSQL 后复跑 DB persistence smoke；用 Mac LAN IP 重新构建真机 APK，按 `QA_DEVICE_CHECKLIST_V0_1.md` 执行 Redmi K60 / Honor Pad 5 手动 QA。
 ```
 
 ### 日期：2026-05-22

@@ -33,6 +33,7 @@
 26. 儿童端默认 voice-first：隐藏文字输入框、发送按钮和可编辑 ASR 文本确认面板；保留重说、取消、停止朗读、静音等大按钮。
 27. 小白狐 opening greeting 已进入 v1 范围：儿童聊天页首次可见时请求后端 opening，称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。
 28. Android 父亲设置页已支持结构化配置孩子小名和显示名；opening greeting 使用小名优先、显示名 fallback，但真机 QA 仍待完成。
+29. 家庭内测前 smoke 脚本和 QA checklist 已补齐：backend local smoke、voice stack mock smoke 可本地通过；DB persistence smoke 需要本地 PostgreSQL；MiMo ASR real smoke 只在 opt-in policy env、MiMo key 和非儿童测试音频同时满足时执行。
 ```
 
 ---
@@ -72,6 +73,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 2. 不使用真实儿童身份、真实家庭信息、真实照片或真实音频。
 3. 发现环境共性坑时由主控更新 SHARED_CONTEXT。
 4. 不把未验证能力写成 done。
+5. 家庭内测前按 `docs/QA_DEVICE_CHECKLIST_V0_1.md` 记录 Redmi K60 和 Honor Pad 5 结果；debug APK 自动构建成功不等于真机通过。
 ```
 
 ---

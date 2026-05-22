@@ -53,6 +53,21 @@ class IntentClassifier:
                 evidence=["privacy_rule"],
             )
 
+        if safety and self._is_child_speech_watch_lite(safety):
+            sub_intent = (
+                "body_discomfort_watch_lite"
+                if "body_discomfort_watch_lite" in safety.evidence
+                else "exaggerated_fatigue"
+            )
+            return IntentClassification(
+                intent=IntentType.EMOTION_EXPRESSION,
+                sub_intent=sub_intent,
+                emotion="tired",
+                risk_level=safety.risk_level,
+                confidence=0.84,
+                evidence=["child_speech_watch_lite", *safety.evidence],
+            )
+
         if safety and safety.risk_level == RiskLevel.WATCH:
             return self._watch_intent(safety)
 
@@ -173,6 +188,15 @@ class IntentClassifier:
 
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         return any(marker in text for marker in markers)
+
+    def _is_child_speech_watch_lite(self, safety: SafetyClassification) -> bool:
+        return (
+            safety.risk_level == RiskLevel.LOW
+            and any(
+                evidence in {"body_discomfort_watch_lite", "exaggerated_fatigue"}
+                for evidence in safety.evidence
+            )
+        )
 
     def _is_explicit_learning_help(self, normalized: str) -> bool:
         if self._is_general_not_know_expression(normalized):

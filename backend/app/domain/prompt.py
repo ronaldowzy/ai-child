@@ -12,6 +12,7 @@ class PromptLayer(StrEnum):
     TIME_CONTEXT = "time_context"
     IMAGE_CONTEXT = "image_context"
     SCENE = "scene"
+    TURN_GUIDANCE = "turn_guidance"
     MEMORY_CONTEXT = "memory_context"
     OUTPUT_CONTRACT = "output_contract"
 

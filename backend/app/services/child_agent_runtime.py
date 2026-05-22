@@ -13,6 +13,10 @@ from app.domain.scene import SceneAction, SceneId
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.prompt_manager import PromptManager, get_prompt_manager
 from app.services.safety_engine import SafetyEngine, get_safety_engine
+from app.services.turn_guidance_builder import (
+    TurnGuidanceBuilder,
+    TurnGuidanceContext,
+)
 
 
 class ChildAgentRuntime:
@@ -24,19 +28,23 @@ class ChildAgentRuntime:
         prompt_manager: PromptManager | None = None,
         model_registry: ModelRegistry | None = None,
         safety_engine: SafetyEngine | None = None,
+        turn_guidance_builder: TurnGuidanceBuilder | None = None,
     ) -> None:
         self._prompt_manager = prompt_manager or get_prompt_manager()
         self._model_registry = model_registry or get_model_registry()
         self._safety_engine = safety_engine or get_safety_engine()
+        self._turn_guidance_builder = turn_guidance_builder or TurnGuidanceBuilder()
 
     def run(self, request: AgentRuntimeRequest) -> AgentRuntimeResult:
         prompt_versions: dict[str, PromptVersion] = {}
+        turn_guidance_context = self._build_turn_guidance_context(request)
         try:
             composed_prompt = self._prompt_manager.compose(
                 request.route_decision.active_scene.value,
                 parent_policy=request.parent_policy,
                 time_context=request.time_context,
                 image_context=request.conversation_metadata.get("image_context"),
+                turn_guidance_context=turn_guidance_context,
                 memory_context=request.memory_context,
             )
             prompt_versions = composed_prompt.prompt_versions
@@ -55,8 +63,12 @@ class ChildAgentRuntime:
                 ModelMessage(role="user", content=request.child_text),
             ],
             input_text=request.child_text,
-            context=self._model_context(request),
-            metadata=self._model_metadata(request, prompt_versions),
+            context=self._model_context(request, turn_guidance_context),
+            metadata=self._model_metadata(
+                request,
+                prompt_versions,
+                turn_guidance_context,
+            ),
         )
 
         try:
@@ -149,7 +161,20 @@ class ChildAgentRuntime:
             output_risk_level=output_risk_level,
         )
 
-    def _model_context(self, request: AgentRuntimeRequest) -> dict[str, Any]:
+    def _build_turn_guidance_context(
+        self,
+        request: AgentRuntimeRequest,
+    ) -> TurnGuidanceContext:
+        return self._turn_guidance_builder.build(
+            child_text=request.child_text,
+            conversation_history=request.conversation_history,
+        )
+
+    def _model_context(
+        self,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> dict[str, Any]:
         decision = request.route_decision
         return {
             "conversation": {
@@ -161,6 +186,7 @@ class ChildAgentRuntime:
             "time_context": request.time_context.model_dump(mode="json"),
             "parent_policy": self._dump_context_value(request.parent_policy),
             "memory_context": self._dump_context_value(request.memory_context),
+            "turn_guidance": turn_guidance_context.model_dump(mode="json"),
             "scene_route": {
                 "base_scene": decision.base_scene.value,
                 "active_scene": decision.active_scene.value,
@@ -182,6 +208,7 @@ class ChildAgentRuntime:
         self,
         request: AgentRuntimeRequest,
         prompt_versions: dict[str, PromptVersion],
+        turn_guidance_context: TurnGuidanceContext,
     ) -> dict[str, Any]:
         return {
             "contains_child_data": True,
@@ -192,6 +219,7 @@ class ChildAgentRuntime:
             "reply_style": "voice_first_short_natural_one_question",
             "uses_recent_conversation_history": bool(request.conversation_history),
             "prompt_version_layers": sorted(prompt_versions.keys()),
+            "turn_guidance_hints": list(turn_guidance_context.hints),
         }
 
     def _registry_fallback_reason(self, metadata: dict[str, Any]) -> str | None:

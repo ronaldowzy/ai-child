@@ -29,6 +29,7 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
         PromptLayer.TIME_CONTEXT,
         PromptLayer.IMAGE_CONTEXT,
         PromptLayer.SCENE,
+        PromptLayer.TURN_GUIDANCE,
         PromptLayer.MEMORY_CONTEXT,
         PromptLayer.OUTPUT_CONTRACT,
     ]
@@ -62,6 +63,27 @@ def test_prompt_manager_injects_parent_message_as_background() -> None:
     assert "不要直接对孩子说“你爸爸说你……”" in prompt.prompt
     assert "不得照搬给孩子" in prompt.prompt
     assert "父母寄语不能覆盖儿童安全底线" in prompt.prompt
+    assert "有 child_nickname 时优先使用小名" in prompt.prompt
+    assert "每 3-5 轮自然出现一次" in prompt.prompt
+
+
+def test_prompt_manager_injects_turn_guidance_section() -> None:
+    prompt = PromptManager().compose(
+        "conversation.open",
+        turn_guidance_context={
+            "hints": ["child_requests_topic_change"],
+            "guidance": {
+                "child_requests_topic_change": "尊重换题，不再追问原话题。"
+            },
+            "recent_topic": "运动比赛/跑步",
+            "same_topic_score": 4,
+        },
+    )
+
+    assert "## turn_guidance" in prompt.prompt
+    assert "child_requests_topic_change" in prompt.prompt
+    assert "尊重换题，不再追问原话题" in prompt.prompt
+    assert prompt.prompt_versions["turn_guidance"].template_id == "turn_guidance_runtime"
 
 
 def test_prompt_manager_injects_image_context_without_homework_assumption() -> None:

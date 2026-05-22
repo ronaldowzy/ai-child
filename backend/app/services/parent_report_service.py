@@ -557,13 +557,30 @@ class ParentReportService:
         emotion_observations: list[str] = []
         safety_alerts: list[str] = []
 
-        if any(scene.startswith("learning.") for scene in scenes) or any(
-            self._contains_any(text, ("作业", "题", "数学", "怎么做", "不会"))
+        has_learning_topic = any(
+            scene.startswith("learning.") for scene in scenes
+        ) or any(self._is_learning_help_text(text) for text in child_texts)
+        has_sports_topic = any(self._is_sports_text(text) for text in child_texts)
+        has_topic_change = any(
+            self._contains_any(
+                text,
+                ("换个话题", "聊点别的", "别聊这个", "不说了", "算了"),
+            )
             for text in child_texts
-        ):
+        )
+        has_sports_fatigue = any(
+            self._has_sports_fatigue_expression(text) for text in child_texts
+        )
+
+        if has_learning_topic:
             topics.append("学习求助")
             learning_observations.append(
                 "今天出现学习或题目线索，先确认孩子是在分享图片还是在问题目；如果是在问题，继续用复述题意、圈出已知条件、分步思考的方式陪伴。"
+            )
+        if has_sports_topic:
+            topics.append("运动比赛/跑步")
+            expression_observations.append(
+                "孩子今天围绕运动比赛、跑步或速度感受连续表达，说明他能把一个主动话题延展开；父亲可以轻轻问比赛项目或他最在意的一个细节。"
             )
         if attachment_count:
             topics.append("图片分享")
@@ -591,6 +608,15 @@ class ParentReportService:
             emotion_observations.append(
                 "今天出现过情绪、疲惫或“没听清”一类状态线索；父亲可以先确认孩子是不是累了、被打断了，或只是想重说一遍。"
             )
+        if has_sports_fatigue:
+            emotion_observations.append(
+                "孩子在跑步、运动或比赛语境下用了“要死了、累死了、快不行了”一类夸张疲惫表达；更适合先确认跑后身体感受，不应直接当作高危心理信号。"
+            )
+        if has_topic_change:
+            expression_observations.append(
+                "孩子明确表达过想换个话题，这是主动表达边界和转场需求；后续不要把同一话题追问太久。"
+            )
+            state_summary.append("孩子会主动提出换话题，适合尊重转场并给两个轻松选择。")
         if not topics:
             topics.append("日常聊天")
 
@@ -610,6 +636,8 @@ class ParentReportService:
             state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
         if attachment_count:
             state_summary.append("孩子今天明显在使用图片作为表达入口，不要默认当成作业或隐私问题。")
+        if has_sports_topic:
+            state_summary.append("孩子今天的主线更接近运动比赛和跑步体验，不应误判为学习求助。")
         if agent_turn_count and child_turn_count:
             state_summary.append(
                 f"当天记录到 {child_turn_count} 次孩子输入和 {agent_turn_count} 次小白狐回复，可作为今晚沟通的实际依据。"
@@ -636,6 +664,59 @@ class ParentReportService:
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         normalized = text.strip().lower().replace(" ", "")
         return any(marker in normalized for marker in markers)
+
+    def _is_learning_help_text(self, text: str) -> bool:
+        normalized = text.strip().lower().replace(" ", "")
+        if self._contains_any(normalized, ("换个话题", "题外话")):
+            return False
+        explicit_learning_phrases = (
+            "我有一道题不会",
+            "有一道题不会",
+            "这道题不会",
+            "这题不会",
+            "这道题怎么做",
+            "这题怎么做",
+            "帮我看看作业",
+            "帮我看作业",
+            "数学题不会",
+            "语文题不会",
+            "英语题不会",
+            "英语作业",
+            "语文作业",
+            "数学作业",
+            "口算题",
+            "应用题",
+            "练习册",
+        )
+        if self._contains_any(normalized, explicit_learning_phrases):
+            return True
+        learning_subjects = (
+            "作业",
+            "数学题",
+            "语文题",
+            "英语题",
+            "口算",
+            "应用题",
+            "练习册",
+            "课本题",
+        )
+        help_markers = ("不会", "不懂", "怎么做", "帮我", "看看", "检查")
+        return self._contains_any(normalized, learning_subjects) and self._contains_any(
+            normalized,
+            help_markers,
+        )
+
+    def _is_sports_text(self, text: str) -> bool:
+        return self._contains_any(
+            text,
+            ("比赛", "运动", "跑步", "跑完", "十五公里", "公里", "快的感觉"),
+        )
+
+    def _has_sports_fatigue_expression(self, text: str) -> bool:
+        return self._is_sports_text(text) and self._contains_any(
+            text,
+            ("要死了", "累死了", "快不行了", "喘死了"),
+        )
 
     def _observations_for(
         self,
@@ -700,6 +781,10 @@ class ParentReportService:
         if conversation_topics and "图片分享" in conversation_topics:
             actions.append(
                 "如果孩子今天分享了图片，可以先问“你最想让我看哪里？”而不是直接判断这是题目或隐私。"
+            )
+        if conversation_topics and "运动比赛/跑步" in conversation_topics:
+            actions.append(
+                "如果孩子聊到比赛或跑后“要死了”一类夸张疲惫，可以温和确认跑后是否只是累、有没有疼痛；不要否定夸张表达，也不要追问太久。"
             )
 
         strategy_memories = [

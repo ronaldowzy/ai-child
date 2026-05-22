@@ -106,8 +106,18 @@ class SafetyEngine:
         if self._contains_any(normalized, bullying_markers):
             hits.append((RiskLevel.WATCH, RiskCategory.BULLYING, "bullying"))
 
-        medical_markers = ("流血", "胸口疼", "喘不过气", "吃错药", "头很痛")
-        if self._contains_any(normalized, medical_markers):
+        medical_markers = (
+            "流血",
+            "胸口疼",
+            "喘不过气",
+            "吃错药",
+            "头很痛",
+            "头晕",
+            "想吐",
+            "站不稳",
+        )
+        has_medical_watch = self._contains_any(normalized, medical_markers)
+        if has_medical_watch:
             hits.append((RiskLevel.WATCH, RiskCategory.MEDICAL, "medical"))
 
         mental_distress_watch_markers = ("没人喜欢我", "我很害怕", "一直哭")
@@ -120,6 +130,39 @@ class SafetyEngine:
             hits.append(
                 (RiskLevel.LOW, RiskCategory.MENTAL_DISTRESS, "mild_distress")
             )
+
+        exaggerated_fatigue_markers = ("累死了", "要死了", "快不行了", "喘死了")
+        sports_context_markers = (
+            "跑完",
+            "跑步",
+            "运动",
+            "比赛",
+            "玩完",
+            "练完",
+            "训练",
+        )
+        has_exaggerated_fatigue = self._contains_any(
+            normalized,
+            exaggerated_fatigue_markers,
+        )
+        has_sports_context = self._contains_any(normalized, sports_context_markers)
+        if has_exaggerated_fatigue and not has_medical_watch:
+            if has_sports_context:
+                hits.append(
+                    (
+                        RiskLevel.LOW,
+                        RiskCategory.MEDICAL,
+                        "body_discomfort_watch_lite",
+                    )
+                )
+            else:
+                hits.append(
+                    (
+                        RiskLevel.LOW,
+                        RiskCategory.MENTAL_DISTRESS,
+                        "exaggerated_fatigue",
+                    )
+                )
 
         privacy_markers = (
             "家庭住址",

@@ -28,9 +28,9 @@
 ```text
 1. true LLM streaming 未实现。
 2. CameraX / real OCR 未实现。
-3. MiMo ASR real provider smoke 只在 opt-in env 和非儿童测试音频满足时执行。
-4. Redmi K60 / Honor Pad 5 真机 QA 仍待用户或开发者执行。
-5. true MiMo vision/OCR smoke 只在 opt-in env 和非儿童/非家庭测试图片满足时执行。
+3. MiMo ASR real provider smoke 已用临时 env overlay + synthetic fake wav 执行并 PASS；这只验证 provider 请求链路，不验证中文识别准确率。
+4. MiMo vision/OCR real provider smoke 已用临时 env overlay + fake/test image 执行，当前 FAIL：真实 provider 请求未成功，后端 fallback 到 mock 被脚本拦截。
+5. Redmi K60 / Honor Pad 5 真机 QA 仍待用户或开发者执行。
 ```
 
 ## 2. APK Metadata
@@ -115,33 +115,49 @@ notes:
   - script installed/started Homebrew postgresql@16, created/updated child_ai role and child_ai_dev DB, ran migrations, then smoke.
   - final output: POSTGRES_SETUP: PASS.
 
-scripts/smoke_mimo_asr_opt_in.sh
-result: NOT RUN
-reason:
-  - check_asr_real_status.sh reported ASR_STATUS=mock_only after sourcing .env because CHILD_AI_ASR_PROVIDER is not mimo.
-  - real MiMo ASR smoke therefore was not attempted.
-
 bash scripts/check_asr_real_status.sh
 result: PASS
 observed:
-  - ASR_STATUS=mock_only
-  - reason=CHILD_AI_ASR_PROVIDER is not mimo
-expected status values:
-  - ASR_STATUS=mock_only
-  - ASR_STATUS=policy_blocked
+  - dotenv_loaded=true
+  - mimo_key_present=true
+  - mimo_key_source=CHILD_AI_MIMO_API_KEY
+  - initial_asr_provider=mock
+  - smoke_env_overlay=applied
+  - smoke_audio=synthetic_fake_wav
   - ASR_STATUS=mimo_ready
+  - status=needs_retry
+  - provider=mimo
+  - model=mimo-v2.5
+  - duration=1000
+  - errorCode=empty_transcript
   - ASR_STATUS=mimo_smoke_pass
-  - ASR_STATUS=mimo_smoke_fail
+notes:
+  - The synthetic tone audio is intentionally non-child fake input.
+  - needs_retry / empty_transcript is acceptable for this smoke because it validates real provider request wiring, not recognition accuracy.
+  - No API key, audio base64, transcript text, or raw provider response was printed.
 
 bash scripts/smoke_vision_model_opt_in.sh
-result: BLOCKED
+result: FAIL
 coverage:
   - OpenAI-compatible multimodal vision path
   - AttachmentService vision recognition with image_data_uri
   - output redaction: no key, no base64, no full provider raw response
+observed:
+  - dotenv_loaded=true
+  - vision_model_path_implemented=yes
+  - mimo_key_present=true
+  - smoke_env_overlay=applied
+  - smoke_image=generated_fake_test_image
+  - VISION_STATUS=mimo_ready
+  - model_call_finished logged fallback_used=true, provider=mock, error_type=ModelProviderError
+  - VISION_STATUS=mimo_smoke_fail
+  - provider=mock
+  - model=mimo-v2.5-pro
+  - error_type=provider_fallback_or_policy_blocked
 notes:
-  - after sourcing .env, required opt-in values were still incomplete.
-  - missing: CHILD_AI_MIMO_ALLOW_IMAGE=true and CHILD_AI_VISION_SMOKE_IMAGE.
+  - This is not blocked by missing image or missing image policy; the script generated a fake/test PNG and applied temporary opt-in image policy.
+  - The smoke made a real MiMo vision attempt, but ModelRegistry fell back after a provider error. The script rejects that fallback as a failed real-provider smoke.
+  - No API key, image base64, full image description, or provider raw response was printed.
 ```
 
 ## 5. Smoke Commands
@@ -158,29 +174,21 @@ bash scripts/smoke_vision_model_opt_in.sh
 MiMo ASR opt-in smoke:
 
 ```bash
-ASR_PROVIDER=mimo \
-MIMO_ASR_ENABLED=true \
-MIMO_ASR_ALLOW_CHILD_AUDIO=true \
-MIMO_ASR_RETENTION_POLICY_CHECKED=true \
-MIMO_ASR_NO_TRAINING_CONFIRMED=true \
-CHILD_AI_MIMO_KEY="$CHILD_AI_MIMO_KEY" \
-MIMO_ASR_SMOKE_AUDIO=/path/to/non-child-smoke-audio.wav \
-bash scripts/smoke_mimo_asr_opt_in.sh
+bash scripts/check_asr_real_status.sh
 ```
 
-The opt-in script must not be used with real child recordings during development smoke.
+The status script sources `.env`, applies a temporary MiMo ASR smoke overlay,
+generates a synthetic fake wav if no safe smoke audio is provided, starts a
+temporary backend, and then runs the opt-in script. It must not be used with
+real child recordings during development smoke.
 
 MiMo vision opt-in smoke:
 
 ```bash
-CHILD_AI_VISION_PROVIDER=mimo \
-CHILD_AI_MIMO_ENABLED=true \
-CHILD_AI_MIMO_ALLOW_IMAGE=true \
-CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true \
-CHILD_AI_MIMO_API_KEY="$CHILD_AI_MIMO_API_KEY" \
-CHILD_AI_VISION_SMOKE_IMAGE=/path/to/fake-smoke-test-image.png \
-VISION_SMOKE_BASE_URL=http://127.0.0.1:8000 \
 bash scripts/smoke_vision_model_opt_in.sh
 ```
 
-The vision smoke must not be used with real child photos or real family photos during development smoke.
+The vision script sources `.env`, applies a temporary MiMo image smoke overlay,
+generates a fake/test PNG if no safe smoke image is provided, and starts a
+temporary backend. It must not be used with real child photos or real family
+photos during development smoke.

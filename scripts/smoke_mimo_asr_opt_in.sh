@@ -19,7 +19,8 @@ fi
 
 cat <<'INFO'
 MiMo ASR opt-in smoke will only run when all policy env values are explicit.
-It must use a developer-provided non-child fake/smoke/test audio file.
+It must use a non-child fake/smoke/test audio file; check_asr_real_status.sh
+can generate a synthetic fake wav when no smoke audio path is provided.
 This script never prints API keys, audio base64, transcript text, or raw provider response.
 INFO
 

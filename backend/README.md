@@ -43,6 +43,9 @@ The current backend is intentionally local-first and mock-first:
 - Opening greeting is available at `POST /api/v1/conversation/opening`.
   It uses time context, parent policy names, and parent guidance to return one
   short child-facing greeting, with optional `reply.audio_url`.
+- Parent policy supports `child_nickname` and `child_display_name`; Android
+  father settings can edit them, and opening greeting uses nickname first,
+  display name second, then no forced call name.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
   can generate or return a cached wav URL. The default provider is mock and
   never calls external services. MiMo VoiceClone is disabled until explicit

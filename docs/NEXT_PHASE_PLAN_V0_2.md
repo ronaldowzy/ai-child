@@ -32,6 +32,7 @@
 25. MiMo ASR spec intake 已完成脱敏归档；`/api/v1/asr/transcribe` 已挂载，MiMo `/chat/completions` ASR provider 已实现；默认 mock/disabled，真实儿童音频外发仍 policy-blocked。
 26. 儿童端默认 voice-first：隐藏文字输入框、发送按钮和可编辑 ASR 文本确认面板；保留重说、取消、停止朗读、静音等大按钮。
 27. 小白狐 opening greeting 已进入 v1 范围：儿童聊天页首次可见时请求后端 opening，称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。
+28. Android 父亲设置页已支持结构化配置孩子小名和显示名；opening greeting 使用小名优先、显示名 fallback，但真机 QA 仍待完成。
 ```
 
 ---

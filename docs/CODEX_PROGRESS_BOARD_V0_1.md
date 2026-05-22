@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版已接入
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：Redmi K60 / Honor Pad 5 真机复验 opening greeting、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；MiMo ASR fake/smoke audio 和 DB conversation message 持久化继续排队，不能按旧固定场景假设开发
+下一步：Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；MiMo ASR fake/smoke audio 和 DB conversation message 持久化继续排队，不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -234,6 +234,7 @@ Mock 拍题：done
 | ASR-Provider-1 MiMo ASR provider | done |  | `/api/v1/asr/transcribe` 已挂载；MiMo `/chat/completions` provider 已实现；默认 policy-blocked；新增 fake-audio smoke 脚本，不使用真实儿童录音 |
 | ASR-Android-1 录音上传 voice-first UI | done |  | Android 已接入 RECORD_AUDIO 点击触发、短 WAV 录音、上传后端 ASR、儿童默认自动发送、重说/取消；DevSettings 确认面板保留；不常开麦克风、不自动连续监听 |
 | Opening-1 小白狐启动开场白 | done |  | 后端新增 `/api/v1/conversation/opening`；支持 child_nickname / child_display_name 称呼优先级、时段和父母寄语约束、TTS 失败降级；Android 每 session 请求一次，孩子先说话时不插入 |
+| ParentProfile-1 父亲设置孩子称呼 | done |  | Android 父亲设置页已接入 child_nickname / child_display_name 读取、编辑和保存；opening 使用小名优先、显示名 fallback；待 Redmi K60 / Honor Pad 5 真机 QA |
 | ASR-Smoke-1 provider smoke QA | done |  | `scripts/smoke_mimo_asr.sh` 支持 `.wav` 和本地 `.m4a` 转 16k mono WAV smoke；真实 smoke 已确认 `provider=mimo`、`model=mimo-v2.5`；新增 `asr_call_finished` timing，不输出 transcript/base64/API key |
 | Ops-Foundation-1 运行基础缺口分析 | done |  | 新增 `OPS_FOUNDATION_GAP_ANALYSIS_V0_1.md`；首批聚焦 request_id、结构化日志、provider timing、health 扩展和脚本统一 |
 | Ops-Foundation-2 P0 后端可观测性骨架 | done |  | 新增 request_id middleware、结构化 JSON 日志、request/model/TTS timing、`/api/v1/health/detail` 和日志脱敏测试；不接第三方 APM |
@@ -253,6 +254,15 @@ Mock 拍题：done
 Codex 偏差：无；本轮未做常开麦克风、未保存原始音频、未做真实 LLM streaming、未做 DB 全量迁移、未破坏横屏布局或 animation_v1。
 需要补充到 AGENTS.md 的规则：暂无。
 明日第一任务：在 Redmi K60 上手动 QA opening greeting、语音权限、录音上传、ASR 自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段 audio queue、停止/静音和 ASR policy blocked/needs_retry；Honor Pad 5 复验横屏、animation_v1、opening 和录音性能。
+```
+
+### 日期：2026-05-22
+
+```text
+今日目标：补齐 Parent Profile + Opening Greeting 闭环，让父亲设置页可以结构化配置孩子小名和显示名。
+完成任务：Android ParentPolicy DTO、ParentPolicyViewModel 和 ParentSettingsScreen 已支持 child_nickname / child_display_name；父亲设置页新增“孩子称呼”轻量区块，小名优先用于小白狐 opening greeting，没有小名时使用显示名，都没有时不强行称呼。补充 Android DTO/ViewModel 测试和后端 parent policy API 断言。
+阻塞问题：无代码阻塞；未连接 Redmi K60 / Honor Pad 5 真机，父亲设置保存后的真实 opening greeting 称呼效果仍待设备 QA。
+Codex 偏差：无；本轮未修改 ASR provider、TTS provider、stream service、ChatViewModel voice-first 主链路、animation_v1 或 DB conversation/message 持久化。
 ```
 
 ### 日期：2026-05-19

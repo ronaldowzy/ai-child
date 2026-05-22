@@ -10,6 +10,8 @@ class ParentPolicyDtosTest {
     fun parentPolicyUpdateSerializesBackendScheduleShape() {
         val request = ParentPolicyUpdateRequest(
             childId = "child_demo_001",
+            childNickname = "豆豆",
+            childDisplayName = "王小明",
             parentMessageRaw = "小名叫豆豆，最近喜欢恐龙。",
             goals = listOf("数学题先复述题意"),
             communicationPreferences = mapOf(
@@ -26,6 +28,8 @@ class ParentPolicyDtosTest {
         val json = request.toJsonString()
 
         assertTrue(json.contains("\"daily_schedule\""))
+        assertTrue(json.contains("\"child_nickname\":\"豆豆\""))
+        assertTrue(json.contains("\"child_display_name\":\"王小明\""))
         assertTrue(json.contains("\"parent_message_raw\":\"小名叫豆豆"))
         assertTrue(json.contains("\"period\":\"after_school\""))
         assertTrue(json.contains("\"period\":\"bedtime\""))
@@ -38,6 +42,8 @@ class ParentPolicyDtosTest {
             """
             {
               "child_id": "child_demo_001",
+              "child_nickname": "豆豆",
+              "child_display_name": "王小明",
               "parent_message_raw": "小名叫豆豆，最近喜欢恐龙。",
               "goals": ["数学题先复述题意"],
               "communication_preferences": {
@@ -66,8 +72,53 @@ class ParentPolicyDtosTest {
         )
 
         assertEquals(listOf("数学题先复述题意"), response.goals)
+        assertEquals("豆豆", response.childNickname)
+        assertEquals("王小明", response.childDisplayName)
         assertEquals("小名叫豆豆，最近喜欢恐龙。", response.parentMessageRaw)
         assertEquals("15:30", response.schedule.entry("after_school")?.start)
         assertEquals(2, response.version)
+    }
+
+    @Test
+    fun parentPolicyResponseHandlesMissingChildNames() {
+        val response = ParentPolicyResponse.fromJsonString(
+            """
+            {
+              "child_id": "child_demo_001",
+              "parent_message_raw": null,
+              "goals": [],
+              "communication_preferences": {},
+              "safety_rules": {},
+              "schedule": {
+                "daily_schedule": []
+              },
+              "version": 1
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(null, response.childNickname)
+        assertEquals(null, response.childDisplayName)
+        assertEquals("", response.parentMessageRaw.orEmpty())
+    }
+
+    @Test
+    fun parentPolicyUpdateSerializesNullChildNames() {
+        val request = ParentPolicyUpdateRequest(
+            childId = "child_demo_001",
+            childNickname = null,
+            childDisplayName = null,
+            parentMessageRaw = null,
+            goals = emptyList(),
+            communicationPreferences = emptyMap(),
+            schedule = defaultParentSchedule(),
+        )
+
+        val json = org.json.JSONObject(request.toJsonString())
+
+        assertTrue(json.has("child_nickname"))
+        assertTrue(json.isNull("child_nickname"))
+        assertTrue(json.has("child_display_name"))
+        assertTrue(json.isNull("child_display_name"))
     }
 }

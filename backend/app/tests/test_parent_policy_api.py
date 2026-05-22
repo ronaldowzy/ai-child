@@ -87,7 +87,9 @@ def test_parent_policy_post_updates_child_names() -> None:
     get_response = client.get(f"/api/v1/parent/policy/{child_id}")
 
     assert get_response.status_code == 200
-    assert get_response.json()["child_nickname"] == "豆豆"
+    get_body = get_response.json()
+    assert get_body["child_nickname"] == "豆豆"
+    assert get_body["child_display_name"] == "王小明"
 
 
 def test_parent_message_raw_is_not_exposed_in_child_conversation_debug() -> None:

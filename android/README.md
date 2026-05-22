@@ -16,7 +16,7 @@
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` PNG 序列帧、旧静态 PNG 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
-- 父亲设置页可读取和保存父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。
+- 父亲设置页可读取和保存孩子小名 / 显示名、父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。小白狐 opening greeting 优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
 - 儿童聊天页中的父亲设置和父亲日报入口使用轻量误触保护：点击只提示，长按后输入开发 PIN 才进入。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
@@ -28,10 +28,11 @@
 
 ```text
 1. 父母寄语可在父亲设置页编辑；后端会在 PostgreSQL 可用时持久化，数据库不可用时 dev fallback 到内存。
-2. 父母寄语不会出现在儿童聊天 UI 或 session_state debug 中。
-3. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
-4. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
-5. “拍题目”仍作为学习场景快捷动作保留，但默认图片能力是“拍给小白狐看”。
+2. 孩子小名 / 显示名可在父亲设置页编辑；不要强制填写真实全名。
+3. 父母寄语不会出现在儿童聊天 UI 或 session_state debug 中。
+4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
+5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
+6. “拍题目”仍作为学习场景快捷动作保留，但默认图片能力是“拍给小白狐看”。
 ```
 
 待 Redmi K60 手动 QA：
@@ -55,6 +56,7 @@
 - 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 做 MiMo ASR smoke，不用真实儿童录音。
 - 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
 - App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示并按 `audio_url` 自动播放；如果孩子先开口，迟到的 opening 不插入。
+- opening greeting 的称呼来自父亲设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。
 - TTS 朗读优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频；远程播放失败时 fallback 到系统 TextToSpeech 或文字。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
@@ -446,6 +448,7 @@ bash scripts/dev_backend.sh
 5. 页面应显示后端返回的题意引导，例如先问“这道题是在问什么”，不显示最终答案。
 6. 点击“父亲设置”不应直接进入；长按“父亲设置”后输入开发 PIN `0000`，读取当前 policy，修改目标、沟通偏好或时间段，保存后应显示成功提示。
 7. 回到聊天页再发送消息，后端应使用更新后的 parent policy。
+7a. 在父亲设置页填写小名或显示名并保存后，重新进入儿童聊天页，opening greeting 应按“小名 -> 显示名 -> 不称呼”的优先级称呼孩子。
 8. 点击“父亲日报”不应直接进入；长按“父亲日报”后输入开发 PIN `0000`，读取当天 summary；如果当天没有结构化记忆，后端会返回“暂无可汇总的结构化会话素材”类摘要。
 9. 页面不应默认显示 `base=... | active=...` 这类内部 session_state 调试文本。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。

@@ -5,6 +5,8 @@ import org.json.JSONObject
 
 data class ParentPolicyResponse(
     val childId: String,
+    val childNickname: String?,
+    val childDisplayName: String?,
     val parentMessageRaw: String?,
     val goals: List<String>,
     val communicationPreferences: Map<String, Any>,
@@ -17,6 +19,8 @@ data class ParentPolicyResponse(
             val root = JSONObject(rawJson)
             return ParentPolicyResponse(
                 childId = root.getString("child_id"),
+                childNickname = root.optNullableString("child_nickname"),
+                childDisplayName = root.optNullableString("child_display_name"),
                 parentMessageRaw = root.optNullableString("parent_message_raw"),
                 goals = root.optJSONArray("goals").toStringList(),
                 communicationPreferences = root.optJSONObject(
@@ -32,6 +36,8 @@ data class ParentPolicyResponse(
 
 data class ParentPolicyUpdateRequest(
     val childId: String,
+    val childNickname: String?,
+    val childDisplayName: String?,
     val parentMessageRaw: String?,
     val goals: List<String>,
     val communicationPreferences: Map<String, Any>,
@@ -40,6 +46,8 @@ data class ParentPolicyUpdateRequest(
     fun toJsonString(): String {
         return JSONObject()
             .put("child_id", childId)
+            .putNullable("child_nickname", childNickname)
+            .putNullable("child_display_name", childDisplayName)
             .put("parent_message_raw", parentMessageRaw)
             .put("goals", JSONArray(goals))
             .put("communication_preferences", communicationPreferences.toJsonObject())
@@ -198,6 +206,10 @@ private fun JSONObject?.toMap(): Map<String, Any> {
 private fun JSONObject.optNullableString(name: String): String? {
     if (!has(name) || isNull(name)) return null
     return optString(name).takeIf { it.isNotBlank() }
+}
+
+private fun JSONObject.putNullable(name: String, value: String?): JSONObject {
+    return put(name, value ?: JSONObject.NULL)
 }
 
 private fun Map<String, Any>.toJsonObject(): JSONObject {

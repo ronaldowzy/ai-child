@@ -8,6 +8,8 @@ import com.childai.companion.data.parent.ParentPolicyResponse
 import com.childai.companion.data.parent.ParentPolicyUpdateRequest
 import com.childai.companion.data.parent.ParentSchedule
 import com.childai.companion.data.parent.defaultParentSchedule
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -15,6 +17,10 @@ import kotlinx.coroutines.launch
 
 class ParentPolicyViewModel(
     private val repository: ParentPolicyRepository = ParentPolicyRepository(),
+    private val policyReader: suspend (String) -> ParentPolicyResponse = repository::getPolicy,
+    private val policyWriter: suspend (ParentPolicyUpdateRequest) -> ParentPolicyResponse =
+        repository::updatePolicy,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
     private var loadedPolicy: ParentPolicyResponse? = null
 
@@ -34,9 +40,9 @@ class ParentPolicyViewModel(
                 statusMessage = null,
             )
         }
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcher) {
             runCatching {
-                repository.getPolicy(DevSettings.CHILD_ID)
+                policyReader(DevSettings.CHILD_ID)
             }.onSuccess { policy ->
                 loadedPolicy = policy
                 _uiState.update {
@@ -63,6 +69,14 @@ class ParentPolicyViewModel(
 
     fun updateParentMessageRaw(value: String) {
         updateForm { it.copy(parentMessageRaw = value) }
+    }
+
+    fun updateChildNickname(value: String) {
+        updateForm { it.copy(childNickname = value) }
+    }
+
+    fun updateChildDisplayName(value: String) {
+        updateForm { it.copy(childDisplayName = value) }
     }
 
     fun updateOfferChoices(value: Boolean) {
@@ -130,6 +144,8 @@ class ParentPolicyViewModel(
             )
         val request = ParentPolicyUpdateRequest(
             childId = DevSettings.CHILD_ID,
+            childNickname = form.childNickname.trim(),
+            childDisplayName = form.childDisplayName.trim(),
             parentMessageRaw = form.parentMessageRaw.trim(),
             goals = form.goals(),
             communicationPreferences = form.communicationPreferences(
@@ -141,9 +157,9 @@ class ParentPolicyViewModel(
         _uiState.update {
             it.copy(isSaving = true, errorMessage = null, statusMessage = null)
         }
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcher) {
             runCatching {
-                repository.updatePolicy(request)
+                policyWriter(request)
             }.onSuccess { policy ->
                 loadedPolicy = policy
                 _uiState.update {
@@ -184,6 +200,8 @@ data class ParentPolicyUiState(
 )
 
 data class ParentPolicyFormState(
+    val childNickname: String = "",
+    val childDisplayName: String = "",
     val parentMessageRaw: String = "",
     val goalsText: String = "鼓励孩子每天说一件学校小事\n学习问题先引导思路，不直接给答案",
     val offerChoices: Boolean = true,
@@ -229,6 +247,8 @@ data class ParentPolicyFormState(
 private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
     val schedule = scheduleWithDefaults(schedule)
     return ParentPolicyFormState(
+        childNickname = childNickname.orEmpty(),
+        childDisplayName = childDisplayName.orEmpty(),
         parentMessageRaw = parentMessageRaw.orEmpty(),
         goalsText = goals.joinToString(separator = "\n"),
         offerChoices = communicationPreferences.booleanValue(

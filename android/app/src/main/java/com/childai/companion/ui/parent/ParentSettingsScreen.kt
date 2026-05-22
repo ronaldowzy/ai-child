@@ -51,6 +51,8 @@ fun ParentSettingsScreen(
         onBack = onBack,
         onReload = viewModel::loadPolicy,
         onSave = viewModel::savePolicy,
+        onChildNicknameChange = viewModel::updateChildNickname,
+        onChildDisplayNameChange = viewModel::updateChildDisplayName,
         onParentMessageChange = viewModel::updateParentMessageRaw,
         onGoalsTextChange = viewModel::updateGoalsText,
         onOfferChoicesChange = viewModel::updateOfferChoices,
@@ -72,6 +74,8 @@ private fun ParentSettingsScreenContent(
     onBack: () -> Unit,
     onReload: () -> Unit,
     onSave: () -> Unit,
+    onChildNicknameChange: (String) -> Unit,
+    onChildDisplayNameChange: (String) -> Unit,
     onParentMessageChange: (String) -> Unit,
     onGoalsTextChange: (String) -> Unit,
     onOfferChoicesChange: (Boolean) -> Unit,
@@ -126,6 +130,39 @@ private fun ParentSettingsScreenContent(
                     CircularProgressIndicator()
                     Text(text = "正在读取设置")
                 }
+            }
+            SettingsSection(title = "孩子称呼") {
+                OutlinedTextField(
+                    value = uiState.form.childNickname,
+                    onValueChange = onChildNicknameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "小名")
+                    },
+                    placeholder = {
+                        Text(text = "可填小名或家里常用称呼，不强制填写")
+                    },
+                )
+                OutlinedTextField(
+                    value = uiState.form.childDisplayName,
+                    onValueChange = onChildDisplayNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "大名 / 显示名")
+                    },
+                    placeholder = {
+                        Text(text = "没有小名时，小白狐会优先用这个称呼")
+                    },
+                )
+                Text(
+                    text = "用于小白狐开场白称呼孩子。可以只写家里常用称呼，不需要填写真实全名。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             SettingsSection(title = "父母寄语 / 小白狐了解孩子") {
                 OutlinedTextField(
@@ -362,6 +399,8 @@ private fun ParentSettingsScreenPreview() {
             onBack = {},
             onReload = {},
             onSave = {},
+            onChildNicknameChange = {},
+            onChildDisplayNameChange = {},
             onParentMessageChange = {},
             onGoalsTextChange = {},
             onOfferChoicesChange = {},

@@ -537,10 +537,10 @@ Status: confirmed
 Source: father / opening greeting feedback
 Decision: App 打开儿童聊天页后，小白狐应主动请求 opening greeting，基于时间、父母寄语和孩子称呼生成一句短开场白；称呼优先 `child_nickname`，其次 `child_display_name`，都没有则不强行称呼。
 Rationale: 孩子打开 App 时需要小白狐自然进入状态，至少在已配置称呼时喊一下孩子，而不是空白等待或固定模板。
-Affected modules: backend opening API、ParentPolicy schema、Prompt/opening service、Android ChatViewModel、remote audio playback、QA。
-Implementation notes: 后端新增 `POST /api/v1/conversation/opening`；同一 session 做短期去重；TTS 失败不影响文本 opening。Android 每个 chat session 只请求一次，如果孩子先开始说话，opening 不应打断或覆盖孩子输入。
-Docs updated: `backend/README.md`、`android/README.md`、`docs/MANUAL_QA_V0_1.md`。
-Tests or QA needed: 小名优先、display name fallback、无名称不强称呼、晚上低刺激、父母寄语不查岗、opening 音频播放、用户先说话时不插入。
+Affected modules: backend opening API、ParentPolicy schema、Prompt/opening service、Android ChatViewModel、Android father settings、remote audio playback、QA。
+Implementation notes: 后端新增 `POST /api/v1/conversation/opening`；同一 session 做短期去重；TTS 失败不影响文本 opening。Android 每个 chat session 只请求一次，如果孩子先开始说话，opening 不应打断或覆盖孩子输入。父亲设置页已支持配置 `child_nickname` 和 `child_display_name`，文案不诱导填写真实全名。
+Docs updated: `backend/README.md`、`android/README.md`、`docs/MANUAL_QA_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`。
+Tests or QA needed: 小名优先、display name fallback、无名称不强称呼、晚上低刺激、父母寄语不查岗、opening 音频播放、用户先说话时不插入；Redmi K60 / Honor Pad 5 真机复验父亲设置保存后的 opening 称呼。
 
 #### PD-035
 

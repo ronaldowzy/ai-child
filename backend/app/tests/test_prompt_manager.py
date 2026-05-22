@@ -81,6 +81,8 @@ def test_prompt_manager_injects_image_context_without_homework_assumption() -> N
     assert "孩子搭了一个积木城堡" in prompt.prompt
     assert "你看我搭的这个" in prompt.prompt
     assert "不要把它强行当成作业" in prompt.prompt
+    assert "不要逐字复述给孩子" in prompt.prompt
+    assert "不要展开成识别报告" in prompt.prompt
 
 
 def test_prompt_manager_keeps_homework_like_image_context_scaffolded() -> None:

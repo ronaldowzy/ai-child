@@ -586,11 +586,11 @@ private fun AgentPanel(
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
     val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
     BoxWithConstraints(modifier = modifier) {
-        val statusReserve = if (compactLandscape) 58.dp else 82.dp
+        val statusReserve = if (compactLandscape) 48.dp else 68.dp
         val mascotMaxSize = minOf(
             maxWidth,
             (maxHeight - statusReserve).coerceAtLeast(160.dp),
-            if (compactLandscape) 300.dp else 430.dp,
+            if (compactLandscape) 340.dp else 470.dp,
         )
         Column(
             modifier = Modifier.fillMaxSize(),

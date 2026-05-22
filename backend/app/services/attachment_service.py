@@ -186,10 +186,12 @@ class AttachmentService:
         purpose = request.image_purpose.value if request.image_purpose else "unknown"
         caption = request.child_caption or ""
         return (
-            "你是小白狐的图片理解模块。请只做简短图片描述和安全分类，"
+            "你是小白狐的图片理解模块。请只输出一句孩子可理解的简短图片摘要，"
+            "不要列清单，不要输出分析过程，不要写给开发者看的分类说明。"
             "不要输出作业最终答案。若图片像作业题，只提取题目内容和要求；"
             "不要做模板化隐私提醒，也不要猜测图片里有未明确出现的风险；"
             "除非图片用途明确为隐私敏感，否则按普通图片继续描述。"
+            "摘要不超过80个中文字符。"
             f"图片用途: {purpose}。孩子补充说明: {caption[:120]}"
         )
 
@@ -218,7 +220,7 @@ class AttachmentService:
 
     def _truncate_vision_text(self, text: str) -> str:
         stripped = text.strip()
-        return stripped[:1000]
+        return stripped[:300]
 
     def _safe_attachment_metadata(
         self,

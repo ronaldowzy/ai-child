@@ -1,11 +1,13 @@
 from collections.abc import Callable
 from datetime import date, datetime, timezone
+import json
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.logging import hash_identifier
 from app.domain.memory import MemoryItem, MemorySensitivity, MemoryType
+from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
 from app.domain.parent_report import ParentReport
 from app.repositories.conversation_persistence_repository import (
     ConversationPersistenceRepository,
@@ -19,6 +21,7 @@ from app.repositories.parent_report_repository import (
     ParentReportRepositoryUnavailable,
 )
 from app.services.memory_service import MemoryService, get_memory_service
+from app.services.model_registry import ModelRegistry, get_model_registry
 
 
 logger = logging.getLogger("app.parent_report")
@@ -43,6 +46,7 @@ class ParentReportService:
         memory_service: MemoryService | None = None,
         repository: ParentReportRepositoryProtocol | None = None,
         conversation_repository: ConversationPersistenceRepository | None = None,
+        model_registry: ModelRegistry | None = None,
         fallback_repository: InMemoryParentReportRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
         fallback_to_memory: bool = True,
@@ -55,6 +59,7 @@ class ParentReportService:
         self._conversation_repository = (
             conversation_repository or ConversationPersistenceRepository()
         )
+        self._model_registry = model_registry or get_model_registry()
         self._fallback_to_memory = fallback_to_memory
         self._repository_available = True
         self._conversation_repository_available = True
@@ -142,13 +147,14 @@ class ParentReportService:
             conversation_topics=conversation["topics"],
         )
 
-        return ParentReport(
+        fallback_report = ParentReport(
             child_id=child_id,
             date=target_date,
             summary=self._summary(
                 memories=memories,
                 conversation_messages=conversation_messages,
                 conversation_topics=conversation["topics"],
+                conversation_state=conversation["state_summary"],
                 has_learning=bool(learning),
                 has_expression=bool(expression),
                 has_emotion=bool(emotion),
@@ -160,6 +166,209 @@ class ParentReportService:
             safety_alerts=safety_alerts,
             suggested_parent_actions=actions,
             created_at=self._now(),
+        )
+        model_report = self._model_daily_report(
+            child_id=child_id,
+            target_date=target_date,
+            memories=memories,
+            conversation_messages=conversation_messages,
+            conversation=conversation,
+            fallback_report=fallback_report,
+        )
+        return model_report or fallback_report
+
+    def _model_daily_report(
+        self,
+        *,
+        child_id: str,
+        target_date: date,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+        conversation: dict[str, list[str]],
+        fallback_report: ParentReport,
+    ) -> ParentReport | None:
+        try:
+            response = self._model_registry.generate(
+                ModelRequest(
+                    task_type=ModelTaskType.PARENT_REPORT,
+                    messages=[
+                        ModelMessage(
+                            role="system",
+                            content=self._parent_report_system_prompt(),
+                        ),
+                        ModelMessage(
+                            role="user",
+                            content=json.dumps(
+                                self._parent_report_model_payload(
+                                    target_date=target_date,
+                                    memories=memories,
+                                    conversation_messages=conversation_messages,
+                                    conversation=conversation,
+                                    fallback_report=fallback_report,
+                                ),
+                                ensure_ascii=False,
+                            ),
+                        ),
+                    ],
+                    context={"conversation": {"child_id": child_id}},
+                    metadata={
+                        "report_date": target_date.isoformat(),
+                        "material_counts": {
+                            "memories": len(memories),
+                            "conversation_messages": len(conversation_messages),
+                        },
+                    },
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - report generation must not block.
+            self._log_model_fallback(
+                child_id=child_id,
+                report_date=target_date,
+                error_type=exc.__class__.__name__,
+            )
+            return None
+
+        if response.metadata.get("mock") and not response.structured_output.get(
+            "daily_report"
+        ):
+            return None
+        parsed = self._parse_model_report(
+            response.structured_output.get("daily_report")
+            or response.structured_output.get("text")
+            or response.response_text,
+        )
+        if parsed is None:
+            return None
+        return ParentReport(
+            child_id=child_id,
+            date=target_date,
+            summary=parsed["summary"] or fallback_report.summary,
+            learning_observations=parsed["learning_observations"]
+            or fallback_report.learning_observations,
+            expression_observations=parsed["expression_observations"]
+            or fallback_report.expression_observations,
+            emotion_observations=parsed["emotion_observations"]
+            or fallback_report.emotion_observations,
+            safety_alerts=parsed["safety_alerts"] or fallback_report.safety_alerts,
+            suggested_parent_actions=parsed["suggested_parent_actions"]
+            or fallback_report.suggested_parent_actions,
+            created_at=self._now(),
+        )
+
+    def _parent_report_system_prompt(self) -> str:
+        return (
+            "你是小白狐项目的父亲日报分析器。请只基于当天受控素材生成父亲可读的中文日报，"
+            "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、表达状态怎样、"
+            "有没有学习、情绪或安全线索、父亲今晚应该怎么跟进。不要输出逐字聊天记录，"
+            "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
+            "返回严格 JSON，字段为 summary、learning_observations、expression_observations、"
+            "emotion_observations、safety_alerts、suggested_parent_actions。"
+        )
+
+    def _parent_report_model_payload(
+        self,
+        *,
+        target_date: date,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+        conversation: dict[str, list[str]],
+        fallback_report: ParentReport,
+    ) -> dict[str, object]:
+        return {
+            "report_date": target_date.isoformat(),
+            "material_policy": (
+                "conversation_snippets are capped analysis snippets; do not quote them verbatim."
+            ),
+            "topic_hints": conversation["topics"],
+            "state_hints": conversation["state_summary"],
+            "memory_summaries": [
+                {
+                    "type": memory.memory_type.value,
+                    "content": self._safe_text(memory.content),
+                    "tags": [self._safe_text(tag) for tag in memory.tags[:5]],
+                    "requires_parent_attention": memory.requires_parent_attention,
+                }
+                for memory in memories[:12]
+            ],
+            "conversation_snippets": [
+                self._conversation_snippet(message)
+                for message in conversation_messages[:24]
+            ],
+            "fallback_report": fallback_report.model_dump(mode="json"),
+        }
+
+    def _conversation_snippet(
+        self,
+        message: ConversationReportMessage,
+    ) -> dict[str, object]:
+        return {
+            "actor": message.actor,
+            "message_type": message.message_type,
+            "scene": message.active_scene,
+            "risk_level": message.risk_level,
+            "has_attachment": message.attachments_count > 0,
+            "text_summary": self._safe_text(message.normalized_text or "")[:120],
+        }
+
+    def _parse_model_report(self, value: object) -> dict[str, object] | None:
+        raw: object = value
+        if isinstance(value, str):
+            stripped = self._strip_json_fence(value)
+            try:
+                raw = json.loads(stripped)
+            except json.JSONDecodeError:
+                return None
+        if not isinstance(raw, dict):
+            return None
+
+        summary = self._safe_text(str(raw.get("summary") or ""))
+        if not summary:
+            return None
+        return {
+            "summary": summary[:500],
+            "learning_observations": self._model_list(raw, "learning_observations"),
+            "expression_observations": self._model_list(raw, "expression_observations"),
+            "emotion_observations": self._model_list(raw, "emotion_observations"),
+            "safety_alerts": self._model_list(raw, "safety_alerts"),
+            "suggested_parent_actions": self._model_list(
+                raw,
+                "suggested_parent_actions",
+            ),
+        }
+
+    def _strip_json_fence(self, value: str) -> str:
+        stripped = value.strip()
+        if not stripped.startswith("```"):
+            return stripped
+        stripped = stripped.strip("`").strip()
+        if stripped.startswith("json"):
+            return stripped[4:].strip()
+        return stripped
+
+    def _model_list(self, raw: dict[str, object], key: str) -> list[str]:
+        value = raw.get(key)
+        if not isinstance(value, list):
+            return []
+        return self._dedupe_and_limit(
+            [self._safe_text(str(item)) for item in value],
+            limit=6,
+        )
+
+    def _log_model_fallback(
+        self,
+        *,
+        child_id: str,
+        report_date: date,
+        error_type: str,
+    ) -> None:
+        logger.warning(
+            "parent_report_model_fallback",
+            extra={
+                "event": "parent_report_model_fallback",
+                "child_id_hash": hash_identifier(child_id),
+                "report_date": report_date.isoformat(),
+                "error_type": error_type,
+            },
         )
 
     def _now(self) -> datetime:
@@ -322,6 +531,7 @@ class ParentReportService:
         if not child_messages:
             return {
                 "topics": [],
+                "state_summary": [],
                 "learning_observations": [],
                 "expression_observations": [],
                 "emotion_observations": [],
@@ -330,8 +540,18 @@ class ParentReportService:
 
         scenes = {message.active_scene or "" for message in child_messages}
         child_texts = [message.normalized_text or "" for message in child_messages]
+        all_texts = [message.normalized_text or "" for message in messages]
         attachment_count = sum(message.attachments_count for message in child_messages)
+        child_turn_count = len(child_messages)
+        agent_turn_count = len([message for message in messages if message.actor == "agent"])
+        short_turn_count = sum(len(text.strip()) <= 8 for text in child_texts)
+        image_question_count = sum(
+            1
+            for text in child_texts
+            if self._contains_any(text, ("图片", "照片", "拍", "看", "这是什么"))
+        )
         topics: list[str] = []
+        state_summary: list[str] = []
         learning_observations: list[str] = []
         expression_observations: list[str] = []
         emotion_observations: list[str] = []
@@ -343,12 +563,17 @@ class ParentReportService:
         ):
             topics.append("学习求助")
             learning_observations.append(
-                "今天的对话里出现学习或题目相关内容，适合继续用复述题意、圈出已知条件、分步思考的方式陪伴。"
+                "今天出现学习或题目线索，先确认孩子是在分享图片还是在问题目；如果是在问题，继续用复述题意、圈出已知条件、分步思考的方式陪伴。"
             )
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
-                "孩子今天用图片和小白狐互动，可以顺着图片内容请孩子讲一讲他想分享或想问的部分。"
+                f"孩子今天发起了 {attachment_count} 次图片相关互动；更像是在把看到的东西交给小白狐一起看，父亲可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
+            )
+        elif image_question_count:
+            topics.append("看图交流")
+            expression_observations.append(
+                "孩子今天围绕图片或“这是什么”发起交流；适合让孩子先补充一个画面细节，再陪他一起判断。"
             )
         if any(scene.startswith("privacy.") or scene.startswith("safety.") for scene in scenes):
             topics.append("安全或隐私边界")
@@ -360,11 +585,11 @@ class ParentReportService:
                 text,
                 ("难过", "害怕", "担心", "生气", "烦", "累", "困", "不想", "没听清"),
             )
-            for text in child_texts
+            for text in all_texts
         ):
             topics.append("情绪表达")
             emotion_observations.append(
-                "孩子今天表达过情绪或状态线索，适合先回应感受，再给出休息、陪伴或小步骤选择。"
+                "今天出现过情绪、疲惫或“没听清”一类状态线索；父亲可以先确认孩子是不是累了、被打断了，或只是想重说一遍。"
             )
         if not topics:
             topics.append("日常聊天")
@@ -375,15 +600,24 @@ class ParentReportService:
         )
         if avg_len <= 8:
             expression_observations.append(
-                "孩子今天的表达偏短，父亲可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
+                f"孩子今天共有 {child_turn_count} 次输入，其中 {short_turn_count} 次是短句或指令式表达；父亲可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
             )
+            state_summary.append("孩子今天更多是短句或指令式表达，需要更具体、低压力的追问来展开。")
         else:
             expression_observations.append(
-                "孩子今天有连续表达内容，父亲可以围绕孩子主动提到的主题继续追问一个具体细节。"
+                f"孩子今天共有 {child_turn_count} 次输入，整体能连续表达；父亲可以围绕孩子主动提到的主题继续追问一个具体细节。"
+            )
+            state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
+        if attachment_count:
+            state_summary.append("孩子今天明显在使用图片作为表达入口，不要默认当成作业或隐私问题。")
+        if agent_turn_count and child_turn_count:
+            state_summary.append(
+                f"当天记录到 {child_turn_count} 次孩子输入和 {agent_turn_count} 次小白狐回复，可作为今晚沟通的实际依据。"
             )
 
         return {
             "topics": self._dedupe_and_limit(topics, limit=6),
+            "state_summary": self._dedupe_and_limit(state_summary, limit=3),
             "learning_observations": self._dedupe_and_limit(
                 learning_observations,
                 limit=3,
@@ -486,6 +720,7 @@ class ParentReportService:
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
         conversation_topics: list[str],
+        conversation_state: list[str],
         has_learning: bool,
         has_expression: bool,
         has_emotion: bool,
@@ -512,9 +747,12 @@ class ParentReportService:
         focus = self._dedupe_and_limit(focus, limit=6)
 
         focus_text = "、".join(focus)
+        state_text = conversation_state[0] if conversation_state else (
+            "整体适合用低压力提问和具体小步骤支持孩子。"
+        )
         return (
             f"今天记录了 {len(memories)} 条结构化观察和 {len(conversation_messages)} 条会话消息，重点集中在{focus_text}。"
-            "整体适合用低压力提问和具体小步骤支持孩子。"
+            f"{state_text}"
         )
 
     def _safe_text(self, text: str) -> str:

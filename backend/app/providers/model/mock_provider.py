@@ -192,11 +192,18 @@ class MockModelProvider(BaseModelProvider):
         ).strip()
         if not text:
             return None
+        phrase = self._compact_image_phrase(text)
         if self._contains_any(normalized, ("故事", "编")):
-            return f"那我们可以把这张图里的“{text}”当成开头，编一个轻轻的小故事。你想让它发生在家里，还是森林里？"
+            return f"那我们可以把这张图里的“{phrase}”当成开头，编一个轻轻的小故事。你想让它发生在家里，还是森林里？"
         if self._contains_any(normalized, ("是什么", "这是什么", "问")):
-            return f"我先按图片描述来猜：这里像是“{text}”。你可以再告诉我一个细节，我们一起判断。"
-        return f"我们继续聊这张图吧。我记得你刚刚分享的是“{text}”。你最想先说它哪里有趣？"
+            return f"我先按图片描述来猜：这里像是“{phrase}”。你可以再告诉我一个细节，我们一起判断。"
+        return f"我们继续聊这张图吧。我记得你刚刚分享的是“{phrase}”。你最想先说它哪里有趣？"
+
+    def _compact_image_phrase(self, text: str) -> str:
+        compact = " ".join(text.strip().split())
+        if len(compact) <= 48:
+            return compact
+        return f"{compact[:48]}..."
 
     def _compact_parent_goals(self, parent_policy: object) -> str:
         if not isinstance(parent_policy, dict):

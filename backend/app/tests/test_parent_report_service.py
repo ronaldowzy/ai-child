@@ -6,6 +6,7 @@ from app.domain.memory import (
     MemorySensitivity,
     MemoryType,
 )
+from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.repositories.conversation_persistence_repository import ConversationReportMessage
 from app.repositories.parent_report_repository import (
@@ -68,6 +69,22 @@ class FakeConversationRepository:
             for message in self.messages
             if message.created_at.date() == report_date
         ]
+
+
+class FakeParentReportModelRegistry:
+    def __init__(self, output: dict[str, object] | None = None) -> None:
+        self.output = output
+        self.requests: list[ModelRequest] = []
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        self.requests.append(request)
+        return ModelResponse(
+            task_type=ModelTaskType.PARENT_REPORT,
+            response_text="model report",
+            structured_output={"daily_report": self.output or {}},
+            provider_name="fake_model",
+            model_name="fake-parent-report",
+        )
 
 
 def _services() -> tuple[
@@ -242,6 +259,56 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     assert any("图片" in item for item in report.expression_observations)
     assert "我发了一张家里的照片" not in report_json
     assert "数学题不会做" not in report_json
+
+
+def test_parent_report_service_prefers_model_summary_from_daily_conversation() -> None:
+    model_registry = FakeParentReportModelRegistry(
+        {
+            "summary": "今天孩子主要通过图片开启交流，表达直接但能持续围绕同一个对象追问。",
+            "learning_observations": ["出现题目线索，但更需要先确认孩子是在分享还是求助。"],
+            "expression_observations": ["孩子用短句和图片表达需求，适合让他先指出最想看的地方。"],
+            "emotion_observations": ["未看到明显强烈情绪，重点是降低追问压力。"],
+            "safety_alerts": [],
+            "suggested_parent_actions": ["今晚先问孩子“这张图你最想让我看哪里”。"],
+        }
+    )
+    memory_service = MemoryService(
+        repository=InMemoryMemoryRepository(),
+        now_provider=_fixed_now,
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_photo",
+                    text="我拍了一张图给小白狐看。",
+                    attachments_count=1,
+                ),
+                _conversation_message(
+                    message_id="msg_child_question",
+                    text="这是什么？",
+                ),
+            ]
+        ),
+        model_registry=model_registry,
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert model_registry.requests
+    assert "通过图片开启交流" in report.summary
+    assert report.suggested_parent_actions == [
+        "今晚先问孩子“这张图你最想让我看哪里”。"
+    ]
+    payload = model_registry.requests[0].messages[1].content
+    assert isinstance(payload, str)
+    assert "conversation_snippets" in payload
+    assert "逐字聊天记录" not in report.model_dump_json()
 
 
 def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer() -> None:

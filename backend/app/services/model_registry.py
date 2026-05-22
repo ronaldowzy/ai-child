@@ -367,6 +367,12 @@ class ModelRegistry:
         if not child_chat_profile and os.getenv("CHILD_AI_MODEL_PROVIDER") == "mimo":
             child_chat_profile = "mimo_child_chat"
 
+        parent_report_profile = os.getenv("CHILD_AI_PARENT_REPORT_PROFILE")
+        if not parent_report_profile and self._env_provider_requested(
+            "CHILD_AI_PARENT_REPORT_PROVIDER", "CHILD_AI_MODEL_PROVIDER"
+        ):
+            parent_report_profile = "mimo_parent_report"
+
         vision_profile = os.getenv("CHILD_AI_VISION_PROFILE")
         if not vision_profile and self._env_provider_requested(
             "CHILD_AI_VISION_PROVIDER", "CHILD_AI_MODEL_PROVIDER"
@@ -384,7 +390,7 @@ class ModelRegistry:
             ModelTaskType.INTENT_CLASSIFICATION: "intent_classifier_mock",
             ModelTaskType.SAFETY_CLASSIFICATION: "safety_classifier_mock",
             ModelTaskType.MEMORY_EXTRACTION: "memory_extractor_mock",
-            ModelTaskType.PARENT_REPORT: "parent_report_mock",
+            ModelTaskType.PARENT_REPORT: parent_report_profile or "parent_report_mock",
             ModelTaskType.VISION: vision_profile or "vision_mock",
             ModelTaskType.OCR: ocr_profile or "ocr_mock",
         }
@@ -422,6 +428,13 @@ class ModelRegistry:
                 profile_name="parent_report_mock",
                 model_name="mock-parent-report-v0",
                 task_type=ModelTaskType.PARENT_REPORT,
+            ),
+            "mimo_parent_report": self._mimo_profile(
+                profile_name="mimo_parent_report",
+                model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
+                task_type=ModelTaskType.PARENT_REPORT,
+                temperature=0.2,
+                fallback_profile_name="parent_report_mock",
             ),
             "vision_mock": self._mock_profile(
                 profile_name="vision_mock",

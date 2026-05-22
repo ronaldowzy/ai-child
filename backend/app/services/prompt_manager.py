@@ -292,6 +292,7 @@ class PromptManager:
             lines.append(f"图片描述：{text}")
         if child_caption:
             lines.append(f"孩子说明：{child_caption}")
+        lines.append("图片描述是内部上下文，不要逐字复述给孩子，也不要展开成识别报告。")
         if recognized_type == "homework_problem":
             lines.append(
                 "如果孩子是在问图片里的题目，请先引导孩子复述题意或说出卡点；"

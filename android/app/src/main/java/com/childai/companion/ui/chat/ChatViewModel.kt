@@ -604,7 +604,7 @@ class ChatViewModel(
         val generatedAudioUrl = runCatching {
             feedbackTtsAudioGenerator.generateAudioUrl(
                 text = text,
-                emotion = emotion ?: "encourage",
+                emotion = emotion.toXiaobaohuTtsEmotion(),
             )
         }.getOrNull()
         return if (generatedAudioUrl.isNullOrBlank()) {
@@ -621,9 +621,9 @@ class ChatViewModel(
             return
         }
         val text = when (action.id) {
-            "make_story" -> "请根据刚才那张图片编一个小故事：${context.summary}"
-            "ask_what_is_this" -> "我想问刚才那张图片里这是什么：${context.summary}"
-            else -> "我们继续聊刚才那张图片：${context.summary}"
+            "make_story" -> "请根据刚才那张图片编一个小故事。"
+            "ask_what_is_this" -> "我想问刚才那张图片里这是什么。"
+            else -> "我们继续聊刚才那张图片。"
         }
         sendTextWithAttachments(text, listOf(context.attachmentId))
     }
@@ -1395,6 +1395,13 @@ private fun AttachmentCreateResponse.toPendingImageContext(): PendingImageContex
         imagePurpose = recognizedContent.imagePurpose,
         recognizedType = recognizedContent.type,
     )
+}
+
+private fun String?.toXiaobaohuTtsEmotion(): String {
+    return when (this) {
+        "encourage", "comfort", "hint", "explain", "happy", "calm", "safety", "privacy" -> this
+        else -> "encourage"
+    }
 }
 
 interface ConversationMessageSender {

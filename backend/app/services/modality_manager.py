@@ -47,18 +47,17 @@ class ModalityManager:
             )
 
         if recognized_content.image_purpose != ImagePurpose.LEARNING_HOMEWORK:
-            text = recognized_content.text or "这张图片"
             return ModalityDecision(
                 status=AttachmentStatus.IMAGE_READY,
                 recognized_content=recognized_content,
                 reply_text=(
-                    f"我看到你想分享的是：{text}。"
+                    "我看到这张图啦。"
                     "你想让我陪你聊聊它，还是说说你想问哪里？"
                 ),
                 needs_input=None,
                 sub_scene="image_share",
                 active_scene="conversation.open",
-                reply_emotion="curious",
+                reply_emotion="encourage",
                 quick_actions=[
                     QuickAction(id="talk_about_image", label="聊聊它"),
                     QuickAction(id="make_story", label="编个故事"),

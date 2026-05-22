@@ -83,8 +83,8 @@ fun CartoonAgentView(
     )
     Box(
         modifier = modifier
-            .fillMaxWidth(0.88f)
-            .sizeIn(minWidth = 160.dp, maxWidth = 420.dp)
+            .fillMaxWidth(0.96f)
+            .sizeIn(minWidth = 180.dp, maxWidth = 470.dp)
             .aspectRatio(1f),
     ) {
         if (frameSequence != null) {

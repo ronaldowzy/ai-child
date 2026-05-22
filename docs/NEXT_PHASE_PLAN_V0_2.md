@@ -19,7 +19,7 @@
 12. 小白狐 animation_v1 已按运行时包优化为 512px WebP 序列帧，Android assets 约 4.9MB，fallback 链为 animation_v1 -> png_static -> canvas；验收全量包不应整体进入 APK。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
 14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
-15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，业务服务仍按 B2-B5 串行迁移，不能阻塞 Android 语音 QA。
+15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，B2 ParentPolicy 已接入，B3 普通 `/conversation/message` turn thin slice 已接入；stream、MemoryService 和 ParentReportService 仍按后续小步迁移，不能阻塞 Android 语音 QA。
 16. Redmi K60 真机反馈显示 MiMo VoiceClone 音频初步跑通、动态小白狐形象已经可见，但同步链路等待时间仍长，下一阶段不能继续依赖增加 read timeout。
 17. 儿童端主界面下一版改为横屏双栏：左侧动态小白狐，右侧聊天交互；手机也进入横屏。
 18. 父亲已确认 ASR v1 接 MiMo audio input / ASR；真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制，开发阶段先用 fake/smoke audio。
@@ -141,14 +141,16 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 ```text
 1. DB1-A 基础设施已完成：SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local docker compose、migration/reset 脚本和基础测试。
 2. 初始表包含 children、parent_policies、conversation_sessions、conversation_messages、routing_decisions、memory_items、parent_reports、tts_cache_records。
-3. 业务服务仍未迁移，当前 parent policy、memory、report 等运行时行为仍以原有内存实现为主。
+3. `ParentPolicyService` 已优先读写 PostgreSQL，数据库不可用时 dev/test 回退内存。
+4. 普通 `/api/v1/conversation/message` 成功 turn 已 best-effort 写入 `conversation_sessions`、`conversation_messages` 和 `routing_decisions`，保存最小文本、audio_url、emotion、agent_motion 和非敏感路由摘要。
+5. `/api/v1/conversation/stream` turn、MemoryService 和 ParentReportService 仍未落库，运行时行为继续沿用当前实现。
 ```
 
 迁移顺序：
 
 ```text
 1. B2：ParentPolicyService 持久化。
-2. B3：Conversation session/message 落库，保存 child/agent message、audio_url、emotion、agent_motion，不保存 debug。
+2. B3：Conversation session/message thin slice 已完成普通 `/conversation/message` 路径；stream turn 持久化后续单独做。
 3. B4：MemoryService 落库。
 4. B5：ParentReportService 落库。
 ```

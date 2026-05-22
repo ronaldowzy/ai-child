@@ -11,7 +11,7 @@
 当前版本：v0.1-dev
 当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；MiMo ASR fake/smoke audio 和 DB conversation message 持久化继续排队，不能按旧固定场景假设开发
+下一步：Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback；MiMo ASR fake/smoke audio、stream turn 持久化、MemoryService/ParentReportService 落库继续排队，不能按旧固定场景假设开发
 ```
 
 第一轮已完成能力快照：
@@ -56,7 +56,7 @@ Mock 拍题：done
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
 | V1 | 语音交互 v1 | 后端 MiMo ASR voice-first 自动发送 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为后端 MiMo audio input，provider 和 endpoint 已接入但默认 policy-blocked；Android ASR 录音上传和儿童默认自动发送已接入，调试确认模式保留，待真机 QA |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 runtime 已优化为 512px WebP 序列帧，Android assets 约 4.9MB；静态 fallback 已压缩为 WebP，保留 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
-| DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2-B5 业务持久化仍 todo |
+| DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | in_progress | Q1/R3/R8 | DB1-A 基础设施 done；B2 ParentPolicy done；B3 普通 `/conversation/message` turn thin slice done；stream/Memory/ParentReport 仍待迁移 |
 | S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | in_progress | V1/F1/R1 | 后端 NDJSON skeleton 已接入；segment-level interleaved TTS 已完成；Android 首版 stream client、渐进 agent bubble 和 audio segment queue 已接入；旧 `/conversation/message` 保留为 fallback |
 | UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
@@ -220,7 +220,7 @@ Mock 拍题：done
 | O1-01 Open Conversation Mode 小步实现 | done |  | 普通兴趣和日常话题进入 `conversation.open`；ChildAgentRuntime 接收进程内短期 history；普通聊天 quick actions 随上下文轻量变化；安全、隐私、学习、睡前边界保留 |
 | DB1-A PostgreSQL 基础设施 | done |  | 新增 SQLAlchemy sync、psycopg、Alembic、PostgreSQL 16 local compose、初始 8 张表、migration/reset 脚本和基础测试；业务服务仍未迁移 |
 | DB1-B ParentPolicy 持久化 | done |  | ParentPolicyService 已支持 PostgreSQL repository 优先读写；数据库不可用时 dev fallback 到内存；`parent_message_raw` 和 `parent_message_updated_at` 已有迁移 |
-| DB1-C Conversation message 持久化 | todo |  | 保存 child/agent message、audio_url、emotion、agent_motion；不保存 debug、原始音频或照片 |
+| DB1-C Conversation message 持久化 | in_progress |  | thin slice done：普通 `/api/v1/conversation/message` 成功 turn 已 best-effort 保存 session、child message、agent message、routing decision、audio_url、emotion、agent_motion；持久化失败不阻断回复；不保存 debug、prompt、parent_message_raw、原始音频或照片；stream turn 后续单独处理 |
 | DB1-D MemoryService 持久化 | todo |  | 结构化 memory_items 落库，evidence 继续使用 summary，不保存 full transcript |
 | DB1-E ParentReport 持久化 | todo |  | 日报生成结果可持久化，仍不展示逐字聊天记录 |
 | S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |

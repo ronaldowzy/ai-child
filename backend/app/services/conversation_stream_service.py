@@ -61,6 +61,7 @@ class ConversationStreamService:
         self._conversation_service = conversation_service or ConversationService(
             tts_service=_NoopConversationTtsService(),
             debug_enabled=debug_enabled,
+            persistence_enabled=False,
         )
         self._tts_service = tts_service or get_tts_service()
         self._text_segmenter = text_segmenter or TextSegmenter(

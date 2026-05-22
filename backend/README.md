@@ -229,10 +229,14 @@ return evidence fields, quote summaries, or full chat transcripts.
 The v0.1-dev persistence target is local PostgreSQL for family testing. DB1-A
 adds the database foundation. DB1-B has started business persistence:
 `ParentPolicyService` reads/writes `parent_policies` through a SQLAlchemy
-repository when PostgreSQL is available, including `parent_message_raw` and
-`parent_message_updated_at`. If the local database is unavailable in dev/test,
-the service falls back to the existing in-memory policy store so conversation
-and Android QA are not blocked.
+repository when PostgreSQL is available, including `parent_message_raw`,
+`parent_message_updated_at`, `child_nickname`, and `child_display_name`.
+DB1-B3 now also records ordinary `/api/v1/conversation/message` turns with a
+best-effort repository: it upserts `conversation_sessions`, stores the child
+message, stores the agent message after `audio_url` is attached, and stores a
+non-sensitive routing decision summary. If the local database is unavailable in
+dev/test, persistence failures are logged with hashed identifiers and the
+conversation response is not blocked.
 
 Local dev database:
 
@@ -266,7 +270,7 @@ parent_reports
 tts_cache_records
 ```
 
-After pulling DB1-B changes, run migrations:
+After pulling DB1 changes, run migrations:
 
 ```bash
 bash scripts/db_migrate.sh
@@ -275,12 +279,17 @@ bash scripts/db_migrate.sh
 Data boundary:
 
 - This is local family-use storage, not a cloud multi-tenant production design.
-- Conversation text may be stored locally for context, review, and parent report
-  material after the B3 migration step.
+- Ordinary `/api/v1/conversation/message` text may be stored locally for
+  context, review, and future parent report material. Stream turn persistence is
+  not enabled yet.
 - Raw audio files, raw photos, API keys, model keys, and debug internals must
   not be written to PostgreSQL.
+- Prompt text, `parent_message_raw`, provider raw responses, audio base64, and
+  raw image/OCR debug data must not be written to conversation persistence.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
+- `memory_items` and `parent_reports` tables exist, but `MemoryService` and
+  `ParentReportService` runtime persistence are still pending.
 - Parent free-text notes are stored in `parent_policies.parent_message_raw` for
   local family testing. They are prompt background only and must not be exposed
   in child-facing debug/UI.

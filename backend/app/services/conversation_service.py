@@ -16,6 +16,7 @@ from app.domain.schemas.conversation import (
     UiAction,
 )
 from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest
+from app.domain.time import TimeContext
 from app.middleware.request_id import get_request_id
 from app.services.attachment_service import (
     AttachmentService,
@@ -33,6 +34,10 @@ from app.services.conversation_history_service import (
     ConversationHistoryService,
     get_conversation_history_service,
 )
+from app.services.conversation_persistence_service import (
+    ConversationPersistenceService,
+    get_conversation_persistence_service,
+)
 from app.services.intent_classifier import (
     IntentClassification,
     IntentClassifier,
@@ -46,7 +51,11 @@ from app.services.quick_action_service import (
     QuickActionService,
     get_quick_action_service,
 )
-from app.services.safety_engine import SafetyEngine, get_safety_engine
+from app.services.safety_engine import (
+    SafetyClassification,
+    SafetyEngine,
+    get_safety_engine,
+)
 from app.services.scene_orchestrator import (
     SceneOrchestrator,
     get_scene_orchestrator,
@@ -76,9 +85,11 @@ class ConversationService:
         child_agent_runtime: ChildAgentRuntime | None = None,
         memory_hooks: ConversationMemoryHooks | None = None,
         conversation_history_service: ConversationHistoryService | None = None,
+        conversation_persistence_service: ConversationPersistenceService | None = None,
         quick_action_service: QuickActionService | None = None,
         tts_service: TtsService | None = None,
         debug_enabled: bool = True,
+        persistence_enabled: bool = True,
     ) -> None:
         self._time_context_service = time_context_service or get_time_context_service()
         self._parent_policy_service = (
@@ -93,9 +104,13 @@ class ConversationService:
         self._conversation_history_service = (
             conversation_history_service or get_conversation_history_service()
         )
+        self._conversation_persistence_service = (
+            conversation_persistence_service or get_conversation_persistence_service()
+        )
         self._quick_action_service = quick_action_service or get_quick_action_service()
         self._tts_service = tts_service or get_tts_service()
         self._debug_enabled = debug_enabled
+        self._persistence_enabled = persistence_enabled
 
     def handle_message(
         self, request: ConversationMessageRequest
@@ -217,6 +232,14 @@ class ConversationService:
             child_text=request.input.text,
         )
         self._attach_audio_url_if_enabled(response)
+        self._persist_turn_if_enabled(
+            request=request,
+            response=response,
+            safety=safety,
+            intent=intent,
+            route_decision=route_decision,
+            time_context=time_context,
+        )
         self._log_non_sensitive_turn_summary(
             request=request,
             route_decision=route_decision,
@@ -264,6 +287,39 @@ class ConversationService:
             agent_text=response.reply.text,
         )
         return response
+
+    def _persist_turn_if_enabled(
+        self,
+        *,
+        request: ConversationMessageRequest,
+        response: ConversationMessageResponse,
+        safety: SafetyClassification,
+        intent: IntentClassification,
+        route_decision: SceneRouteDecision,
+        time_context: TimeContext,
+    ) -> None:
+        if not self._persistence_enabled:
+            return
+        try:
+            self._conversation_persistence_service.record_turn(
+                request=request,
+                response=response,
+                safety=safety,
+                intent=intent,
+                route_decision=route_decision,
+                time_context=time_context,
+            )
+        except Exception as exc:
+            logger.warning(
+                "conversation_persistence_failed",
+                extra={
+                    "event": "conversation_persistence_failed",
+                    "request_id": get_request_id(),
+                    "child_id_hash": hash_identifier(request.child_id),
+                    "session_id_hash": hash_identifier(request.session_id),
+                    "error_type": exc.__class__.__name__,
+                },
+            )
 
     def _log_non_sensitive_turn_summary(
         self,

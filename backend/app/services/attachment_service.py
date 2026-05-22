@@ -1,3 +1,4 @@
+import json
 import os
 from uuid import uuid4
 
@@ -164,15 +165,36 @@ class AttachmentService:
                 },
             )
         )
-        confidence = response.structured_output.get("confidence", 0.75)
+        vision_output = self._parse_vision_output(response.response_text)
+        confidence = response.structured_output.get(
+            "confidence",
+            vision_output.get("confidence", 0.75),
+        )
         fallback_action = response.structured_output.get("fallback_action")
+        recognized_text = (
+            vision_output.get("context_summary")
+            or vision_output.get("child_summary")
+            or response.response_text
+        )
+        recognized_type = vision_output.get("recognized_type")
+        recognized_type_value = recognized_type if isinstance(recognized_type, str) else None
         return RecognizedContent(
-            type=self._recognized_type(
-                text=response.response_text,
-                attachment_type=request.attachment_type,
-                image_purpose=request.image_purpose,
+            type=(
+                recognized_type_value
+                if recognized_type_value
+                in {
+                    "homework_problem",
+                    "image_observation",
+                    "privacy_sensitive",
+                    "unsafe_unknown",
+                }
+                else self._recognized_type(
+                    text=recognized_text,
+                    attachment_type=request.attachment_type,
+                    image_purpose=request.image_purpose,
+                )
             ),
-            text=self._truncate_vision_text(response.response_text),
+            text=self._truncate_vision_text(recognized_text),
             confidence=confidence if isinstance(confidence, float | int) else 0.75,
             provider_name=response.provider_name,
             image_purpose=request.image_purpose,
@@ -186,14 +208,30 @@ class AttachmentService:
         purpose = request.image_purpose.value if request.image_purpose else "unknown"
         caption = request.child_caption or ""
         return (
-            "你是小白狐的图片理解模块。请只输出一句孩子可理解的简短图片摘要，"
-            "不要列清单，不要输出分析过程，不要写给开发者看的分类说明。"
+            "你是小白狐的图片理解模块。请返回严格 JSON，不要 Markdown。"
+            "字段：child_summary, context_summary, recognized_type。"
+            "child_summary 是一句孩子可理解的短摘要，不超过80个中文字符；"
+            "context_summary 是供后续对话使用的受控图片上下文，保留关键物体、文字、场景和孩子可能想问的点，不超过500个中文字符。"
+            "recognized_type 只能是 image_observation、homework_problem、privacy_sensitive 或 unsafe_unknown。"
             "不要输出作业最终答案。若图片像作业题，只提取题目内容和要求；"
             "不要做模板化隐私提醒，也不要猜测图片里有未明确出现的风险；"
             "除非图片用途明确为隐私敏感，否则按普通图片继续描述。"
-            "摘要不超过80个中文字符。"
             f"图片用途: {purpose}。孩子补充说明: {caption[:120]}"
         )
+
+    def _parse_vision_output(self, response_text: str) -> dict[str, object]:
+        stripped = response_text.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.strip("`").strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(parsed, dict):
+            return {}
+        return parsed
 
     def _recognized_type(
         self,
@@ -220,7 +258,7 @@ class AttachmentService:
 
     def _truncate_vision_text(self, text: str) -> str:
         stripped = text.strip()
-        return stripped[:300]
+        return stripped[:500]
 
     def _safe_attachment_metadata(
         self,

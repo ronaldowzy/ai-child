@@ -2,6 +2,7 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
+from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
 from app.domain.schemas.parent_policy import ParentPolicyUpdateRequest
 from app.main import app
 from app.services.opening_service import OpeningService
@@ -115,6 +116,42 @@ def test_parent_message_can_block_school_checkin() -> None:
     text = response.json()["reply"]["text"]
     assert "学校" not in text
     assert "今天在学校怎么样" not in text
+
+
+def test_opening_can_use_model_generated_text() -> None:
+    class FakeOpeningModelRegistry:
+        requests: list[ModelRequest]
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.requests.append(request)
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="豆豆，晚上好，我们轻轻聊一句你想说的小事。",
+                structured_output={"text": "豆豆，晚上好，我们轻轻聊一句你想说的小事。"},
+                provider_name="fake",
+                model_name="fake-opening",
+            )
+
+    child_id = "opening_model_child"
+    _update_policy(child_id, child_nickname="豆豆", parent_message_raw="晚上要低刺激。")
+    model_registry = FakeOpeningModelRegistry()
+    service = OpeningService(model_registry=model_registry)
+    request = _request_model(
+        child_id=child_id,
+        session_id="opening-model-session",
+    )
+
+    response = service.create_opening(request)
+
+    assert response.reply.text == "豆豆，晚上好，我们轻轻聊一句你想说的小事。"
+    assert model_registry.requests
+    prompt = model_registry.requests[0].messages[0].content
+    assert isinstance(prompt, str)
+    assert "晚上要低刺激" in prompt
+    assert "当前时间段" in prompt
 
 
 def test_opening_tts_failure_still_returns_text() -> None:

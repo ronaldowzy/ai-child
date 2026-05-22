@@ -8,6 +8,8 @@ from app.domain.schemas.conversation import (
 )
 from app.domain.schemas.parent_policy import ParentPolicy
 from app.domain.time import TimeContext, TimePeriod
+from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
+from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
@@ -28,12 +30,14 @@ class OpeningService:
         parent_policy_service: ParentPolicyService | None = None,
         time_context_service: TimeContextService | None = None,
         tts_service: TtsService | None = None,
+        model_registry: ModelRegistry | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
         )
         self._time_context_service = time_context_service or get_time_context_service()
         self._tts_service = tts_service or get_tts_service()
+        self._model_registry = model_registry or get_model_registry()
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
 
     def create_opening(
@@ -51,9 +55,14 @@ class OpeningService:
             timezone=request.client_context.timezone,
             schedule=parent_policy.schedule,
         )
-        text = self._build_opening_text(
+        fallback_text = self._build_opening_text(
             parent_policy=parent_policy,
             time_context=time_context,
+        )
+        text = self._generate_model_opening(
+            parent_policy=parent_policy,
+            time_context=time_context,
+            fallback_text=fallback_text,
         )
         reply = Reply(
             text=text,
@@ -76,6 +85,77 @@ class OpeningService:
         )
         self._session_cache[cache_key] = response
         return response
+
+    def _generate_model_opening(
+        self,
+        *,
+        parent_policy: ParentPolicy,
+        time_context: TimeContext,
+        fallback_text: str,
+    ) -> str:
+        try:
+            response = self._model_registry.generate(
+                ModelRequest(
+                    task_type=ModelTaskType.CHILD_CHAT,
+                    messages=[
+                        ModelMessage(
+                            role="system",
+                            content=self._opening_prompt(
+                                parent_policy=parent_policy,
+                                time_context=time_context,
+                            ),
+                        ),
+                        ModelMessage(role="user", content="请生成开场白。"),
+                    ],
+                    input_text="请生成开场白。",
+                    context={
+                        "conversation": {
+                            "child_id": parent_policy.child_id,
+                        }
+                    },
+                    metadata={"opening_greeting": True},
+                )
+            )
+        except Exception:
+            return fallback_text
+        if response.metadata.get("mock"):
+            return fallback_text
+        return self._sanitize_opening_text(response.response_text) or fallback_text
+
+    def _opening_prompt(
+        self,
+        *,
+        parent_policy: ParentPolicy,
+        time_context: TimeContext,
+    ) -> str:
+        name = self._child_call_name(parent_policy)
+        parent_message = (parent_policy.parent_message_raw or "").strip()
+        goals = "；".join(parent_policy.goals[:4])
+        preferences = parent_policy.communication_preferences
+        return (
+            "你是小白狐。请给孩子一句自然、短、亲切的开场白，适合直接朗读。"
+            "根据当前时间段、父母寄语、孩子称呼和家庭沟通偏好调整语气。"
+            "不要像老师点名，不要查岗，不要强行问学校，不要每次都问今天在学校怎么样。"
+            "如果是晚上，低刺激、短句；如果刚放学，轻松欢迎回来。"
+            "只输出一句或两句，不使用 Markdown。"
+            f"\n孩子称呼：{name or '无'}"
+            f"\n当前时间段：{time_context.time_period.value}"
+            f"\n时间目标：{time_context.schedule_goal or '无'}"
+            f"\n推荐互动：{'、'.join(time_context.preferred_interactions)}"
+            f"\n避免事项：{'、'.join(time_context.avoid)}"
+            f"\n父亲目标：{goals}"
+            f"\n沟通偏好：{preferences}"
+            f"\n父母寄语背景：{parent_message[:500]}"
+        )
+
+    def _sanitize_opening_text(self, text: str) -> str:
+        compact = " ".join(text.strip().split())
+        compact = compact.strip("\"'“”")
+        if not compact:
+            return ""
+        if len(compact) > 80:
+            compact = compact[:80].rstrip("，。！？,.!? ") + "。"
+        return compact
 
     def _build_opening_text(
         self,

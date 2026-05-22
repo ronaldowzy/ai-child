@@ -59,6 +59,7 @@ fun CartoonAgentView(
     } else {
         baseMascotState
     }
+    val visualScale = mascotVisualScale(requestedMascotState)
     val frameSequence = remember(useAnimation, requestedMascotState, manifest) {
         if (useAnimation && manifest != null) {
             manifestLoader.loadFrameSequenceOrNull(requestedMascotState, manifest)
@@ -85,6 +86,10 @@ fun CartoonAgentView(
         modifier = modifier
             .fillMaxWidth(0.96f)
             .sizeIn(minWidth = 180.dp, maxWidth = 470.dp)
+            .graphicsLayer {
+                scaleX = visualScale
+                scaleY = visualScale
+            }
             .aspectRatio(1f),
     ) {
         if (frameSequence != null) {
@@ -112,6 +117,14 @@ fun CartoonAgentView(
                 forceCanvas = renderMode == "canvas",
             )
         }
+    }
+}
+
+private fun mascotVisualScale(state: MascotState): Float {
+    return when (state) {
+        MascotState.Idle -> 1.0f
+        MascotState.Calm -> 1.04f
+        else -> 1.12f
     }
 }
 

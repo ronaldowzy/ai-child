@@ -16,15 +16,21 @@ class FailingModelRegistry:
 
 
 class CapturingModelRegistry:
-    def __init__(self, *, provider_name: str = "mimo") -> None:
+    def __init__(
+        self,
+        *,
+        provider_name: str = "mimo",
+        response_text: str = "图片里是一只测试用的玩具，不包含真实儿童信息。",
+    ) -> None:
         self.request: ModelRequest | None = None
         self.provider_name = provider_name
+        self.response_text = response_text
 
     def generate(self, request: ModelRequest) -> ModelResponse:
         self.request = request
         return ModelResponse(
             task_type=request.task_type,
-            response_text="图片里是一只测试用的玩具，不包含真实儿童信息。",
+            response_text=self.response_text,
             structured_output={},
             provider_name=self.provider_name,
             model_name="mimo-v2.5",
@@ -84,6 +90,31 @@ def test_attachment_service_uses_model_vision_when_explicitly_enabled() -> None:
     assert attachment is not None
     assert attachment.metadata["mock"] is False
     assert IMAGE_DATA_URI not in str(attachment.metadata)
+
+
+def test_model_vision_keeps_richer_context_without_child_facing_echo() -> None:
+    registry = CapturingModelRegistry(
+        response_text=(
+            '{"child_summary":"我看到这张图里有一个红色玩具。",'
+            '"context_summary":"图片里有一个红色玩具车，旁边有蓝色积木和一张写着2+3的问题卡片；孩子可能想问玩具或卡片内容。",'
+            '"recognized_type":"image_observation"}'
+        )
+    )
+    repository = InMemoryAttachmentRepository()
+    service = AttachmentService(
+        repository=repository,
+        model_registry=registry,
+        settings=Settings(model_provider="mock", vision_provider="mimo"),
+    )
+
+    response = service.create_attachment(_request())
+    attachment = repository.get(response.attachment_id)
+
+    assert attachment is not None
+    assert "蓝色积木" in attachment.recognized_content.text
+    assert "问题卡片" in attachment.recognized_content.text
+    assert response.reply.text == "我看到这张图啦。你想让我陪你聊聊它，还是说说你想问哪里？"
+    assert "蓝色积木" not in response.reply.text
 
 
 def test_model_vision_does_not_treat_privacy_words_as_route_signal() -> None:

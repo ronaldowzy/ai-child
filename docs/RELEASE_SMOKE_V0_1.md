@@ -7,7 +7,7 @@
 ```text
 阶段：family-test-prep smoke
 日期：2026-05-22
-目标：用 mock-first 本地 smoke、自动测试和 debug APK 构建确认既有主链路可交付给真机 QA。
+目标：用 mock-first 本地 smoke、real provider smoke、自动测试和真机 LAN debug APK 构建确认既有主链路可交付给真机 QA。
 ```
 
 已完成范围：
@@ -35,6 +35,38 @@
 
 ## 2. APK Metadata
 
+### Device QA Debug APK
+
+```text
+APK path: android/app/build/outputs/apk/debug/app-debug.apk
+build variant: debug
+build time UTC: 2026-05-22T10:03:28Z
+size: 16049959 bytes / 15M
+sha256: 3577e3c3fdb46ccf0298310fce21ac449b5dc5da7b8a20449295bbda567f4b95
+base URL in this build: http://192.168.0.118:8000/
+BuildConfig.CONVERSATION_API_BASE_URL: http://192.168.0.118:8000/
+```
+
+构建命令：
+
+```bash
+bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
+```
+
+注意：
+
+```text
+1. 这个 APK 是本轮给 Redmi K60 / Honor Pad 5 的真机 QA debug APK。
+2. Mac LAN IP 变化后必须重新构建，不能继续使用旧 APK。
+3. 真机 QA 仍未完成；APK 构建成功不等于 Redmi K60 / Honor Pad 5 通过。
+4. 安装前先启动后端：
+   bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+5. 设备和 Mac 必须在同一网络，并在设备侧能访问：
+   http://192.168.0.118:8000/api/v1/health
+```
+
+### Emulator Debug APK From Previous Smoke
+
 ```text
 APK path: android/app/build/outputs/apk/debug/app-debug.apk
 build variant: debug
@@ -47,10 +79,9 @@ base URL in this build: http://10.0.2.2:8000/
 注意：
 
 ```text
-1. 这个 APK 使用默认 emulator base URL，只适合模拟器本机后端。
-2. 交给 Redmi K60 / Honor Pad 5 前必须重新构建：
-   bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://<mac-lan-ip>:8000/
-3. 真机 APK 必须重新记录 path、size、sha256 和 BuildConfig.CONVERSATION_API_BASE_URL。
+1. 这个旧 APK 使用默认 emulator base URL，只适合模拟器本机后端。
+2. 真机不得使用 `http://10.0.2.2:8000/`。
+3. Redmi K60 先测，Honor Pad 5 后测。
 ```
 
 ## 3. Automated Test Results
@@ -65,12 +96,16 @@ result: PASS
 summary: All checks passed
 
 bash scripts/android_gradle.sh test
-result: not rerun in current DB/ASR/Vision smoke round
-summary: previous family-test APK round passed; current round did not touch Android runtime or assets.
+result: PASS
+summary: BUILD SUCCESSFUL; testDebugUnitTest and testReleaseUnitTest up-to-date.
 
 bash scripts/android_gradle.sh assembleDebug
-result: not rerun in current DB/ASR/Vision smoke round
-summary: previous family-test APK round passed; current round did not touch Android runtime or assets.
+result: PASS
+summary: BUILD SUCCESSFUL with default emulator base URL; final device APK was rebuilt afterward with Mac LAN base URL.
+
+bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
+result: PASS
+summary: generated device debug APK with BuildConfig.CONVERSATION_API_BASE_URL=http://192.168.0.118:8000/.
 ```
 
 ## 4. Smoke Results
@@ -195,3 +230,40 @@ The vision script sources `.env`, applies a temporary MiMo image smoke overlay,
 generates a fake/test PNG if no safe smoke image is provided, and starts a
 temporary backend. It must not be used with real child photos or real family
 photos during development smoke.
+
+## 6. Device QA Handoff
+
+```text
+Current status:
+  PostgreSQL setup: PASS
+  DB smoke: PASS
+  real MiMo ASR smoke: PASS, provider=mimo
+  real MiMo vision smoke: PASS, provider=mimo
+  device debug APK build: PASS
+  Redmi K60 QA: pending
+  Honor Pad 5 QA: pending
+
+Still not implemented:
+  true LLM streaming
+  CameraX / real camera OCR
+```
+
+交付真机 QA 前：
+
+```bash
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+curl --noproxy '*' http://192.168.0.118:8000/api/v1/health
+```
+
+真机测试记录使用：
+
+```text
+docs/QA_DEVICE_CHECKLIST_V0_1.md
+docs/QA_RESULT_TEMPLATE_V0_1.md
+```
+
+如果需要收集 Android 日志：
+
+```bash
+bash scripts/collect_android_qa_logs.sh
+```

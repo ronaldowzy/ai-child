@@ -320,6 +320,12 @@ http://10.0.2.2:8000/
 bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.1.10:8000/
 ```
 
+推荐使用真机打包脚本，它会禁止 `10.0.2.2` 并输出 APK metadata：
+
+```bash
+bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
+```
+
 联调前先确认后端可从 Mac 本机和局域网地址访问：
 
 ```bash
@@ -332,7 +338,7 @@ curl --noproxy '*' http://192.168.1.10:8000/api/v1/health
 交付真机 APK 前必须复核：
 
 ```bash
-bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://<mac-lan-ip>:8000/
+bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
 sed -n '1,40p' android/app/build/generated/source/buildConfig/debug/com/childai/companion/BuildConfig.java
 shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
 curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health
@@ -349,6 +355,7 @@ curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health
 ```bash
 bash scripts/android_gradle.sh test
 bash scripts/android_gradle.sh assembleDebug
+bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
 bash scripts/smoke_backend_local.sh
 bash scripts/smoke_voice_stack.sh
 ```
@@ -361,7 +368,22 @@ bash scripts/smoke_voice_stack.sh
 3. MiMo key 只放后端环境变量，不放 Android、docs、tests 或截图。
 4. ASR 真实 provider smoke 只用非儿童测试音频和 opt-in policy env；真机儿童语音 QA 不等于 provider smoke。
 5. 详细 Redmi K60 / Honor Pad 5 手动步骤见 `docs/QA_DEVICE_CHECKLIST_V0_1.md`。
+6. Redmi K60 先测主功能链路，Honor Pad 5 后测低配性能和 fallback。
+7. QA 结果记录模板见 `docs/QA_RESULT_TEMPLATE_V0_1.md`。
 ```
+
+当前真机 QA debug APK：
+
+```text
+路径：android/app/build/outputs/apk/debug/app-debug.apk
+构建时间 UTC：2026-05-22T10:03:28Z
+大小：16049959 bytes / 15M
+SHA256：3577e3c3fdb46ccf0298310fce21ac449b5dc5da7b8a20449295bbda567f4b95
+base URL：http://192.168.0.118:8000/
+BuildConfig.CONVERSATION_API_BASE_URL：http://192.168.0.118:8000/
+```
+
+这个 APK 可用于 Redmi K60 / Honor Pad 5 真机 QA，但尚未真机通过。Mac LAN IP 改变后必须重新构建。
 
 ## 本地运行
 

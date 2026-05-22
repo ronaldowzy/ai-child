@@ -57,6 +57,7 @@ data class AttachmentCreateResponse(
     val hasReadyHomeworkText: Boolean
         get() = !recognizedContent.text.isNullOrBlank() &&
             recognizedContent.type == "homework_problem" &&
+            recognizedContent.imagePurpose == "learning_homework" &&
             recognizedContent.confidence >= HOMEWORK_READY_CONFIDENCE
 
     companion object {

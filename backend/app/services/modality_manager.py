@@ -46,17 +46,14 @@ class ModalityManager:
                 ],
             )
 
-        if (
-            recognized_content.type != "homework_problem"
-            and recognized_content.image_purpose != ImagePurpose.LEARNING_HOMEWORK
-        ):
+        if recognized_content.image_purpose != ImagePurpose.LEARNING_HOMEWORK:
             text = recognized_content.text or "这张图片"
             return ModalityDecision(
                 status=AttachmentStatus.IMAGE_READY,
                 recognized_content=recognized_content,
                 reply_text=(
                     f"我看到你想分享的是：{text}。"
-                    "你想让我陪你聊聊它，还是一起给它编个小故事？"
+                    "你想让我陪你聊聊它，还是说说你想问哪里？"
                 ),
                 needs_input=None,
                 sub_scene="image_share",

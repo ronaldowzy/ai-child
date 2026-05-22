@@ -292,7 +292,12 @@ class PromptManager:
             lines.append(f"图片描述：{text}")
         if child_caption:
             lines.append(f"孩子说明：{child_caption}")
-        lines.append("如果不是作业题，请自然围绕图片继续聊，不要把它当成作业。")
+        if recognized_type == "homework_problem":
+            lines.append(
+                "如果孩子是在问图片里的题目，请先引导孩子复述题意或说出卡点；"
+                "不要直接给最终答案。"
+            )
+        lines.append("如果孩子没有说这是作业题，请自然围绕图片继续聊，不要把它强行当成作业。")
         lines.append("不要声称看到了图片中没有被描述的细节。")
         return "\n".join(lines)
 

@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -56,6 +57,19 @@ class RoutingDecisionWrite:
     decision: dict[str, Any]
     signals: dict[str, Any] | None
     confidence: float | None
+
+
+@dataclass(frozen=True)
+class ConversationReportMessage:
+    id: str
+    session_id: str
+    actor: str
+    message_type: str
+    normalized_text: str | None
+    active_scene: str | None
+    risk_level: str | None
+    attachments_count: int
+    created_at: datetime
 
 
 @dataclass(frozen=True)
@@ -136,6 +150,38 @@ class ConversationPersistenceRepository:
         except SQLAlchemyError as exc:
             raise ConversationPersistenceRepositoryUnavailable(str(exc)) from exc
 
+    def list_report_messages(
+        self,
+        *,
+        child_id: str,
+        report_date: date,
+    ) -> list[ConversationReportMessage]:
+        start = datetime.combine(report_date, time.min, tzinfo=timezone.utc)
+        end = datetime.combine(report_date, time.max, tzinfo=timezone.utc)
+        try:
+            with self._session_factory() as session:
+                rows = (
+                    session.execute(
+                        select(ConversationMessageRecord, RoutingDecisionRecord)
+                        .outerjoin(
+                            RoutingDecisionRecord,
+                            RoutingDecisionRecord.message_id
+                            == ConversationMessageRecord.id,
+                        )
+                        .where(ConversationMessageRecord.child_id == child_id)
+                        .where(ConversationMessageRecord.created_at >= start)
+                        .where(ConversationMessageRecord.created_at <= end)
+                        .order_by(ConversationMessageRecord.created_at.asc())
+                    )
+                    .all()
+                )
+                return [
+                    self._report_message(message, route)
+                    for message, route in rows
+                ]
+        except SQLAlchemyError as exc:
+            raise ConversationPersistenceRepositoryUnavailable(str(exc)) from exc
+
     def _ensure_child(self, session: Session, child_id: str) -> None:
         child = session.get(Child, child_id)
         if child is not None:
@@ -211,3 +257,25 @@ class ConversationPersistenceRepository:
             signals=decision_write.signals,
             confidence=decision_write.confidence,
         )
+
+    def _report_message(
+        self,
+        message: ConversationMessageRecord,
+        route: RoutingDecisionRecord | None,
+    ) -> ConversationReportMessage:
+        return ConversationReportMessage(
+            id=message.id,
+            session_id=message.session_id,
+            actor=message.actor,
+            message_type=message.message_type,
+            normalized_text=message.normalized_text,
+            active_scene=route.active_scene if route else None,
+            risk_level=route.risk_level if route else None,
+            attachments_count=len(message.attachments or []),
+            created_at=self._aware_datetime(message.created_at),
+        )
+
+    def _aware_datetime(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value

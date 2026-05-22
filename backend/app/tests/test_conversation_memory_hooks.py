@@ -61,6 +61,11 @@ class CapturingRuntime:
         )
 
 
+class EmptyConversationRepository:
+    def list_report_messages(self, *, child_id, report_date):
+        return []
+
+
 def _conversation_stack(
     *,
     runtime: CapturingRuntime | None = None,
@@ -72,6 +77,7 @@ def _conversation_stack(
     )
     report_service = ParentReportService(
         memory_service=memory_service,
+        conversation_repository=EmptyConversationRepository(),
         now_provider=_fixed_now,
     )
     runtime = runtime or CapturingRuntime()

@@ -420,7 +420,7 @@ def test_child_agent_runtime_passes_image_context_to_prompt_and_metadata() -> No
     assert registry.last_request is not None
     assert registry.last_request.metadata["contains_image"] is True
     assert "孩子搭了一个积木城堡" in registry.last_request.messages[0].content
-    assert "不要把它当成作业" in registry.last_request.messages[0].content
+    assert "不要把它强行当成作业" in registry.last_request.messages[0].content
 
 
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:

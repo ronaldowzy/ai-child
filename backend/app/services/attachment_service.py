@@ -29,6 +29,19 @@ class HomeworkAttachmentContext(BaseModel):
     attachment_id: str
     recognized_content: RecognizedContent
 
+    def to_prompt_context(self) -> dict[str, str | None]:
+        return {
+            "attachment_id": self.attachment_id,
+            "image_purpose": (
+                self.recognized_content.image_purpose.value
+                if self.recognized_content.image_purpose
+                else None
+            ),
+            "recognized_type": self.recognized_content.type,
+            "recognized_text": self.recognized_content.text,
+            "child_caption": self.recognized_content.child_caption,
+        }
+
 
 class ImageAttachmentContext(BaseModel):
     attachment_id: str
@@ -175,7 +188,8 @@ class AttachmentService:
         return (
             "你是小白狐的图片理解模块。请只做简短图片描述和安全分类，"
             "不要输出作业最终答案。若图片像作业题，只提取题目内容和要求；"
-            "若包含地址、电话、证件、学校名、人脸等隐私，请明确标为隐私敏感。"
+            "不要做模板化隐私提醒，也不要猜测图片里有未明确出现的风险；"
+            "除非图片用途明确为隐私敏感，否则按普通图片继续描述。"
             f"图片用途: {purpose}。孩子补充说明: {caption[:120]}"
         )
 
@@ -197,9 +211,6 @@ class AttachmentService:
             return "homework_problem"
 
         normalized = text.lower()
-        privacy_keywords = ("地址", "电话", "手机号", "身份证", "证件", "学校名", "人脸")
-        if any(keyword in normalized for keyword in privacy_keywords):
-            return "privacy_sensitive"
         homework_keywords = ("题目", "作业", "算式", "应用题", "选择题", "练习")
         if any(keyword in normalized for keyword in homework_keywords):
             return "homework_problem"
@@ -267,7 +278,6 @@ class AttachmentService:
                 and attachment.child_id == child_id
                 and attachment.session_id == session_id
                 and attachment.status in {AttachmentStatus.IMAGE_READY, AttachmentStatus.OCR_READY}
-                and attachment.recognized_content.type != "homework_problem"
             ):
                 return ImageAttachmentContext(
                     attachment_id=attachment.id,

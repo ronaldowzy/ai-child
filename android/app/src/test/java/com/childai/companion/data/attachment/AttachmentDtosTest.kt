@@ -106,6 +106,38 @@ class AttachmentDtosTest {
     }
 
     @Test
+    fun responseDoesNotAutoSendShareImageEvenWhenVisionTextLooksLikeHomework() {
+        val response = AttachmentCreateResponse.fromJsonString(
+            """
+            {
+              "attachment_id": "att_share_homework_like",
+              "recognized_content": {
+                "type": "homework_problem",
+                "text": "图片里有一张纸，上面像是数学题目和一些数字。",
+                "confidence": 0.93,
+                "provider_name": "mimo",
+                "image_purpose": "share"
+              },
+              "reply": {
+                "type": "agent_message",
+                "text": "我看到你想分享的是：图片里有一张纸，上面像是数学题目和一些数字。",
+                "voice_enabled": true,
+                "emotion": "curious"
+              },
+              "ui_actions": [],
+              "session_state": {
+                "base_scene": "conversation.open",
+                "active_scene": "conversation.open"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertFalse(response.hasReadyHomeworkText)
+        assertEquals("share", response.recognizedContent.imagePurpose)
+    }
+
+    @Test
     fun genericImageResponsePreservesCaptionForFollowupContext() {
         val response = AttachmentCreateResponse.fromJsonString(
             """

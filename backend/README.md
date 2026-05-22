@@ -412,6 +412,11 @@ Second-round routing fixes:
 - Generic image sharing can continue into conversation through attachment
   context. The prompt receives the image summary and child caption, but no raw
   photo.
+- Parent reports are generated when the parent opens the report screen. The
+  service combines structured memory with same-day persisted conversation
+  message/routing summaries, refreshes stale same-day reports when new chat
+  material exists, and still avoids raw transcripts, evidence quotes, prompts,
+  debug internals, provider raw responses, and raw media.
 
 ## Optional Xiaomi Mimo Provider
 

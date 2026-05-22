@@ -7,6 +7,7 @@ from app.domain.memory import (
     MemoryType,
 )
 from app.repositories.memory_repository import InMemoryMemoryRepository
+from app.repositories.conversation_persistence_repository import ConversationReportMessage
 from app.repositories.parent_report_repository import (
     InMemoryParentReportRepository,
     ParentReportRepositoryUnavailable,
@@ -49,6 +50,26 @@ def _memory_request(
     )
 
 
+class FakeConversationRepository:
+    def __init__(
+        self,
+        messages: list[ConversationReportMessage] | None = None,
+    ) -> None:
+        self.messages = messages or []
+
+    def list_report_messages(
+        self,
+        *,
+        child_id: str,
+        report_date: date,
+    ) -> list[ConversationReportMessage]:
+        return [
+            message
+            for message in self.messages
+            if message.created_at.date() == report_date
+        ]
+
+
 def _services() -> tuple[
     InMemoryMemoryRepository,
     MemoryService,
@@ -61,6 +82,7 @@ def _services() -> tuple[
     )
     report_service = ParentReportService(
         memory_service=memory_service,
+        conversation_repository=FakeConversationRepository(),
         now_provider=_fixed_now,
     )
     return repository, memory_service, report_service
@@ -80,9 +102,33 @@ def _services_with_report_repository() -> tuple[
     report_service = ParentReportService(
         memory_service=memory_service,
         repository=report_repository,
+        conversation_repository=FakeConversationRepository(),
         now_provider=_fixed_now,
     )
     return memory_service, report_repository, report_service
+
+
+def _conversation_message(
+    *,
+    message_id: str,
+    actor: str = "child",
+    text: str | None,
+    active_scene: str | None = "conversation.open",
+    risk_level: str | None = "none",
+    attachments_count: int = 0,
+    created_at: datetime = datetime(2026, 5, 18, 10, 30, tzinfo=timezone.utc),
+) -> ConversationReportMessage:
+    return ConversationReportMessage(
+        id=message_id,
+        session_id="session_parent_report_service_test",
+        actor=actor,
+        message_type="text",
+        normalized_text=text,
+        active_scene=active_scene,
+        risk_level=risk_level,
+        attachments_count=attachments_count,
+        created_at=created_at,
+    )
 
 
 def test_parent_report_service_generates_normal_daily_report() -> None:
@@ -159,6 +205,83 @@ def test_parent_report_service_get_daily_report_saves_generated_report() -> None
     assert persisted.learning_observations == report.learning_observations
 
 
+def test_parent_report_service_uses_daily_conversation_without_raw_transcript() -> None:
+    memory_service = MemoryService(
+        repository=InMemoryMemoryRepository(),
+        now_provider=_fixed_now,
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_photo_learning",
+                    text="我发了一张家里的照片，里面有数学题不会做。",
+                    active_scene="conversation.open",
+                    attachments_count=1,
+                ),
+                _conversation_message(
+                    message_id="msg_agent_photo_learning",
+                    actor="agent",
+                    text="我们先看看你最想问哪里。",
+                ),
+            ]
+        ),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert "会话消息" in report.summary
+    assert "图片分享" in report.summary
+    assert any("复述题意" in item for item in report.learning_observations)
+    assert any("图片" in item for item in report.expression_observations)
+    assert "我发了一张家里的照片" not in report_json
+    assert "数学题不会做" not in report_json
+
+
+def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer() -> None:
+    memory_service, report_repository, _ = _services_with_report_repository()
+    old_report_service = ParentReportService(
+        memory_service=memory_service,
+        repository=report_repository,
+        conversation_repository=FakeConversationRepository(),
+        now_provider=_fixed_now,
+    )
+    old_report = old_report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        repository=report_repository,
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_newer_photo",
+                    text="我拍了一张图想问问这是什么。",
+                    attachments_count=1,
+                    created_at=datetime(2026, 5, 18, 11, 0, tzinfo=timezone.utc),
+                )
+            ]
+        ),
+        now_provider=lambda: datetime(2026, 5, 18, 11, 5, tzinfo=timezone.utc),
+    )
+
+    refreshed = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert refreshed.summary != old_report.summary
+    assert "会话消息" in refreshed.summary
+    assert refreshed.created_at > old_report.created_at
+
+
 def test_parent_report_service_second_get_returns_persisted_report() -> None:
     memory_service, _, report_service = _services_with_report_repository()
     memory_service.create(
@@ -225,6 +348,7 @@ def test_parent_report_service_repository_failure_returns_generated_report(
     report_service = ParentReportService(
         memory_service=memory_service,
         repository=FailingReportRepository(),
+        conversation_repository=FakeConversationRepository(),
         now_provider=_fixed_now,
     )
     caplog.set_level("WARNING", logger="app.parent_report")

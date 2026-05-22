@@ -80,7 +80,25 @@ def test_prompt_manager_injects_image_context_without_homework_assumption() -> N
     assert "孩子刚刚分享了一张图片" in prompt.prompt
     assert "孩子搭了一个积木城堡" in prompt.prompt
     assert "你看我搭的这个" in prompt.prompt
-    assert "不要把它当成作业" in prompt.prompt
+    assert "不要把它强行当成作业" in prompt.prompt
+
+
+def test_prompt_manager_keeps_homework_like_image_context_scaffolded() -> None:
+    prompt = PromptManager().compose(
+        "conversation.open",
+        image_context={
+            "attachment_id": "att_image_002",
+            "image_purpose": "share",
+            "recognized_type": "homework_problem",
+            "recognized_text": "图片里有一张纸，上面像是数学题目和一些数字。",
+            "child_caption": "我拍了一张图片给小白狐看。",
+        },
+    )
+
+    assert "图片里有一张纸" in prompt.prompt
+    assert "先引导孩子复述题意或说出卡点" in prompt.prompt
+    assert "不要直接给最终答案" in prompt.prompt
+    assert "不要把它强行当成作业" in prompt.prompt
 
 
 def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None:

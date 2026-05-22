@@ -202,6 +202,13 @@ class ConversationService:
                     limit=6,
                 )
             )
+        prompt_image_context = (
+            image_context.to_prompt_context()
+            if image_context is not None
+            else homework_context.to_prompt_context()
+            if homework_context is not None
+            else None
+        )
         runtime_result = self._child_agent_runtime.run(
             AgentRuntimeRequest(
                 child_id=request.child_id,
@@ -218,11 +225,7 @@ class ConversationService:
                     "attachment_count": len(request.input.attachments),
                     "contains_image": image_context is not None
                     or homework_context is not None,
-                    "image_context": (
-                        image_context.to_prompt_context()
-                        if image_context is not None
-                        else None
-                    ),
+                    "image_context": prompt_image_context,
                 },
             )
         )

@@ -546,8 +546,9 @@ class ChatViewModel(
         attachmentResponse: AttachmentCreateResponse,
     ) {
         if (!attachmentResponse.hasReadyHomeworkText) {
+            val reply = attachmentResponse.reply.withGeneratedAudioForAttachment()
             renderAgentReply(
-                reply = attachmentResponse.reply,
+                reply = reply,
                 uiActions = attachmentResponse.uiActions,
                 sessionState = attachmentResponse.sessionState,
                 mockPhoto = null,
@@ -588,6 +589,28 @@ class ChatViewModel(
                     pendingImageContext = null,
                 )
             }
+        }
+    }
+
+    private suspend fun ConversationReply.withGeneratedAudioForAttachment(): ConversationReply {
+        if (
+            !voiceEnabled ||
+            !audioUrl.isNullOrBlank() ||
+            !_uiState.value.tts.isAutoReadEnabled ||
+            _uiState.value.tts.isMuted
+        ) {
+            return this
+        }
+        val generatedAudioUrl = runCatching {
+            feedbackTtsAudioGenerator.generateAudioUrl(
+                text = text,
+                emotion = emotion ?: "encourage",
+            )
+        }.getOrNull()
+        return if (generatedAudioUrl.isNullOrBlank()) {
+            copy(voiceEnabled = false, audioUrl = null)
+        } else {
+            copy(audioUrl = generatedAudioUrl)
         }
     }
 
@@ -1360,10 +1383,7 @@ private fun List<ConversationUiAction>.toQuickActionUi(): List<QuickActionUi> {
 }
 
 private fun AttachmentCreateResponse.toPendingImageContext(): PendingImageContextUiState? {
-    if (
-        recognizedContent.type == "homework_problem" ||
-        recognizedContent.imagePurpose == IMAGE_PURPOSE_HOMEWORK
-    ) {
+    if (recognizedContent.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
         return null
     }
     val summary = recognizedContent.text

@@ -125,9 +125,13 @@ def test_db_persistence_e2e_parent_policy_conversation_memory_report() -> None:
         fallback_to_memory=False,
     )
     report_repository = ParentReportRepository(session_factory=session_factory)
+    conversation_repository = ConversationPersistenceRepository(
+        session_factory=session_factory,
+    )
     report_service = ParentReportService(
         memory_service=memory_service,
         repository=report_repository,
+        conversation_repository=conversation_repository,
         now_provider=lambda: report_now[0],
         fallback_to_memory=False,
     )
@@ -235,9 +239,13 @@ def test_parent_report_repository_failure_does_not_block_e2e_report(
             visible_to_child=False,
         )
     )
+    session_factory = _sqlite_session_factory()
     report_service = ParentReportService(
         memory_service=memory_service,
         repository=FailingReportRepository(),
+        conversation_repository=ConversationPersistenceRepository(
+            session_factory=session_factory,
+        ),
         now_provider=lambda: datetime(2026, 5, 22, 20, 0, tzinfo=timezone.utc),
     )
     caplog.set_level("WARNING", logger="app.parent_report")

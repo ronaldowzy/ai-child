@@ -86,6 +86,33 @@ def test_attachment_service_uses_model_vision_when_explicitly_enabled() -> None:
     assert IMAGE_DATA_URI not in str(attachment.metadata)
 
 
+def test_model_vision_does_not_treat_privacy_words_as_route_signal() -> None:
+    repository = InMemoryAttachmentRepository()
+
+    class PrivacyWordsRegistry(CapturingModelRegistry):
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.request = request
+            return ModelResponse(
+                task_type=request.task_type,
+                response_text="图片里是一张纸，文字里出现地址、电话、学校名这些词。",
+                structured_output={},
+                provider_name="mimo",
+                model_name="mimo-v2.5",
+            )
+
+    service = AttachmentService(
+        repository=repository,
+        model_registry=PrivacyWordsRegistry(),
+        settings=Settings(model_provider="mock", vision_provider="mimo"),
+    )
+
+    response = service.create_attachment(_request())
+
+    assert response.recognized_content.type == "image_observation"
+    assert response.session_state.active_scene == "conversation.open"
+    assert "隐私信息" not in response.reply.text
+
+
 def test_attachment_request_rejects_unsupported_image_data_uri() -> None:
     with pytest.raises(ValueError, match="png, jpeg, or webp"):
         _request(image_data_uri="data:text/plain;base64,ZmFrZQ==")

@@ -81,11 +81,11 @@ class MockOCRProvider(BaseOCRProvider):
                 text=text,
                 confidence=confidence,
                 provider_name=self.provider_name,
-                image_purpose=ImagePurpose.LEARNING_HOMEWORK,
+                image_purpose=purpose,
                 child_caption=request.child_caption,
                 fallback_action=None,
             )
-        if purpose == ImagePurpose.PRIVACY_SENSITIVE or self._looks_private(text):
+        if purpose == ImagePurpose.PRIVACY_SENSITIVE:
             return RecognizedContent(
                 type="privacy_sensitive",
                 text=text,
@@ -114,9 +114,4 @@ class MockOCRProvider(BaseOCRProvider):
     def _looks_like_homework(self, text: str) -> bool:
         normalized = text.strip().lower().replace(" ", "")
         markers = ("题", "作业", "算式", "应用题", "课文", "口算", "数学")
-        return any(marker in normalized for marker in markers)
-
-    def _looks_private(self, text: str) -> bool:
-        normalized = text.strip().lower().replace(" ", "")
-        markers = ("地址", "电话", "手机号", "学校名", "学校名字", "门牌", "身份证")
         return any(marker in normalized for marker in markers)

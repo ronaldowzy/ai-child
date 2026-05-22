@@ -64,11 +64,14 @@ deprecated：已废弃，不再作为实现依据。
 | PD-035 | confirmed | MiMo ASR 复用当前 MiMo key：优先 `CHILD_AI_MIMO_ASR_API_KEY`，为空时使用 `CHILD_AI_MIMO_API_KEY`，再 fallback 到 `CHILD_AI_MIMO_TTS_API_KEY`；ASR 默认模型是 `mimo-v2.5`，不是文本对话的 `mimo-v2.5-pro`。 | backend config、ASR provider、QA artifact gate、docs、smoke script |
 | PD-036 | confirmed | 儿童主界面默认隐藏文字输入框、发送按钮和可编辑 ASR 文本确认面板；语音是主输入，保留重说、取消、停止朗读、静音等大按钮。 | Android child UI、InputBar、DevSettings、QA |
 | PD-037 | confirmed | App 打开儿童聊天页后，小白狐应主动请求 opening greeting，基于时间、父母寄语和孩子称呼生成一句短开场白；称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。 | backend opening API、Android ChatViewModel、ParentPolicy、TTS、QA |
+| PD-038 | confirmed | 普通文字对话调用 MiMo `mimo-v2.5-pro`；带图片的 conversation attachment / vision / OCR 链路调用 MiMo `mimo-v2.5`。 | ModelRegistry、OpenAICompatibleProvider、AttachmentService vision path、vision smoke script |
+| PD-039 | confirmed | “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`，隐私边界只由明确隐私意图或后续安全策略触发。 | AttachmentService、MockOCRProvider、PromptManager、Android pending image context、QA |
+| PD-040 | confirmed | 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory 生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。 | ParentReportService、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen |
 
 新增执行依据：
 
 ```text
-PD-028 / PD-029 / PD-030 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-034 / PD-035 / PD-036 / PD-037 是 ASR、voice-first 和开场白体验的最高优先级语音输入修正。
+PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-034 / PD-035 / PD-036 / PD-037 是 ASR、voice-first 和开场白体验的最高优先级语音输入修正。
 不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
 ```
 
@@ -567,6 +570,32 @@ Affected modules: ModelRegistry、OpenAICompatibleProvider、AttachmentService v
 Implementation notes: `mimo_child_chat` 继续使用 `CHILD_AI_MIMO_MODEL=mimo-v2.5-pro`；`mimo_vision` / `mimo_ocr` 使用 `CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5`。Provider 必须优先使用 selected profile 的 model，不能让全局文本模型覆盖 vision profile。真实 smoke 仍只使用 fake/test image，不使用真实儿童或家庭图片。
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/VISION_MODEL_SMOKE_V0_1.md`、`docs/RELEASE_SMOKE_V0_1.md`、`backend/README.md`。
 Tests or QA needed: smoke 脚本输出 `provider=mimo` / `model=mimo-v2.5`，不输出 API key、image base64 或完整图片描述；后续 CameraX 仍需单独设计。
+
+#### PD-039
+
+Decision ID: PD-039
+Date: 2026-05-22
+Status: confirmed
+Source: father / image sharing QA feedback
+Decision: “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`。隐私边界只由明确隐私意图或后续安全策略触发。
+Rationale: 真机图片 QA 发现 MiMo vision 会输出“可能有隐私”或包含否定式隐私描述，关键词二次判定会把普通图片误路由到隐私边界，并导致模板化回复。
+Affected modules: AttachmentService、MockOCRProvider、ModalityManager、PromptManager、Android pending image context、QA。
+Implementation notes: 后端不再根据 image description 关键词二次标记 `privacy_sensitive`；普通图片即使描述像作业题，也保留 image context 并继续 `conversation.open`，只有孩子明确把它当作作业题时才进入学习引导。图片上下文必须传入 prompt，避免模型回复“看不到图片”。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`。
+Tests or QA needed: 普通照片不误进 privacy.boundary；普通照片不强行问“这道题”；后续对话能围绕刚才那张图回答；明确隐私图片仍可由显式 purpose 进入 privacy.boundary。
+
+#### PD-040
+
+Decision ID: PD-040
+Date: 2026-05-22
+Status: confirmed
+Source: father / parent report QA feedback
+Decision: 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory 生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。
+Rationale: 只基于 memory 的日报会漏掉当天真实互动，父亲点开日报时需要看到有用的总结分析，而不是空摘要或过早生成的旧摘要。
+Affected modules: ParentReportService、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen。
+Implementation notes: 日报生成使用会话数量、图片/学习/表达/情绪/安全边界等非敏感摘要信号；不输出 child_text/agent_text 原文，不保存 prompt、debug、provider raw response、evidence 或 quote_summary。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 当天 conversation message 可进入日报摘要；新会话晚于已生成 report 时重新生成；report JSON 不含逐字聊天、evidence、quote_summary、prompt 或 debug。
 
 ---
 

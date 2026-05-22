@@ -61,6 +61,7 @@ import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import com.childai.companion.voice.AndroidTtsController
 import com.childai.companion.voice.MediaPlayerAudioUrlPlayer
 import com.childai.companion.voice.RemoteAudioTtsController
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChildChatScreen(
@@ -216,6 +217,7 @@ private fun ChildChatScreenContent(
             ) {
                 AgentPanel(
                     agent = uiState.agent,
+                    agentReplyText = uiState.agentReplyText,
                     compactLandscape = compactLandscape,
                     modifier = Modifier
                         .weight(0.41f)
@@ -551,6 +553,7 @@ private fun ParentEntryButton(
 @Composable
 private fun AgentPanel(
     agent: FoxAgentUiState,
+    agentReplyText: String,
     compactLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -577,12 +580,9 @@ private fun AgentPanel(
                 ),
             )
             Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 16.dp))
-            Text(
-                text = agent.statusText,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = if (compactLandscape) 1 else 2,
-                overflow = TextOverflow.Ellipsis,
+            AgentReplyCarouselText(
+                text = agentReplyText.ifBlank { agent.statusText },
+                compactLandscape = compactLandscape,
             )
             if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -593,6 +593,86 @@ private fun AgentPanel(
             }
         }
     }
+}
+
+@Composable
+private fun AgentReplyCarouselText(
+    text: String,
+    compactLandscape: Boolean,
+) {
+    val segments = remember(text, compactLandscape) {
+        agentReplyCarouselSegments(
+            text = text,
+            maxChars = if (compactLandscape) 34 else 52,
+        )
+    }
+    var currentIndex by remember(text, compactLandscape) { mutableStateOf(0) }
+    LaunchedEffect(segments) {
+        currentIndex = 0
+        while (segments.size > 1) {
+            delay(3_200)
+            currentIndex = (currentIndex + 1) % segments.size
+        }
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(0.92f),
+    ) {
+        Text(
+            text = segments.getOrElse(currentIndex) { text },
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = if (compactLandscape) 2 else 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+    }
+}
+
+internal fun agentReplyCarouselSegments(
+    text: String,
+    maxChars: Int = 52,
+): List<String> {
+    val normalized = text.trim().replace(Regex("\\s+"), " ")
+    if (normalized.isBlank()) return emptyList()
+
+    val limit = maxChars.coerceAtLeast(12)
+    val sentenceParts = Regex("(?<=[。！？!?；;])")
+        .split(normalized)
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+    val source = sentenceParts.ifEmpty { listOf(normalized) }
+    val chunks = mutableListOf<String>()
+    val current = StringBuilder()
+
+    fun flushCurrent() {
+        if (current.isNotEmpty()) {
+            chunks += current.toString()
+            current.clear()
+        }
+    }
+
+    source.forEach { part ->
+        if (part.length > limit) {
+            flushCurrent()
+            part.chunked(limit).forEach { chunk ->
+                if (chunk.isNotBlank()) {
+                    chunks += chunk
+                }
+            }
+        } else if (current.isEmpty()) {
+            current.append(part)
+        } else if (current.length + part.length <= limit) {
+            current.append(part)
+        } else {
+            flushCurrent()
+            current.append(part)
+        }
+    }
+    flushCurrent()
+    return chunks
 }
 
 @Composable

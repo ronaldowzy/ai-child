@@ -4,6 +4,7 @@ import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
+import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.voice.SpeechInputController
 import com.childai.companion.voice.SpeechInputResult
 import java.io.File
@@ -100,12 +101,14 @@ class ChatViewModelVoiceInputTest {
     @Test
     fun needsRetryShowsRetryPromptWithoutSending() {
         val sender = RecordingConversationSender()
+        val feedbackTts = RecordingFeedbackTtsAudioGenerator()
         val message = "我刚才没听清，可以再说一次，也可以直接打字。"
         val viewModel = viewModel(
             sender = sender,
             speech = FakeSpeechInputController(
                 result = SpeechInputResult.NeedsRetry(message),
             ),
+            feedbackTts = feedbackTts,
         )
 
         viewModel.startVoiceRecording(tempDir())
@@ -116,6 +119,8 @@ class ChatViewModelVoiceInputTest {
         assertEquals(message, viewModel.uiState.value.voice.errorMessage)
         assertEquals(MessageAuthor.Agent, viewModel.uiState.value.messages.last().author)
         assertEquals(message, viewModel.uiState.value.messages.last().text)
+        assertEquals(message, viewModel.uiState.value.agentReplyText)
+        assertEquals(listOf(message), feedbackTts.requestedTexts)
     }
 
     @Test
@@ -134,10 +139,12 @@ class ChatViewModelVoiceInputTest {
         sender: RecordingConversationSender,
         speech: SpeechInputController = FakeSpeechInputController(),
         voiceConfirmBeforeSend: Boolean = false,
+        feedbackTts: XiaobaohuTtsAudioGenerator = RecordingFeedbackTtsAudioGenerator(),
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = sender,
             speechInputController = speech,
+            feedbackTtsAudioGenerator = feedbackTts,
             sendDispatcher = Dispatchers.Unconfined,
             voiceConfirmBeforeSend = voiceConfirmBeforeSend,
         )
@@ -171,6 +178,15 @@ private class FakeSpeechInputController(
     }
 
     override fun shutdown() = Unit
+}
+
+private class RecordingFeedbackTtsAudioGenerator : XiaobaohuTtsAudioGenerator {
+    val requestedTexts = mutableListOf<String>()
+
+    override suspend fun generateAudioUrl(text: String, emotion: String): String? {
+        requestedTexts += text
+        return "/media/tts/feedback.wav"
+    }
 }
 
 private class RecordingConversationSender : ConversationMessageSender {

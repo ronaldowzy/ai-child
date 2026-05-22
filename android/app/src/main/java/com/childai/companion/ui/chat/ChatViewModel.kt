@@ -11,6 +11,8 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.conversation.ConversationUiAction
+import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
+import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
@@ -47,6 +49,7 @@ class ChatViewModel(
             recorder = AndroidWavAudioRecorder(cacheDirectory = cacheDirectory),
         )
     },
+    private val feedbackTtsAudioGenerator: XiaobaohuTtsAudioGenerator = XiaobaohuTtsRepository(),
     initialTtsUiState: TtsUiState = TtsUiState(),
     private val sendDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     requestOpeningOnInit: Boolean = false,
@@ -62,11 +65,17 @@ class ChatViewModel(
     private var childInteractionStarted = false
 
     private val _uiState = MutableStateFlow(
-        ChatUiState(
-            messages = initialChatMessages(),
-            voice = createVoiceUiState(),
-            tts = initialTtsUiState,
-        ),
+        run {
+            val initialMessages = initialChatMessages()
+            ChatUiState(
+                messages = initialMessages,
+                agentReplyText = initialMessages.lastOrNull { it.author == MessageAuthor.Agent }
+                    ?.text
+                    .orEmpty(),
+                voice = createVoiceUiState(),
+                tts = initialTtsUiState,
+            )
+        },
     )
     val uiState: StateFlow<ChatUiState> = _uiState
     private val audioSegmentQueuePlayer = AudioSegmentQueuePlayer(
@@ -583,6 +592,7 @@ class ChatViewModel(
                         ),
                     )
                 }
+                speakAgentFeedback(result.message)
             }
             is SpeechInputResult.PolicyBlocked -> {
                 appendAgentMessage(result.message)
@@ -830,6 +840,10 @@ class ChatViewModel(
             return
         }
         _uiState.update { state ->
+            val nextAgentReplyText = state.messages
+                .firstOrNull { it.id == messageId }
+                ?.let { it.text + delta }
+                ?: state.agentReplyText
             state.copy(
                 messages = state.messages.map { message ->
                     if (message.id == messageId) {
@@ -838,6 +852,7 @@ class ChatViewModel(
                         message
                     }
                 },
+                agentReplyText = nextAgentReplyText,
             )
         }
     }
@@ -949,12 +964,20 @@ class ChatViewModel(
 
     private fun appendMessage(message: ChatMessage) {
         _uiState.update { state ->
-            state.copy(messages = state.messages + message)
+            state.copy(
+                messages = state.messages + message,
+                agentReplyText = if (message.author == MessageAuthor.Agent) {
+                    message.text
+                } else {
+                    state.agentReplyText
+                },
+            )
         }
     }
 
     private fun replaceMessageText(messageId: String, text: String) {
         _uiState.update { state ->
+            val replacedMessage = state.messages.firstOrNull { it.id == messageId }
             state.copy(
                 messages = state.messages.map { message ->
                     if (message.id == messageId) {
@@ -963,6 +986,41 @@ class ChatViewModel(
                         message
                     }
                 },
+                agentReplyText = if (replacedMessage?.author == MessageAuthor.Agent) {
+                    text
+                } else {
+                    state.agentReplyText
+                },
+            )
+        }
+    }
+
+    private fun speakAgentFeedback(text: String) {
+        val trimmedText = text.trim()
+        val currentTts = _uiState.value.tts
+        if (
+            trimmedText.isBlank() ||
+            !currentTts.isAutoReadEnabled ||
+            currentTts.isMuted
+        ) {
+            return
+        }
+        viewModelScope.launch(sendDispatcher) {
+            val audioUrl = runCatching {
+                feedbackTtsAudioGenerator.generateAudioUrl(
+                    text = trimmedText,
+                    emotion = "encourage",
+                )
+            }.getOrNull()
+            maybeAutoReadReply(
+                ConversationReply(
+                    type = "agent_message",
+                    text = trimmedText,
+                    voiceEnabled = true,
+                    audioUrl = audioUrl,
+                    emotion = "encourage",
+                    agentMotion = "listening_tail",
+                ),
             )
         }
     }
@@ -1176,6 +1234,7 @@ class ChatViewModel(
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
+    val agentReplyText: String = "",
     val quickActions: List<QuickActionUi> = emptyList(),
     val sessionState: ConversationSessionState? = null,
     val agent: FoxAgentUiState = FoxAgentUiState(),

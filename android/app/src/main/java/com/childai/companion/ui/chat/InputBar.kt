@@ -167,60 +167,62 @@ fun InputBar(
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${voice.statusText} · ${tts.statusText}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            if (tts.isSpeaking || tts.isSpeakingPending) {
-                TextButton(onClick = onStopTts) {
-                    Text(text = "停止")
-                }
-            }
-            if (inputBarShouldShowResayAction(useChildVoiceFirstInput, voice.inputMode)) {
-                TextButton(
-                    onClick = { startVoiceRecordingWithPermission() },
-                    enabled = enabled && !voice.isUploading,
-                ) {
-                    Text(text = "重说")
-                }
-            }
-            if (inputBarShouldShowCancelAction(useChildVoiceFirstInput, voice.inputMode)) {
-                TextButton(onClick = voice.actions.onCancelVoiceInput) {
-                    Text(text = if (useChildVoiceFirstInput) "取消" else "取消语音")
-                }
-            }
-            TextButton(onClick = onToggleTtsMuted) {
-                Text(text = if (tts.isMuted) "打开朗读" else "静音")
-            }
-        }
-        if (tts.needsSystemSetup) {
+        if (!useChildVoiceFirstInput) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onOpenTtsSettings) {
-                    Text(text = "检查朗读设置")
+                Text(
+                    text = "${voice.statusText} · ${tts.statusText}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (tts.isSpeaking || tts.isSpeakingPending) {
+                    TextButton(onClick = onStopTts) {
+                        Text(text = "停止")
+                    }
                 }
-                TextButton(onClick = onInstallTtsData) {
-                    Text(text = "安装语音数据")
+                if (inputBarShouldShowResayAction(useChildVoiceFirstInput, voice.inputMode)) {
+                    TextButton(
+                        onClick = { startVoiceRecordingWithPermission() },
+                        enabled = enabled && !voice.isUploading,
+                    ) {
+                        Text(text = "重说")
+                    }
+                }
+                if (inputBarShouldShowCancelAction(useChildVoiceFirstInput, voice.inputMode)) {
+                    TextButton(onClick = voice.actions.onCancelVoiceInput) {
+                        Text(text = "取消语音")
+                    }
+                }
+                TextButton(onClick = onToggleTtsMuted) {
+                    Text(text = if (tts.isMuted) "打开朗读" else "静音")
                 }
             }
-        }
-        if (DevSettings.SHOW_TTS_DIAGNOSTICS && tts.diagnosticText.isNotBlank()) {
-            Text(
-                text = "朗读诊断：${tts.diagnosticText}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-            )
+            if (tts.needsSystemSetup) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onOpenTtsSettings) {
+                        Text(text = "检查朗读设置")
+                    }
+                    TextButton(onClick = onInstallTtsData) {
+                        Text(text = "安装语音数据")
+                    }
+                }
+            }
+            if (DevSettings.SHOW_TTS_DIAGNOSTICS && tts.diagnosticText.isNotBlank()) {
+                Text(
+                    text = "朗读诊断：${tts.diagnosticText}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
         }
     }
 }

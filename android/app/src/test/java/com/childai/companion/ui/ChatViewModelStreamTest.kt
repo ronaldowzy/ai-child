@@ -32,6 +32,7 @@ class ChatViewModelStreamTest {
         assertFalse(state.isSending)
         assertEquals(MessageAuthor.Agent, state.messages.last().author)
         assertEquals("你好呀", state.messages.last().text)
+        assertEquals("你好呀", state.agentReplyText)
     }
 
     @Test
@@ -42,6 +43,7 @@ class ChatViewModelStreamTest {
         viewModel.applyStreamEvent(streamEvent("text_final", "text" to "最终文本"))
 
         assertEquals("最终文本", viewModel.uiState.value.messages.last().text)
+        assertEquals("最终文本", viewModel.uiState.value.agentReplyText)
     }
 
     @Test

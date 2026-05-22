@@ -114,13 +114,61 @@ class OpenAICompatibleProvider(BaseModelProvider):
         timeout_ms = profile.default_params.timeout_ms if profile is not None else 5000
         return max(timeout_ms / 1000, 0.001)
 
-    def _messages(self, request: ModelRequest) -> list[dict[str, str]]:
+    def _messages(self, request: ModelRequest) -> list[dict[str, Any]]:
+        image_data_uri = self._image_data_uri(request)
         if request.messages:
-            return [
+            messages = [
                 {"role": message.role, "content": message.content}
                 for message in request.messages
             ]
-        return [{"role": "user", "content": request.input_text or ""}]
+        else:
+            messages = [{"role": "user", "content": request.input_text or ""}]
+
+        if not image_data_uri:
+            return messages
+
+        image_attached = False
+        for message in messages:
+            if message.get("role") != "user" or image_attached:
+                continue
+            content = message.get("content")
+            if isinstance(content, list):
+                image_attached = True
+                continue
+            message["content"] = self._multimodal_content(
+                text=str(content or ""),
+                image_data_uri=image_data_uri,
+            )
+            image_attached = True
+
+        if not image_attached:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": self._multimodal_content(
+                        text=request.input_text or "",
+                        image_data_uri=image_data_uri,
+                    ),
+                }
+            )
+        return messages
+
+    def _image_data_uri(self, request: ModelRequest) -> str | None:
+        value = request.metadata.get("image_data_uri") or request.context.get(
+            "image_data_uri"
+        )
+        return value if isinstance(value, str) and value.startswith("data:image/") else None
+
+    def _multimodal_content(
+        self,
+        *,
+        text: str,
+        image_data_uri: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {"type": "text", "text": text},
+            {"type": "image_url", "image_url": {"url": image_data_uri}},
+        ]
 
     def _post_chat_completion(
         self,

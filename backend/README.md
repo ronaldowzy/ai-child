@@ -230,9 +230,12 @@ Family-test smoke scripts live under `scripts/` and are designed to catch
 configuration drift before handing an APK to device QA.
 
 ```bash
+bash scripts/setup_local_postgres.sh
 bash scripts/smoke_backend_local.sh
 bash scripts/smoke_voice_stack.sh
 bash scripts/smoke_db_persistence.sh
+bash scripts/check_asr_real_status.sh
+bash scripts/smoke_vision_model_opt_in.sh
 ```
 
 Coverage:
@@ -243,8 +246,23 @@ Coverage:
 - `smoke_voice_stack.sh` starts a temporary mock backend and checks mock ASR,
   mock TTS, and stream `include_tts=true` through `audio_ready`.
 - `smoke_db_persistence.sh` requires local PostgreSQL and migrations. If the
-  database is unavailable, it prints a clear `SKIP` with the docker compose
-  command and must not be counted as pass.
+  database is unavailable, it prints a clear `SKIP` with
+  `bash scripts/setup_local_postgres.sh` and must not be counted as pass.
+- `setup_local_postgres.sh` first tries Docker Compose, waits for the local
+  PostgreSQL healthcheck, runs migrations, then runs DB persistence smoke. If
+  Docker is unavailable on macOS, it tries Homebrew `postgresql@16` and creates
+  the `child_ai` role and `child_ai_dev` database idempotently. If Docker,
+  Homebrew, or permissions are unavailable, it reports `POSTGRES_SETUP: BLOCKED`
+  with a concrete reason.
+- `check_asr_real_status.sh` distinguishes `ASR_STATUS=mock_only`,
+  `policy_blocked`, `mimo_ready`, `mimo_smoke_pass`, and `mimo_smoke_fail`.
+  It may generate a synthetic non-child fake WAV only to validate the provider
+  request chain when all MiMo ASR policy flags and key are present but no smoke
+  audio path was provided.
+- `smoke_vision_model_opt_in.sh` verifies the OpenAI-compatible MiMo vision path
+  only when image external-transmission env flags, key, and a fake/smoke/test
+  image path are all present. It never prints image base64, the full image
+  description, API keys, or provider raw response.
 
 MiMo ASR real smoke is opt-in only:
 
@@ -262,6 +280,23 @@ bash scripts/smoke_mimo_asr_opt_in.sh
 The MiMo opt-in smoke must use developer-provided non-child test audio. It must
 not print API keys, audio base64, transcript text, or provider raw response, and
 it must not be run with real child recordings during development smoke.
+
+MiMo vision/OCR smoke is opt-in only:
+
+```bash
+CHILD_AI_VISION_PROVIDER=mimo \
+CHILD_AI_MIMO_ENABLED=true \
+CHILD_AI_MIMO_ALLOW_IMAGE=true \
+CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true \
+CHILD_AI_MIMO_API_KEY="$CHILD_AI_MIMO_API_KEY" \
+CHILD_AI_VISION_SMOKE_IMAGE=/path/to/fake-smoke-test-image.png \
+VISION_SMOKE_BASE_URL=http://127.0.0.1:8000 \
+bash scripts/smoke_vision_model_opt_in.sh
+```
+
+The vision smoke path posts a data URI to `/api/v1/conversation/attachment`.
+The backend does not store the raw image data URI and still defaults to
+MockOCR unless the provider and policy env explicitly opt in to MiMo.
 
 ## Local PostgreSQL Persistence
 
@@ -298,8 +333,15 @@ date, operation, and error type.
 Local dev database:
 
 ```bash
-docker compose -f docker-compose.local.yml up -d
+bash scripts/setup_local_postgres.sh
+```
+
+Manual Docker-only equivalent:
+
+```bash
+docker compose -f docker-compose.local.yml up -d postgres
 bash scripts/db_migrate.sh
+bash scripts/smoke_db_persistence.sh
 ```
 
 To reset the local schema during development:
@@ -754,6 +796,17 @@ artifact can only test recording, upload, confirmation UI, and graceful retry or
 policy-blocked messaging. It must not be described as a real MiMo ASR test.
 For real ASR QA, verify the smoke output shows `provider=mimo` and
 `model=mimo-v2.5`.
+
+The standard status check is:
+
+```bash
+bash scripts/check_asr_real_status.sh
+```
+
+`ASR_STATUS=mock_only` means only the mock ASR path is active.
+`ASR_STATUS=policy_blocked` means MiMo ASR is selected but required policy/key
+env is incomplete. `ASR_STATUS=mimo_smoke_pass` is the only script status that
+can be described as a successful real MiMo ASR smoke.
 
 ASR does not require a separate key by default. The backend resolves MiMo ASR
 credentials in this order:

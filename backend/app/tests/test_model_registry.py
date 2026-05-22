@@ -369,6 +369,74 @@ def test_model_registry_blocks_mimo_image_and_audio_without_explicit_policy(
     assert response.metadata["failure_type"] == "ModelDataPolicyBlockedError"
 
 
+def test_model_registry_can_route_vision_to_mimo_with_multimodal_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_VISION_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_IMAGE", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+
+    def fake_urlopen(request: object, timeout: float) -> FakeHttpResponse:
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return FakeHttpResponse(_fake_mimo_response())
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fake_urlopen,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.VISION,
+            input_text="请描述图片。",
+            metadata={
+                "contains_image": True,
+                "image_data_uri": "data:image/png;base64,ZmFrZQ==",
+            },
+        )
+    )
+
+    content = captured["body"]["messages"][0]["content"]
+    assert isinstance(content, list)
+    assert content[1]["type"] == "image_url"
+    assert response.provider_name == "mimo"
+
+
+def test_model_registry_blocks_mimo_vision_without_retention_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_VISION_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_IMAGE", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "false")
+
+    def fail_if_called(_request: object, timeout: float) -> FakeHttpResponse:
+        raise AssertionError(f"urlopen should not be called, timeout={timeout}")
+
+    monkeypatch.setattr(
+        "app.providers.model.openai_compatible_provider.urlopen",
+        fail_if_called,
+    )
+
+    response = ModelRegistry().generate(
+        ModelRequest(
+            task_type=ModelTaskType.VISION,
+            input_text="请描述图片。",
+            metadata={
+                "contains_image": True,
+                "image_data_uri": "data:image/png;base64,ZmFrZQ==",
+            },
+        )
+    )
+
+    assert response.provider_name == "mock"
+    assert response.metadata["policy_blocked"] is True
+    assert response.metadata["failed_profile"] == "mimo_vision"
+    assert response.metadata["failure_type"] == "ModelDataPolicyBlockedError"
+
+
 def test_model_registry_mock_provider_is_not_blocked_by_data_policy() -> None:
     registry = ModelRegistry(
         providers={"mock": MockModelProvider(provider_name="mock")},

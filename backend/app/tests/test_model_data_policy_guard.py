@@ -101,6 +101,24 @@ def test_guard_blocks_image_and_audio_without_explicit_policy(
         )
 
 
+def test_guard_blocks_external_image_when_retention_policy_is_not_checked() -> None:
+    guard = ModelDataPolicyGuard()
+
+    with pytest.raises(
+        ModelDataPolicyBlockedError, match="retention_policy_not_checked"
+    ):
+        guard.validate(
+            request=_request(contains_image=True),
+            profile=_profile(
+                data_policy=ModelDataPolicy(
+                    external_transmission=True,
+                    allow_image=True,
+                    retention_policy_checked=False,
+                )
+            ),
+        )
+
+
 def test_guard_allows_external_child_data_when_policy_is_complete() -> None:
     guard = ModelDataPolicyGuard()
 

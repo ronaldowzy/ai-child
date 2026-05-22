@@ -21,7 +21,7 @@ class ModelProviderType(StrEnum):
 
 class ModelMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
-    content: str
+    content: str | list[dict[str, Any]]
 
 
 class ModelRequest(BaseModel):

@@ -181,6 +181,19 @@ tap voice
 | ASR-QA-09 | Latency | 记录 tap-to-transcript ms 和 provider total ms。 |
 | ASR-QA-10 | Child voice | 记录儿童声音识别主观准确率和失败样例摘要。 |
 
+Before any child-facing ASR QA, run:
+
+```bash
+bash scripts/check_asr_real_status.sh
+```
+
+`ASR_STATUS=mock_only` and `ASR_STATUS=policy_blocked` are not real MiMo ASR
+recognition. A real MiMo ASR smoke requires `ASR_STATUS=mimo_smoke_pass` and
+output showing `provider=mimo` / `model=mimo-v2.5`. If no non-child smoke audio
+path is provided but all MiMo env gates are present, the script may generate a
+synthetic fake WAV; that only verifies the provider request chain, not Mandarin
+recognition accuracy.
+
 ---
 
 ## 8. Open Questions

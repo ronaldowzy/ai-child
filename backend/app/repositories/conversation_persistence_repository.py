@@ -123,8 +123,14 @@ class ConversationPersistenceRepository:
             with self._session_factory() as session:
                 self._ensure_child(session, turn_write.session.child_id)
                 self._upsert_session_record(session, turn_write.session)
-                session.add(self._message_record(turn_write.child_message))
-                session.add(self._message_record(turn_write.agent_message))
+                session.flush()
+                session.add_all(
+                    [
+                        self._message_record(turn_write.child_message),
+                        self._message_record(turn_write.agent_message),
+                    ]
+                )
+                session.flush()
                 session.add(self._routing_decision_record(turn_write.routing_decision))
                 session.commit()
         except SQLAlchemyError as exc:

@@ -26,6 +26,12 @@ class ModelDataPolicyGuard:
 
         if self._metadata_flag(metadata, "contains_image") and not policy.allow_image:
             reasons.append("image_not_allowed")
+        if (
+            policy.external_transmission
+            and self._metadata_flag(metadata, "contains_image")
+            and not policy.retention_policy_checked
+        ):
+            reasons.append("retention_policy_not_checked")
 
         if self._metadata_flag(metadata, "contains_audio") and not policy.allow_audio:
             reasons.append("audio_not_allowed")

@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     app_name: str = "Child AI Growth Agent Backend"
     api_v1_prefix: str = "/api/v1"
     environment: str = "dev"
+    model_provider: str = "mock"
+    vision_provider: str = "mock"
     mimo_api_key: str = ""
     tts_provider: str = "mock"
     conversation_tts_enabled: bool = False

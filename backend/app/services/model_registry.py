@@ -338,14 +338,26 @@ class ModelRegistry:
         if not child_chat_profile and os.getenv("CHILD_AI_MODEL_PROVIDER") == "mimo":
             child_chat_profile = "mimo_child_chat"
 
+        vision_profile = os.getenv("CHILD_AI_VISION_PROFILE")
+        if not vision_profile and self._env_provider_requested(
+            "CHILD_AI_VISION_PROVIDER", "CHILD_AI_MODEL_PROVIDER"
+        ):
+            vision_profile = "mimo_vision"
+
+        ocr_profile = os.getenv("CHILD_AI_OCR_PROFILE")
+        if not ocr_profile and self._env_provider_requested(
+            "CHILD_AI_OCR_PROVIDER", "CHILD_AI_VISION_PROVIDER"
+        ):
+            ocr_profile = "mimo_ocr"
+
         return {
             ModelTaskType.CHILD_CHAT: child_chat_profile or "child_chat_primary",
             ModelTaskType.INTENT_CLASSIFICATION: "intent_classifier_mock",
             ModelTaskType.SAFETY_CLASSIFICATION: "safety_classifier_mock",
             ModelTaskType.MEMORY_EXTRACTION: "memory_extractor_mock",
             ModelTaskType.PARENT_REPORT: "parent_report_mock",
-            ModelTaskType.VISION: "vision_mock",
-            ModelTaskType.OCR: "ocr_mock",
+            ModelTaskType.VISION: vision_profile or "vision_mock",
+            ModelTaskType.OCR: ocr_profile or "ocr_mock",
         }
 
     def _default_profiles(self) -> dict[str, ModelProfile]:
@@ -394,6 +406,26 @@ class ModelRegistry:
                 task_type=ModelTaskType.OCR,
                 vision=True,
             ),
+            "mimo_vision": self._mimo_profile(
+                profile_name="mimo_vision",
+                model_name=os.getenv(
+                    "CHILD_AI_MIMO_VISION_MODEL",
+                    os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
+                ),
+                task_type=ModelTaskType.VISION,
+                vision=True,
+                fallback_profile_name="vision_mock",
+            ),
+            "mimo_ocr": self._mimo_profile(
+                profile_name="mimo_ocr",
+                model_name=os.getenv(
+                    "CHILD_AI_MIMO_OCR_MODEL",
+                    os.getenv("CHILD_AI_MIMO_VISION_MODEL", "mimo-v2.5-pro"),
+                ),
+                task_type=ModelTaskType.OCR,
+                vision=True,
+                fallback_profile_name="ocr_mock",
+            ),
         }
 
     def _mimo_profile(
@@ -403,6 +435,8 @@ class ModelRegistry:
         model_name: str,
         task_type: ModelTaskType,
         temperature: float = 0.0,
+        vision: bool = False,
+        fallback_profile_name: str = "child_chat_primary",
     ) -> ModelProfile:
         return ModelProfile(
             id=profile_name,
@@ -411,7 +445,7 @@ class ModelRegistry:
             provider_type=ModelProviderType.OPENAI_COMPATIBLE,
             model_name=model_name,
             task_type=task_type,
-            capabilities=ModelCapabilities(),
+            capabilities=ModelCapabilities(vision=vision),
             data_policy=ModelDataPolicy(
                 allow_child_data=self._env_bool(
                     "CHILD_AI_MIMO_ALLOW_CHILD_DATA", default=False
@@ -433,7 +467,7 @@ class ModelRegistry:
                 timeout_ms=int(os.getenv("CHILD_AI_MIMO_TIMEOUT_MS", "5000")),
             ),
             enabled=self._env_bool("CHILD_AI_MIMO_ENABLED", default=False),
-            fallback_profile_name="child_chat_primary",
+            fallback_profile_name=fallback_profile_name,
         )
 
     def _mock_profile(
@@ -472,6 +506,9 @@ class ModelRegistry:
         if raw_value is None:
             return default
         return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+    def _env_provider_requested(self, *env_names: str) -> bool:
+        return any(os.getenv(env_name, "").strip().lower() == "mimo" for env_name in env_names)
 
 
 _model_registry = ModelRegistry()

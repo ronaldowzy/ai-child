@@ -1,15 +1,19 @@
+import os
 from uuid import uuid4
 
 from pydantic import BaseModel
 
+from app.core.config import Settings, get_settings
 from app.domain.attachment import (
     AttachmentCreateRequest,
     AttachmentCreateResponse,
     AttachmentRecord,
     AttachmentStatus,
+    AttachmentType,
     ImagePurpose,
     RecognizedContent,
 )
+from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
 from app.domain.schemas.conversation import Reply, SessionState, UiAction
 from app.providers.ocr.base import OCRRequest
 from app.providers.ocr.mock_ocr_provider import MockOCRProvider
@@ -17,6 +21,7 @@ from app.repositories.attachment_repository import (
     InMemoryAttachmentRepository,
     get_attachment_repository,
 )
+from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.modality_manager import ModalityManager, get_modality_manager
 
 
@@ -51,26 +56,19 @@ class AttachmentService:
         repository: InMemoryAttachmentRepository | None = None,
         modality_manager: ModalityManager | None = None,
         ocr_provider: MockOCRProvider | None = None,
+        model_registry: ModelRegistry | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self._repository = repository or get_attachment_repository()
         self._modality_manager = modality_manager or get_modality_manager()
         self._ocr_provider = ocr_provider or MockOCRProvider()
+        self._model_registry = model_registry or get_model_registry()
+        self._settings = settings or get_settings()
 
     def create_attachment(
         self, request: AttachmentCreateRequest
     ) -> AttachmentCreateResponse:
-        recognized_content = self._ocr_provider.recognize(
-            OCRRequest(
-                attachment_type=request.attachment_type,
-                image_purpose=request.image_purpose,
-                file_id=request.file_id,
-                mock_ocr_text=request.mock_ocr_text,
-                mock_vision_text=request.mock_vision_text,
-                child_caption=request.child_caption,
-                mock_confidence=request.mock_confidence,
-                metadata=request.metadata,
-            )
-        )
+        recognized_content = self._recognize(request)
         decision = self._modality_manager.decide_image_attachment(recognized_content)
         attachment = self._repository.save(
             AttachmentRecord(
@@ -82,16 +80,10 @@ class AttachmentService:
                 file_id=request.file_id,
                 status=decision.status,
                 recognized_content=decision.recognized_content,
-                metadata={
-                    "mock": True,
-                    "has_file_id": bool(request.file_id),
-                    "ocr_provider": decision.recognized_content.provider_name,
-                    "image_purpose": (
-                        decision.recognized_content.image_purpose.value
-                        if decision.recognized_content.image_purpose
-                        else None
-                    ),
-                },
+                metadata=self._safe_attachment_metadata(
+                    request=request,
+                    recognized_content=decision.recognized_content,
+                ),
             )
         )
 
@@ -110,6 +102,131 @@ class AttachmentService:
                 needs_input=decision.needs_input,
             ),
         )
+
+    def _recognize(self, request: AttachmentCreateRequest) -> RecognizedContent:
+        if request.image_data_uri and self._should_use_model_vision():
+            return self._recognize_with_model_vision(request)
+
+        return self._ocr_provider.recognize(
+            OCRRequest(
+                attachment_type=request.attachment_type,
+                image_purpose=request.image_purpose,
+                file_id=request.file_id,
+                mock_ocr_text=request.mock_ocr_text,
+                mock_vision_text=request.mock_vision_text,
+                child_caption=request.child_caption,
+                mock_confidence=request.mock_confidence,
+                metadata=request.metadata,
+            )
+        )
+
+    def _should_use_model_vision(self) -> bool:
+        configured_provider = (self._settings.vision_provider or "").strip().lower()
+        if configured_provider == "mimo":
+            return True
+        return (
+            configured_provider in {"", "mock"}
+            and (self._settings.model_provider or "").strip().lower() == "mimo"
+        ) or os.getenv("CHILD_AI_VISION_PROVIDER", "").strip().lower() == "mimo"
+
+    def _recognize_with_model_vision(
+        self,
+        request: AttachmentCreateRequest,
+    ) -> RecognizedContent:
+        prompt = self._vision_prompt(request)
+        response = self._model_registry.generate(
+            ModelRequest(
+                task_type=ModelTaskType.VISION,
+                input_text=prompt,
+                messages=[ModelMessage(role="user", content=prompt)],
+                context={
+                    "conversation": {
+                        "child_id": request.child_id,
+                        "session_id": request.session_id,
+                    }
+                },
+                metadata={
+                    "contains_image": True,
+                    "image_data_uri": request.image_data_uri,
+                },
+            )
+        )
+        confidence = response.structured_output.get("confidence", 0.75)
+        fallback_action = response.structured_output.get("fallback_action")
+        return RecognizedContent(
+            type=self._recognized_type(
+                text=response.response_text,
+                attachment_type=request.attachment_type,
+                image_purpose=request.image_purpose,
+            ),
+            text=self._truncate_vision_text(response.response_text),
+            confidence=confidence if isinstance(confidence, float | int) else 0.75,
+            provider_name=response.provider_name,
+            image_purpose=request.image_purpose,
+            child_caption=request.child_caption,
+            fallback_action=(
+                fallback_action if isinstance(fallback_action, str) else None
+            ),
+        )
+
+    def _vision_prompt(self, request: AttachmentCreateRequest) -> str:
+        purpose = request.image_purpose.value if request.image_purpose else "unknown"
+        caption = request.child_caption or ""
+        return (
+            "你是小白狐的图片理解模块。请只做简短图片描述和安全分类，"
+            "不要输出作业最终答案。若图片像作业题，只提取题目内容和要求；"
+            "若包含地址、电话、证件、学校名、人脸等隐私，请明确标为隐私敏感。"
+            f"图片用途: {purpose}。孩子补充说明: {caption[:120]}"
+        )
+
+    def _recognized_type(
+        self,
+        *,
+        text: str,
+        attachment_type: object,
+        image_purpose: ImagePurpose | None,
+    ) -> str:
+        if image_purpose == ImagePurpose.PRIVACY_SENSITIVE:
+            return "privacy_sensitive"
+        if image_purpose == ImagePurpose.UNSAFE_UNKNOWN:
+            return "unsafe_unknown"
+        if (
+            image_purpose == ImagePurpose.LEARNING_HOMEWORK
+            or attachment_type == AttachmentType.HOMEWORK_PHOTO
+        ):
+            return "homework_problem"
+
+        normalized = text.lower()
+        privacy_keywords = ("地址", "电话", "手机号", "身份证", "证件", "学校名", "人脸")
+        if any(keyword in normalized for keyword in privacy_keywords):
+            return "privacy_sensitive"
+        homework_keywords = ("题目", "作业", "算式", "应用题", "选择题", "练习")
+        if any(keyword in normalized for keyword in homework_keywords):
+            return "homework_problem"
+        return "image_observation"
+
+    def _truncate_vision_text(self, text: str) -> str:
+        stripped = text.strip()
+        return stripped[:1000]
+
+    def _safe_attachment_metadata(
+        self,
+        *,
+        request: AttachmentCreateRequest,
+        recognized_content: RecognizedContent,
+    ) -> dict[str, object]:
+        return {
+            "mock": recognized_content.provider_name.startswith("mock"),
+            "has_file_id": bool(request.file_id),
+            "has_image_data_uri": bool(request.image_data_uri),
+            "image_data_uri_stored": False if request.image_data_uri else None,
+            "ocr_provider": recognized_content.provider_name,
+            "image_purpose": (
+                recognized_content.image_purpose.value
+                if recognized_content.image_purpose
+                else None
+            ),
+        }
 
     def get_ready_homework_context(
         self,

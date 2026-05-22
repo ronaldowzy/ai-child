@@ -18,10 +18,13 @@ from app.services.conversation_stream_service import ConversationStreamService
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 SMOKE_SCRIPTS = [
+    "scripts/setup_local_postgres.sh",
     "scripts/smoke_backend_local.sh",
     "scripts/smoke_db_persistence.sh",
     "scripts/smoke_voice_stack.sh",
+    "scripts/check_asr_real_status.sh",
     "scripts/smoke_mimo_asr_opt_in.sh",
+    "scripts/smoke_vision_model_opt_in.sh",
 ]
 
 

@@ -44,7 +44,7 @@ try:
         session.execute(text("SELECT 1"))
 except SQLAlchemyError as exc:
     print("DB_PERSISTENCE_SMOKE: SKIP database unavailable. Start local PostgreSQL first:")
-    print("  docker compose -f docker-compose.local.yml up -d")
+    print("  bash scripts/setup_local_postgres.sh")
     print(f"error_type={exc.__class__.__name__}")
     print("DB_PRECHECK_STATUS=unavailable")
 else:
@@ -59,7 +59,7 @@ fi
 if [[ "${RUN_MIGRATE}" == "true" ]]; then
   if ! bash "${ROOT_DIR}/scripts/db_migrate.sh"; then
     echo "DB_PERSISTENCE_SMOKE: SKIP database migration failed. Start local PostgreSQL first:" >&2
-    echo "  docker compose -f docker-compose.local.yml up -d" >&2
+    echo "  bash scripts/setup_local_postgres.sh" >&2
     exit 2
   fi
 fi
@@ -96,7 +96,7 @@ try:
         session.execute(text("SELECT 1"))
 except SQLAlchemyError as exc:
     print("DB_PERSISTENCE_SMOKE: SKIP database unavailable. Start local PostgreSQL first:")
-    print("  docker compose -f docker-compose.local.yml up -d")
+    print("  bash scripts/setup_local_postgres.sh")
     print(f"error_type={exc.__class__.__name__}")
     raise SystemExit(2)
 

@@ -30,6 +30,7 @@
 2. CameraX / real OCR 未实现。
 3. MiMo ASR real provider smoke 只在 opt-in env 和非儿童测试音频满足时执行。
 4. Redmi K60 / Honor Pad 5 真机 QA 仍待用户或开发者执行。
+5. true MiMo vision/OCR smoke 只在 opt-in env 和非儿童/非家庭测试图片满足时执行。
 ```
 
 ## 2. APK Metadata
@@ -57,19 +58,19 @@ base URL in this build: http://10.0.2.2:8000/
 ```text
 bash scripts/test_backend.sh
 result: PASS
-summary: 278 passed in 1.27s
+summary: 286 passed in 1.90s
 
 bash scripts/lint_backend.sh
 result: PASS
 summary: All checks passed
 
 bash scripts/android_gradle.sh test
-result: PASS
-summary: BUILD SUCCESSFUL
+result: not rerun in current DB/ASR/Vision smoke round
+summary: previous family-test APK round passed; current round did not touch Android runtime or assets.
 
 bash scripts/android_gradle.sh assembleDebug
-result: PASS
-summary: BUILD SUCCESSFUL
+result: not rerun in current DB/ASR/Vision smoke round
+summary: previous family-test APK round passed; current round did not touch Android runtime or assets.
 ```
 
 ## 4. Smoke Results
@@ -84,8 +85,8 @@ coverage:
   - POST/GET /api/v1/parent/policy
   - GET /api/v1/parent/reports/{child_id}
 notes:
-  - health/detail returned degraded because local PostgreSQL was unavailable.
-  - DB-backed persistence warnings were expected in this no-DB smoke; response fallback still worked.
+  - after local PostgreSQL setup, health/detail returned ok.
+  - DB-backed persistence path was available during this smoke.
 
 bash scripts/smoke_voice_stack.sh
 result: PASS
@@ -97,25 +98,61 @@ notes:
   - no real child audio, API key, base64, transcript text, or provider raw response was printed.
 
 bash scripts/smoke_db_persistence.sh
-result: SKIP
+result: PASS
 reason:
-  - local PostgreSQL was unavailable on 127.0.0.1:5432.
-  - script output clearly prompted: docker compose -f docker-compose.local.yml up -d
-  - this is not counted as PASS.
+  - local PostgreSQL is now available through scripts/setup_local_postgres.sh.
+  - migration completed and parent policy -> conversation -> memory -> parent report persistence path passed.
+
+bash scripts/setup_local_postgres.sh
+result: PASS
+coverage:
+  - Docker Compose postgres:16 startup when Docker is available
+  - Homebrew postgresql@16 fallback on macOS when Docker is unavailable
+  - Alembic migration
+  - DB persistence smoke
+notes:
+  - current Codex environment had no Docker CLI.
+  - script installed/started Homebrew postgresql@16, created/updated child_ai role and child_ai_dev DB, ran migrations, then smoke.
+  - final output: POSTGRES_SETUP: PASS.
 
 scripts/smoke_mimo_asr_opt_in.sh
 result: NOT RUN
 reason:
-  - real MiMo ASR smoke requires explicit opt-in env flags, MiMo key, and developer-provided non-child smoke audio path.
-  - this round did not execute external MiMo ASR to avoid unintended child-audio or secret exposure.
+  - check_asr_real_status.sh reported ASR_STATUS=mock_only after sourcing .env because CHILD_AI_ASR_PROVIDER is not mimo.
+  - real MiMo ASR smoke therefore was not attempted.
+
+bash scripts/check_asr_real_status.sh
+result: PASS
+observed:
+  - ASR_STATUS=mock_only
+  - reason=CHILD_AI_ASR_PROVIDER is not mimo
+expected status values:
+  - ASR_STATUS=mock_only
+  - ASR_STATUS=policy_blocked
+  - ASR_STATUS=mimo_ready
+  - ASR_STATUS=mimo_smoke_pass
+  - ASR_STATUS=mimo_smoke_fail
+
+bash scripts/smoke_vision_model_opt_in.sh
+result: BLOCKED
+coverage:
+  - OpenAI-compatible multimodal vision path
+  - AttachmentService vision recognition with image_data_uri
+  - output redaction: no key, no base64, no full provider raw response
+notes:
+  - after sourcing .env, required opt-in values were still incomplete.
+  - missing: CHILD_AI_MIMO_ALLOW_IMAGE=true and CHILD_AI_VISION_SMOKE_IMAGE.
 ```
 
 ## 5. Smoke Commands
 
 ```bash
 bash scripts/smoke_backend_local.sh
+bash scripts/setup_local_postgres.sh
 bash scripts/smoke_voice_stack.sh
 bash scripts/smoke_db_persistence.sh
+bash scripts/check_asr_real_status.sh
+bash scripts/smoke_vision_model_opt_in.sh
 ```
 
 MiMo ASR opt-in smoke:
@@ -133,3 +170,17 @@ bash scripts/smoke_mimo_asr_opt_in.sh
 
 The opt-in script must not be used with real child recordings during development smoke.
 
+MiMo vision opt-in smoke:
+
+```bash
+CHILD_AI_VISION_PROVIDER=mimo \
+CHILD_AI_MIMO_ENABLED=true \
+CHILD_AI_MIMO_ALLOW_IMAGE=true \
+CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true \
+CHILD_AI_MIMO_API_KEY="$CHILD_AI_MIMO_API_KEY" \
+CHILD_AI_VISION_SMOKE_IMAGE=/path/to/fake-smoke-test-image.png \
+VISION_SMOKE_BASE_URL=http://127.0.0.1:8000 \
+bash scripts/smoke_vision_model_opt_in.sh
+```
+
+The vision smoke must not be used with real child photos or real family photos during development smoke.

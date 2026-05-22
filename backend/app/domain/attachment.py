@@ -1,8 +1,10 @@
+import base64
+import binascii
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.domain.schemas.conversation import Reply, SessionState, UiAction
 
@@ -45,16 +47,40 @@ class RecognizedContent(BaseModel):
 
 
 class AttachmentCreateRequest(BaseModel):
+    MAX_IMAGE_BYTES: ClassVar[int] = 5 * 1024 * 1024
+    ALLOWED_IMAGE_DATA_URI_PREFIXES: ClassVar[tuple[str, ...]] = (
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/webp;base64,",
+    )
+
     child_id: str = Field(..., min_length=1)
     session_id: str = Field(..., min_length=1)
     attachment_type: AttachmentType
     image_purpose: ImagePurpose | None = None
     file_id: str | None = Field(default=None, min_length=1, max_length=200)
+    image_data_uri: str | None = Field(default=None, max_length=7_000_000)
     mock_ocr_text: str | None = Field(default=None, max_length=2000)
     mock_vision_text: str | None = Field(default=None, max_length=2000)
     child_caption: str | None = Field(default=None, max_length=1000)
     mock_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("image_data_uri")
+    @classmethod
+    def validate_image_data_uri(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.startswith(cls.ALLOWED_IMAGE_DATA_URI_PREFIXES):
+            raise ValueError("image_data_uri must be png, jpeg, or webp data URI")
+        _, encoded = value.split(",", 1)
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("image_data_uri must contain valid base64") from exc
+        if len(decoded) > cls.MAX_IMAGE_BYTES:
+            raise ValueError("image_data_uri decoded image exceeds 5MB")
+        return value
 
 
 class AttachmentRecord(BaseModel):

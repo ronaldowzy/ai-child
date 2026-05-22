@@ -337,6 +337,27 @@ CHILD_AI_ASR_SMOKE_WAV=/path/to/fake-or-smoke.wav-or.m4a
 bash scripts/smoke_mimo_asr.sh
 ```
 
+Status check contract:
+
+```bash
+bash scripts/check_asr_real_status.sh
+```
+
+The status check must print one of:
+
+```text
+ASR_STATUS=mock_only
+ASR_STATUS=policy_blocked
+ASR_STATUS=mimo_ready
+ASR_STATUS=mimo_smoke_pass
+ASR_STATUS=mimo_smoke_fail
+```
+
+`mock_only` means Android can only test recording/upload/fallback UI, not real
+speech recognition. `policy_blocked` means MiMo ASR is selected but missing one
+or more required policy/key env values. Only `mimo_smoke_pass` with
+`provider=mimo` and `model=mimo-v2.5` can be called a real MiMo ASR smoke.
+
 For `.m4a` smoke files, the script converts to 16 kHz mono WAV before calling
 the backend so the smoke artifact matches the Android recording path and the
 MiMo spec's `data:audio/wav;base64,...` requirement.

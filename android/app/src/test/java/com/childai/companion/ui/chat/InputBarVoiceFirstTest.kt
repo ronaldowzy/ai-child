@@ -59,5 +59,14 @@ class InputBarVoiceFirstTest {
             "正在听懂你说的话",
             inputBarPrimaryVoiceButtonText(VoiceInputMode.Uploading),
         )
+        assertEquals("再说一次", inputBarPrimaryVoiceButtonText(VoiceInputMode.NeedsRetry))
+        assertEquals(
+            "请大人检查后再说",
+            inputBarPrimaryVoiceButtonText(VoiceInputMode.Failed),
+        )
+        assertEquals(
+            "请大人检查后再说",
+            inputBarPrimaryVoiceButtonText(VoiceInputMode.PermissionDenied),
+        )
     }
 }

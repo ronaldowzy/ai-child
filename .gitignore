@@ -50,6 +50,7 @@ Thumbs.db
 # Logs and local runtime data
 *.log
 logs/
+qa_logs/
 tmp/
 backend/storage/tts_cache/*
 !backend/storage/tts_cache/.gitkeep

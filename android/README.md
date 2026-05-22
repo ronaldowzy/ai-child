@@ -376,9 +376,9 @@ bash scripts/smoke_voice_stack.sh
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-构建时间 UTC：2026-05-22T10:03:28Z
-大小：16049959 bytes / 15M
-SHA256：3577e3c3fdb46ccf0298310fce21ac449b5dc5da7b8a20449295bbda567f4b95
+构建时间 UTC：2026-05-22T12:06:31Z
+大小：16190741 bytes / 15M
+SHA256：798a87a6256c9b2523b519aeb337385eec2fe7b9cecc43e25f1feb79bf51f850
 base URL：http://192.168.0.118:8000/
 BuildConfig.CONVERSATION_API_BASE_URL：http://192.168.0.118:8000/
 ```

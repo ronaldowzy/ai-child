@@ -114,7 +114,8 @@ class ChatViewModelVoiceInputTest {
         assertTrue(sender.sentTexts.isEmpty())
         assertEquals(VoiceInputMode.NeedsRetry, viewModel.uiState.value.voice.inputMode)
         assertEquals(message, viewModel.uiState.value.voice.errorMessage)
-        assertEquals(1, viewModel.uiState.value.messages.size)
+        assertEquals(MessageAuthor.Agent, viewModel.uiState.value.messages.last().author)
+        assertEquals(message, viewModel.uiState.value.messages.last().text)
     }
 
     @Test

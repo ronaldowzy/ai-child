@@ -567,6 +567,7 @@ class ChatViewModel(
                 }
             }
             is SpeechInputResult.NeedsRetry -> {
+                appendAgentMessage(result.message)
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
@@ -575,7 +576,11 @@ class ChatViewModel(
                             pendingTranscript = "",
                             errorMessage = result.message,
                         ),
-                        agent = baseAgentState,
+                        agent = FoxAgentUiState(
+                            mood = FoxMood.Listening,
+                            motion = FoxMotion.ListeningTail,
+                            statusText = "我刚才没听清，可以再说一次。",
+                        ),
                     )
                 }
             }

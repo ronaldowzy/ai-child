@@ -256,6 +256,9 @@ internal fun inputBarPrimaryVoiceButtonText(inputMode: VoiceInputMode): String {
     return when (inputMode) {
         VoiceInputMode.Listening -> "说完了"
         VoiceInputMode.Uploading -> "正在听懂你说的话"
+        VoiceInputMode.NeedsRetry -> "再说一次"
+        VoiceInputMode.Failed,
+        VoiceInputMode.PermissionDenied -> "请大人检查后再说"
         else -> "按一下开始说"
     }
 }

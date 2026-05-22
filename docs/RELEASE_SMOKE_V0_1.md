@@ -40,9 +40,9 @@
 ```text
 APK path: android/app/build/outputs/apk/debug/app-debug.apk
 build variant: debug
-build time UTC: 2026-05-22T10:03:28Z
-size: 16049959 bytes / 15M
-sha256: 3577e3c3fdb46ccf0298310fce21ac449b5dc5da7b8a20449295bbda567f4b95
+build time UTC: 2026-05-22T12:06:31Z
+size: 16190741 bytes / 15M
+sha256: 798a87a6256c9b2523b519aeb337385eec2fe7b9cecc43e25f1feb79bf51f850
 base URL in this build: http://192.168.0.118:8000/
 BuildConfig.CONVERSATION_API_BASE_URL: http://192.168.0.118:8000/
 ```

@@ -7,6 +7,10 @@ from app.domain.memory import (
     MemoryType,
 )
 from app.repositories.memory_repository import InMemoryMemoryRepository
+from app.repositories.parent_report_repository import (
+    InMemoryParentReportRepository,
+    ParentReportRepositoryUnavailable,
+)
 from app.services.memory_service import MemoryService
 from app.services.parent_report_service import ParentReportService
 
@@ -62,6 +66,25 @@ def _services() -> tuple[
     return repository, memory_service, report_service
 
 
+def _services_with_report_repository() -> tuple[
+    MemoryService,
+    InMemoryParentReportRepository,
+    ParentReportService,
+]:
+    memory_repository = InMemoryMemoryRepository()
+    report_repository = InMemoryParentReportRepository()
+    memory_service = MemoryService(
+        repository=memory_repository,
+        now_provider=_fixed_now,
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        repository=report_repository,
+        now_provider=_fixed_now,
+    )
+    return memory_service, report_repository, report_service
+
+
 def test_parent_report_service_generates_normal_daily_report() -> None:
     _, memory_service, report_service = _services()
     memory_service.create(
@@ -109,6 +132,159 @@ def test_parent_report_service_generates_normal_daily_report() -> None:
     assert report.safety_alerts == []
     assert any("不直接给最终答案" in action for action in report.suggested_parent_actions)
     assert "逐字返回" not in report.model_dump_json()
+
+
+def test_parent_report_service_get_daily_report_saves_generated_report() -> None:
+    memory_service, report_repository, report_service = _services_with_report_repository()
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="孩子在学习求助时需要先确认题意，再一步一步说出已知条件。",
+            tags=["学习求助", "题意确认"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+
+    report = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+    persisted = report_repository.get(
+        "child_parent_report_service_test",
+        date(2026, 5, 18),
+    )
+
+    assert persisted is not None
+    assert persisted.summary == report.summary
+    assert persisted.learning_observations == report.learning_observations
+
+
+def test_parent_report_service_second_get_returns_persisted_report() -> None:
+    memory_service, _, report_service = _services_with_report_repository()
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="孩子在学习求助时需要先确认题意，再一步一步说出已知条件。",
+            tags=["学习求助", "题意确认"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    first = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.EXPRESSION_PATTERN,
+            content="这条后续记忆不应改变已持久化的当日报告。",
+            tags=["表达"],
+        )
+    )
+
+    second = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert second.created_at == first.created_at
+    assert second.learning_observations == first.learning_observations
+    assert second.expression_observations == first.expression_observations
+
+
+def test_parent_report_service_repository_failure_returns_generated_report(
+    caplog,
+) -> None:
+    class FailingReportRepository:
+        def save(self, _report):
+            raise ParentReportRepositoryUnavailable("contains report summary")
+
+        def get(self, _child_id, _report_date):
+            raise ParentReportRepositoryUnavailable("contains report summary")
+
+        def list_by_child(self, _child_id, limit=30):
+            raise ParentReportRepositoryUnavailable("contains report summary")
+
+        def delete(self, _child_id, _report_date):
+            raise ParentReportRepositoryUnavailable("contains report summary")
+
+        def clear(self):
+            raise ParentReportRepositoryUnavailable("contains report summary")
+
+    memory_service = MemoryService(
+        repository=InMemoryMemoryRepository(),
+        now_provider=_fixed_now,
+    )
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="孩子在学习求助时需要先确认题意，再一步一步说出已知条件。",
+            tags=["学习求助", "题意确认"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        repository=FailingReportRepository(),
+        now_provider=_fixed_now,
+    )
+    caplog.set_level("WARNING", logger="app.parent_report")
+
+    report = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.learning_observations
+    assert "parent_report_repository_fallback" in caplog.text
+    assert "孩子在学习求助时需要先确认题意" not in caplog.text
+    assert "contains report summary" not in caplog.text
+
+
+def test_parent_report_service_only_uses_parent_visible_current_day_memory() -> None:
+    repository, memory_service, report_service = _services()
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="今天可见的学习观察。",
+            tags=["今天"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="今天不可见的学习观察。",
+            tags=["不可见"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        ).model_copy(update={"visible_to_parent": False}, deep=True)
+    )
+    yesterday = memory_service.create(
+        _memory_request(
+            memory_type=MemoryType.LEARNING_PATTERN,
+            content="昨天的学习观察。",
+            tags=["昨天"],
+            sensitivity=MemorySensitivity.MEDIUM,
+        )
+    )
+    repository.save(
+        yesterday.model_copy(
+            update={
+                "created_at": datetime(2026, 5, 17, 10, 0, tzinfo=timezone.utc),
+                "updated_at": datetime(2026, 5, 17, 10, 0, tzinfo=timezone.utc),
+            },
+            deep=True,
+        )
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert "今天可见的学习观察" in report_json
+    assert "今天不可见的学习观察" not in report_json
+    assert "昨天的学习观察" not in report_json
 
 
 def test_parent_report_service_generates_high_risk_report_without_raw_detail() -> None:

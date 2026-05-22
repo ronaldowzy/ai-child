@@ -1,9 +1,22 @@
 from collections.abc import Callable
 from datetime import date, datetime, timezone
+import logging
 
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.logging import hash_identifier
 from app.domain.memory import MemoryItem, MemorySensitivity, MemoryType
 from app.domain.parent_report import ParentReport
+from app.repositories.parent_report_repository import (
+    InMemoryParentReportRepository,
+    ParentReportRepository,
+    ParentReportRepositoryProtocol,
+    ParentReportRepositoryUnavailable,
+)
 from app.services.memory_service import MemoryService, get_memory_service
+
+
+logger = logging.getLogger("app.parent_report")
 
 
 class ParentReportService:
@@ -23,9 +36,18 @@ class ParentReportService:
         self,
         *,
         memory_service: MemoryService | None = None,
+        repository: ParentReportRepositoryProtocol | None = None,
+        fallback_repository: InMemoryParentReportRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
+        fallback_to_memory: bool = True,
     ) -> None:
         self._memory_service = memory_service or get_memory_service()
+        self._repository = repository or ParentReportRepository()
+        self._fallback_repository = (
+            fallback_repository or InMemoryParentReportRepository()
+        )
+        self._fallback_to_memory = fallback_to_memory
+        self._repository_available = True
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
     def get_daily_report(
@@ -34,7 +56,12 @@ class ParentReportService:
         *,
         report_date: date | None = None,
     ) -> ParentReport:
-        return self.generate_daily_report(child_id, report_date=report_date)
+        target_date = report_date or self._now().date()
+        existing = self._get_persisted_report(child_id, target_date)
+        if existing is not None:
+            return existing
+        report = self.generate_daily_report(child_id, report_date=target_date)
+        return self._save_generated_report(report)
 
     def generate_daily_report(
         self,
@@ -84,6 +111,63 @@ class ParentReportService:
         if now.tzinfo is None:
             return now.replace(tzinfo=timezone.utc)
         return now
+
+    def _get_persisted_report(
+        self,
+        child_id: str,
+        report_date: date,
+    ) -> ParentReport | None:
+        if self._repository_available:
+            try:
+                return self._repository.get(child_id, report_date)
+            except (ParentReportRepositoryUnavailable, SQLAlchemyError) as exc:
+                self._log_repository_fallback(
+                    child_id=child_id,
+                    report_date=report_date,
+                    operation="get",
+                    error_type=exc.__class__.__name__,
+                )
+                if not self._fallback_to_memory:
+                    raise
+                self._repository_available = False
+        return self._fallback_repository.get(child_id, report_date)
+
+    def _save_generated_report(self, report: ParentReport) -> ParentReport:
+        if self._repository_available:
+            try:
+                saved = self._repository.save(report)
+                self._fallback_repository.save(saved)
+                return saved
+            except (ParentReportRepositoryUnavailable, SQLAlchemyError) as exc:
+                self._log_repository_fallback(
+                    child_id=report.child_id,
+                    report_date=report.date,
+                    operation="save",
+                    error_type=exc.__class__.__name__,
+                )
+                if not self._fallback_to_memory:
+                    raise
+                self._repository_available = False
+        return self._fallback_repository.save(report)
+
+    def _log_repository_fallback(
+        self,
+        *,
+        child_id: str,
+        report_date: date,
+        operation: str,
+        error_type: str,
+    ) -> None:
+        logger.warning(
+            "parent_report_repository_fallback",
+            extra={
+                "event": "parent_report_repository_fallback",
+                "operation": operation,
+                "child_id_hash": hash_identifier(child_id),
+                "report_date": report_date.isoformat(),
+                "error_type": error_type,
+            },
+        )
 
     def _daily_parent_visible_memories(
         self,

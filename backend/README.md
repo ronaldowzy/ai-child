@@ -227,11 +227,12 @@ return evidence fields, quote summaries, or full chat transcripts.
 ## Local PostgreSQL Persistence
 
 The v0.1-dev persistence target is local PostgreSQL for family testing. DB1-A
-adds the database foundation. DB1-B has started business persistence:
+adds the database foundation. DB1-B2/B3/B4/B5 now cover the local persistence
+thin slice:
 `ParentPolicyService` reads/writes `parent_policies` through a SQLAlchemy
 repository when PostgreSQL is available, including `parent_message_raw`,
 `parent_message_updated_at`, `child_nickname`, and `child_display_name`.
-DB1-B3 now also records ordinary `/api/v1/conversation/message` turns and
+DB1-B3 records ordinary `/api/v1/conversation/message` turns and
 completed `/api/v1/conversation/stream` turns with a best-effort repository. It
 upserts `conversation_sessions`, stores the child message, stores one final
 agent message, and stores a non-sensitive routing decision summary. Stream turns
@@ -247,6 +248,13 @@ evidence must be short `quote_summary` style evidence, safety memories remain
 parent-visible, and forbidden raw evidence sources are rejected before storage.
 If PostgreSQL is unavailable, MemoryService falls back to the process-local
 repository without blocking conversation or Android QA.
+
+DB1-B5 records generated `ParentReportService` reports in `parent_reports`.
+`get_daily_report()` first reads an existing report for `child_id + date`; if
+none exists, it generates a report from parent-visible structured memory and
+best-effort saves it. Repository failure does not block the parent report API:
+the service returns the generated report and logs only hashed identifiers,
+date, operation, and error type.
 
 Local dev database:
 
@@ -304,10 +312,12 @@ Data boundary:
   sensitivity, visibility flags, parent-attention flags, expiry, and optional
   embedding ids. It must not store raw media, full chat transcripts, prompts,
   debug internals, provider raw responses, or API keys.
+- `parent_reports` stores parent-facing daily summary text, observations,
+  structured safety alerts, and suggested parent actions. It must not store
+  memory evidence, quote summaries, raw chat transcripts, prompts, debug
+  internals, provider raw responses, or API keys.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
-- `parent_reports` exists, but `ParentReportService` runtime persistence is
-  still pending.
 - Parent free-text notes are stored in `parent_policies.parent_message_raw` for
   local family testing. They are prompt background only and must not be exposed
   in child-facing debug/UI.

@@ -37,7 +37,7 @@ def test_general_not_know_does_not_route_to_learning_help() -> None:
     )
 
     assert result.intent == IntentType.CASUAL_CHAT
-    assert result.evidence == ["mock_model_fallback"]
+    assert result.evidence == ["rule_default_conversation_open"]
 
 
 def test_game_puzzle_does_not_route_to_homework_help() -> None:

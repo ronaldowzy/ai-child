@@ -1,9 +1,7 @@
 from pydantic import BaseModel, Field
 
 from app.domain.enums import IntentType, RiskCategory, RiskLevel
-from app.domain.model_types import ModelRequest, ModelTaskType
 from app.domain.time import TimeContext, TimePeriod
-from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.safety_engine import SafetyClassification
 
 
@@ -19,10 +17,10 @@ class IntentClassification(BaseModel):
 
 
 class IntentClassifier:
-    """Keyword-first intent classifier with MockModelProvider fallback."""
+    """Keyword-first intent classifier for the child conversation router."""
 
-    def __init__(self, *, model_registry: ModelRegistry | None = None) -> None:
-        self._model_registry = model_registry or get_model_registry()
+    def __init__(self) -> None:
+        pass
 
     def classify(
         self,
@@ -138,24 +136,11 @@ class IntentClassifier:
                 evidence=["after_school_keyword"],
             )
 
-        return self._mock_model_fallback(text, safety=safety)
-
-    def _mock_model_fallback(
-        self, text: str, *, safety: SafetyClassification | None
-    ) -> IntentClassification:
-        response = self._model_registry.generate(
-            ModelRequest(
-                task_type=ModelTaskType.INTENT_CLASSIFICATION,
-                input_text=text,
-            )
-        )
-        raw_intent = response.structured_output.get("intent")
-        normalized_intent = self._normalize_model_intent(raw_intent)
         return IntentClassification(
-            intent=normalized_intent,
+            intent=IntentType.CASUAL_CHAT,
             risk_level=safety.risk_level if safety else RiskLevel.NONE,
-            confidence=float(response.structured_output.get("confidence", 0.5)),
-            evidence=["mock_model_fallback"],
+            confidence=0.5,
+            evidence=["rule_default_conversation_open"],
         )
 
     def _watch_intent(self, safety: SafetyClassification) -> IntentClassification:
@@ -185,13 +170,6 @@ class IntentClassifier:
             confidence=0.82,
             evidence=["safety_watch", *safety.evidence],
         )
-
-    def _normalize_model_intent(self, raw_intent: object) -> IntentType:
-        if raw_intent == IntentType.LEARNING_HELP.value:
-            return IntentType.LEARNING_HELP
-        if raw_intent == IntentType.SAFETY_RISK.value:
-            return IntentType.SAFETY_RISK
-        return IntentType.CASUAL_CHAT
 
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         return any(marker in text for marker in markers)

@@ -16,6 +16,7 @@ from app.domain.memory import (
     MemorySensitivity,
     MemoryType,
 )
+from app.domain.model_types import ModelResponse, ModelTaskType
 from app.domain.enums import RiskCategory, RiskLevel
 from app.domain.schemas.conversation import (
     ClientContext,
@@ -74,6 +75,31 @@ class EmptyConversationRepository:
         return []
 
 
+class ReportModelRegistry:
+    def generate(self, request):
+        return ModelResponse(
+            task_type=ModelTaskType.PARENT_REPORT,
+            response_text="",
+            structured_output={
+                "daily_report": {
+                    "summary": "模型日报：学习求助。",
+                    "learning_observations": [
+                        "孩子本次遇到学习求助，系统引导其先说明题目在问什么。"
+                    ],
+                    "expression_observations": [],
+                    "emotion_observations": [],
+                    "safety_alerts": [],
+                    "suggested_parent_actions": [
+                        "今晚可以轻轻问题目在问什么；避免直接给答案。"
+                    ],
+                }
+            },
+            provider_name="mimo",
+            model_name="mimo-v2.5-pro",
+            metadata={},
+        )
+
+
 def _conversation_stack(
     *,
     runtime: CapturingRuntime | None = None,
@@ -86,6 +112,7 @@ def _conversation_stack(
     report_service = ParentReportService(
         memory_service=memory_service,
         conversation_repository=EmptyConversationRepository(),
+        model_registry=ReportModelRegistry(),
         now_provider=_fixed_now,
     )
     runtime = runtime or CapturingRuntime()

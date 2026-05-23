@@ -790,12 +790,12 @@ def build_report(
     provider_note = (
         "Synthetic real-provider trace review. This is not real child QA, not "
         "Android device validation, and not a production data policy. Opening "
-        "and parent_report use deterministic default paths; child_chat traces "
-        "are the provider quality evidence."
+        "uses deterministic default paths; child_chat and parent_report traces "
+        "are provider-quality evidence."
         if provider_mode == PROVIDER_MIMO
         else "Synthetic trace review for local prompt analysis. This is not real "
         "child QA, not real MiMo output, and not Android device validation. "
-        "Opening and parent_report use deterministic default paths."
+        "Opening uses deterministic default paths; parent_report is model-first."
     )
     provider_models = sorted(
         {
@@ -822,8 +822,8 @@ def build_report(
         f"- Provider/model names: `{', '.join(provider_models) or 'none'}`",
         "- Trace source: local opt-in `model_debug_traces`.",
         "- Opening default path: `deterministic_policy_template`.",
-        "- ParentReport default path: `deterministic_report_builder`.",
-        "- Provider quality evidence: `child_chat` traces only.",
+        "- ParentReport default path: `model_first_parent_report`.",
+        "- Provider quality evidence: `child_chat` and `parent_report` traces.",
         f"- Scenario count: `{len(scenarios)}`",
         f"- Trace count: `{len(traces)}`",
         "- Data boundary: synthetic text only; no real child audio/image/data.",
@@ -1032,7 +1032,7 @@ def _uses_deterministic_default(
     scenario: ScenarioResult,
     traces: list[Any],
 ) -> bool:
-    return scenario.category in {"opening", "parent_report"} and not traces
+    return scenario.category == "opening" and not traces
 
 
 def _deterministic_default_checks(scenario: ScenarioResult) -> tuple[str, ...]:

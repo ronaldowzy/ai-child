@@ -58,7 +58,7 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
     assert len(scenarios) >= 15
     assert len(traces) >= 1
     assert any(trace.task_type == "child_chat" for trace in traces)
-    assert not any(trace.task_type == "parent_report" for trace in traces)
+    assert any(trace.task_type == "parent_report" for trace in traces)
     assert all(trace.provider_name == "mock" for trace in traces)
     assert repository.list_recent(limit=500)
 
@@ -69,7 +69,7 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
     assert "mock responses do not represent real MiMo quality" in report
     assert "deterministic_default/no_model_trace" in report
     assert "opening deterministic default used: yes" in report
-    assert "parent_report deterministic default used: yes" in report
+    assert "ParentReport default path: `model_first_parent_report`" in report
     assert "Trace count" in report
 
 
@@ -233,7 +233,7 @@ def test_real_provider_report_flags_empty_opening_raw_response() -> None:
     assert "fallback covered the child-facing text" in report
 
 
-def test_real_provider_report_treats_opening_and_report_no_trace_as_deterministic() -> None:
+def test_real_provider_report_treats_opening_as_deterministic_and_report_as_model() -> None:
     runner = _import_runner_module()
     opening = runner.ScenarioResult(
         scenario_id="opening-interest-callback",
@@ -259,7 +259,7 @@ def test_real_provider_report_treats_opening_and_report_no_trace_as_deterministi
         session_id="child-chat-topic-change-session",
         response_text="好呀，我们换一个轻松的。",
     )
-    trace = SimpleNamespace(
+    child_chat_trace = SimpleNamespace(
         child_id="trace_chat_topic_change",
         session_id="child-chat-topic-change-session",
         task_type="child_chat",
@@ -274,16 +274,31 @@ def test_real_provider_report_treats_opening_and_report_no_trace_as_deterministi
         request_context_json={},
         request_metadata_json={},
     )
+    parent_report_trace = SimpleNamespace(
+        child_id="trace_parent_report_relationship",
+        session_id=None,
+        task_type="parent_report",
+        provider_name="mimo",
+        model_name="mimo-v2.5-pro",
+        fallback_used=False,
+        policy_blocked=False,
+        error_type=None,
+        response_text='{"summary":"今天孩子围绕跑步比赛表达了兴趣。"}',
+        request_messages_json=[{"role": "system", "content": "父亲日报分析器"}],
+        request_input_text="",
+        request_context_json={},
+        request_metadata_json={},
+    )
 
     report = runner.build_report(
         scenarios=[opening, parent_report, child_chat],
-        traces=[trace],
+        traces=[child_chat_trace, parent_report_trace],
         provider_mode="mimo",
     )
 
     assert "deterministic_default/no_model_trace" in report
     assert "opening deterministic default used: yes" in report
-    assert "parent_report deterministic default used: yes" in report
+    assert "parent_report/provider=mimo/model=mimo-v2.5-pro" in report
     assert "P0: scenario did not produce a trace" not in report
     assert "real provider empty raw response in opening-interest-callback" not in report
     assert "child_chat/provider=mimo/model=mimo-v2.5-pro" in report

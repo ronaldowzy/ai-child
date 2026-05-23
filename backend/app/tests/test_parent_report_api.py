@@ -64,11 +64,11 @@ def test_parent_report_api_returns_report_by_child_and_date() -> None:
     body = report_response.json()
     assert body["child_id"] == "child_parent_report_api_test"
     assert body["date"] == _today()
-    assert body["learning_observations"] == [
-        "孩子在学习求助时需要先确认题意，再一步一步说出已知条件。"
-    ]
+    assert body["generation_status"] in {"model_failed", "model_blocked"}
+    assert body["summary"] == "日报暂时生成失败，请稍后重试。"
+    assert body["learning_observations"] == []
     assert body["safety_alerts"] == []
-    assert any("不直接给最终答案" in action for action in body["suggested_parent_actions"])
+    assert body["generation_error_code"]
 
 
 def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
@@ -93,8 +93,9 @@ def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
 
     assert report_response.status_code == 200
     body = report_response.json()
-    assert body["safety_alerts"]
-    assert any("安全确认" in action for action in body["suggested_parent_actions"])
+    assert body["generation_status"] in {"model_failed", "model_blocked"}
+    assert body["summary"] == "日报暂时生成失败，请稍后重试。"
+    assert body["safety_alerts"] == []
 
 
 def test_parent_report_api_does_not_return_full_chat_transcript_or_evidence() -> None:

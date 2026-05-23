@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Child, ParentReportRecord
 from app.db.session import SessionLocal
-from app.domain.parent_report import ParentReport
+from app.domain.parent_report import ParentReport, ParentReportGenerationStatus
 
 
 class ParentReportRepositoryUnavailable(RuntimeError):
@@ -203,6 +203,10 @@ class ParentReportRepository:
         record.emotion_observations = list(report.emotion_observations)
         record.safety_alerts = list(report.safety_alerts)
         record.suggested_parent_actions = list(report.suggested_parent_actions)
+        record.generation_status = report.generation_status.value
+        record.generated_by = report.generated_by
+        record.generation_error_code = report.generation_error_code
+        record.material_fingerprint = report.material_fingerprint
         record.created_at = report.created_at
 
     def _to_domain(self, record: ParentReportRecord) -> ParentReport:
@@ -216,6 +220,12 @@ class ParentReportRepository:
             safety_alerts=list(record.safety_alerts or []),
             suggested_parent_actions=list(record.suggested_parent_actions or []),
             created_at=self._aware_datetime(record.created_at),
+            generation_status=ParentReportGenerationStatus(
+                record.generation_status or ParentReportGenerationStatus.LEGACY.value
+            ),
+            generated_by=record.generated_by or "legacy",
+            generation_error_code=record.generation_error_code,
+            material_fingerprint=record.material_fingerprint,
         )
 
     def _aware_datetime(self, value: datetime) -> datetime:

@@ -111,8 +111,30 @@ private fun ParentReportScreenContent(
                 )
             }
             uiState.report?.let { report ->
-                ReportBody(report = report)
+                if (report.isGeneratedSuccessfully) {
+                    ReportBody(report = report)
+                } else {
+                    ReportGenerationStatus(report = report)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReportGenerationStatus(report: ParentReport) {
+    ReportSection(title = "日报生成状态") {
+        Text(
+            text = "日报暂时生成失败，请稍后重试。",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.error,
+        )
+        report.generationErrorCode?.let { errorCode ->
+            Text(
+                text = "状态：${report.generationStatus} / $errorCode",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -215,6 +237,8 @@ private fun ParentReportScreenPreview() {
                     suggestedParentActions = listOf(
                         "今晚用一个具体问题轻轻收尾，不要追问过多。",
                     ),
+                    generationStatus = "model_generated",
+                    generatedBy = "model",
                 ),
             ),
             onBack = {},

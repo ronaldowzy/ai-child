@@ -96,6 +96,7 @@ def _enable_mimo_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHILD_AI_MIMO_ENABLED", "true")
     monkeypatch.setenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro")
     monkeypatch.setenv("CHILD_AI_MIMO_API_KEY", "test-api-key")
+    monkeypatch.setenv("CHILD_AI_MIMO_TIMEOUT_MS", "5000")
 
 
 def test_model_registry_select_returns_default_mock_provider_for_child_chat() -> None:
@@ -407,6 +408,27 @@ def test_model_registry_can_route_vision_to_mimo_with_multimodal_policy(
     assert content[0]["type"] == "image_url"
     assert content[1]["type"] == "text"
     assert response.provider_name == "mimo"
+
+
+def test_model_registry_can_route_parent_report_to_mimo_without_changing_child_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MODEL_PROVIDER", "mock")
+    monkeypatch.setenv("CHILD_AI_PARENT_REPORT_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_CHILD_DATA", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+
+    registry = ModelRegistry()
+
+    child_profile = registry.select_profile(ModelTaskType.CHILD_CHAT)
+    parent_report_profile = registry.select_profile(ModelTaskType.PARENT_REPORT)
+    vision_profile = registry.select_profile(ModelTaskType.VISION)
+
+    assert child_profile.profile_name == "child_chat_primary"
+    assert parent_report_profile.profile_name == "mimo_parent_report"
+    assert parent_report_profile.model_name == "mimo-v2.5-pro"
+    assert vision_profile.profile_name == "vision_mock"
 
 
 def test_model_registry_blocks_mimo_vision_without_retention_policy(

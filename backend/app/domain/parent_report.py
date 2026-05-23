@@ -1,6 +1,15 @@
 from datetime import date, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
+
+
+class ParentReportGenerationStatus(StrEnum):
+    MODEL_GENERATED = "model_generated"
+    MODEL_BLOCKED = "model_blocked"
+    MODEL_FAILED = "model_failed"
+    DETERMINISTIC_FALLBACK = "deterministic_fallback"
+    LEGACY = "legacy"
 
 
 class ParentReport(BaseModel):
@@ -13,3 +22,7 @@ class ParentReport(BaseModel):
     safety_alerts: list[str] = Field(default_factory=list, max_length=10)
     suggested_parent_actions: list[str] = Field(default_factory=list, max_length=10)
     created_at: datetime
+    generation_status: ParentReportGenerationStatus = ParentReportGenerationStatus.LEGACY
+    generated_by: str = Field(default="legacy", max_length=80)
+    generation_error_code: str | None = Field(default=None, max_length=120)
+    material_fingerprint: str | None = Field(default=None, max_length=120)

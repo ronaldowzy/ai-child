@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；“拍给小白狐看”已从儿童端默认 mock attachment 改为系统相机/相册真实图片 multipart 上传 + 后端 MiMo vision 路径，普通 child_chat 仍用 `mimo-v2.5-pro`，vision/OCR/multimodal 用 `mimo-v2.5`；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening/report deterministic default 已接入后端
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；“拍给小白狐看”已从儿童端默认 mock attachment 改为系统相机/相册真实图片 multipart 上传 + 后端 MiMo vision 路径，普通 child_chat 仍用 `mimo-v2.5-pro`，vision/OCR/multimodal 用 `mimo-v2.5`；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening deterministic default 已接入后端；父亲日报已按 PD-052 从 deterministic v1 修订为 model-first v2，正式成功只接受 `ModelTaskType.PARENT_REPORT` 结构化模型输出
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：继续用更多非儿童中文样例评估 local_sensevoice 准确率与 tap-to-transcript 延迟，并用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、系统相机真实拍照/相册上传、MiMo vision 识图、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR fallback smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5；MiMo 文本 real synthetic trace 已用 `mimo-v2.5-pro` 复跑 PASS；PROMPT-REAL-HARDEN-1 后 child-facing 自伤回复已改为确定性儿童化可信成人兜底，舞台说明/多问句/睡前明天钩子/换题逐字复述已运行时压制；MVP-CLOSEOUT-1 后 opening/parent_report 默认改为确定性 policy/template/report 主路径，不再把 provider raw empty 作为家庭内测前阻塞，最新真实 trace P0/P1/P2 为 none；未接 CameraX
+下一步：继续用更多非儿童中文样例评估 local_sensevoice 准确率与 tap-to-transcript 延迟，并用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、系统相机真实拍照/相册上传、MiMo vision 识图、父亲日报 model-first 成功/失败状态、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR fallback smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5；MiMo 文本 real synthetic trace 已用 `mimo-v2.5-pro` 复跑 PASS；PROMPT-REAL-HARDEN-1 后 child-facing 自伤回复已改为确定性儿童化可信成人兜底，舞台说明/多问句/睡前明天钩子/换题逐字复述已运行时压制；Opening 仍为 deterministic default；ParentReport v2 为 model-first，模型失败时不展示规则日报冒充成功；未接 CameraX
 ```
 
 第一轮已完成能力快照：
@@ -21,7 +21,7 @@
 Android 壳：done
 Conversation API：done
 真实图片上传：in_progress
-父亲设置/日报：done
+父亲设置/日报：review
 ```
 
 ---
@@ -38,13 +38,13 @@ Conversation API：done
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | done | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | done | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | done | M6 | 结构化记忆可写可查，pytest/ruff 通过 |
-| M8 | 父亲日报 | ParentReportService | done | M7 | 今日摘要可生成，pytest/ruff 通过 |
+| M8 | 父亲日报 | ParentReportService | review | M7 | deterministic v1 已完成；model-first v2 已接入，等待真实 provider/父亲端 QA |
 | M9 | 附件/OCR/Vision | Attachment + OCR/Vision foundation | done | M6 | 附件上下文可接入学习/图片分享，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | done | C0 | Android 可编译，单元测试通过 |
 | A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions；session_state 内部保存，默认不展示给儿童 |
 | A3 | Android 图片输入 | 系统相机/相册真实上传 + attachment 续聊 | in_progress | A2/M9 | 儿童默认入口已改为真实图片 multipart 上传；mock attachment 仅保留为测试/异常替身；真机相机和 MiMo vision 仍待设备 QA |
-| A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
+| A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | review | A2/M2/M8 | policy 可修改；ParentReportScreen 已识别 model-first 成功/失败状态，真机 QA 待验 |
 | E2E | 联调 | 后端 + Android 家庭内测流程 | in_progress | Q1/A1-A4 | 本机/LAN API 已通过；QA1 窗口模式模拟器复验覆盖基础聊天、放学后、学习入口、父亲入口点击保护和后端断开温和错误；父亲正确 PIN、系统相机真实拍照上传、MiMo vision 识图和真实平板仍待复验 |
 | R1 | AgentRuntime | 统一智能体执行链路和输出安全检查 | done | Q1/E2E/R2 | conversation 编排收敛到 runtime，模型调用、输出检查和安全 fallback 边界已落地 |
 | R2 | 模型外发安全闸门 | 真实模型接入前 child data gate | done | Q1 | 外发开关、数据最小化、审计和 fallback gate 可测 |
@@ -159,7 +159,8 @@ Conversation API：done
 | M7-03 MemoryService | done |  | 过滤过期记忆，普通检索默认隔离 safety |
 | M7-04 MemoryExtractor mock | done |  | 输出结构化记忆 |
 | M8-01 ParentReport schema | done |  | 字段完整 |
-| M8-02 ParentReportService | done |  | 今日摘要可生成，不返回逐字聊天记录 |
+| M8-02 ParentReportService deterministic v1 | done |  | 今日摘要可生成，不返回逐字聊天记录 |
+| M8-03 ParentReportService model-first v2 | review |  | 正式日报主路径调用 `ModelTaskType.PARENT_REPORT`；模型失败返回可重试状态，不用规则日报冒充成功 |
 | M8-03 report API | done |  | /reports/{child_id} 和 /report/today 可用 |
 | M9-01 Attachment schema | done |  | homework_photo 和 recognized_content 可表达 |
 | M9-02 MockOCRProvider | done |  | mock 识别题目，支持低置信度 |
@@ -175,7 +176,7 @@ Conversation API：done
 | A2-02 ui_actions 渲染 | done |  | 快捷按钮可显示；session_state 用于续会话和开发排查，默认不在儿童界面展示 |
 | A3-01 系统相机真实图片上传 | in_progress |  | Android 调系统相机/相册并 multipart 上传；后端返回真实 attachment_id；CameraX 不在本轮范围；真机 QA 待验 |
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
-| A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
+| A4-02 ParentReportScreen | review |  | report 可读取；model_failed/model_blocked 时展示“日报暂时生成失败，请稍后重试”，不展示 fallback 正文；真机 QA 待验 |
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
 | E2E-02 Android 模拟器基础 smoke | done |  | AVD 启动、App 安装、聊天 API、父亲日报读取通过 |
 | E2E-03 Android 完整手动 QA | in_progress |  | QA1 通过窗口模式模拟器验证基础聊天、放学后、学习入口动作、父亲入口普通点击不进入、错误 PIN 不进入和后端不可达温和错误；正确 PIN、父亲设置修改、设备侧完整 mock 拍题和真实平板仍待复验 |
@@ -227,10 +228,10 @@ Conversation API：done
 | DB1-B ParentPolicy 持久化 | done |  | ParentPolicyService 已支持 PostgreSQL repository 优先读写；数据库不可用时 dev fallback 到内存；`parent_message_raw` 和 `parent_message_updated_at` 已有迁移 |
 | DB1-C Conversation message 持久化 | done |  | thin slice done：普通 `/api/v1/conversation/message` 和 `/api/v1/conversation/stream` 成功 turn 均已 best-effort 保存 session、child message、agent message、routing decision、audio_url/stream audio summary、emotion、agent_motion；持久化失败不阻断回复；不保存 delta 列表、debug、prompt、parent_message_raw、原始音频或照片 |
 | DB1-D MemoryService 持久化 | done |  | thin slice done：MemoryService 优先使用 PostgreSQL `memory_items`，数据库不可用时回退进程内 repository；只保存结构化 summary、tags、evidence summary、visibility/safety flags，不保存 raw media、full transcript、prompt 或 debug internals |
-| DB1-E ParentReport 持久化 | done |  | thin slice done：ParentReportService 优先从 PostgreSQL `parent_reports` 读取已生成日报；缺失或当天有更新会话素材时，结合结构化 memory、当天 `conversation_messages` 和 `routing_decisions` 重新生成并保存；数据库不可用时回退即时生成/进程内缓存；不保存 evidence、quote_summary、raw transcript、prompt、debug 或 provider raw response |
+| DB1-E ParentReport 持久化 | done |  | thin slice done：ParentReportService 优先从 PostgreSQL `parent_reports` 读取已生成日报；model-first v2 新增 `generation_status` / `generated_by` / `generation_error_code` / `material_fingerprint`；缺失或当天有更新会话素材时刷新模型日报；模型失败不保存为正式报告；不保存 evidence、quote_summary、raw transcript、prompt、debug 或 provider raw response |
 | DEV-TRACE-1 模型调用 trace | done |  | 新增 dev/test `model_debug_traces` 临时表；相关功能测试必须显式开启并验证写入；`ModelRegistry.generate()` 统一记录完整 request messages/input/context/metadata 和 response text/structured output/metadata、fallback/policy/error/latency；记录失败不阻断模型调用，过滤 API key/Authorization/raw media/base64；不改 Android 或现有业务表 |
 | DEV-TRACE-2 trace scenario review | done |  | 新增 `scripts/run_model_trace_scenarios.py`，强制 mock provider + trace enablement，清空并回放 15 个 synthetic opening/child_chat/parent_report 场景，确认写入 `model_debug_traces` 并生成 `MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`；报告标记 P2 mock 质量观察，明确不代表真实 MiMo、Android 真机或真实儿童 QA |
-| DEV-TRACE-3 real provider trace review | done |  | `run_model_trace_scenarios.py --provider mimo` 已支持显式 opt-in real MiMo synthetic 文本场景；临时 env overlay 不写 `.env`，缺 key 时输出 `REAL_PROVIDER_BLOCKED`；2026-05-23 在 MVP-CLOSEOUT-1 后复跑 `REAL_PROVIDER_SMOKE: PASS`，provider/model=`mimo/mimo-v2.5-pro`，生成 `MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`。child_chat 是当前真实 provider 输出质量证据；opening/parent_report 默认 deterministic，不再要求 provider raw output。最新报告 P0/P1/P2 为 none；报告不代表真机 QA |
+| DEV-TRACE-3 real provider trace review | done |  | `run_model_trace_scenarios.py --provider mimo` 已支持显式 opt-in real MiMo synthetic 文本场景；临时 env overlay 不写 `.env`，缺 key 时输出 `REAL_PROVIDER_BLOCKED`；2026-05-23 在 MVP-CLOSEOUT-1 后复跑 `REAL_PROVIDER_SMOKE: PASS`，provider/model=`mimo/mimo-v2.5-pro`。PD-052 后 parent_report 再次纳入 model-first trace/QA 范围；报告不代表真机 QA |
 | S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |
 | S-Stream-1 后端 stream endpoint | done |  | 新增 `/api/v1/conversation/stream` NDJSON skeleton；保留旧接口；复用 ConversationService/Runtime 安全链路；按句子 pseudo streaming 和可恢复 TTS segment error |
 | S-Stream-2 Android stream client | done |  | 新增 NDJSON stream client、progressive agent bubble、audio segment queue、stop/mute 处理；stream 失败 fallback 旧接口；待 Redmi K60/Honor Pad 5 手动 QA |

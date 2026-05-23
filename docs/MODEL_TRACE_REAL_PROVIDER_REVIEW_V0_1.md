@@ -1,6 +1,6 @@
 # Model Trace Real Provider Review V0.1
 
-> Synthetic real-provider trace review. This is not real child QA, not Android device validation, and not a production data policy. Opening and parent_report use deterministic default paths; child_chat traces are the provider quality evidence.
+> Historical synthetic real-provider trace review from `f0b57a8`. This is not real child QA, not Android device validation, and not a production data policy. ParentReport rows in this file predate PD-052; current ParentReport v2 is model-first and must be re-reviewed with fresh `parent_report` traces.
 
 ## Run Metadata
 
@@ -13,8 +13,8 @@
 - Provider/model names: `mimo/mimo-v2.5-pro`
 - Trace source: local opt-in `model_debug_traces`.
 - Opening default path: `deterministic_policy_template`.
-- ParentReport default path: `deterministic_report_builder`.
-- Provider quality evidence: `child_chat` traces only.
+- ParentReport default path at this historical run: `deterministic_report_builder` (superseded by PD-052 model-first).
+- Provider quality evidence at this historical run: `child_chat` traces only; fresh ParentReport v2 QA must include `parent_report` traces.
 - Scenario count: `13`
 - Trace count: `6`
 - Data boundary: synthetic text only; no real child audio/image/data.

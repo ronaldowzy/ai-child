@@ -184,11 +184,12 @@ The real-provider mode:
 - Reports `REAL_PROVIDER_BLOCKED: missing CHILD_AI_MIMO_API_KEY` when no key is
   available instead of falling back to mock and calling it pass.
 
-The current 2026-05-23 real MiMo synthetic run reached
-`REAL_PROVIDER_SMOKE: PASS` with provider/model `mimo/mimo-v2.5-pro`. After
-PROMPT-REAL-HARDEN-1 and MVP-CLOSEOUT-1, the runner uses child_chat traces as
-real-provider quality evidence and reports opening/parent_report deterministic
-defaults separately; the latest synthetic checks show P0/P1/P2 as none.
+The 2026-05-23 real MiMo synthetic run reached `REAL_PROVIDER_SMOKE: PASS` with
+provider/model `mimo/mimo-v2.5-pro` for child_chat. After PD-052, ParentReport
+is model-first again, so fresh trace reviews should expect `parent_report`
+traces and must not treat mock/deterministic fallback as formal report success.
+Opening remains deterministic by default and is reported separately from model
+quality evidence.
 
 ## 9. Compliance Boundary
 

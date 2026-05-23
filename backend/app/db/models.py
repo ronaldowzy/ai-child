@@ -255,6 +255,24 @@ class ParentReportRecord(Base):
         JSON,
         nullable=True,
     )
+    generation_status: Mapped[str] = mapped_column(
+        String(80),
+        default="legacy",
+        nullable=False,
+    )
+    generated_by: Mapped[str] = mapped_column(
+        String(80),
+        default="legacy",
+        nullable=False,
+    )
+    generation_error_code: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+    )
+    material_fingerprint: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

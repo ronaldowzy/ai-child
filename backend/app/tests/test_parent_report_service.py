@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+import json
 
 from app.domain.memory import (
     MemoryCreateRequest,
@@ -6,6 +7,8 @@ from app.domain.memory import (
     MemorySensitivity,
     MemoryType,
 )
+from app.domain.model_types import ModelResponse, ModelTaskType
+from app.domain.parent_report import ParentReportGenerationStatus
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.repositories.conversation_persistence_repository import ConversationReportMessage
 from app.repositories.parent_report_repository import (
@@ -70,6 +73,87 @@ class FakeConversationRepository:
         ]
 
 
+class SuccessfulParentReportModelRegistry:
+    def __init__(self) -> None:
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        payload = _payload_from_request(request)
+        memories = payload.get("memory_summaries", [])
+        learning = [
+            item["content"]
+            for item in memories
+            if item.get("type") == MemoryType.LEARNING_PATTERN.value
+        ]
+        expression = [
+            item["content"]
+            for item in memories
+            if item.get("type") == MemoryType.EXPRESSION_PATTERN.value
+        ]
+        emotion = [
+            item["content"]
+            for item in memories
+            if item.get("type") == MemoryType.EMOTION_OBSERVATION.value
+        ]
+        safety = [
+            item["content"]
+            for item in memories
+            if item.get("requires_parent_attention")
+            or item.get("type") == MemoryType.SAFETY.value
+        ]
+        topics = payload.get("topic_hints", [])
+        state = payload.get("state_hints", [])
+        if "学习求助" in topics and not learning:
+            learning.append("模型观察：今天有学习求助线索，适合先复述题意。")
+        if "图片分享" in topics and not expression:
+            expression.append("模型观察：孩子今天用图片作为表达入口。")
+        fallback_hints = payload.get("deterministic_fallback_hints", {})
+        actions = list(fallback_hints.get("relationship_parent_actions") or [])
+        if learning:
+            actions.append("可以请孩子先复述题目在问什么；避免直接给最终答案。")
+        if safety:
+            actions.append("今晚先做安全确认；避免责备或追问细节。")
+        if "图片分享" in topics:
+            actions.append("可以先问“你最想让我看哪里？”；避免默认当成作业或隐私。")
+        if not actions:
+            actions = ["今晚可以轻轻开口问一个当天小细节；避免连续追问或贴标签。"]
+        summary_topics = list(topics)
+        if not summary_topics and learning:
+            summary_topics.append("学习支持")
+        if not summary_topics and safety:
+            summary_topics.append("安全信号")
+        if payload.get("conversation_snippets"):
+            summary_topics.append("会话消息")
+        data = {
+            "summary": "模型日报："
+            + ("、".join(summary_topics[:3]) if summary_topics else "基于当天素材生成。")
+            + (" " + state[0] if state else ""),
+            "learning_observations": learning,
+            "expression_observations": expression,
+            "emotion_observations": emotion,
+            "safety_alerts": safety,
+            "suggested_parent_actions": actions,
+        }
+        return ModelResponse(
+            task_type=ModelTaskType.PARENT_REPORT,
+            response_text="",
+            structured_output={"daily_report": data},
+            provider_name="mimo",
+            model_name="mimo-v2.5-pro",
+            metadata={},
+        )
+
+
+def _payload_from_request(request) -> dict:
+    content = request.messages[-1].content
+    if isinstance(content, list):
+        raise AssertionError("parent report test request should be text JSON")
+    if content.startswith("上一次输出为空或不可解析。"):
+        content = content.split("\n", 1)[1]
+    return json.loads(content)
+
+
 def _services() -> tuple[
     InMemoryMemoryRepository,
     MemoryService,
@@ -83,6 +167,7 @@ def _services() -> tuple[
     report_service = ParentReportService(
         memory_service=memory_service,
         conversation_repository=FakeConversationRepository(),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=_fixed_now,
     )
     return repository, memory_service, report_service
@@ -103,6 +188,7 @@ def _services_with_report_repository() -> tuple[
         memory_service=memory_service,
         repository=report_repository,
         conversation_repository=FakeConversationRepository(),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=_fixed_now,
     )
     return memory_service, report_repository, report_service
@@ -176,7 +262,7 @@ def test_parent_report_service_generates_normal_daily_report() -> None:
         "孩子本次表达了低落或紧张情绪，后续适合先接住感受再进入问题解决。"
     ]
     assert report.safety_alerts == []
-    assert any("不直接给最终答案" in action for action in report.suggested_parent_actions)
+    assert any("直接给最终答案" in action for action in report.suggested_parent_actions)
     assert "逐字返回" not in report.model_dump_json()
 
 
@@ -227,6 +313,7 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
                 ),
             ]
         ),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=_fixed_now,
     )
 
@@ -244,15 +331,8 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     assert "数学题不会做" not in report_json
 
 
-def test_parent_report_service_default_does_not_call_model_from_daily_conversation() -> None:
-    class NoCallModelRegistry:
-        requests = 0
-
-        def generate(self, _request):
-            self.requests += 1
-            raise AssertionError("parent report default path must not call model")
-
-    model_registry = NoCallModelRegistry()
+def test_parent_report_service_model_first_uses_daily_conversation_materials() -> None:
+    model_registry = SuccessfulParentReportModelRegistry()
     memory_service = MemoryService(
         repository=InMemoryMemoryRepository(),
         now_provider=_fixed_now,
@@ -281,19 +361,27 @@ def test_parent_report_service_default_does_not_call_model_from_daily_conversati
         report_date=date(2026, 5, 18),
     )
 
-    assert model_registry.requests == 0
+    assert len(model_registry.requests) == 1
+    assert model_registry.requests[0].task_type == ModelTaskType.PARENT_REPORT
     assert "会话消息" in report.summary
     assert any("你最想让我看哪里" in action for action in report.suggested_parent_actions)
     assert "逐字聊天记录" not in report.model_dump_json()
 
 
-def test_parent_report_service_default_does_not_retry_empty_model_response() -> None:
+def test_parent_report_service_empty_model_response_retries_once_then_fails() -> None:
     class EmptyThenReportModelRegistry:
         requests = 0
 
-        def generate(self, _request):
+        def generate(self, request):
             self.requests += 1
-            raise AssertionError("parent report default path must not retry model")
+            return ModelResponse(
+                task_type=request.task_type,
+                response_text="",
+                structured_output={},
+                provider_name="mimo",
+                model_name="mimo-v2.5-pro",
+                metadata={},
+            )
 
     model_registry = EmptyThenReportModelRegistry()
     report_service = ParentReportService(
@@ -319,19 +407,21 @@ def test_parent_report_service_default_does_not_retry_empty_model_response() -> 
         report_date=date(2026, 5, 18),
     )
 
-    assert report.summary
-    assert model_registry.requests == 0
+    assert report.generation_status == ParentReportGenerationStatus.MODEL_FAILED
+    assert report.generation_error_code == "empty_or_unparseable_model_report"
+    assert model_registry.requests == 2
+    assert report.summary == "日报暂时生成失败，请稍后重试。"
 
 
-def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() -> None:
-    class EmptyReportModelRegistry:
+def test_parent_report_service_provider_failure_does_not_return_rule_report() -> None:
+    class FailingReportModelRegistry:
         requests = 0
 
         def generate(self, _request):
             self.requests += 1
-            raise AssertionError("parent report default path must not call model")
+            raise RuntimeError("provider raw response should not leak")
 
-    model_registry = EmptyReportModelRegistry()
+    model_registry = FailingReportModelRegistry()
     report_service = ParentReportService(
         memory_service=MemoryService(
             repository=InMemoryMemoryRepository(),
@@ -354,10 +444,89 @@ def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() ->
         report_date=date(2026, 5, 18),
     )
 
-    assert report.summary
-    assert report.suggested_parent_actions
-    assert model_registry.requests == 0
+    assert report.generation_status == ParentReportGenerationStatus.MODEL_FAILED
+    assert report.generation_error_code == "RuntimeError"
+    assert model_registry.requests == 1
+    assert report.summary == "日报暂时生成失败，请稍后重试。"
+    assert "provider raw response should not leak" not in report.model_dump_json()
     assert "我今天想聊画画" not in report.model_dump_json()
+
+
+def test_parent_report_model_payload_redacts_debug_secret_and_base64() -> None:
+    class CapturingModelRegistry(SuccessfulParentReportModelRegistry):
+        payload: dict | None = None
+
+        def generate(self, request):
+            self.payload = _payload_from_request(request)
+            return super().generate(request)
+
+    model_registry = CapturingModelRegistry()
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_secret",
+                    text=(
+                        "Authorization: Bearer secret-token data:image/png;base64,AAAA "
+                        "prompt: hidden debug trace"
+                    ),
+                )
+            ]
+        ),
+        model_registry=model_registry,
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    payload_json = json.dumps(model_registry.payload, ensure_ascii=False)
+    assert report.generation_status == ParentReportGenerationStatus.MODEL_GENERATED
+    assert "[redacted]" in payload_json
+    assert "secret-token" not in payload_json
+    assert "data:image" not in payload_json
+    assert "base64" not in payload_json.lower()
+    assert "hidden debug trace" not in payload_json
+
+
+def test_parent_report_failure_is_not_persisted_as_success() -> None:
+    class EmptyModelRegistry:
+        def generate(self, request):
+            return ModelResponse(
+                task_type=request.task_type,
+                response_text="",
+                structured_output={},
+                provider_name="mimo",
+                model_name="mimo-v2.5-pro",
+                metadata={},
+            )
+
+    memory_service = MemoryService(
+        repository=InMemoryMemoryRepository(),
+        now_provider=_fixed_now,
+    )
+    report_repository = InMemoryParentReportRepository()
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        repository=report_repository,
+        conversation_repository=FakeConversationRepository(),
+        model_registry=EmptyModelRegistry(),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.get_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.generation_status == ParentReportGenerationStatus.MODEL_FAILED
+    assert report_repository.get("child_parent_report_service_test", date(2026, 5, 18)) is None
 
 
 def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer() -> None:
@@ -366,6 +535,7 @@ def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer
         memory_service=memory_service,
         repository=report_repository,
         conversation_repository=FakeConversationRepository(),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=_fixed_now,
     )
     old_report = old_report_service.get_daily_report(
@@ -385,6 +555,7 @@ def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer
                 )
             ]
         ),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=lambda: datetime(2026, 5, 18, 11, 5, tzinfo=timezone.utc),
     )
 
@@ -398,7 +569,7 @@ def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer
     assert refreshed.created_at > old_report.created_at
 
 
-def test_parent_report_service_second_get_returns_persisted_report() -> None:
+def test_parent_report_service_refreshes_when_new_memory_arrives() -> None:
     memory_service, _, report_service = _services_with_report_repository()
     memory_service.create(
         _memory_request(
@@ -425,9 +596,11 @@ def test_parent_report_service_second_get_returns_persisted_report() -> None:
         report_date=date(2026, 5, 18),
     )
 
-    assert second.created_at == first.created_at
-    assert second.learning_observations == first.learning_observations
-    assert second.expression_observations == first.expression_observations
+    assert second.created_at >= first.created_at
+    assert second.material_fingerprint != first.material_fingerprint
+    assert second.expression_observations == [
+        "这条后续记忆不应改变已持久化的当日报告。"
+    ]
 
 
 def test_parent_report_service_repository_failure_returns_generated_report(
@@ -465,6 +638,7 @@ def test_parent_report_service_repository_failure_returns_generated_report(
         memory_service=memory_service,
         repository=FailingReportRepository(),
         conversation_repository=FakeConversationRepository(),
+        model_registry=SuccessfulParentReportModelRegistry(),
         now_provider=_fixed_now,
     )
     caplog.set_level("WARNING", logger="app.parent_report")

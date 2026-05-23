@@ -104,6 +104,10 @@ def test_db_metadata_includes_key_columns() -> None:
             "emotion_observations",
             "safety_alerts",
             "suggested_parent_actions",
+            "generation_status",
+            "generated_by",
+            "generation_error_code",
+            "material_fingerprint",
             "created_at",
         },
         "model_debug_traces": {

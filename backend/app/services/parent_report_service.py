@@ -1,5 +1,7 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from hashlib import sha256
 import json
 import logging
 
@@ -7,8 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.logging import hash_identifier
 from app.domain.memory import MemoryItem, MemorySensitivity, MemoryType
-from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
-from app.domain.parent_report import ParentReport
+from app.domain.model_types import ModelMessage, ModelRequest, ModelResponse, ModelTaskType
+from app.domain.parent_report import ParentReport, ParentReportGenerationStatus
 from app.repositories.conversation_persistence_repository import (
     ConversationPersistenceRepository,
     ConversationPersistenceRepositoryUnavailable,
@@ -33,6 +35,12 @@ from app.services.relationship_memory import (
 
 
 logger = logging.getLogger("app.parent_report")
+
+
+@dataclass(frozen=True)
+class _ModelDailyReportResult:
+    report: ParentReport | None
+    error_code: str | None
 
 
 class ParentReportService:
@@ -98,7 +106,9 @@ class ParentReportService:
             memories=memories,
             conversation_messages=conversation_messages,
         )
-        return self._save_generated_report(report)
+        if report.generation_status == ParentReportGenerationStatus.MODEL_GENERATED:
+            return self._save_generated_report(report)
+        return report
 
     def generate_daily_report(
         self,
@@ -128,6 +138,44 @@ class ParentReportService:
         conversation_messages: list[ConversationReportMessage],
     ) -> ParentReport:
         conversation = self._conversation_analysis(conversation_messages)
+        fallback_report = self._deterministic_fallback_report(
+            child_id=child_id,
+            target_date=target_date,
+            memories=memories,
+            conversation_messages=conversation_messages,
+            conversation=conversation,
+        )
+        material_fingerprint = self._material_fingerprint(
+            memories=memories,
+            conversation_messages=conversation_messages,
+        )
+        model_result = self._model_daily_report(
+            child_id=child_id,
+            target_date=target_date,
+            memories=memories,
+            conversation_messages=conversation_messages,
+            conversation=conversation,
+            fallback_report=fallback_report,
+            material_fingerprint=material_fingerprint,
+        )
+        if model_result.report is not None:
+            return model_result.report
+        return self._failed_report(
+            child_id=child_id,
+            target_date=target_date,
+            error_code=model_result.error_code or "model_unavailable",
+            material_fingerprint=material_fingerprint,
+        )
+
+    def _deterministic_fallback_report(
+        self,
+        *,
+        child_id: str,
+        target_date: date,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+        conversation: dict[str, list[str]],
+    ) -> ParentReport:
 
         learning = self._observations_for(memories, {MemoryType.LEARNING_PATTERN})
         expression = self._observations_for(
@@ -155,7 +203,7 @@ class ParentReportService:
             conversation_topics=conversation["topics"],
         )
 
-        fallback_report = ParentReport(
+        return ParentReport(
             child_id=child_id,
             date=target_date,
             summary=self._summary(
@@ -174,8 +222,14 @@ class ParentReportService:
             safety_alerts=safety_alerts,
             suggested_parent_actions=actions,
             created_at=self._now(),
+            generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
+            generated_by="deterministic_fallback",
+            generation_error_code=None,
+            material_fingerprint=self._material_fingerprint(
+                memories=memories,
+                conversation_messages=conversation_messages,
+            ),
         )
-        return fallback_report
 
     def _model_daily_report(
         self,
@@ -186,7 +240,8 @@ class ParentReportService:
         conversation_messages: list[ConversationReportMessage],
         conversation: dict[str, list[str]],
         fallback_report: ParentReport,
-    ) -> ParentReport | None:
+        material_fingerprint: str,
+    ) -> _ModelDailyReportResult:
         try:
             response = self._request_model_report(
                 child_id=child_id,
@@ -198,23 +253,28 @@ class ParentReportService:
                 retry=False,
             )
         except Exception as exc:  # noqa: BLE001 - report generation must not block.
+            error_type = exc.__class__.__name__
             self._log_model_fallback(
                 child_id=child_id,
                 report_date=target_date,
-                error_type=exc.__class__.__name__,
+                error_type=error_type,
             )
-            return None
+            return _ModelDailyReportResult(report=None, error_code=error_type)
 
-        if response.metadata.get("mock") and not response.structured_output.get(
-            "daily_report"
-        ):
-            return None
+        blocked_error = self._model_response_blocked_error(response)
+        if blocked_error is not None:
+            self._log_model_fallback(
+                child_id=child_id,
+                report_date=target_date,
+                error_type=blocked_error,
+            )
+            return _ModelDailyReportResult(report=None, error_code=blocked_error)
         parsed = self._parse_model_report(
             response.structured_output.get("daily_report")
             or response.structured_output.get("text")
             or response.response_text,
         )
-        if parsed is None and not response.metadata.get("mock"):
+        if parsed is None:
             try:
                 retry_response = self._request_model_report(
                     child_id=child_id,
@@ -226,33 +286,91 @@ class ParentReportService:
                     retry=True,
                 )
             except Exception as exc:  # noqa: BLE001 - report fallback must hold.
+                error_type = exc.__class__.__name__
                 self._log_model_fallback(
                     child_id=child_id,
                     report_date=target_date,
-                    error_type=exc.__class__.__name__,
+                    error_type=error_type,
                 )
-                return None
+                return _ModelDailyReportResult(report=None, error_code=error_type)
+            blocked_error = self._model_response_blocked_error(retry_response)
+            if blocked_error is not None:
+                self._log_model_fallback(
+                    child_id=child_id,
+                    report_date=target_date,
+                    error_type=blocked_error,
+                )
+                return _ModelDailyReportResult(report=None, error_code=blocked_error)
             parsed = self._parse_model_report(
                 retry_response.structured_output.get("daily_report")
                 or retry_response.structured_output.get("text")
                 or retry_response.response_text,
             )
         if parsed is None:
-            return None
+            self._log_model_fallback(
+                child_id=child_id,
+                report_date=target_date,
+                error_type="empty_or_unparseable_model_report",
+            )
+            return _ModelDailyReportResult(
+                report=None,
+                error_code="empty_or_unparseable_model_report",
+            )
+        return _ModelDailyReportResult(
+            report=ParentReport(
+                child_id=child_id,
+                date=target_date,
+                summary=parsed["summary"],
+                learning_observations=parsed["learning_observations"],
+                expression_observations=parsed["expression_observations"],
+                emotion_observations=parsed["emotion_observations"],
+                safety_alerts=parsed["safety_alerts"],
+                suggested_parent_actions=parsed["suggested_parent_actions"],
+                created_at=self._now(),
+                generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
+                generated_by="model",
+                generation_error_code=None,
+                material_fingerprint=material_fingerprint,
+            ),
+            error_code=None,
+        )
+
+    def _model_response_blocked_error(self, response: ModelResponse) -> str | None:
+        if response.metadata.get("policy_blocked"):
+            return "policy_blocked"
+        if response.metadata.get("fallback_used"):
+            return str(response.metadata.get("failure_type") or "provider_fallback")
+        if response.metadata.get("mock") or response.provider_name == "mock":
+            return "mock_provider_not_formal_report"
+        return None
+
+    def _failed_report(
+        self,
+        *,
+        child_id: str,
+        target_date: date,
+        error_code: str,
+        material_fingerprint: str,
+    ) -> ParentReport:
+        status = (
+            ParentReportGenerationStatus.MODEL_BLOCKED
+            if "policy" in error_code.lower() or "blocked" in error_code.lower()
+            else ParentReportGenerationStatus.MODEL_FAILED
+        )
         return ParentReport(
             child_id=child_id,
             date=target_date,
-            summary=parsed["summary"] or fallback_report.summary,
-            learning_observations=parsed["learning_observations"]
-            or fallback_report.learning_observations,
-            expression_observations=parsed["expression_observations"]
-            or fallback_report.expression_observations,
-            emotion_observations=parsed["emotion_observations"]
-            or fallback_report.emotion_observations,
-            safety_alerts=parsed["safety_alerts"] or fallback_report.safety_alerts,
-            suggested_parent_actions=parsed["suggested_parent_actions"]
-            or fallback_report.suggested_parent_actions,
+            summary="日报暂时生成失败，请稍后重试。",
+            learning_observations=[],
+            expression_observations=[],
+            emotion_observations=[],
+            safety_alerts=[],
+            suggested_parent_actions=["请稍后重试生成父亲日报；不要把当前失败状态当作孩子当天表现。"],
             created_at=self._now(),
+            generation_status=status,
+            generated_by="model",
+            generation_error_code=error_code,
+            material_fingerprint=material_fingerprint,
         )
 
     def _request_model_report(
@@ -294,6 +412,7 @@ class ParentReportService:
                 ],
                 context={"conversation": {"child_id": child_id}},
                 metadata={
+                    "contains_child_data": True,
                     "report_date": target_date.isoformat(),
                     "parent_report_retry": retry,
                     "material_counts": {
@@ -346,7 +465,25 @@ class ParentReportService:
                 self._conversation_snippet(message)
                 for message in conversation_messages[:24]
             ],
-            "fallback_report": fallback_report.model_dump(mode="json"),
+            "report_schema": {
+                "summary": "非空中文字符串，必须由当天素材归纳，不要逐字引用。",
+                "learning_observations": "list[str]",
+                "expression_observations": "list[str]",
+                "emotion_observations": "list[str]",
+                "safety_alerts": "list[str]",
+                "suggested_parent_actions": "list[str]，每条包含 starter + avoid 语义",
+            },
+            "deterministic_fallback_hints": {
+                "topics": conversation["topics"],
+                "state_summary": conversation["state_summary"],
+                "relationship_parent_actions": [
+                    action
+                    for action in fallback_report.suggested_parent_actions
+                    if "今晚可以轻轻问" in action
+                    or "孩子表达不想聊" in action
+                    or "孩子今天有表达展开" in action
+                ][:4],
+            },
         }
 
     def _conversation_snippet(
@@ -547,6 +684,14 @@ class ParentReportService:
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
     ) -> bool:
+        if report.generation_status != ParentReportGenerationStatus.MODEL_GENERATED:
+            return True
+        material_fingerprint = self._material_fingerprint(
+            memories=memories,
+            conversation_messages=conversation_messages,
+        )
+        if report.material_fingerprint != material_fingerprint:
+            return True
         latest = self._latest_material_time(
             memories=memories,
             conversation_messages=conversation_messages,
@@ -943,7 +1088,49 @@ class ParentReportService:
         safe = " ".join(text.strip().split())
         for forbidden, replacement in self._FORBIDDEN_REPLACEMENTS.items():
             safe = safe.replace(forbidden, replacement)
+        lowered = safe.lower()
+        secret_markers = (
+            "authorization:",
+            "bearer ",
+            "api_key",
+            "apikey",
+            "secret",
+            "token",
+            "data:image",
+            "data:audio",
+            ";base64,",
+            "provider raw",
+            "debug trace",
+            "prompt:",
+        )
+        if any(marker in lowered for marker in secret_markers):
+            return "[redacted]"
         return safe[:220]
+
+    def _material_fingerprint(
+        self,
+        *,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+    ) -> str:
+        payload = {
+            "memories": [
+                {
+                    "id": memory.id,
+                    "updated_at": self._aware_datetime(memory.updated_at).isoformat(),
+                }
+                for memory in memories
+            ],
+            "messages": [
+                {
+                    "id": message.id,
+                    "created_at": self._aware_datetime(message.created_at).isoformat(),
+                }
+                for message in conversation_messages
+            ],
+        }
+        raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        return sha256(raw.encode("utf-8")).hexdigest()[:32]
 
     def _dedupe_and_limit(self, values: list[str], *, limit: int) -> list[str]:
         result: list[str] = []

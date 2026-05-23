@@ -372,14 +372,19 @@ If PostgreSQL is unavailable, MemoryService falls back to the process-local
 repository without blocking conversation or Android QA.
 
 DB1-B5 records generated `ParentReportService` reports in `parent_reports`.
-`get_daily_report()` first reads an existing report for `child_id + date`; if
-none exists, it generates a report from parent-visible structured memory and
-best-effort saves it. Repository failure does not block the parent report API:
-the service returns the generated report and logs only hashed identifiers,
-date, operation, and error type.
-Parent reports can use relationship memories to suggest low-pressure real-world
-conversation starters with an avoid note, for example gently asking about a
-running competition without interrogating distance or body symptoms.
+`get_daily_report()` first reads an existing model-generated report for
+`child_id + date`; if none exists or same-day materials changed, it builds a
+minimal evidence packet from same-day conversation messages, routing/scene/risk
+signals, and parent-visible structured memory, then calls
+`ModelTaskType.PARENT_REPORT`. Only valid structured model output is saved as a
+formal report. Provider failure, policy blocking, empty output, or invalid JSON
+returns `generation_status=model_failed|model_blocked` with a retry message
+instead of showing a deterministic rule report as success. Repository failure
+does not leak report content; logs contain only hashed identifiers, date,
+operation, and error type.
+Parent reports can use relationship memories as model evidence for low-pressure
+real-world conversation starters with an avoid note, for example gently asking
+about a running competition without interrogating distance or body symptoms.
 
 Local dev database:
 
@@ -446,11 +451,13 @@ Data boundary:
   embedding ids. It must not store raw media, full chat transcripts, prompts,
   debug internals, provider raw responses, or API keys.
 - `parent_reports` stores parent-facing daily summary text, observations,
-  structured safety alerts, and suggested parent actions. It must not store
-  memory evidence, quote summaries, raw chat transcripts, prompts, debug
-  internals, provider raw responses, or API keys. Family MVP report generation
-  is deterministic by default and does not call `ModelRegistry.generate()`; the
-  model report path is retained only for dev/test experiments.
+  structured safety alerts, suggested parent actions, generation status, and a
+  same-day material fingerprint. It must not store memory evidence, quote
+  summaries, raw chat transcripts, prompts, debug internals, provider raw
+  responses, or API keys. ParentReport v2 is model-first: formal report content
+  comes from `ModelTaskType.PARENT_REPORT`; deterministic/rule material is only
+  an internal fallback/hints path and is not shown as a successful report when
+  the model fails.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
 - `model_debug_traces` is a dev/test opt-in temporary table for prompt analysis.
@@ -509,12 +516,12 @@ Run the repeatable synthetic prompt review:
 
 The scenario runner uses synthetic providers for its own process, clears prior
 trace rows, runs opening / child_chat / parent_report synthetic cases, verifies
-that child_chat model traces are recorded, and writes
-`docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. Opening and parent_report use their
-deterministic default paths in the runner and are marked `deterministic_default`
-instead of being treated as missing model traces. The report is useful for
-prompt contract review, but it is not real MiMo output, real child QA, or
-Android device validation.
+that child_chat and parent_report model traces are recorded, and writes
+`docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. Opening remains deterministic by
+default and is marked `deterministic_default`; ParentReport is model-first and
+should produce a `parent_report` trace. The report is useful for prompt contract
+review, but it is not real MiMo output, real child QA, or Android device
+validation.
 
 Run the explicit real MiMo synthetic text-only review:
 
@@ -527,19 +534,18 @@ CHILD_AI_MIMO_API_KEY=... \
 ```
 
 Real-provider mode is opt-in only. It applies a process-local MiMo overlay for
-child_chat, never writes `.env`, and does not use real child audio/images,
-Android, CameraX, ASR, TTS, or vision. If the MiMo key is missing the runner
+child_chat and parent_report, never writes `.env`, and does not use real child
+audio/images, Android, CameraX, ASR, TTS, or vision. If the MiMo key is missing the runner
 exits with `REAL_PROVIDER_BLOCKED` and does not report a mock pass as real
 provider evidence. The current real synthetic review reached
 `REAL_PROVIDER_SMOKE: PASS` for provider/model `mimo/mimo-v2.5-pro`; the report
 is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`. PROMPT-REAL-HARDEN-1 keeps
 child-facing self-harm replies on a deterministic trusted-adult fallback,
 strips stage directions, suppresses multi-question replies, removes bedtime
-"tomorrow" hooks, and avoids verbatim topic-change echo. MVP-CLOSEOUT-1 moves
-opening and parent_report to deterministic default paths, so the latest report
-uses child_chat traces as provider quality evidence and no longer treats
-opening/report raw empty responses as family MVP blockers; P0/P1/P2 are none in
-the synthetic checks.
+"tomorrow" hooks, and avoids verbatim topic-change echo. Opening remains
+deterministic by default. ParentReport was revised in PD-052 to model-first, so
+parent_report traces are again required for model report QA; model failure is
+reported as failed/blocked rather than replaced with a successful rule report.
 
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed

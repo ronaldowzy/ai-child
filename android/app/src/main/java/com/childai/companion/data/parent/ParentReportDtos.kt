@@ -11,7 +11,13 @@ data class ParentReport(
     val emotionObservations: List<String>,
     val safetyAlerts: List<String>,
     val suggestedParentActions: List<String>,
+    val generationStatus: String = "legacy",
+    val generatedBy: String = "legacy",
+    val generationErrorCode: String? = null,
 ) {
+    val isGeneratedSuccessfully: Boolean
+        get() = generationStatus == "model_generated"
+
     companion object {
         fun fromJsonString(rawJson: String): ParentReport {
             val root = JSONObject(rawJson)
@@ -33,9 +39,19 @@ data class ParentReport(
                 suggestedParentActions = root.optJSONArray(
                     "suggested_parent_actions",
                 ).toParentReportStringList(),
+                generationStatus = root.optString("generation_status", "legacy"),
+                generatedBy = root.optString("generated_by", "legacy"),
+                generationErrorCode = root.optNullableString(
+                    "generation_error_code",
+                ),
             )
         }
     }
+}
+
+private fun JSONObject.optNullableString(name: String): String? {
+    if (!has(name) || isNull(name)) return null
+    return optString(name).takeIf { it.isNotBlank() }
 }
 
 private fun org.json.JSONArray?.toParentReportStringList(): List<String> {

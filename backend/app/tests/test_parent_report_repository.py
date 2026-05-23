@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
-from app.domain.parent_report import ParentReport
+from app.domain.parent_report import ParentReport, ParentReportGenerationStatus
 from app.repositories.parent_report_repository import ParentReportRepository
 
 
@@ -36,6 +36,10 @@ def _report(
         safety_alerts=["今天出现需要父亲关注的安全信号。"],
         suggested_parent_actions=["今晚先做安全确认。"],
         created_at=created_at,
+        generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
+        generated_by="model",
+        generation_error_code=None,
+        material_fingerprint="fingerprint_001",
     )
 
 
@@ -56,6 +60,10 @@ def test_parent_report_repository_save_get_roundtrips_all_fields() -> None:
     assert reloaded.safety_alerts == report.safety_alerts
     assert reloaded.suggested_parent_actions == report.suggested_parent_actions
     assert reloaded.created_at == report.created_at
+    assert reloaded.generation_status == ParentReportGenerationStatus.MODEL_GENERATED
+    assert reloaded.generated_by == "model"
+    assert reloaded.generation_error_code is None
+    assert reloaded.material_fingerprint == "fingerprint_001"
 
 
 def test_parent_report_repository_same_child_date_updates_without_duplicate() -> None:

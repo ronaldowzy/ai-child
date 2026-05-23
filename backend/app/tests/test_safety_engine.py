@@ -60,3 +60,12 @@ def test_output_parent_isolation_phrase_is_blocked() -> None:
     assert result.risk_level == RiskLevel.HIGH
     assert result.requires_parent_attention is True
     assert result.primary_category == RiskCategory.ADULT_SECRET
+
+
+def test_output_retention_pressure_is_blocked() -> None:
+    result = SafetyEngine().classify_output("你不来我会难过，连续签到还有限时奖励。")
+
+    assert result.risk_level == RiskLevel.HIGH
+    assert result.requires_parent_attention is True
+    assert result.primary_category == RiskCategory.ADULT_SECRET
+    assert result.evidence == ["unsafe_output_retention_pressure"]

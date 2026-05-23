@@ -636,6 +636,19 @@ Implementation notes: 新增 `turn_guidance` runtime section，覆盖 operation 
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`docs/PROMPT_CHILD_SPEECH_GUIDANCE_V0_1.md`。
 Tests or QA needed: 回归测试覆盖真实运动比赛语音序列、换题、睡前收尾、自伤 critical 保留、医学 watch 保留和父亲日报 topic 抽取；Redmi K60 / Honor Pad 5 仍需真机复验回复自然度。
 
+#### PD-044
+
+Decision ID: PD-044
+Date: 2026-05-23
+Status: confirmed
+Source: father / `HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`
+Decision: 下一阶段产品优化以 Healthy Engagement 为总指导：目标使用“健康依恋 / 主动回访 / 成长陪伴习惯”，避免把“不健康依赖”作为产品目标；长期吸引力来自被理解感、掌控感、能力感、期待感和现实生活迁移。
+Rationale: 家庭内测前已经跑通 voice-first、TTS、ASR、vision、stream、DB、prompt guidance 和父亲日报的基础闭环；下一阶段必须防止为了留存而引入成瘾式机制或排他关系。
+Affected modules: global/output prompts、QuickActionService、SafetyEngine output safety、ParentReportService、future relationship memory、opening v2、Android QA。
+Implementation notes: 禁止签到压力、断签惩罚、排行榜、抽卡、FOMO、限时错过、情感勒索、秘密关系和排他依恋；儿童端应持续提供继续说、换个话题、讲个小故事、今天不聊了等掌控动作；输出应尊重停止、换题和睡前收尾，并尽量连接回父母、老师、同伴、作品、运动、学习小步骤或睡眠。本轮已先落地输出契约、quick actions 和输出安全拦截的最小快改。
+Docs updated: `docs/HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`。
+Tests or QA needed: prompt contract、quick actions、retention-pressure output safety 已有后端测试；Redmi K60 / Honor Pad 5 仍需确认实际回复和快捷动作是否低压力、可收束。
+
 ---
 
 ## 3. Current Product Direction

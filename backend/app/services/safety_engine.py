@@ -266,6 +266,29 @@ class SafetyEngine:
                 evidence=["unsafe_output_dependency_or_isolation"],
                 safe_response_hint="use_scene_fallback",
             )
+        unsafe_retention_pressure_markers = (
+            "你不来我会难过",
+            "你不来我会伤心",
+            "你不来我会想你",
+            "小白狐想你了",
+            "每天都要来看我",
+            "不要断签",
+            "断签",
+            "限时奖励",
+            "错过就没有",
+            "连续签到",
+            "排行榜",
+            "抽卡",
+        )
+        if self._contains_any(normalized, unsafe_retention_pressure_markers):
+            return SafetyClassification(
+                risk_level=RiskLevel.HIGH,
+                primary_category=RiskCategory.ADULT_SECRET,
+                categories=[RiskCategory.ADULT_SECRET],
+                requires_parent_attention=True,
+                evidence=["unsafe_output_retention_pressure"],
+                safe_response_hint="use_scene_fallback",
+            )
         return self.classify_input(text)
 
     def _safe_response_hint(

@@ -37,11 +37,11 @@ class QuickActionService:
                 SceneAction(id="dino_extinction", label="恐龙怎么灭绝"),
             ]
         if "开心" in normalized or "高兴" in normalized:
-            return self._actions("说开心原因", "发生了什么", "换个小话题")
+            return self._actions("继续说", "换个话题", "今天不聊了")
         if "画" in normalized:
             return [
                 SceneAction(id="share_photo", label="拍给小白狐看"),
-                *self._actions("说画面", "加个角色")[:2],
+                *self._actions("继续说", "讲个小故事")[:2],
             ]
         if any(marker in normalized for marker in ("给你看", "拍", "积木", "玩具")):
             return [
@@ -49,20 +49,21 @@ class QuickActionService:
                 *self._actions("聊聊它", "编个故事")[:2],
             ]
         if "游戏" in normalized:
-            return self._actions("说玩法", "说角色", "休息一下")
+            return self._actions("继续说", "换个话题", "今天不聊了")
+        if any(marker in normalized for marker in ("故事", "想象", "编一个", "编个")):
+            return self._actions("继续说", "讲个小故事", "今天不聊了")
 
         topic = self._topic_hint(text)
         if topic:
-            compact_topic = topic[:4]
             return self._actions(
-                f"{compact_topic}哪里有趣",
-                f"为什么想到{compact_topic}",
+                "继续说",
                 "换个话题",
+                "今天不聊了",
             )
 
         if "为什么" in reply_text or "为什么" in text:
-            return self._actions("说我的想法", "举个例子", "换个问法")
-        return self._actions("接着说", "问个问题", "换个小话题")
+            return self._actions("继续说", "换个说法", "今天不聊了")
+        return self._actions("继续说", "讲个小故事", "今天不聊了")
 
     def _topic_hint(self, text: str) -> str:
         prefixes = ("我想聊", "我喜欢", "我今天看到", "我在想", "我想说")

@@ -153,6 +153,9 @@ def test_output_contract_is_voice_first_and_not_markdown() -> None:
     assert "最多只问一个主要问题" in prompt.prompt
     assert "不要把话题硬拉回固定选项" in prompt.prompt
     assert "只有我懂你" in prompt.prompt
+    assert "不使用签到、连续天数、积分、排行榜、抽卡" in prompt.prompt
+    assert "今天不聊了" in prompt.prompt
+    assert "连接回现实生活、父母、老师、同伴" in prompt.prompt
 
 
 def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:

@@ -8,6 +8,7 @@ from app.providers.asr.base import (
     AsrProviderTimeoutError,
     BaseAsrProvider,
 )
+from app.providers.asr.local_sensevoice_provider import LocalSenseVoiceAsrProvider
 from app.providers.asr.mimo_asr_provider import MimoAsrProvider
 from app.providers.asr.mock_asr_provider import MockAsrProvider
 
@@ -20,6 +21,7 @@ __all__ = [
     "AsrProviderResult",
     "AsrProviderTimeoutError",
     "BaseAsrProvider",
+    "LocalSenseVoiceAsrProvider",
     "MimoAsrProvider",
     "MockAsrProvider",
 ]

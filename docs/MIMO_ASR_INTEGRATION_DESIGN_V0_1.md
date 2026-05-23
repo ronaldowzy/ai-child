@@ -1,12 +1,14 @@
 # MiMo ASR Integration Design v0.1
 
-用途：定义 MiMo audio input 作为 ASR v1 目标 provider 时的后端接入方式、数据策略和 Coordinator 集成事项。本文档允许实现受控 provider 和 endpoint，但默认仍 policy-blocked，不表示已经允许真实儿童音频外发。
+用途：定义 MiMo audio input 作为 ASR v1 云端 fallback provider 时的后端接入方式、数据策略和 Coordinator 集成事项。PD-048 已将真实识别第一选择修订为 sherpa-onnx + SenseVoice-Small int8 本地推理；本文档保留 MiMo fallback 约束。默认仍 policy-blocked，不表示已经允许真实儿童音频外发。
 
 状态：
 
 ```text
 implementation_target
 default_provider=mock
+preferred_real_provider=local_sensevoice
+fallback_provider=mimo
 cloud_asr_enabled=false
 android_child_mode_auto_send=true
 confirm_before_send_debug_mode=true
@@ -17,11 +19,11 @@ confirm_before_send_debug_mode=true
 ## 1. Decision Summary
 
 ```text
-1. ASR v1 方案确定接 MiMo audio input / ASR。
+1. ASR v1 原云端方案是 MiMo audio input / ASR；PD-048 后，MiMo 降级为本地 SenseVoice 异常后的 fallback。
 2. Android 不直接调用 MiMo，只负责录音、上传后端和儿童端语音状态。
 3. 后端 ASR endpoint 即使存在，也只能返回 transcript，不能直接调用 conversation/message 或 conversation/stream。
 4. Android 仍不得持有 MiMo API key。
-5. 真实 provider 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
+5. MiMo fallback 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
 6. 开发阶段先用 fake audio / smoke audio；未取得父亲授权和 policy flags 前，不允许真实儿童音频外发。
 7. Android 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation stream；确认面板仅保留为 DevSettings / 父亲调试模式。
 8. 不做常开麦克风，不做 streaming ASR，不做后端 ASR 自动调用 conversation。
@@ -33,6 +35,7 @@ confirm_before_send_debug_mode=true
 
 | Field | Value |
 |---|---|
+| Provider role | Cloud fallback after local SenseVoice ASR error |
 | Provider | MiMo OpenAI-compatible chat completions |
 | Target models | `mimo-v2.5` first, `mimo-v2-omni` fallback |
 | Unsupported model names | `MiMo-V2.5-ASR`, `mimo-v2.5-asr` |
@@ -65,7 +68,8 @@ POST /api/v1/asr/transcribe
   -> AsrService
   -> AsrProvider
        - MockAsrProvider by default
-       - MiMoAsrProvider only when explicitly enabled
+       - LocalSenseVoiceAsrProvider when explicitly enabled
+       - MiMoAsrProvider only as fallback and only when explicitly enabled
   -> transcript response with requiresConfirmation=true as backend safety metadata
   -> Android child mode auto-sends non-empty transcript by default
   -> DevSettings / father debug mode can show editable confirmation text
@@ -311,7 +315,7 @@ Current safe integration status:
 1. ASR settings now exist in `backend/app/core/config.py` with mock/disabled defaults.
 2. ASR env defaults are documented in `.env.example` and `backend/README.md`.
 3. Backend tests cover mock transcript, unsupported format, default MiMo policy block and router smoke in isolation.
-4. Product decision now confirms MiMo ASR as v1 target, while real child-audio external transmission remains gated.
+4. Product decision PD-048 now makes local SenseVoice the v1 first choice; MiMo remains fallback while real child-audio external transmission remains gated.
 ```
 
 Current implementation tasks:
@@ -319,8 +323,9 @@ Current implementation tasks:
 ```text
 1. Mount ASR router in `backend/app/main.py` while preserving mock/disabled defaults. [done]
 2. Wire real MiMo ASR network call behind `AsrDataPolicyGuard`. [done]
-3. Confirm model id through a policy-gated smoke using fake/smoke audio only. [manual smoke only]
+3. Confirm MiMo fallback model id through a policy-gated smoke using fake/smoke audio only. [manual smoke only]
 4. Build Android recording upload, child-mode auto-send, and optional DevSettings confirm UI. [code_ready_device_qa]
+5. Add local SenseVoice provider and fallback orchestration. [done]
 ```
 
 Smoke script contract:

@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     tts_public_base_url: str = "/media/tts"
     tts_max_text_chars: int = 600
     asr_provider: str = "mock"
+    asr_fallback_provider: str = "mimo"
+    local_sensevoice_enabled: bool = False
+    local_sensevoice_model_path: str = (
+        "backend/models/asr/sensevoice/model.int8.onnx"
+    )
+    local_sensevoice_tokens_path: str = "backend/models/asr/sensevoice/tokens.txt"
+    local_sensevoice_num_threads: int = 4
+    local_sensevoice_use_itn: bool = True
+    local_sensevoice_language: str = "zh"
     mimo_asr_enabled: bool = False
     mimo_asr_api_key: str = ""
     mimo_asr_base_url: str = "https://token-plan-cn.xiaomimimo.com/v1"

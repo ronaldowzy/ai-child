@@ -48,12 +48,12 @@
 
 已确认方向：
 
-- 语音输入 ASR v1 目标已修订为后端 MiMo audio input / ASR。
-- Android 不直接调用 MiMo，不保存 MiMo API key；Android 只负责点击录音、上传后端 ASR 和儿童端语音状态。
+- 语音输入 ASR v1 目标已修订为后端本地 SenseVoice ASR 优先，MiMo audio input / ASR 作为本地异常后的云端 fallback。
+- Android 不直接调用 MiMo，不保存 MiMo API key，也不持有本地 ASR 模型；Android 只负责点击录音、上传后端 ASR 和儿童端语音状态。
 - 语音输入 v1 儿童默认流程：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> ASR ok 自动发送 transcript -> text 走 conversation stream；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
 - Future hands-free conversational mode 不进入 v1。
 - 自动发送后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
-- 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 做 MiMo ASR smoke，不用真实儿童录音。
+- 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 或非儿童测试音频做 ASR smoke，不用真实儿童录音。
 - 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
 - App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示并按 `audio_url` 自动播放；如果孩子先开口，迟到的 opening 不插入。
 - opening greeting 的称呼来自父亲设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。

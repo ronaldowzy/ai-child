@@ -1,6 +1,6 @@
 # ASR Input Research v0.1
 
-用途：记录 MiMo 音频输入 / ASR 能力调研结论，以及本项目在儿童语音输入上的数据边界。父亲已确认 ASR v1 方案接 MiMo；本文档仍强调默认 disabled 和 policy gate，不表示已经允许真实儿童音频外发。
+用途：记录 ASR 能力调研结论，以及本项目在儿童语音输入上的数据边界。父亲已确认 ASR v1 从云端 MiMo 优先修订为本地 ASR 优先：第一选择是 sherpa-onnx + SenseVoice-Small int8；MiMo audio input / ASR 保留为本地异常后的 fallback。本文档仍强调默认 mock、云端 disabled 和 policy gate，不表示已经允许真实儿童音频外发。
 
 来源：
 
@@ -24,23 +24,25 @@
 当前 confirmed decision：
 
 ```text
-1. ASR v1 目标是后端接 MiMo audio input / ASR。
-2. Android 不直接调用 MiMo，不保存 MiMo API key。
-3. Android 只负责主动点击录音、上传到后端 ASR endpoint 和儿童端语音状态。
-4. 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
-5. 不做常开麦克风，不做唤醒词，不做后端 ASR 自动调用 conversation。
-6. 真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制。
-7. 开发阶段先用 fake audio / smoke audio 验证，不用真实儿童录音。
-8. 不保存原始音频、长篇逐字转写或真实儿童身份信息到长期记忆。
+1. ASR v1 目标是后端本地 ASR 优先，使用 sherpa-onnx + SenseVoice-Small int8。
+2. 本地 ASR 异常后才 fallback 到原有识别方式；当前默认 fallback provider 是 MiMo audio input / ASR。
+3. Android 不直接调用 MiMo，不保存 MiMo API key，也不直接持有本地模型。
+4. Android 只负责主动点击录音、上传到后端 ASR endpoint 和儿童端语音状态。
+5. 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
+6. 不做常开麦克风，不做唤醒词，不做后端 ASR 自动调用 conversation。
+7. 真实儿童音频外发必须由父亲授权和 ASR data policy flags 控制；本地 ASR 不需要云端 policy flags，但仍不得持久化原始音频。
+8. 开发阶段先用 fake audio / smoke audio 或非儿童公开测试音频验证，不用真实儿童录音。
+9. 不保存原始音频、长篇逐字转写或真实儿童身份信息到长期记忆。
 ```
 
-MiMo ASR / audio input 的定位：
+Provider 定位：
 
 ```text
-1. 是 ASR v1 的目标 provider。
-2. 后端统一调用 MiMo，Android 永不直连供应商。
-3. 必须在父亲授权、儿童音频外发、供应商留存和训练策略 flags 全部满足后才能真实外发。
-4. 即使启用，后端也只返回 transcript；儿童默认是否自动发送由 Android voice-first 产品逻辑决定。
+1. `local_sensevoice` 是真实识别第一选择。
+2. MiMo ASR 是本地异常后的云端 fallback 和对照测试路径。
+3. 后端统一调用 ASR provider，Android 永不直连供应商。
+4. MiMo 必须在父亲授权、儿童音频外发、供应商留存和训练策略 flags 全部满足后才能真实外发。
+5. 即使启用，后端也只返回 transcript；儿童默认是否自动发送由 Android voice-first 产品逻辑决定。
 ```
 
 ---
@@ -49,6 +51,8 @@ MiMo ASR / audio input 的定位：
 
 | Topic | Finding | Project Interpretation |
 |---|---|---|
+| Local SenseVoice | sherpa-onnx 可运行 SenseVoice-Small int8 ONNX，本机 Apple M2 / 8GB 上公开中文样例约 83ms 完成，模型加载约 0.7s，常驻约 471MB。 | 作为当前真实 ASR 第一选择，详见 `docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md`。 |
+| Fun-ASR-Nano | sherpa-onnx Fun-ASR-Nano int8 可运行，但本机加载和内存占用明显更高。 | 保留为备选研究方向，不作为当前第一版默认。 |
 | Model names | 外部规格称 `mimo-v2.5` 和 `mimo-v2-omni` 支持音频输入转写。 | ASR v1 默认 `mimo-v2.5`；2026-05-21 受控 smoke 已确认 `provider=mimo`、`model=mimo-v2.5`。不要使用文本对话模型 `mimo-v2.5-pro` 做 ASR。 |
 | Unsupported ASR-only names | 外部规格称 `MiMo-V2.5-ASR` / `mimo-v2.5-asr` 未开放或不可用。 | 不把 ASR-only 名称写成默认配置。 |
 | Endpoint | OpenAI-compatible chat completions endpoint，路径为 `/v1/chat/completions`。 | 后端 provider 层适配，不让 Android 直连供应商。 |
@@ -61,7 +65,7 @@ MiMo ASR / audio input 的定位：
 | Size | 外部规格建议不超过 25 MB。 | 本项目可先采用更保守上限；不允许长录音上传。 |
 | Auth | Bearer token；key 从环境变量读取。 | 只能后端临时 env / config 管理，不能进 Android、docs、tests 或 git。ASR 默认复用当前 MiMo key：ASR key -> shared MiMo key -> TTS key。 |
 | Retention/training | 外部规格没有给出可验证的留存、删除和训练承诺。 | 默认 policy-blocked；真实儿童音频外发必须由父亲授权并显式打开 retention/no-training 相关 flags。 |
-| Performance | 外部规格给出 20 秒级测试音频的数秒级延迟。 | 只能作为参考；儿童语音、网络和设备需独立 QA。 |
+| Performance | 外部规格给出 20 秒级测试音频的数秒级延迟；本机调研发现本地 SenseVoice 显著更快。 | 当前把 MiMo 从主路径降为 fallback；儿童语音、网络和设备仍需独立 QA。 |
 
 ---
 
@@ -92,7 +96,7 @@ MiMo ASR / audio input 的定位：
 
 ```text
 1. Android 不长期保存原始音频。
-2. 后端 ASR endpoint 可以在用户主动录音后接收短音频，但默认 provider 为 mock/disabled，MiMo 外发受 policy gate 控制。
+2. 后端 ASR endpoint 可以在用户主动录音后接收短音频，但默认 provider 为 mock；启用真实识别时优先本地 SenseVoice，MiMo 外发受 policy gate 控制。
 3. 音频只在一次转写请求中短暂存在，不写数据库、不进日志、不进 memory。
 4. 转写结果在孩子确认前只是 pending transcript，不作为正式 child message。
 5. 孩子确认或父亲确认后，才把编辑后的文本发送到 conversation API。
@@ -114,7 +118,7 @@ MiMo ASR / audio input 的定位：
 如果以上信息缺失，项目默认结论是：
 
 ```text
-MiMo ASR provider remains configured but policy-blocked; use text input or fake/smoke audio for development verification.
+MiMo ASR fallback remains configured but policy-blocked; use local ASR, text input, or fake/smoke audio for development verification.
 ```
 
 ---
@@ -139,7 +143,8 @@ MiMo ASR provider remains configured but policy-blocked; use text input or fake/
 tap voice
   -> record short audio
   -> upload to backend ASR
-  -> backend calls MiMo only when ASR policy flags allow it
+  -> backend tries local SenseVoice when enabled
+  -> if local ASR raises an error, backend may fallback to MiMo only when ASR policy flags allow it
   -> ASR ok: Android child mode auto-sends transcript to conversation API
   -> needs_retry / failure: retry or cancel
   -> debug/father mode: show editable transcript and require confirmation
@@ -154,6 +159,7 @@ tap voice
 | permission_denied | 麦克风权限被拒绝 | 继续打字，不阻断聊天。 |
 | backend_asr_unavailable | 后端 ASR disabled 或不可达 | 改用打字，或稍后重试。 |
 | asr_policy_blocked | 未允许儿童音频外发或未确认留存策略 | 不外发音频，提示先打字或由父亲开启受控 ASR。 |
+| local_asr_unavailable | 本地模型文件缺失、依赖缺失或推理异常 | 走已配置 fallback；若 fallback 也不可用，提示重试或打字。 |
 | audio_too_long | 超过 30 秒 | 请短一点再说，或直接打字。 |
 | audio_too_large | 超过大小上限 | 请重新说短一点。 |
 | unsupported_format | 格式不在白名单 | 客户端转 WAV，或提示重录/打字。 |
@@ -170,25 +176,26 @@ tap voice
 
 | ID | Check | Expected |
 |---|---|---|
-| ASR-QA-01 | MiMo ASR fake/smoke audio 正常识别 | 后端返回可编辑 pending transcript，不自动发送。 |
-| ASR-QA-02 | MiMo ASR disabled / policy blocked | 后端返回 policy blocked 或未启用，不外发。 |
-| ASR-QA-03 | 超长音频 | 客户端和后端均拒绝。 |
-| ASR-QA-04 | 超大音频 | 后端拒绝，日志不记录 base64。 |
-| ASR-QA-05 | 空结果 | 温和提示重试或打字。 |
-| ASR-QA-06 | 学习求助语音 | 确认发送后仍走学习引导，不直接给最终答案。 |
-| ASR-QA-07 | 高风险语音文本 | 确认发送后触发 safety.guardian 和父亲提醒。 |
-| ASR-QA-08 | Secret scan | repo、logs、tests 不含真实 key、真实儿童信息、原始音频和长 base64。 |
-| ASR-QA-09 | Latency | 记录 tap-to-transcript ms 和 provider total ms。 |
-| ASR-QA-10 | Child voice | 记录儿童声音识别主观准确率和失败样例摘要。 |
+| ASR-QA-01 | Local SenseVoice 非儿童中文 WAV 正常识别 | 后端返回 `provider=local_sensevoice` 和 pending transcript；儿童端默认自动发送。 |
+| ASR-QA-02 | Local SenseVoice 异常 fallback | 本地异常后走配置的 fallback；MiMo fallback 仍受 policy guard 控制。 |
+| ASR-QA-03 | MiMo ASR disabled / policy blocked | 后端返回 policy blocked 或未启用，不外发。 |
+| ASR-QA-04 | 超长音频 | 客户端和后端均拒绝。 |
+| ASR-QA-05 | 超大音频 | 后端拒绝，日志不记录 base64。 |
+| ASR-QA-06 | 空结果 | 温和提示重试或打字。 |
+| ASR-QA-07 | 学习求助语音 | 自动发送后仍走学习引导，不直接给最终答案。 |
+| ASR-QA-08 | 高风险语音文本 | 自动发送后触发 safety.guardian 和父亲提醒。 |
+| ASR-QA-09 | Secret scan | repo、logs、tests 不含真实 key、真实儿童信息、原始音频和长 base64。 |
+| ASR-QA-10 | Latency | 记录 tap-to-transcript ms 和 provider total ms。 |
+| ASR-QA-11 | Child voice | 记录儿童声音识别主观准确率和失败样例摘要。 |
 
-Before any child-facing ASR QA, run:
+Before cloud fallback ASR QA, run:
 
 ```bash
 bash scripts/check_asr_real_status.sh
 ```
 
 `ASR_STATUS=mock_only` and `ASR_STATUS=policy_blocked` are not real MiMo ASR
-recognition. A real MiMo ASR smoke requires `ASR_STATUS=mimo_smoke_pass` and
+recognition. A real MiMo fallback smoke requires `ASR_STATUS=mimo_smoke_pass` and
 output showing `provider=mimo` / `model=mimo-v2.5`. If no non-child smoke audio
 path is provided but all MiMo env gates are present, the script may generate a
 synthetic fake WAV; that only verifies the provider request chain, not Mandarin
@@ -199,14 +206,15 @@ recognition accuracy.
 ## 8. Open Questions
 
 ```text
-1. MiMo 是否提供明确的儿童音频 retention / no-training / deletion policy。
-2. MiMo 是否支持真正的 streaming audio input。
-3. 是否需要在父亲设置页显示当前 ASR provider、effective key 来源和 policy flags。
-4. 云 ASR 生成的 pending transcript 是否需要短暂 request_id 级审计字段，且如何避免保存正文。
+1. SenseVoice-Small int8 对真实儿童中文、噪声环境、远场平板麦克风的准确率。
+2. MiMo 是否提供明确的儿童音频 retention / no-training / deletion policy。
+3. MiMo 是否支持真正的 streaming audio input。
+4. 是否需要在父亲设置页显示当前 ASR provider、effective key 来源和 policy flags。
+5. 云 ASR fallback 生成的 pending transcript 是否需要短暂 request_id 级审计字段，且如何避免保存正文。
 ```
 
 当前实现方向：
 
 ```text
-Backend MiMo ASR v1 target; default mock/disabled until father authorization and policy flags are enabled.
+Backend local SenseVoice ASR is the preferred real provider; default remains mock until local model files are installed. MiMo ASR remains cloud fallback and policy-blocked until father authorization and policy flags are enabled.
 ```

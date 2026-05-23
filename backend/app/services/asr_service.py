@@ -12,10 +12,12 @@ from app.domain.schemas.asr import (
     AsrTranscriptionResponse,
 )
 from app.providers.asr.base import (
+    AsrProviderError,
     AsrProviderRequest,
     BaseAsrProvider,
 )
 from app.middleware.request_id import get_request_id
+from app.providers.asr.local_sensevoice_provider import LocalSenseVoiceAsrProvider
 from app.providers.asr.mimo_asr_provider import MimoAsrProvider
 from app.providers.asr.mock_asr_provider import MockAsrProvider
 from app.services.asr_data_policy_guard import (
@@ -52,13 +54,19 @@ class AsrService:
         *,
         settings: Settings | None = None,
         provider: BaseAsrProvider | None = None,
+        fallback_provider: BaseAsrProvider | None = None,
         policy_guard: AsrDataPolicyGuard | None = None,
         policy_settings: AsrDataPolicySettings | None = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._provider = provider or self._build_provider()
+        self._fallback_provider = (
+            fallback_provider
+            if fallback_provider is not None
+            else self._build_fallback_provider()
+        )
         self._policy_guard = policy_guard or AsrDataPolicyGuard()
-        self._policy_settings = policy_settings or self._build_policy_settings()
+        self._policy_settings = policy_settings
 
     def transcribe(
         self,
@@ -72,22 +80,40 @@ class AsrService:
         response_status: AsrTranscriptStatus | None = None
         error_type: str | None = None
         try:
-            decoded_size = self._validate_audio(request)
-            self._policy_guard.validate(self._policy_settings)
-
-            result = self._provider.transcribe(
-                AsrProviderRequest(
-                    audio_data_uri=request.audio.data,
-                    audio_format=request.audio.format,
-                    language=request.language,
-                    duration_ms=request.audio.duration_ms,
-                    prompt=TRANSCRIBE_ONLY_PROMPT,
-                    metadata={
-                        "decoded_audio_bytes": decoded_size,
-                        "mock_transcript": request.metadata.get("mock_transcript"),
-                    },
-                )
+            decoded_audio = self._validate_audio(request)
+            decoded_size = len(decoded_audio)
+            provider_request = AsrProviderRequest(
+                audio_data_uri=request.audio.data,
+                audio_format=request.audio.format,
+                language=request.language,
+                duration_ms=request.audio.duration_ms,
+                prompt=TRANSCRIBE_ONLY_PROMPT,
+                metadata={
+                    "decoded_audio": decoded_audio,
+                    "decoded_audio_bytes": decoded_size,
+                    "mock_transcript": request.metadata.get("mock_transcript"),
+                },
             )
+
+            self._policy_guard.validate(self._policy_settings_for(self._provider))
+            try:
+                result = self._provider.transcribe(provider_request)
+            except AsrProviderError as exc:
+                fallback_provider = self._select_fallback_provider()
+                if fallback_provider is None:
+                    raise
+                self._log_asr_primary_fallback(
+                    primary_provider=self._provider.provider_name,
+                    fallback_provider=fallback_provider.provider_name,
+                    error_type=exc.__class__.__name__,
+                )
+                provider = fallback_provider.provider_name
+                model = self._model_name(provider)
+                self._policy_guard.validate(
+                    self._policy_settings_for(fallback_provider)
+                )
+                result = fallback_provider.transcribe(provider_request)
+
             provider = result.provider
             model = result.model
             duration_ms = result.duration_ms
@@ -142,7 +168,7 @@ class AsrService:
                 error_type=error_type,
             )
 
-    def _validate_audio(self, request: AsrTranscriptionRequest) -> int:
+    def _validate_audio(self, request: AsrTranscriptionRequest) -> bytes:
         audio = request.audio
         if audio.format not in self.SUPPORTED_AUDIO_FORMATS:
             raise AsrRequestValidationError(
@@ -167,7 +193,7 @@ class AsrService:
                 "audio_too_large",
                 "ASR audio data exceeds the backend skeleton limit",
             )
-        return len(decoded)
+        return decoded
 
     def _extract_base64(self, data: str, *, audio_format: AsrAudioFormat) -> str:
         prefix = f"data:audio/{audio_format.value};base64,"
@@ -210,6 +236,24 @@ class AsrService:
             },
         )
 
+    def _log_asr_primary_fallback(
+        self,
+        *,
+        primary_provider: AsrProviderName,
+        fallback_provider: AsrProviderName,
+        error_type: str,
+    ) -> None:
+        logging.getLogger("app.asr_timing").warning(
+            "asr_primary_provider_fallback",
+            extra={
+                "event": "asr_primary_provider_fallback",
+                "request_id": get_request_id(),
+                "primary_provider": primary_provider.value,
+                "fallback_provider": fallback_provider.value,
+                "error_type": error_type,
+            },
+        )
+
     def _is_unclear_marker(self, transcript: str) -> bool:
         normalized = transcript.strip().strip("。.!！?？[]【】()（） ")
         return normalized.lower() in self._UNCLEAR_MARKERS or normalized.lower() in {
@@ -218,14 +262,32 @@ class AsrService:
         }
 
     def _model_name(self, provider: AsrProviderName | None) -> str | None:
+        if provider == AsrProviderName.LOCAL_SENSEVOICE:
+            return self._settings.resolve_repo_path(
+                self._settings.local_sensevoice_model_path
+            ).name
         if provider == AsrProviderName.MIMO:
             return self._settings.mimo_asr_model
         if provider == AsrProviderName.MOCK:
             return "mock-asr-v0"
         return None
 
-    def _build_provider(self) -> BaseAsrProvider:
-        if self._settings.asr_provider == AsrProviderName.MIMO.value:
+    def _build_provider(self, provider_name: str | None = None) -> BaseAsrProvider:
+        selected_provider = provider_name or self._settings.asr_provider
+        if selected_provider == AsrProviderName.LOCAL_SENSEVOICE.value:
+            return LocalSenseVoiceAsrProvider(
+                model_path=self._settings.resolve_repo_path(
+                    self._settings.local_sensevoice_model_path
+                ),
+                tokens_path=self._settings.resolve_repo_path(
+                    self._settings.local_sensevoice_tokens_path
+                ),
+                num_threads=self._settings.local_sensevoice_num_threads,
+                use_itn=self._settings.local_sensevoice_use_itn,
+                language=self._settings.local_sensevoice_language,
+                enabled=self._settings.local_sensevoice_enabled,
+            )
+        if selected_provider == AsrProviderName.MIMO.value:
             return MimoAsrProvider(
                 base_url=self._settings.mimo_asr_base_url,
                 api_key=self._settings.effective_mimo_asr_api_key,
@@ -235,10 +297,38 @@ class AsrService:
             )
         return MockAsrProvider()
 
-    def _build_policy_settings(self) -> AsrDataPolicySettings:
+    def _build_fallback_provider(self) -> BaseAsrProvider | None:
+        fallback_provider_name = self._settings.asr_fallback_provider.strip()
+        if not fallback_provider_name:
+            return None
+        if fallback_provider_name == self._provider.provider_name.value:
+            return None
+        return self._build_provider(fallback_provider_name)
+
+    def _select_fallback_provider(self) -> BaseAsrProvider | None:
+        if self._provider.provider_name != AsrProviderName.LOCAL_SENSEVOICE:
+            return None
+        if self._fallback_provider is None:
+            return None
+        if self._fallback_provider.provider_name == self._provider.provider_name:
+            return None
+        return self._fallback_provider
+
+    def _policy_settings_for(
+        self,
+        provider: BaseAsrProvider,
+    ) -> AsrDataPolicySettings:
+        if provider is self._provider and self._policy_settings is not None:
+            return self._policy_settings
+        return self._build_policy_settings(provider)
+
+    def _build_policy_settings(
+        self,
+        provider: BaseAsrProvider,
+    ) -> AsrDataPolicySettings:
         return AsrDataPolicySettings(
-            provider=self._provider.provider_name,
-            provider_enabled=self._provider.enabled,
+            provider=provider.provider_name,
+            provider_enabled=provider.enabled,
             api_key_present=bool(self._settings.effective_mimo_asr_api_key),
             allow_child_audio=self._settings.mimo_asr_allow_child_audio,
             retention_policy_checked=(

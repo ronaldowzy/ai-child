@@ -17,6 +17,7 @@ class AsrMode(StrEnum):
 class AsrProviderName(StrEnum):
     MOCK = "mock"
     MIMO = "mimo"
+    LOCAL_SENSEVOICE = "local_sensevoice"
 
 
 class AsrTranscriptStatus(StrEnum):

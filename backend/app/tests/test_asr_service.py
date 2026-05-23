@@ -11,9 +11,19 @@ from app.domain.schemas.asr import (
     AsrTranscriptStatus,
     AsrTranscriptionRequest,
 )
-from app.providers.asr.base import AsrProviderRequest, AsrProviderResult, BaseAsrProvider
+from app.providers.asr.base import (
+    AsrProviderError,
+    AsrProviderRequest,
+    AsrProviderResult,
+    BaseAsrProvider,
+)
+from app.providers.asr.local_sensevoice_provider import LocalSenseVoiceAsrProvider
 from app.providers.asr.mimo_asr_provider import MimoAsrProvider
-from app.services.asr_data_policy_guard import AsrDataPolicyBlockedError
+from app.services.asr_data_policy_guard import (
+    AsrDataPolicyBlockedError,
+    AsrDataPolicyGuard,
+    AsrDataPolicySettings,
+)
 from app.services.asr_service import AsrRequestValidationError, AsrService
 
 
@@ -57,6 +67,33 @@ class StaticAsrProvider(BaseAsrProvider):
             transcript=self._transcript,
             provider=self.provider_name,
             model="static-asr-test",
+            duration_ms=request.duration_ms,
+        )
+
+
+class FailingLocalAsrProvider(BaseAsrProvider):
+    def __init__(self) -> None:
+        super().__init__(
+            provider_name=AsrProviderName.LOCAL_SENSEVOICE,
+            enabled=True,
+        )
+
+    def transcribe(self, request: AsrProviderRequest) -> AsrProviderResult:
+        raise AsrProviderError("local_sensevoice_test_failure")
+
+
+class RecordingAsrProvider(BaseAsrProvider):
+    def __init__(self, transcript: str) -> None:
+        super().__init__(provider_name=AsrProviderName.MOCK, enabled=True)
+        self._transcript = transcript
+        self.last_request: AsrProviderRequest | None = None
+
+    def transcribe(self, request: AsrProviderRequest) -> AsrProviderResult:
+        self.last_request = request
+        return AsrProviderResult(
+            transcript=self._transcript,
+            provider=self.provider_name,
+            model="recording-asr-test",
             duration_ms=request.duration_ms,
         )
 
@@ -160,6 +197,63 @@ def test_mimo_asr_reuses_shared_mimo_key_and_default_asr_model(
     assert isinstance(service._provider, MimoAsrProvider)
     assert service._provider.api_key == "shared-mimo-key"
     assert service._provider.model == "mimo-v2.5"
+
+
+def test_local_sensevoice_is_policy_allowed_without_cloud_flags() -> None:
+    AsrDataPolicyGuard().validate(
+        AsrDataPolicySettings(
+            provider=AsrProviderName.LOCAL_SENSEVOICE,
+            provider_enabled=True,
+            api_key_present=False,
+            allow_child_audio=False,
+            retention_policy_checked=False,
+            no_training_confirmed=False,
+        )
+    )
+
+
+def test_local_sensevoice_provider_can_be_selected_by_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHILD_AI_ASR_PROVIDER", "local_sensevoice")
+    monkeypatch.setenv("CHILD_AI_LOCAL_SENSEVOICE_ENABLED", "true")
+    monkeypatch.setenv(
+        "CHILD_AI_LOCAL_SENSEVOICE_MODEL_PATH",
+        "backend/models/asr/sensevoice/model.int8.onnx",
+    )
+    monkeypatch.setenv(
+        "CHILD_AI_LOCAL_SENSEVOICE_TOKENS_PATH",
+        "backend/models/asr/sensevoice/tokens.txt",
+    )
+    get_settings.cache_clear()
+
+    service = AsrService()
+
+    assert isinstance(service._provider, LocalSenseVoiceAsrProvider)
+    assert service._provider.enabled is True
+    assert service._provider.model_path.name == "model.int8.onnx"
+    assert service._provider.tokens_path.name == "tokens.txt"
+    assert service._fallback_provider is not None
+    assert service._fallback_provider.provider_name == AsrProviderName.MIMO
+
+
+def test_local_sensevoice_failure_falls_back_to_existing_provider() -> None:
+    fallback_provider = RecordingAsrProvider("我想聊火山")
+
+    response = AsrService(
+        provider=FailingLocalAsrProvider(),
+        fallback_provider=fallback_provider,
+    ).transcribe(AsrTranscriptionRequest.model_validate(_request_payload()))
+
+    assert response.status == AsrTranscriptStatus.OK
+    assert response.transcript == "我想聊火山"
+    assert response.provider == AsrProviderName.MOCK
+    assert response.model == "recording-asr-test"
+    assert fallback_provider.last_request is not None
+    assert fallback_provider.last_request.metadata["decoded_audio_bytes"] == len(
+        b"RIFF-fake-wav"
+    )
+    assert fallback_provider.last_request.metadata["decoded_audio"] == b"RIFF-fake-wav"
 
 
 def test_asr_router_mock_smoke() -> None:

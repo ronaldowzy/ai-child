@@ -19,7 +19,10 @@ class AsrDataPolicySettings:
 
 class AsrDataPolicyGuard:
     def validate(self, settings: AsrDataPolicySettings) -> None:
-        if settings.provider == AsrProviderName.MOCK:
+        if settings.provider in {
+            AsrProviderName.MOCK,
+            AsrProviderName.LOCAL_SENSEVOICE,
+        }:
             return
 
         reasons: list[str] = []

@@ -41,12 +41,14 @@ The current backend is intentionally local-first and mock-first:
   sentences, no Markdown/list formatting, and usually one main question.
 - Returns child-facing reply metadata for future voice and 小白狐 animation
   work: `voice_enabled`, optional `audio_url`, `emotion`, and `agent_motion`.
-- Speech recognition v1 is backend MiMo ASR: Android records only after an
-  explicit tap and uploads short audio to the backend ASR endpoint. Child mode
-  auto-sends a non-empty transcript to conversation; the pending transcript
-  panel remains only for DevSettings / father debugging.
-  Raw child audio is never stored long-term and MiMo ASR remains disabled until
-  father authorization and ASR policy flags allow it.
+- Speech recognition v1 is backend local-first ASR: Android records only after
+  an explicit tap and uploads short audio to the backend ASR endpoint. The
+  preferred real provider is sherpa-onnx + SenseVoice-Small int8; if local ASR
+  raises an error, the service can fall back to the configured original ASR
+  provider. Child mode auto-sends a non-empty transcript to conversation; the
+  pending transcript panel remains only for DevSettings / father debugging.
+  Raw child audio is never stored long-term, and cloud MiMo ASR fallback remains
+  disabled until father authorization and ASR policy flags allow it.
 - Opening greeting is available at `POST /api/v1/conversation/opening`.
   It uses time context, parent policy names, and parent guidance to return one
   short child-facing greeting, with optional `reply.audio_url`. When a recent
@@ -88,12 +90,15 @@ Current backend contract:
   transcript is sent automatically by Android. Confirm-before-send remains a
   debug/father mode only; hands-free conversational mode is still a future
   product phase and should not change the v1 backend contract.
-- ASR v1 target is backend MiMo audio input / ASR. Android must not call MiMo
-  directly or store provider API keys.
+- ASR v1 target is backend local-first ASR using sherpa-onnx +
+  SenseVoice-Small int8, with MiMo audio input / ASR retained as an optional
+  fallback. Android must not call MiMo directly or store provider API keys.
 - Raw audio uploaded for ASR must be short-lived request data only: no database
   persistence, no logs, no memory, no test fixtures with real child recordings.
 - Keep external audio and child text transmission disabled unless a confirmed
-  product decision and provider gate review explicitly allow it.
+  product decision and provider gate review explicitly allow it. Local ASR does
+  not require the external-audio policy flags but still must not persist raw
+  audio.
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
   `reply.agent_motion` for Android TTS and 小白狐 presentation.
 - Use `POST /api/v1/tts/xiaobaohu` for backend-generated 小白狐 speech audio.
@@ -270,14 +275,16 @@ Coverage:
 - `check_asr_real_status.sh` sources `.env`, applies a temporary MiMo ASR
   smoke overlay, starts a temporary backend, and generates a synthetic
   non-child fake WAV when no safe smoke audio path was provided. This validates
-  the real provider request chain without permanently changing `.env`.
+  the cloud fallback provider request chain without permanently changing
+  `.env`. Local SenseVoice ASR is documented separately and should be validated
+  with non-child WAV samples after the ONNX model files are installed.
 - `smoke_vision_model_opt_in.sh` verifies the OpenAI-compatible MiMo vision path
   by sourcing `.env`, applying a temporary MiMo image smoke overlay, starting a
   temporary backend, and generating a fake/test PNG when no safe image path was
   provided. It never prints image base64, the full image description, API keys,
   or provider raw response.
 
-MiMo ASR real smoke:
+MiMo ASR fallback smoke:
 
 ```bash
 bash scripts/check_asr_real_status.sh
@@ -794,11 +801,12 @@ Streaming v1 will reuse the same request_id and provider timing fields, then add
 stream-specific `first_text_ms`, `first_tts_start_ms`, `first_audio_ms`, and
 `stream_total_ms`.
 
-## MiMo ASR v1
+## ASR v1: Local SenseVoice + MiMo Fallback
 
-MiMo ASR / audio-input research and integration design are documented in:
+ASR research and integration design are documented in:
 
 ```text
+docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md
 docs/ASR_INPUT_RESEARCH_V0_1.md
 docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md
 ```
@@ -806,19 +814,28 @@ docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md
 Current backend status:
 
 ```text
-1. ASR v1 target is backend MiMo audio input / ASR.
+1. ASR v1 target is backend local-first ASR: sherpa-onnx + SenseVoice-Small int8.
 2. Android records/uploads to the backend and child mode auto-sends a non-empty transcript; `requiresConfirmation=true` pending transcript UI is kept only for DevSettings / father debugging.
 3. Android must not call MiMo directly and must not store MiMo API keys.
-4. `POST /api/v1/asr/transcribe` is mounted, but default provider is mock; MiMo ASR is disabled and policy-blocked by default.
-5. Real MiMo `/chat/completions` ASR provider is implemented behind `AsrDataPolicyGuard`.
-6. No real child audio should be used in development smoke; use fake/smoke audio only.
-7. Raw audio must not be stored in the database, logs, long-term memory, docs, tests, or git.
+4. `POST /api/v1/asr/transcribe` is mounted, but default provider is mock so ordinary dev/test does not require local model files.
+5. `local_sensevoice` is implemented as a formal provider and lazy-loads the ONNX model only on first recognition.
+6. If local SenseVoice raises a provider/config/runtime error, `AsrService` can fall back to `CHILD_AI_ASR_FALLBACK_PROVIDER`; the operational default is `mimo`.
+7. MiMo ASR fallback remains disabled and policy-blocked by default. Real child audio external transmission still requires father authorization and all ASR policy flags.
+8. No real child audio should be used in development smoke; use fake/smoke audio or non-child test audio only.
+9. Raw audio must not be stored in the database, logs, long-term memory, docs, tests, or git.
 ```
 
 ASR environment defaults:
 
 ```bash
 export CHILD_AI_ASR_PROVIDER=mock
+export CHILD_AI_ASR_FALLBACK_PROVIDER=mimo
+export CHILD_AI_LOCAL_SENSEVOICE_ENABLED=false
+export CHILD_AI_LOCAL_SENSEVOICE_MODEL_PATH=backend/models/asr/sensevoice/model.int8.onnx
+export CHILD_AI_LOCAL_SENSEVOICE_TOKENS_PATH=backend/models/asr/sensevoice/tokens.txt
+export CHILD_AI_LOCAL_SENSEVOICE_NUM_THREADS=4
+export CHILD_AI_LOCAL_SENSEVOICE_USE_ITN=true
+export CHILD_AI_LOCAL_SENSEVOICE_LANGUAGE=zh
 export CHILD_AI_MIMO_ASR_ENABLED=false
 export CHILD_AI_MIMO_ASR_API_KEY=""
 export CHILD_AI_MIMO_ASR_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
@@ -828,10 +845,44 @@ export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
 export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
 ```
 
-ASR uses `mimo-v2.5` by default. Do not use the text conversation model
-`mimo-v2.5-pro` for ASR.
+Install the optional local ASR runtime:
 
-Fake-audio smoke script:
+```bash
+cd backend
+python -m pip install -e ".[dev,asr-local]"
+```
+
+Install SenseVoice-Small int8 ONNX model files under the ignored model
+directory:
+
+```bash
+mkdir -p backend/models/asr/sensevoice /tmp/child-ai-asr-models
+curl -L \
+  -o /tmp/child-ai-asr-models/sensevoice.tar.bz2 \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
+tar -xjf /tmp/child-ai-asr-models/sensevoice.tar.bz2 -C /tmp/child-ai-asr-models
+cp /tmp/child-ai-asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx backend/models/asr/sensevoice/model.int8.onnx
+cp /tmp/child-ai-asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/tokens.txt backend/models/asr/sensevoice/tokens.txt
+```
+
+Enable local-first ASR:
+
+```bash
+export CHILD_AI_ASR_PROVIDER=local_sensevoice
+export CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true
+export CHILD_AI_ASR_FALLBACK_PROVIDER=mimo
+```
+
+For local development without cloud fallback, use:
+
+```bash
+export CHILD_AI_ASR_FALLBACK_PROVIDER=mock
+```
+
+MiMo fallback uses `mimo-v2.5` by default. Do not use the text conversation
+model `mimo-v2.5-pro` for ASR.
+
+MiMo fallback fake-audio smoke script:
 
 ```bash
 set -a
@@ -854,13 +905,14 @@ prints only status/provider/model/duration/confidence/errorCode. It does not
 print the API key, base64 audio, full transcript, request body, response body,
 or audio path.
 
-Do not enable MiMo ASR with real child audio until father authorization,
+Do not enable MiMo ASR fallback with real child audio until father authorization,
 retention/deletion/no-training terms, and all ASR policy flags are confirmed.
 
 ### ASR QA artifact rule
 
 Android ASR UI code does not mean real ASR is enabled. Before asking for real
-speech-recognition QA, verify the running backend is not using mock ASR:
+speech-recognition QA, verify the running backend is not using mock ASR and
+record whether the provider is local or cloud fallback:
 
 ```bash
 set -a
@@ -870,6 +922,10 @@ python3 - <<'PY'
 import os
 for key in [
     "CHILD_AI_ASR_PROVIDER",
+    "CHILD_AI_ASR_FALLBACK_PROVIDER",
+    "CHILD_AI_LOCAL_SENSEVOICE_ENABLED",
+    "CHILD_AI_LOCAL_SENSEVOICE_MODEL_PATH",
+    "CHILD_AI_LOCAL_SENSEVOICE_TOKENS_PATH",
     "CHILD_AI_MIMO_ASR_ENABLED",
     "CHILD_AI_MIMO_ASR_API_KEY",
     "CHILD_AI_MIMO_API_KEY",
@@ -884,13 +940,13 @@ for key in [
 PY
 ```
 
-If `CHILD_AI_ASR_PROVIDER` is `mock` or the MiMo flags are incomplete, the
-artifact can only test recording, upload, confirmation UI, and graceful retry or
-policy-blocked messaging. It must not be described as a real MiMo ASR test.
-For real ASR QA, verify the smoke output shows `provider=mimo` and
-`model=mimo-v2.5`.
+If `CHILD_AI_ASR_PROVIDER` is `mock`, the artifact can only test recording,
+upload, confirmation UI, and graceful retry messaging. It must not be described
+as a real recognition test. For local ASR QA, verify the backend response shows
+`provider=local_sensevoice` and uses the intended ONNX file. For cloud fallback
+QA, verify the smoke output shows `provider=mimo` and `model=mimo-v2.5`.
 
-The standard status check is:
+The existing standard MiMo fallback status check is:
 
 ```bash
 bash scripts/check_asr_real_status.sh
@@ -899,7 +955,7 @@ bash scripts/check_asr_real_status.sh
 `ASR_STATUS=mock_only` means only the mock ASR path is active.
 `ASR_STATUS=policy_blocked` means MiMo ASR is selected but required policy/key
 env is incomplete. `ASR_STATUS=mimo_smoke_pass` is the only script status that
-can be described as a successful real MiMo ASR smoke.
+can be described as a successful real MiMo fallback smoke.
 
 ASR does not require a separate key by default. The backend resolves MiMo ASR
 credentials in this order:

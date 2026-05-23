@@ -375,6 +375,7 @@ conversation_messages
 routing_decisions
 memory_items
 parent_reports
+model_debug_traces
 tts_cache_records
 ```
 
@@ -408,11 +409,56 @@ Data boundary:
   internals, provider raw responses, or API keys.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
+- `model_debug_traces` is a dev/test opt-in temporary table for prompt analysis.
+  It can store full text prompts and model responses only when explicitly
+  enabled locally. It must not store API keys, Authorization headers, `.env`
+  contents, raw media, base64 image/audio payloads, or provider raw HTTP
+  headers.
 - Parent free-text notes are stored in `parent_policies.parent_message_raw` for
   local family testing. They are prompt background only and must not be exposed
   in child-facing debug/UI.
 - Any future cloud deployment or app-store release requires a separate child
   data compliance review before enabling remote persistence.
+
+## Local Model Debug Traces
+
+`DEV-TRACE-1` adds a local, temporary `model_debug_traces` table for product and
+prompt analysis during family testing. It records calls made through
+`ModelRegistry.generate()`, including request messages, `input_text`, context,
+metadata, selected profile/provider/model, response text, structured output,
+fallback/policy flags, error type, elapsed time, request id, and child/session
+ids plus hashes.
+
+It is disabled by default:
+
+```bash
+export CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=true
+export CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT=true
+export CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS=20000
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+```
+
+Even when enabled, trace sanitization redacts secret-like fields and replaces
+raw image/audio data URIs or long base64 payloads with `[raw_media_omitted]`.
+Trace write failures are logged as warnings and never block model replies.
+
+Inspect recent traces:
+
+```bash
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/show_model_debug_traces.py --limit 20
+```
+
+Clear traces:
+
+```bash
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/clear_model_debug_traces.py
+```
+
+This table is not a production child-data strategy. Before any cloud deployment
+or app-store release, prompt/response tracing must be redesigned and reviewed
+under a separate child data compliance process.
 
 ## Freedom-first Conversation Notes
 

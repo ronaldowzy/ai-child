@@ -24,6 +24,7 @@ from app.providers.model.base import (
 )
 from app.providers.model.mock_provider import MockModelProvider
 from app.providers.model.openai_compatible_provider import OpenAICompatibleProvider
+from app.services.model_debug_trace_service import ModelDebugTraceService
 from app.services.model_data_policy_guard import (
     ModelDataPolicyBlockedError,
     ModelDataPolicyGuard,
@@ -50,6 +51,7 @@ class ModelRegistry:
         profiles: Mapping[str, ModelProfile] | None = None,
         task_profile_map: Mapping[ModelTaskType | str, str] | None = None,
         data_policy_guard: ModelDataPolicyGuard | None = None,
+        model_debug_trace_service: ModelDebugTraceService | None = None,
     ) -> None:
         self._providers = dict(providers or self._default_providers())
         self._profiles = dict(profiles or self._default_profiles())
@@ -57,6 +59,9 @@ class ModelRegistry:
             task_profile_map or self._default_task_profile_map()
         )
         self._data_policy_guard = data_policy_guard or ModelDataPolicyGuard()
+        self._model_debug_trace_service = (
+            model_debug_trace_service or ModelDebugTraceService()
+        )
 
     def select(self, task_type: ModelTaskType | str) -> BaseModelProvider:
         profile = self.select_profile(task_type)
@@ -234,6 +239,16 @@ class ModelRegistry:
                     conversation_context.get("session_id")
                 ),
             },
+        )
+        self._model_debug_trace_service.record_model_call(
+            request=request,
+            profile=profile,
+            response=response,
+            started_at=started_at,
+            fallback_used=fallback_used,
+            policy_blocked=policy_blocked,
+            error_type=error_type,
+            error_detail=error_detail,
         )
 
     def _conversation_context(self, context: dict[str, Any]) -> dict[str, str]:

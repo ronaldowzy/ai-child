@@ -262,6 +262,74 @@ class ParentReportRecord(Base):
     )
 
 
+class ModelDebugTraceRecord(Base):
+    __tablename__ = "model_debug_traces"
+
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    request_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    task_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    profile_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    provider_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    child_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    child_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    session_id_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    request_messages_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    request_input_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_context_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    request_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    request_params_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_structured_output_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    response_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    fallback_used: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    policy_blocked: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    error_type: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    elapsed_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trace_source: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+        default="model_registry",
+        server_default=text("'model_registry'"),
+    )
+    environment: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+
 class TtsCacheRecord(Base, TimestampMixin):
     __tablename__ = "tts_cache_records"
     __table_args__ = (UniqueConstraint("cache_key", name="uq_tts_cache_key"),)

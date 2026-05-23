@@ -67,6 +67,7 @@ deprecated：已废弃，不再作为实现依据。
 | PD-038 | confirmed | 普通文字对话调用 MiMo `mimo-v2.5-pro`；带图片的 conversation attachment / vision / OCR 链路调用 MiMo `mimo-v2.5`。 | ModelRegistry、OpenAICompatibleProvider、AttachmentService vision path、vision smoke script |
 | PD-039 | confirmed | “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`，隐私边界只由明确隐私意图或后续安全策略触发。 | AttachmentService、MockOCRProvider、PromptManager、Android pending image context、QA |
 | PD-040 | confirmed | 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory 生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。 | ParentReportService、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen |
+| PD-047 | confirmed | 当前本地测试阶段允许通过 opt-in 临时表 `model_debug_traces` 记录完整模型 prompt 和回复，用于 prompt/体验分析；默认关闭，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
 
 新增执行依据：
 
@@ -674,6 +675,19 @@ Affected modules: OpeningPolicyBuilder、OpeningService、relationship memory he
 Implementation notes: `OpeningPolicyBuilder` 输出 `OpeningPolicy`，包含 `opening_mode`、age band、max chars、interest recall allowed/reason、topic boundary cooldown、bedtime defer、parent bridge、parent goal hint、forbidden phrases 和 prompt rules。`OpeningService` fallback text 和 model prompt 共用同一 policy；memory read failure 不阻塞 opening；同 session cache 与 TTS fallback 保持不变。本轮不改 Android、不改 DB schema、不做 push notification、不做 Growing Nest 或 CameraX。
 Docs updated: `docs/OPENING_GREETING_V2_POLICY_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`docs/HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 后端测试覆盖 interest callback、default light、boundary respect、bedtime closure/defer、no-school policy、father learning goal translation、age limits、memory failure fallback、model prompt contract、TTS failure 和 session cache；Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
+
+#### PD-047
+
+Decision ID: PD-047
+Date: 2026-05-23
+Status: confirmed
+Source: DEV-TRACE-1 local prompt analysis request
+Decision: 当前本地测试阶段允许通过 opt-in 临时表 `model_debug_traces` 记录完整模型 prompt、messages、input_text、context、metadata、模型回复和 structured output，用于 prompt/体验分析。
+Rationale: 家庭测试和专家 prompt 优化需要看到实际 `ModelRegistry.generate()` 发送给模型的完整上下文，以及模型返回内容和 fallback/policy/error 状态。集中在 ModelRegistry 层记录能覆盖 child_chat、opening、parent_report、vision/OCR 等任务，避免各业务服务分散补日志。
+Affected modules: ModelRegistry、ModelDebugTraceService、ModelDebugTraceRepository、`model_debug_traces` migration、backend docs、prompt QA。
+Implementation notes: 默认 `CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=false`；本地 dev/test 显式开启后记录完整文本 prompt 和 response，但过滤 API key、Authorization/Bearer、`.env`、raw image/audio、base64 media 和 provider raw HTTP headers。trace 写入失败只 warning，不阻塞模型调用；新增清空脚本；该能力不代表生产儿童数据策略。
+Docs updated: `docs/MODEL_DEBUG_TRACE_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 后端测试覆盖 disabled/enabled、opening prompt、parent report prompt、provider fallback、policy blocked、trace failure best-effort、secret/base64 sanitization、migration 可读和 clear。
 
 ---
 

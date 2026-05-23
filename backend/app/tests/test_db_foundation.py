@@ -15,8 +15,10 @@ EXPECTED_TABLES = {
     "routing_decisions",
     "memory_items",
     "parent_reports",
+    "model_debug_traces",
     "tts_cache_records",
 }
+INITIAL_REVISION_TABLES = EXPECTED_TABLES - {"model_debug_traces"}
 
 
 def test_db_metadata_includes_initial_tables() -> None:
@@ -104,6 +106,34 @@ def test_db_metadata_includes_key_columns() -> None:
             "suggested_parent_actions",
             "created_at",
         },
+        "model_debug_traces": {
+            "id",
+            "created_at",
+            "request_id",
+            "task_type",
+            "profile_name",
+            "provider_name",
+            "model_name",
+            "child_id",
+            "session_id",
+            "child_id_hash",
+            "session_id_hash",
+            "request_messages_json",
+            "request_input_text",
+            "request_context_json",
+            "request_metadata_json",
+            "request_params_json",
+            "response_text",
+            "response_structured_output_json",
+            "response_metadata_json",
+            "fallback_used",
+            "policy_blocked",
+            "error_type",
+            "error_detail",
+            "elapsed_ms",
+            "trace_source",
+            "environment",
+        },
         "tts_cache_records": {
             "id",
             "cache_key",
@@ -146,6 +176,14 @@ def test_db_json_columns_use_sqlalchemy_json_type() -> None:
             "safety_alerts",
             "suggested_parent_actions",
         },
+        "model_debug_traces": {
+            "request_messages_json",
+            "request_context_json",
+            "request_metadata_json",
+            "request_params_json",
+            "response_structured_output_json",
+            "response_metadata_json",
+        },
         "tts_cache_records": {"metadata"},
     }
 
@@ -168,6 +206,7 @@ def test_db_datetime_columns_are_timezone_aware() -> None:
         "routing_decisions": {"created_at"},
         "memory_items": {"expires_at", "created_at", "updated_at"},
         "parent_reports": {"created_at"},
+        "model_debug_traces": {"created_at"},
         "tts_cache_records": {"created_at", "updated_at", "last_accessed_at"},
     }
 
@@ -203,7 +242,7 @@ def test_alembic_initial_revision_is_readable() -> None:
     assert 'revision: str = "20260520_0001"' in revision_text
     assert "down_revision: str | None = None" in revision_text
     assert "sa.JSON()" in revision_text
-    for table_name in EXPECTED_TABLES:
+    for table_name in INITIAL_REVISION_TABLES:
         assert table_name in revision_text
 
 
@@ -239,3 +278,21 @@ def test_alembic_child_name_revision_is_readable() -> None:
     assert 'down_revision: str | None = "20260521_0002"' in revision_text
     assert "child_nickname" in revision_text
     assert "child_display_name" in revision_text
+
+
+def test_alembic_model_debug_trace_revision_is_readable() -> None:
+    backend_dir = Path(__file__).resolve().parents[2]
+    revision_path = (
+        backend_dir
+        / "alembic"
+        / "versions"
+        / "20260523_0004_create_model_debug_traces.py"
+    )
+
+    assert revision_path.is_file()
+    revision_text = revision_path.read_text(encoding="utf-8")
+    assert 'revision: str = "20260523_0004"' in revision_text
+    assert 'down_revision: str | None = "20260521_0003"' in revision_text
+    assert "model_debug_traces" in revision_text
+    assert "request_messages_json" in revision_text
+    assert "response_structured_output_json" in revision_text

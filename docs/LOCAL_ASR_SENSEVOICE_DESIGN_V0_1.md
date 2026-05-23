@@ -5,12 +5,13 @@
 状态：
 
 ```text
-implementation_target
+implementation_plus_non_child_smoke_pass
 preferred_real_provider=local_sensevoice
 runtime=sherpa-onnx
 model=SenseVoice-Small int8 ONNX
 fallback_provider=mimo
 default_provider=mock
+latest_non_child_smoke=PASS provider=local_sensevoice model=model.int8.onnx
 ```
 
 ---
@@ -169,3 +170,39 @@ cp /tmp/child-ai-asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/t
 | LOCAL-ASR-08 | 真机延迟 | 记录 tap-to-transcript、provider elapsed、首句回复延迟和失败率。 |
 
 当前自动化测试覆盖 provider 选择、本地 policy allow、本地异常 fallback、mock/MiMo 旧路径和日志脱敏基础。真实中文识别准确率仍需非儿童测试音频和真机 QA。
+
+---
+
+## 8. Smoke Harness
+
+新增本地 smoke harness：
+
+```bash
+python scripts/check_local_sensevoice_asr_status.py \
+  --audio /path/to/non_child_test.wav \
+  --fallback mock \
+  --expect-pass \
+  --output docs/LOCAL_ASR_SENSEVOICE_SMOKE_V0_1.md
+```
+
+状态语义：
+
+| Status | Meaning |
+|---|---|
+| PASS | `numpy` / `sherpa_onnx` 可 import，`model.int8.onnx` / `tokens.txt` 存在，ASR response provider 为 `local_sensevoice`，status 为 `ok` 或 `needs_retry`。 |
+| BLOCKED | 缺依赖、缺模型、缺 tokens、缺 `--expect-pass` 音频，或 local primary 失败后只走了 fallback。`fallback=mock` 可验证兜底链路，但不能写成本地 ASR 通过。 |
+| FAIL | 非预期 provider/API 崩溃、route 崩溃，或报告/日志泄漏 raw audio/base64。 |
+
+当前本机收口结果：
+
+```text
+date=2026-05-23
+status=PASS
+audio_source=synthetic_non_child_wav generated via macOS say/afconvert
+provider=local_sensevoice
+model=model.int8.onnx
+transcript_status=ok
+report=docs/LOCAL_ASR_SENSEVOICE_SMOKE_V0_1.md
+```
+
+该结果只证明本地依赖、模型文件、provider 和服务调用链可跑通；不代表真实儿童语音准确率，不代表 Android 真机 QA，不提交 WAV、ONNX、tokens 或 DB dump。

@@ -33,6 +33,15 @@ def _import_runner_module():
     return run_model_trace_scenarios
 
 
+def _import_local_asr_smoke_module():
+    root = Path(__file__).resolve().parents[3]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts import check_local_sensevoice_asr_status
+
+    return check_local_sensevoice_asr_status
+
+
 def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> None:
     runner = _import_runner_module()
 
@@ -143,6 +152,7 @@ def test_real_provider_report_format_can_be_generated(tmp_path: Path) -> None:
     assert "Provider mode: `mimo`" in real_report
     assert "Provider smoke status" in real_report
     assert "Response summary" in real_report
+    assert "d1d1524" not in real_report
 
 
 def test_real_provider_report_flags_empty_and_stage_direction() -> None:
@@ -295,8 +305,73 @@ def test_trace_scripts_compile() -> None:
         "run_model_trace_scenarios.py",
         "show_model_debug_traces.py",
         "clear_model_debug_traces.py",
+        "check_local_sensevoice_asr_status.py",
     ):
         py_compile.compile(
             str(root / "scripts" / script_name),
             doraise=True,
         )
+
+
+def test_local_sensevoice_smoke_missing_model_blocks_without_crash(
+    tmp_path: Path,
+) -> None:
+    smoke = _import_local_asr_smoke_module()
+    report_path = tmp_path / "local_asr_smoke.md"
+
+    result = smoke.run_smoke(
+        fallback="none",
+        output=report_path,
+        model_path=tmp_path / "missing-model.int8.onnx",
+        tokens_path=tmp_path / "missing-tokens.txt",
+    )
+
+    assert result.status == "BLOCKED"
+    assert "missing_local_sensevoice_model" in str(result.reason)
+    assert report_path.is_file()
+    report = report_path.read_text(encoding="utf-8")
+    assert "Status: `BLOCKED`" in report
+    assert "raw audio/base64 in report: `no`" in report
+    assert "data:audio" not in report
+    assert ";base64," not in report
+
+
+def test_local_sensevoice_smoke_fallback_mock_is_not_local_pass(
+    tmp_path: Path,
+) -> None:
+    smoke = _import_local_asr_smoke_module()
+    report_path = tmp_path / "local_asr_smoke.md"
+
+    result = smoke.run_smoke(
+        fallback="mock",
+        output=report_path,
+        model_path=tmp_path / "missing-model.int8.onnx",
+        tokens_path=tmp_path / "missing-tokens.txt",
+    )
+
+    assert result.status == "BLOCKED"
+    assert result.reason == "local_primary_failed_fallback_mock"
+    assert result.provider == "mock"
+    assert result.fallback_used is True
+    assert result.local_primary_failed is True
+    report = report_path.read_text(encoding="utf-8")
+    assert "provider result: `mock`" in report
+    assert "fallback used: `true`" in report
+    assert "local primary failed: `true`" in report
+
+
+def test_local_sensevoice_smoke_expect_pass_requires_audio(
+    tmp_path: Path,
+) -> None:
+    smoke = _import_local_asr_smoke_module()
+
+    result = smoke.run_smoke(
+        fallback="mock",
+        expect_pass=True,
+        output=tmp_path / "local_asr_smoke.md",
+        model_path=tmp_path / "missing-model.int8.onnx",
+        tokens_path=tmp_path / "missing-tokens.txt",
+    )
+
+    assert result.status == "BLOCKED"
+    assert result.reason == "missing_audio_path_when_expect_pass"

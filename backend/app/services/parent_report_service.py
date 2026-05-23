@@ -269,6 +269,8 @@ class ParentReportService:
             "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、表达状态怎样、"
             "有没有学习、情绪或安全线索、父亲今晚应该怎么跟进。不要输出逐字聊天记录，"
             "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
+            "必须输出非空、可解析的严格 JSON object；不要返回空字符串、none、null、Markdown 或解释文字。"
+            "suggested_parent_actions 每条建议都应包含 starter + avoid 语义：可以怎么轻轻开口，以及避免怎么追问。"
             "返回严格 JSON，字段为 summary、learning_observations、expression_observations、"
             "emotion_observations、safety_alerts、suggested_parent_actions。"
         )

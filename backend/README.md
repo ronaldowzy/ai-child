@@ -253,6 +253,7 @@ bash scripts/smoke_backend_local.sh
 bash scripts/smoke_voice_stack.sh
 bash scripts/smoke_db_persistence.sh
 bash scripts/check_asr_real_status.sh
+python scripts/check_local_sensevoice_asr_status.py --fallback mock
 bash scripts/smoke_vision_model_opt_in.sh
 ```
 
@@ -276,8 +277,12 @@ Coverage:
   smoke overlay, starts a temporary backend, and generates a synthetic
   non-child fake WAV when no safe smoke audio path was provided. This validates
   the cloud fallback provider request chain without permanently changing
-  `.env`. Local SenseVoice ASR is documented separately and should be validated
-  with non-child WAV samples after the ONNX model files are installed.
+  `.env`.
+- `check_local_sensevoice_asr_status.py` validates the local SenseVoice primary
+  path with non-child WAV input, checks `numpy` / `sherpa_onnx` and model files,
+  and writes `docs/LOCAL_ASR_SENSEVOICE_SMOKE_V0_1.md`. If no audio is given it
+  generates a 1s silent WAV for provider/init verification only; a successful
+  recognition smoke should pass an explicit non-child WAV with `--expect-pass`.
 - `smoke_vision_model_opt_in.sh` verifies the OpenAI-compatible MiMo vision path
   by sourcing `.env`, applying a temporary MiMo image smoke overlay, starting a
   temporary backend, and generating a fake/test PNG when no safe image path was
@@ -878,6 +883,33 @@ For local development without cloud fallback, use:
 ```bash
 export CHILD_AI_ASR_FALLBACK_PROVIDER=mock
 ```
+
+Local SenseVoice smoke harness:
+
+```bash
+python scripts/check_local_sensevoice_asr_status.py \
+  --audio /path/to/non_child_test.wav \
+  --fallback mock \
+  --expect-pass \
+  --output docs/LOCAL_ASR_SENSEVOICE_SMOKE_V0_1.md
+```
+
+Result semantics:
+
+- `PASS`: `numpy` and `sherpa_onnx` import, `model.int8.onnx` and `tokens.txt`
+  exist, and the ASR response provider is `local_sensevoice` with status `ok` or
+  `needs_retry`.
+- `BLOCKED`: dependency/model/tokens/audio are missing, or local primary failed
+  and only a fallback provider responded. `fallback=mock` can verify fallback
+  plumbing, but it is not a local SenseVoice pass.
+- `FAIL`: unexpected provider/API failure, route crash, or raw audio/base64 leak.
+
+The report records provider/model/status, elapsed time, and transcript length
+only. It does not include audio data, base64, full transcript text, model files,
+or child recordings. The 2026-05-23 local run used a macOS synthetic non-child
+Chinese WAV and returned `provider=local_sensevoice`, `model=model.int8.onnx`,
+`status=ok`; this validates the local provider path, not real child accuracy or
+Android device QA.
 
 MiMo fallback uses `mimo-v2.5` by default. Do not use the text conversation
 model `mimo-v2.5-pro` for ASR.

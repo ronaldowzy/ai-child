@@ -161,6 +161,7 @@ def test_opening_can_use_model_generated_text() -> None:
     assert "晚上要低刺激" in prompt
     assert "当前时间段" in prompt
     assert "opening_mode" in prompt
+    assert "不输出空内容、none、null" in prompt
 
 
 def test_model_opening_prompt_constrains_interest_revisit() -> None:

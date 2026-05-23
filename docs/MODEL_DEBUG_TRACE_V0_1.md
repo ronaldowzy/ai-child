@@ -1,7 +1,8 @@
 # Model Debug Trace v0.1
 
-Status: DEV-TRACE-1 implemented for local dev/test only; DEV-TRACE-2 synthetic
-scenario runner and review report added.
+Status: DEV-TRACE-1 implemented for local dev/test only; DEV-TRACE-2 mock
+synthetic scenario runner and review report added; DEV-TRACE-3 real MiMo
+opt-in synthetic trace review added.
 
 ## 1. Scope
 
@@ -18,7 +19,8 @@ prompt review can inspect what was sent to the model and what came back.
 - No cloud sync.
 - No production retention policy.
 - No prompt scoring.
-- No true LLM streaming, CameraX, E2-B, or real provider smoke change.
+- No true LLM streaming, CameraX, E2-B durable recall, Android QA, or
+  production provider smoke automation.
 
 ## 3. Enablement
 
@@ -155,6 +157,35 @@ The runner:
 
 The generated review is for prompt and contract analysis only. It is not real
 child QA, not real MiMo output quality, and not Android device validation.
+
+Run a real MiMo synthetic text-only review with explicit opt-in:
+
+```bash
+CHILD_AI_MIMO_API_KEY=... \
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/run_model_trace_scenarios.py \
+    --provider mimo \
+    --output docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md
+```
+
+The real-provider mode:
+
+- Is never the default.
+- Loads local `.env` values into the runner process only and does not print
+  secrets.
+- Applies a temporary process env overlay for `mimo_child_chat` and
+  `mimo_parent_report`.
+- Runs synthetic text scenarios only; it does not use real child audio, images,
+  photos, Android, CameraX, ASR, TTS, or vision.
+- Writes `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`.
+- Reports `REAL_PROVIDER_BLOCKED: missing CHILD_AI_MIMO_API_KEY` when no key is
+  available instead of falling back to mock and calling it pass.
+
+The current 2026-05-23 real MiMo synthetic run reached
+`REAL_PROVIDER_SMOKE: PASS` with provider/model `mimo/mimo-v2.5-pro`; the review
+still found prompt-quality issues that need later hardening, including empty raw
+responses covered by runtime fallback, adult-clinical self-harm wording, and
+multi-question replies in some child_chat scenarios.
 
 ## 9. Compliance Boundary
 

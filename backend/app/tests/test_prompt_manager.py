@@ -149,12 +149,15 @@ def test_global_prompt_contains_no_secret_safety_rule() -> None:
 def test_output_contract_is_voice_first_and_not_markdown() -> None:
     prompt = PromptManager().compose("daily.after_school_checkin")
 
+    assert "不输出内部分析、舞台说明、括号里的语气提示" in prompt.prompt
     assert "不使用 Markdown、标题、项目符号、编号列表、表格、代码块或链接格式" in prompt.prompt
     assert "最多只问一个主要问题" in prompt.prompt
+    assert "不要连续抛出两个以上问句" in prompt.prompt
     assert "不要把话题硬拉回固定选项" in prompt.prompt
     assert "只有我懂你" in prompt.prompt
     assert "不使用签到、连续天数、积分、排行榜、抽卡" in prompt.prompt
     assert "今天不聊了" in prompt.prompt
+    assert "睡前收尾不再抛新问题" in prompt.prompt
     assert "连接回现实生活、父母、老师、同伴" in prompt.prompt
 
 
@@ -165,6 +168,8 @@ def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() ->
     assert "告诉爸爸妈妈、老师或可信任的大人" in prompt.prompt
     assert "不让孩子保密" in prompt.prompt
     assert "requires_parent_attention 应为 true" in prompt.prompt
+    assert "不要输出成人临床化说明" in prompt.prompt
+    assert "心理健康专业人士" in prompt.prompt
 
 
 def test_watch_safety_prompt_is_gentle_without_forced_parent_attention() -> None:

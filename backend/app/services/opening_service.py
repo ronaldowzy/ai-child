@@ -183,7 +183,7 @@ class OpeningService:
             "不要像老师点名，不要查岗，不要强行追问日间经历，不要每次都问固定日常问题。"
             "如果是晚上，低刺激、短句；如果刚放学，轻松欢迎回来。"
             "opening 必须遵守 opening policy，不要自己扩大目标。"
-            "只输出一句或两句，不使用 Markdown。"
+            "必须直接输出一句或两句中文开场白，不输出空内容、none、null，不使用 Markdown。"
             f"\n孩子称呼：{name or '无'}"
             f"\n当前时间段：{time_context.time_period.value}"
             f"\n时间目标：{schedule_goal}"

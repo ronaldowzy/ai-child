@@ -470,6 +470,25 @@ that `model_debug_traces` contains rows, and writes
 contract review, but it is not real MiMo output, real child QA, or Android
 device validation.
 
+Run the explicit real MiMo synthetic text-only review:
+
+```bash
+CHILD_AI_MIMO_API_KEY=... \
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/run_model_trace_scenarios.py \
+    --provider mimo \
+    --output docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md
+```
+
+Real-provider mode is opt-in only. It applies a process-local MiMo overlay for
+`mimo_child_chat` / `mimo_parent_report`, never writes `.env`, and does not use
+real child audio/images, Android, CameraX, ASR, TTS, or vision. If the MiMo key
+is missing the runner exits with `REAL_PROVIDER_BLOCKED` and does not report a
+mock pass as real provider evidence. The current real synthetic review reached
+`REAL_PROVIDER_SMOKE: PASS` for provider/model `mimo/mimo-v2.5-pro`; the report
+is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md` and records remaining prompt
+quality issues separately from provider connectivity.
+
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed
 under a separate child data compliance process.

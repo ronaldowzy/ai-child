@@ -221,6 +221,34 @@ def test_memory_service_rejects_raw_media_or_fixed_negative_labels() -> None:
             )
         )
 
+    for source in ("full_transcript", "raw_transcript", "verbatim_child_text"):
+        with pytest.raises(UnsafeMemoryError):
+            service.create(
+                _request(
+                    content="孩子最近对植物感兴趣。",
+                    tags=["植物"],
+                ).model_copy(
+                    update={
+                        "evidence": [
+                            MemoryEvidence(
+                                source=source,
+                                session_id="session_memory_service_test",
+                                quote_summary="不应保存逐字转写。",
+                            )
+                        ]
+                    },
+                    deep=True,
+                )
+            )
+
+    with pytest.raises(UnsafeMemoryError):
+        service.create(
+            _request(
+                content="孩子就是不愿意表达。",
+                tags=["表达"],
+            )
+        )
+
 
 def test_memory_service_repository_failure_falls_back_without_sensitive_log(
     caplog: pytest.LogCaptureFixture,

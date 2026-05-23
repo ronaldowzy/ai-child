@@ -649,6 +649,19 @@ Implementation notes: 禁止签到压力、断签惩罚、排行榜、抽卡、F
 Docs updated: `docs/HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`。
 Tests or QA needed: prompt contract、quick actions、retention-pressure output safety 已有后端测试；Redmi K60 / Honor Pad 5 仍需确认实际回复和快捷动作是否低压力、可收束。
 
+#### PD-045
+
+Decision ID: PD-045
+Date: 2026-05-23
+Status: confirmed
+Source: E1 Relationship Memory / Interest Seed implementation
+Decision: 小白狐可以从自然对话中提取低敏、短期可回访的关系记忆：`interest_seed`、`topic_boundary`、`proud_moment`。这些记忆只保存结构化摘要和 metadata，不保存完整儿童原话、raw chat、full transcript、原始音频或原始图片。
+Rationale: Healthy Engagement 的“被理解感、掌控感、能力感和现实生活迁移”需要小白狐记得孩子在意的低敏兴趣、尊重孩子表达的边界，并把表达上的小进步转化为低压力成长反馈和父亲现实接话建议。
+Affected modules: ConversationMemoryHooks、MemoryService、OpeningService、ParentReportService、memory tests、opening/report tests。
+Implementation notes: E1 复用现有 `MemoryType.INTEREST` / `STRATEGY` / `EXPRESSION_PATTERN`，通过 `MemoryEvidence.metadata.relationship_memory_type` 表达具体类型；规则型 extractor 过滤操作旁白、旁人提示、疑似 ASR 碎片、隐私、高风险安全和严重医疗信息。Opening 只轻回访最近一个 low-sensitivity interest seed，且读取失败不阻塞；父亲日报把 relationship memory 转成 starter + avoid 风格的现实接话建议。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 后端测试覆盖跑步比赛/画画/故事兴趣、换话题/睡前边界、proud_moment、过滤 raw/full transcript、Opening 有/无 seed 和睡前分支、父亲日报低压力接话建议；Redmi K60 / Honor Pad 5 仍需真机观察回复自然度和是否过度回访。
+
 ---
 
 ## 3. Current Product Direction

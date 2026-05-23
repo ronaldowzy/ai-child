@@ -2,9 +2,17 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
+from app.domain.memory import (
+    MemoryCreateRequest,
+    MemoryEvidence,
+    MemorySensitivity,
+    MemoryType,
+)
 from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
+from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.domain.schemas.parent_policy import ParentPolicyUpdateRequest
 from app.main import app
+from app.services.memory_service import MemoryService
 from app.services.opening_service import OpeningService
 from app.services.parent_policy_service import get_parent_policy_service
 
@@ -195,7 +203,104 @@ def test_same_session_returns_cached_opening_without_regenerating_tts() -> None:
     assert tts.calls == 1
 
 
-def _request_model(*, child_id: str, session_id: str):
+def test_opening_lightly_revisits_recent_interest_seed() -> None:
+    child_id = "opening_relationship_seed_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    memory_service = _memory_service_with_interest_seed(
+        child_id=child_id,
+        topic="跑步比赛",
+    )
+    service = OpeningService(memory_service=memory_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-relationship-seed",
+        )
+    )
+
+    assert "豆豆，" in response.reply.text
+    assert "跑步比赛" in response.reply.text
+    assert "想你" not in response.reply.text
+    assert "每天都要" not in response.reply.text
+
+
+def test_opening_without_interest_seed_keeps_existing_fallback() -> None:
+    service = OpeningService(
+        memory_service=MemoryService(repository=InMemoryMemoryRepository())
+    )
+
+    response = service.create_opening(
+        _request_model(
+            child_id="opening_no_relationship_seed",
+            session_id="opening-no-relationship-seed",
+        )
+    )
+
+    assert response.reply.text
+    assert "上次聊到" not in response.reply.text
+
+
+def test_bedtime_opening_with_interest_seed_is_low_stimulation() -> None:
+    child_id = "opening_relationship_bedtime_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    memory_service = _memory_service_with_interest_seed(
+        child_id=child_id,
+        topic="跑步比赛",
+    )
+    service = OpeningService(memory_service=memory_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-relationship-bedtime",
+            device_time="2026-05-21T20:40:00+08:00",
+        )
+    )
+
+    assert "跑步比赛" in response.reply.text
+    assert "明天再慢慢说" in response.reply.text
+    assert "继续聊一点" not in response.reply.text
+
+
+def _memory_service_with_interest_seed(
+    *,
+    child_id: str,
+    topic: str,
+) -> MemoryService:
+    memory_service = MemoryService(repository=InMemoryMemoryRepository())
+    memory_service.create(
+        MemoryCreateRequest(
+            child_id=child_id,
+            memory_type=MemoryType.INTEREST,
+            content=f"孩子近期自然聊到{topic}，可作为低压力回访的兴趣种子。",
+            tags=["relationship_memory", "interest_seed", topic],
+            evidence=[
+                MemoryEvidence(
+                    source="conversation_summary",
+                    session_id="opening_relationship_seed_source",
+                    quote_summary=f"孩子自然提到{topic}相关内容，适合短期轻回访。",
+                    metadata={
+                        "relationship_memory_type": "interest_seed",
+                        "topic": topic,
+                        "next_hook": "下次可轻轻问一个具体细节。",
+                    },
+                )
+            ],
+            sensitivity=MemorySensitivity.LOW,
+            confidence=0.8,
+            importance=0.5,
+        )
+    )
+    return memory_service
+
+
+def _request_model(
+    *,
+    child_id: str,
+    session_id: str,
+    device_time: str = "2026-05-21T16:30:00+08:00",
+):
     from app.domain.schemas.conversation import (
         ClientContext,
         ConversationOpeningRequest,
@@ -205,7 +310,7 @@ def _request_model(*, child_id: str, session_id: str):
         child_id=child_id,
         session_id=session_id,
         client_context=ClientContext(
-            device_time=datetime.fromisoformat("2026-05-21T16:30:00+08:00"),
+            device_time=datetime.fromisoformat(device_time),
             timezone="Asia/Shanghai",
             app_mode="child",
         ),

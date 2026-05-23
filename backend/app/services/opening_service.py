@@ -9,6 +9,8 @@ from app.domain.schemas.conversation import (
 from app.domain.schemas.parent_policy import ParentPolicy
 from app.domain.time import TimeContext, TimePeriod
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
+from app.domain.memory import MemoryItem
+from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.parent_policy_service import (
     ParentPolicyService,
@@ -17,6 +19,10 @@ from app.services.parent_policy_service import (
 from app.services.time_context_service import (
     TimeContextService,
     get_time_context_service,
+)
+from app.services.relationship_memory import (
+    latest_interest_seed,
+    memory_relationship_topic,
 )
 from app.services.tts_service import TtsService, get_tts_service
 
@@ -31,6 +37,7 @@ class OpeningService:
         time_context_service: TimeContextService | None = None,
         tts_service: TtsService | None = None,
         model_registry: ModelRegistry | None = None,
+        memory_service: MemoryService | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -38,6 +45,7 @@ class OpeningService:
         self._time_context_service = time_context_service or get_time_context_service()
         self._tts_service = tts_service or get_tts_service()
         self._model_registry = model_registry or get_model_registry()
+        self._memory_service = memory_service or get_memory_service()
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
 
     def create_opening(
@@ -55,13 +63,16 @@ class OpeningService:
             timezone=request.client_context.timezone,
             schedule=parent_policy.schedule,
         )
+        interest_seed = self._safe_latest_interest_seed(request.child_id)
         fallback_text = self._build_opening_text(
             parent_policy=parent_policy,
             time_context=time_context,
+            interest_seed=interest_seed,
         )
         text = self._generate_model_opening(
             parent_policy=parent_policy,
             time_context=time_context,
+            interest_seed=interest_seed,
             fallback_text=fallback_text,
         )
         reply = Reply(
@@ -91,6 +102,7 @@ class OpeningService:
         *,
         parent_policy: ParentPolicy,
         time_context: TimeContext,
+        interest_seed: MemoryItem | None,
         fallback_text: str,
     ) -> str:
         try:
@@ -103,6 +115,7 @@ class OpeningService:
                             content=self._opening_prompt(
                                 parent_policy=parent_policy,
                                 time_context=time_context,
+                                interest_seed=interest_seed,
                             ),
                         ),
                         ModelMessage(role="user", content="请生成开场白。"),
@@ -127,11 +140,13 @@ class OpeningService:
         *,
         parent_policy: ParentPolicy,
         time_context: TimeContext,
+        interest_seed: MemoryItem | None = None,
     ) -> str:
         name = self._child_call_name(parent_policy)
         parent_message = (parent_policy.parent_message_raw or "").strip()
         goals = "；".join(parent_policy.goals[:4])
         preferences = parent_policy.communication_preferences
+        seed_topic = memory_relationship_topic(interest_seed) if interest_seed else ""
         return (
             "你是小白狐。请给孩子一句自然、短、亲切的开场白，适合直接朗读。"
             "根据当前时间段、父母寄语、孩子称呼和家庭沟通偏好调整语气。"
@@ -145,6 +160,7 @@ class OpeningService:
             f"\n避免事项：{'、'.join(time_context.avoid)}"
             f"\n父亲目标：{goals}"
             f"\n沟通偏好：{preferences}"
+            f"\n可轻回访兴趣：{seed_topic or '无'}"
             f"\n父母寄语背景：{parent_message[:500]}"
         )
 
@@ -162,6 +178,7 @@ class OpeningService:
         *,
         parent_policy: ParentPolicy,
         time_context: TimeContext,
+        interest_seed: MemoryItem | None = None,
     ) -> str:
         name = self._child_call_name(parent_policy)
         prefix = f"{name}，" if name else ""
@@ -171,9 +188,20 @@ class OpeningService:
             or "不要问学校" in parent_message
             or "别问学校" in parent_message
         )
+        seed_topic = memory_relationship_topic(interest_seed) if interest_seed else ""
 
         if time_context.time_period == TimePeriod.BEDTIME:
+            if seed_topic:
+                return (
+                    f"{prefix}晚上好。{seed_topic}我们可以明天再慢慢说，"
+                    "现在轻轻收个尾就好。"
+                )
             return f"{prefix}晚上好。我们轻轻说一小句就好。"
+        if seed_topic:
+            return (
+                f"{prefix}我还记得你上次聊到{seed_topic}。"
+                "今天想继续聊一点，还是先换个轻松小故事？"
+            )
         if time_context.time_period == TimePeriod.AFTER_SCHOOL:
             if avoid_school_check:
                 return f"{prefix}回来啦。我们不急着汇报，先说你想说的。"
@@ -187,6 +215,12 @@ class OpeningService:
             (parent_policy.child_nickname or "").strip()
             or (parent_policy.child_display_name or "").strip()
         )
+
+    def _safe_latest_interest_seed(self, child_id: str) -> MemoryItem | None:
+        try:
+            return latest_interest_seed(self._memory_service, child_id=child_id)
+        except Exception:
+            return None
 
     def _attach_audio_url(self, reply: Reply) -> None:
         try:

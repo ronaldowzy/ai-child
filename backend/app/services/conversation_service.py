@@ -280,6 +280,7 @@ class ConversationService:
         self._memory_hooks.record_turn(
             child_id=request.child_id,
             session_id=request.session_id,
+            child_text=request.input.text,
             safety=safety,
             intent=intent,
             route_decision=route_decision,

@@ -269,6 +269,9 @@ class MemoryService:
             "full_chat",
             "chat_transcript",
             "long_chat_transcript",
+            "full_transcript",
+            "raw_transcript",
+            "verbatim_child_text",
         }
         for evidence in memory.evidence:
             source = evidence.source.strip().lower()
@@ -285,6 +288,9 @@ class MemoryService:
             "内向是缺陷",
             "内向不好",
             "内向有问题",
+            "孩子就是",
+            "孩子总是",
+            "性格缺陷",
         )
         if any(marker in memory.content for marker in forbidden_content_markers):
             raise UnsafeMemoryError(

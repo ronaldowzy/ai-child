@@ -22,6 +22,14 @@ from app.repositories.parent_report_repository import (
 )
 from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
+from app.services.relationship_memory import (
+    INTEREST_SEED,
+    PROUD_MOMENT,
+    TOPIC_BOUNDARY,
+    memory_relationship_next_hook,
+    memory_relationship_topic,
+    relationship_memories,
+)
 
 
 logger = logging.getLogger("app.parent_report")
@@ -287,6 +295,7 @@ class ParentReportService:
                     "content": self._safe_text(memory.content),
                     "tags": [self._safe_text(tag) for tag in memory.tags[:5]],
                     "requires_parent_attention": memory.requires_parent_attention,
+                    "relationship": self._relationship_memory_payload(memory),
                 }
                 for memory in memories[:12]
             ],
@@ -787,6 +796,8 @@ class ParentReportService:
                 "如果孩子聊到比赛或跑后“要死了”一类夸张疲惫，可以温和确认跑后是否只是累、有没有疼痛；不要否定夸张表达，也不要追问太久。"
             )
 
+        actions.extend(self._relationship_parent_actions(memories))
+
         strategy_memories = [
             memory for memory in memories if memory.memory_type == MemoryType.STRATEGY
         ]
@@ -798,6 +809,51 @@ class ParentReportService:
                 "今晚用一个具体问题轻轻收尾，例如“今天有没有一件还不错的小事？”不要追问过多。"
             )
         return self._dedupe_and_limit(actions, limit=6)
+
+    def _relationship_parent_actions(self, memories: list[MemoryItem]) -> list[str]:
+        actions: list[str] = []
+        for memory in relationship_memories(
+            memories,
+            relationship_memory_type=INTEREST_SEED,
+        )[:2]:
+            topic = memory_relationship_topic(memory) or "孩子最近主动提到的兴趣"
+            if topic == "跑步比赛":
+                starter = "我听说你最近聊到跑步比赛，你最喜欢跑得快的哪一刻？"
+                avoid = "避免连续追问距离真假或身体问题。"
+            else:
+                starter = f"我听说你最近聊到{topic}，你最喜欢里面哪一小点？"
+                avoid = "避免连续追问或把兴趣变成任务。"
+            hook = memory_relationship_next_hook(memory)
+            suffix = f"也可以参考：{hook}。" if hook else ""
+            actions.append(f"今晚可以轻轻问：“{starter}”{avoid}{suffix}")
+
+        if relationship_memories(memories, relationship_memory_type=PROUD_MOMENT):
+            actions.append(
+                "孩子今天有表达展开的小进步；可以具体反馈“你刚才把事情说清楚了”，不要用积分、排名或比较来强化。"
+            )
+        if relationship_memories(memories, relationship_memory_type=TOPIC_BOUNDARY):
+            actions.append(
+                "孩子表达不想聊或想换题时，父亲可以尊重停顿，给两个轻松选择，不把话题拉回旧问题。"
+            )
+        return actions
+
+    def _relationship_memory_payload(
+        self,
+        memory: MemoryItem,
+    ) -> dict[str, object] | None:
+        relationship_type = None
+        for evidence in memory.evidence:
+            value = evidence.metadata.get("relationship_memory_type")
+            if isinstance(value, str):
+                relationship_type = value
+                break
+        if relationship_type is None:
+            return None
+        return {
+            "type": relationship_type,
+            "topic": self._safe_text(memory_relationship_topic(memory) or ""),
+            "next_hook": self._safe_text(memory_relationship_next_hook(memory) or ""),
+        }
 
     def _summary(
         self,

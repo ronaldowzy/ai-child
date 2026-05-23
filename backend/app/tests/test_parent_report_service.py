@@ -527,3 +527,72 @@ def test_parent_report_service_sanitizes_fixed_negative_labels() -> None:
     assert "胆小" not in report_json
     assert "不合群" not in report_json
     assert "需要更多安全感" in report_json
+
+
+def test_parent_report_uses_relationship_memory_for_low_pressure_parent_action() -> None:
+    _, memory_service, report_service = _services()
+    memory_service.create(
+        MemoryCreateRequest(
+            child_id="child_parent_report_service_test",
+            memory_type=MemoryType.INTEREST,
+            content="孩子近期自然聊到跑步比赛，可作为低压力回访的兴趣种子。",
+            tags=["relationship_memory", "interest_seed", "跑步比赛"],
+            evidence=[
+                MemoryEvidence(
+                    source="conversation_summary",
+                    session_id="session_parent_report_relationship",
+                    quote_summary="孩子自然提到跑步比赛相关内容，适合短期轻回访。",
+                    metadata={
+                        "relationship_memory_type": "interest_seed",
+                        "topic": "跑步比赛",
+                        "next_hook": "下次可问比赛是短跑还是接力。",
+                    },
+                )
+            ],
+            sensitivity=MemorySensitivity.LOW,
+            confidence=0.78,
+            importance=0.52,
+            visible_to_parent=True,
+            visible_to_child=False,
+        )
+    )
+    memory_service.create(
+        MemoryCreateRequest(
+            child_id="child_parent_report_service_test",
+            memory_type=MemoryType.EXPRESSION_PATTERN,
+            content="孩子能把运动比赛、项目或感受连起来表达，适合给低压力成长反馈。",
+            tags=["relationship_memory", "proud_moment", "运动比赛表达"],
+            evidence=[
+                MemoryEvidence(
+                    source="conversation_summary",
+                    session_id="session_parent_report_relationship",
+                    quote_summary="孩子围绕运动比赛表达了主题、项目或感受。",
+                    metadata={
+                        "relationship_memory_type": "proud_moment",
+                        "topic": "运动比赛表达",
+                        "next_hook": "父亲可具体肯定孩子把事情说清楚了。",
+                    },
+                )
+            ],
+            sensitivity=MemorySensitivity.LOW,
+            confidence=0.78,
+            importance=0.52,
+            visible_to_parent=True,
+            visible_to_child=False,
+        )
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert any(
+        "跑步比赛" in action and "避免连续追问距离真假" in action
+        for action in report.suggested_parent_actions
+    )
+    assert any("把事情说清楚" in action for action in report.suggested_parent_actions)
+    assert "evidence" not in report_json
+    assert "quote_summary" not in report_json
+    assert "我每天" not in report_json

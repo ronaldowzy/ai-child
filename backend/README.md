@@ -15,6 +15,11 @@ The current backend is intentionally local-first and mock-first:
   rule-based conversation memory after routing. Memory evidence uses summary
   sources only; raw chat, full transcripts, raw audio, and raw photos are not
   stored as long-term evidence.
+- E1 relationship memory is rule-first and local: low-sensitivity
+  `interest_seed`, `topic_boundary`, and `proud_moment` summaries can be
+  created from child conversation turns, while operation asides, bystander
+  prompts, privacy details, high-risk safety content, and raw/full transcripts
+  are filtered out before storage.
 - Treats child chat as open-ended conversation. Time periods and scenes provide
   context, safety boundaries, and fallback replies; they should not force every
   ordinary message into a fixed script.
@@ -42,7 +47,9 @@ The current backend is intentionally local-first and mock-first:
   father authorization and ASR policy flags allow it.
 - Opening greeting is available at `POST /api/v1/conversation/opening`.
   It uses time context, parent policy names, and parent guidance to return one
-  short child-facing greeting, with optional `reply.audio_url`.
+  short child-facing greeting, with optional `reply.audio_url`. When a recent
+  low-sensitivity relationship `interest_seed` exists, opening may lightly
+  revisit one topic and still gives the child a clear choice to switch away.
 - Parent policy supports `child_nickname` and `child_display_name`; Android
   father settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.
@@ -183,8 +190,9 @@ They cover:
 - automatic conversation memory hooks in
   `app/tests/test_conversation_memory_hooks.py`, including learning patterns,
   low-energy emotion observations, high-risk safety memory, watch observations,
-  privacy-boundary summaries, parent report visibility, and safety-memory
-  retrieval isolation
+  privacy-boundary summaries, relationship interest seeds, topic boundaries,
+  proud moments, parent report visibility, and safety-memory retrieval
+  isolation
 
 ## Demo Scenarios
 
@@ -310,6 +318,9 @@ PostgreSQL is available. The service keeps the same validation boundary as the
 in-memory repository: memory content must be structured summary material,
 evidence must be short `quote_summary` style evidence, safety memories remain
 parent-visible, and forbidden raw evidence sources are rejected before storage.
+Relationship memory E1 uses the same table and schema: `interest_seed`,
+`topic_boundary`, and `proud_moment` are stored as low-sensitivity structured
+summaries with metadata, not as child verbatim text.
 If PostgreSQL is unavailable, MemoryService falls back to the process-local
 repository without blocking conversation or Android QA.
 
@@ -319,6 +330,9 @@ none exists, it generates a report from parent-visible structured memory and
 best-effort saves it. Repository failure does not block the parent report API:
 the service returns the generated report and logs only hashed identifiers,
 date, operation, and error type.
+Parent reports can use relationship memories to suggest low-pressure real-world
+conversation starters with an avoid note, for example gently asking about a
+running competition without interrogating distance or body symptoms.
 
 Local dev database:
 

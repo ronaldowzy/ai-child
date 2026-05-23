@@ -9,7 +9,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs 并完成 output contract / quick actions / output safety 快速落地
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice 已接入后端
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
 下一步：使用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR real smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5，未接 CameraX
 ```
@@ -200,6 +200,7 @@ Mock 拍题：done
 | R6-04 儿童语音 prompt guidance | done |  | global/scene prompt 新增儿童表达理解、话题换轨和睡前收尾；ChildAgentRuntime 注入 `turn_guidance`；Safety/Intent 对运动语境夸张疲惫按 watch-lite 处理；父亲日报不把运动比赛误报学习求助 |
 | HE-01 Healthy Engagement 总体设计 | done |  | `HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md` 已作为下一阶段产品优化指导进入 docs；产品目标改为健康依恋、主动回访和成长陪伴习惯，禁止签到压力、FOMO、排行榜、抽卡、情感勒索和排他依恋 |
 | HE-02 Healthy Engagement 快速落地 | done |  | child_chat output contract 增加健康使用边界和现实连接；Open conversation quick actions 默认提供继续说、换个话题、讲个小故事、今天不聊了；SafetyEngine 拦截留存压力输出 |
+| HE-03 Relationship Memory / Interest Seed | done |  | E1 thin slice：ConversationMemoryHooks 从儿童自然对话中规则提取低敏 `interest_seed`、`topic_boundary`、`proud_moment`，不保存完整原话；Opening 可轻回访最近兴趣种子；ParentReportService 生成低压力现实接话建议 |
 | R7-01 完整设备 QA | in_progress |  | QA1 已补充 MANUAL_QA_V0_1.md 当前结果；后续采用双设备策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容和大屏验证 |
 | R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；默认仍 Mock 优先 |
 

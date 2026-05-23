@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.AttachmentCreateResponse
 import com.childai.companion.data.attachment.AttachmentRepository
+import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationRepository
 import com.childai.companion.data.conversation.ConversationReply
@@ -345,8 +346,9 @@ class ChatViewModel(
 
     fun onQuickAction(action: QuickActionUi) {
         when (action.id) {
-            "take_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_HOMEWORK)
-            "share_photo" -> showMockPhotoCapture(imagePurpose = IMAGE_PURPOSE_SHARE)
+            "take_photo", "share_photo" -> appendAgentMessage(
+                "请点下方“拍给小白狐看”，直接拍照或从相册选一张。",
+            )
             "talk_about_image", "make_story", "ask_what_is_this" ->
                 continuePendingImageConversation(action)
             else -> sendText(action.label)
@@ -450,10 +452,10 @@ class ChatViewModel(
     }
 
     fun submitCapturedPhoto(
-        imageDataUri: String,
+        payload: PhotoUploadPayload,
         imagePurpose: String = IMAGE_PURPOSE_SHARE,
     ) {
-        if (_uiState.value.isSending || imageDataUri.isBlank()) return
+        if (_uiState.value.isSending || payload.bytes.isEmpty()) return
         childInteractionStarted = true
         appendMessage(
             ChatMessage(
@@ -485,7 +487,9 @@ class ChatViewModel(
                 attachmentRepository.createCapturedImage(
                     childId = DevSettings.CHILD_ID,
                     sessionId = sessionId,
-                    imageDataUri = imageDataUri,
+                    imageBytes = payload.bytes,
+                    mimeType = payload.mimeType,
+                    fileName = payload.fileName,
                     imagePurpose = imagePurpose,
                     childCaption = "我拍了一张图片给小白狐看。",
                 )

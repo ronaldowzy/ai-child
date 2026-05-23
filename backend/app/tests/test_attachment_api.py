@@ -1,7 +1,14 @@
 from fastapi.testclient import TestClient
 
+from app.api.v1 import conversation_attachment as attachment_api
+from app.core.config import Settings
+from app.domain.model_types import ModelRequest, ModelResponse
 from app.main import app
-from app.repositories.attachment_repository import get_attachment_repository
+from app.repositories.attachment_repository import (
+    InMemoryAttachmentRepository,
+    get_attachment_repository,
+)
+from app.services.attachment_service import AttachmentService
 
 
 client = TestClient(app)
@@ -9,6 +16,34 @@ client = TestClient(app)
 
 def setup_function() -> None:
     get_attachment_repository().clear()
+    attachment_api.attachment_service = AttachmentService()
+
+
+class CapturingVisionRegistry:
+    def __init__(
+        self,
+        *,
+        provider_name: str = "mimo",
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        self.request: ModelRequest | None = None
+        self.provider_name = provider_name
+        self.metadata = metadata or {}
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        self.request = request
+        return ModelResponse(
+            task_type=request.task_type,
+            response_text=(
+                '{"child_summary":"我看到一张测试图片。",'
+                '"context_summary":"图片里有一张非儿童测试图，适合聊看到的形状和颜色。",'
+                '"recognized_type":"image_observation"}'
+            ),
+            structured_output={},
+            provider_name=self.provider_name,
+            model_name="mimo-v2.5",
+            metadata=self.metadata,
+        )
 
 
 def test_conversation_attachment_accepts_high_confidence_homework_photo() -> None:
@@ -39,6 +74,130 @@ def test_conversation_attachment_accepts_high_confidence_homework_photo() -> Non
     assert body["session_state"]["needs_input"] == "problem_understanding"
     assert "这道题是在问什么" in body["reply"]["text"]
     assert "答案是" not in body["reply"]["text"]
+
+
+def test_image_upload_endpoint_accepts_real_multipart_and_uses_mimo_vision(
+    monkeypatch,
+) -> None:
+    registry = CapturingVisionRegistry(provider_name="mimo")
+    repository = InMemoryAttachmentRepository()
+    monkeypatch.setattr(
+        attachment_api,
+        "attachment_service",
+        AttachmentService(
+            repository=repository,
+            model_registry=registry,
+            settings=Settings(model_provider="mimo", vision_provider="mimo"),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/attachments/images",
+        data={
+            "child_id": "child_real_image_upload_test",
+            "session_id": "real_image_upload_session",
+            "image_purpose": "share",
+            "child_caption": "我拍了一张图片给小白狐看。",
+        },
+        files={"file": ("sample.jpg", b"not-a-real-child-photo", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    attachment = repository.get(body["attachment_id"])
+
+    assert body["attachment_id"].startswith("att_")
+    assert body["mime_type"] == "image/jpeg"
+    assert body["size_bytes"] == len(b"not-a-real-child-photo")
+    assert body["recognized_content"]["provider_name"] == "mimo"
+    assert body["recognized_content"]["text"].startswith("图片里有一张非儿童测试图")
+    assert registry.request is not None
+    assert registry.request.metadata["contains_image"] is True
+    assert registry.request.metadata["contains_child_data"] is True
+    assert registry.request.metadata["image_data_uri"].startswith("data:image/jpeg;base64,")
+    assert attachment is not None
+    assert attachment.metadata["source"] == "real_image_upload"
+    assert attachment.metadata["image_data_uri_stored"] is False
+    assert "data:image" not in str(attachment.metadata)
+
+
+def test_image_upload_rejects_unsupported_mime(monkeypatch) -> None:
+    monkeypatch.setattr(
+        attachment_api,
+        "attachment_service",
+        AttachmentService(
+            repository=InMemoryAttachmentRepository(),
+            model_registry=CapturingVisionRegistry(),
+            settings=Settings(model_provider="mimo", vision_provider="mimo"),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/attachments/images",
+        data={
+            "child_id": "child_real_image_upload_test",
+            "session_id": "real_image_upload_session",
+        },
+        files={"file": ("sample.txt", b"text", "text/plain")},
+    )
+
+    assert response.status_code == 415
+
+
+def test_image_upload_does_not_mark_mock_vision_as_real_success(monkeypatch) -> None:
+    monkeypatch.setattr(
+        attachment_api,
+        "attachment_service",
+        AttachmentService(
+            repository=InMemoryAttachmentRepository(),
+            model_registry=CapturingVisionRegistry(
+                provider_name="mock",
+                metadata={"fallback_used": True},
+            ),
+            settings=Settings(model_provider="mimo", vision_provider="mimo"),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/attachments/images",
+        data={
+            "child_id": "child_real_image_upload_test",
+            "session_id": "real_image_upload_session",
+        },
+        files={"file": ("sample.jpg", b"image-bytes", "image/jpeg")},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "vision_provider_unavailable"
+
+
+def test_image_upload_returns_policy_blocked_when_vision_policy_blocks(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        attachment_api,
+        "attachment_service",
+        AttachmentService(
+            repository=InMemoryAttachmentRepository(),
+            model_registry=CapturingVisionRegistry(
+                provider_name="mimo",
+                metadata={"policy_blocked": True},
+            ),
+            settings=Settings(model_provider="mimo", vision_provider="mimo"),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/attachments/images",
+        data={
+            "child_id": "child_real_image_upload_test",
+            "session_id": "real_image_upload_session",
+        },
+        files={"file": ("sample.jpg", b"image-bytes", "image/jpeg")},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "vision_policy_blocked"
 
 
 def test_conversation_attachment_low_confidence_requests_retry_or_speech() -> None:

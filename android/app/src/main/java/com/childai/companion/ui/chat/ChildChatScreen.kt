@@ -52,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.parent.ParentEntryPinDialog
@@ -137,7 +138,7 @@ private fun ChildChatScreenContent(
     onMockImagePurposeChange: (String) -> Unit,
     onDismissMockPhoto: () -> Unit,
     onSubmitMockPhoto: () -> Unit,
-    onPhotoCaptured: (String) -> Unit,
+    onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
@@ -381,7 +382,7 @@ private fun ChatPanel(
     onToggleTtsMuted: () -> Unit,
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
-    onPhotoCaptured: (String) -> Unit,
+    onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -758,7 +759,7 @@ private fun ChildChatScreenPreview() {
             onToggleTtsMuted = {},
             onOpenTtsSettings = {},
             onInstallTtsData = {},
-            onPhotoCaptured = {},
+            onPhotoCaptured = { _, _ -> },
             onPhotoCaptureFailed = {},
             onMockProblemTextChange = {},
             onMockImagePurposeChange = {},

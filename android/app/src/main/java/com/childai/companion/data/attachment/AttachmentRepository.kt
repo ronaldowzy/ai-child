@@ -6,18 +6,20 @@ class AttachmentRepository(
     suspend fun createCapturedImage(
         childId: String,
         sessionId: String,
-        imageDataUri: String,
+        imageBytes: ByteArray,
+        mimeType: String,
+        fileName: String,
         imagePurpose: String = "share",
         childCaption: String = "我拍了一张图片给小白狐看。",
     ): AttachmentCreateResponse {
-        return apiClient.createAttachment(
-            AttachmentCreateRequest(
-                childId = childId,
-                sessionId = sessionId,
-                imagePurpose = imagePurpose,
-                imageDataUri = imageDataUri,
-                childCaption = childCaption,
-            ),
+        return apiClient.uploadImage(
+            childId = childId,
+            sessionId = sessionId,
+            imageBytes = imageBytes,
+            mimeType = mimeType,
+            fileName = fileName,
+            imagePurpose = imagePurpose,
+            childCaption = childCaption,
         )
     }
 

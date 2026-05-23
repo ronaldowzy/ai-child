@@ -9,9 +9,9 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening/report deterministic default 已接入后端
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；“拍给小白狐看”已从儿童端默认 mock attachment 改为系统相机/相册真实图片 multipart 上传 + 后端 MiMo vision 路径，普通 child_chat 仍用 `mimo-v2.5-pro`，vision/OCR/multimodal 用 `mimo-v2.5`；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening/report deterministic default 已接入后端
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
-下一步：继续用更多非儿童中文样例评估 local_sensevoice 准确率与 tap-to-transcript 延迟，并用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR fallback smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5；MiMo 文本 real synthetic trace 已用 `mimo-v2.5-pro` 复跑 PASS；PROMPT-REAL-HARDEN-1 后 child-facing 自伤回复已改为确定性儿童化可信成人兜底，舞台说明/多问句/睡前明天钩子/换题逐字复述已运行时压制；MVP-CLOSEOUT-1 后 opening/parent_report 默认改为确定性 policy/template/report 主路径，不再把 provider raw empty 作为家庭内测前阻塞，最新真实 trace P0/P1/P2 为 none；未接 CameraX
+下一步：继续用更多非儿童中文样例评估 local_sensevoice 准确率与 tap-to-transcript 延迟，并用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、系统相机真实拍照/相册上传、MiMo vision 识图、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR fallback smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5；MiMo 文本 real synthetic trace 已用 `mimo-v2.5-pro` 复跑 PASS；PROMPT-REAL-HARDEN-1 后 child-facing 自伤回复已改为确定性儿童化可信成人兜底，舞台说明/多问句/睡前明天钩子/换题逐字复述已运行时压制；MVP-CLOSEOUT-1 后 opening/parent_report 默认改为确定性 policy/template/report 主路径，不再把 provider raw empty 作为家庭内测前阻塞，最新真实 trace P0/P1/P2 为 none；未接 CameraX
 ```
 
 第一轮已完成能力快照：
@@ -20,7 +20,7 @@
 后端骨架：done
 Android 壳：done
 Conversation API：done
-Mock 拍题：done
+真实图片上传：in_progress
 父亲设置/日报：done
 ```
 
@@ -33,19 +33,19 @@ Mock 拍题：done
 | C0 | 项目准备 | 仓库、文档、AGENTS、README | done | 无 | 本地仓库规则和结构清晰，GitHub 远程已配置 |
 | M1 | 后端骨架 | FastAPI + health + conversation mock | done | C0 | pytest 通过，mock 会话可用 |
 | M2 | 时间与父亲策略 | TimeContext + ParentPolicy | done | M1 | time_period 和父亲目标注入会话 |
-| M3 | 模型抽象 | ModelRegistry + MockProvider | done | M1 | 业务不绑定具体模型 |
+| M3 | 模型抽象 | ModelRegistry + provider abstraction | done | M1 | 业务不绑定具体模型 |
 | M4 | Prompt 管理 | PromptManager + 分层模板 | done | M3 | 场景 prompt 可组合 |
 | M5 | 安全与意图 | SafetyEngine + IntentClassifier | done | M2 | 高风险优先，意图识别可测 |
 | M6 | 场景编排 | SceneOrchestrator + 四类场景 | done | M5 | 动态场景切换可用 |
 | M7 | 记忆系统 | MemoryService + MemoryExtractor mock | done | M6 | 结构化记忆可写可查，pytest/ruff 通过 |
 | M8 | 父亲日报 | ParentReportService | done | M7 | 今日摘要可生成，pytest/ruff 通过 |
-| M9 | 附件/OCR | Attachment + Mock OCR | done | M6 | 拍题流程可演示，pytest/ruff 通过 |
+| M9 | 附件/OCR/Vision | Attachment + OCR/Vision foundation | done | M6 | 附件上下文可接入学习/图片分享，pytest/ruff 通过 |
 | Q1 | 后端硬化 | scenario tests + 本地质量脚本 + demo scripts | done | M1-M9 | pytest/ruff/demo 通过，后端 MVP 可稳定验收 |
 | A1 | Android 壳 | Compose 静态聊天 UI | done | C0 | Android 可编译，单元测试通过 |
 | A2 | Android API | 接入 conversation API | done | Q1/A1 | 可请求后端并渲染 reply/ui_actions；session_state 内部保存，默认不展示给儿童 |
-| A3 | Android 拍题 | Mock 拍题流程 | done | A2/M9 | mock attachment + conversation 连续调用可用 |
+| A3 | Android 图片输入 | 系统相机/相册真实上传 + attachment 续聊 | in_progress | A2/M9 | 儿童默认入口已改为真实图片 multipart 上传；mock attachment 仅保留为测试/异常替身；真机相机和 MiMo vision 仍待设备 QA |
 | A4 | 父亲设置/日报 | 设置目标、作息并查看日报 | done | A2/M2/M8 | policy 可修改，report 可读取 |
-| E2E | 联调 | 后端 + Android 家庭内测流程 | in_progress | Q1/A1-A4 | 本机/LAN API 已通过；QA1 窗口模式模拟器复验覆盖基础聊天、放学后、学习入口、父亲入口点击保护和后端断开温和错误；父亲正确 PIN、设备侧完整 mock 拍题和真实平板仍待复验 |
+| E2E | 联调 | 后端 + Android 家庭内测流程 | in_progress | Q1/A1-A4 | 本机/LAN API 已通过；QA1 窗口模式模拟器复验覆盖基础聊天、放学后、学习入口、父亲入口点击保护和后端断开温和错误；父亲正确 PIN、系统相机真实拍照上传、MiMo vision 识图和真实平板仍待复验 |
 | R1 | AgentRuntime | 统一智能体执行链路和输出安全检查 | done | Q1/E2E/R2 | conversation 编排收敛到 runtime，模型调用、输出检查和安全 fallback 边界已落地 |
 | R2 | 模型外发安全闸门 | 真实模型接入前 child data gate | done | Q1 | 外发开关、数据最小化、审计和 fallback gate 可测 |
 | R3 | 自动记忆闭环 | conversation 后自动抽取结构化记忆并进入日报素材 | done | M7/M8/R1 | 规则型摘要记忆写入、日报可见和 safety 检索隔离已测 |
@@ -173,7 +173,7 @@ Mock 拍题：done
 | A1-02 ChildChatScreen | done |  | 静态 UI 已创建，test 通过 |
 | A2-01 ConversationApiClient | done |  | 可请求后端 conversation API |
 | A2-02 ui_actions 渲染 | done |  | 快捷按钮可显示；session_state 用于续会话和开发排查，默认不在儿童界面展示 |
-| A3-01 Mock 拍题 | done |  | 题目流程跑通，不接真实 CameraX |
+| A3-01 系统相机真实图片上传 | in_progress |  | Android 调系统相机/相册并 multipart 上传；后端返回真实 attachment_id；CameraX 不在本轮范围；真机 QA 待验 |
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
 | A4-02 ParentReportScreen | done |  | report 可读取，不展示逐字聊天记录 |
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |

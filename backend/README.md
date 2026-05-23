@@ -31,10 +31,12 @@ The current backend is local-first and test-stage real-path focused:
   Time context, parent free-form guidance, memory, recent turns, and images are
   prompt/context inputs; safety, privacy, explicit learning help, explicit
   bedtime closeout, and confirmed parent hard rules are guardrails.
-- Attachment is moving from homework-only to universal image sharing. The
-  existing homework flow remains available, but generic image attachments can
-  represent toys, drawings, books, plants, handmade work, or homework and are
-  routed by image intent.
+- Attachment now supports the active real image path for “拍给小白狐看”:
+  Android uploads a real system-camera or system-picker image to
+  `POST /api/v1/attachments/images`, the backend runs MiMo vision for the image
+  summary, and conversation receives only controlled `image_context` through
+  `attachment_id`. The older JSON/mock attachment path remains for automated
+  tests and explicit fallback diagnostics, not the child-facing default.
 - Uses `ConversationHistoryService` for short-term, in-memory recent turns so
   ordinary chat can keep context within one running backend process. This is not
   a durable chat database; service restart clears it, and full chat transcripts
@@ -107,6 +109,9 @@ Current backend contract:
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
   `reply.agent_motion` for Android TTS and 小白狐 presentation.
 - Use `POST /api/v1/tts/xiaobaohu` for backend-generated 小白狐 speech audio.
+- Use `POST /api/v1/attachments/images` for real image upload from Android.
+  Conversation follow-up sends the returned `attachment_id`; do not send image
+  base64 in conversation payloads or logs.
 - Use `POST /api/v1/conversation/opening` when the child chat screen first
   becomes visible. Call-name priority is `child_nickname`,
   `child_display_name`, then no forced call name.
@@ -310,13 +315,33 @@ MiMo vision/OCR smoke:
 bash scripts/smoke_vision_model_opt_in.sh
 ```
 
-The vision smoke path posts a data URI to `/api/v1/conversation/attachment`.
-The backend does not store the raw image data URI and still defaults to
-MockOCR unless the provider and policy env explicitly opt in to MiMo.
+The legacy vision smoke path can post a safe data URI to
+`/api/v1/conversation/attachment` for provider-contract testing. The active
+Android QA path posts multipart image bytes to `/api/v1/attachments/images` and
+must not be reported as PASS unless MiMo vision actually handled the image.
 Normal text chat uses `CHILD_AI_MIMO_MODEL=mimo-v2.5-pro`; image/vision/OCR
 uses `CHILD_AI_MIMO_VISION_MODEL=mimo-v2.5` because MiMo image understanding is
 served by the native multimodal model, not the pro text model. The MiMo provider
 uses `max_completion_tokens` for MiMo chat completions.
+
+Real-path development backend:
+
+```bash
+CHILD_AI_MIMO_API_KEY=... bash scripts/run_real_path_dev_backend.sh
+```
+
+This script applies a temporary process env overlay for active QA:
+
+```text
+child_chat -> mimo_child_chat / mimo-v2.5-pro
+vision/OCR -> mimo_vision / mimo-v2.5
+ASR -> local_sensevoice first, MiMo fallback
+TTS -> MiMo VoiceClone first
+model debug trace -> enabled for local prompt review
+```
+
+Do not commit `.env`, real keys, uploaded images, model files, DB dumps, or
+base64 image/audio payloads.
 
 ## Local PostgreSQL Persistence
 

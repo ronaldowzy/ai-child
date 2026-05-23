@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.voice.TtsUiState
 
 @Composable
@@ -47,7 +48,7 @@ fun InputBar(
     onToggleTtsMuted: () -> Unit = {},
     onOpenTtsSettings: () -> Unit = {},
     onInstallTtsData: () -> Unit = {},
-    onPhotoCaptured: (String) -> Unit = {},
+    onPhotoCaptured: (PhotoUploadPayload, String) -> Unit = { _, _ -> },
     onPhotoCaptureFailed: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -64,7 +65,7 @@ fun InputBar(
         }
     }
     val imageInputLaunchers = rememberImageInputLaunchers(
-        onCaptured = { imageDataUri, _ -> onPhotoCaptured(imageDataUri) },
+        onCaptured = onPhotoCaptured,
         onFailed = onPhotoCaptureFailed,
     )
 

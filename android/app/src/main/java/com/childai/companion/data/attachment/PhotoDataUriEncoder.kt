@@ -4,28 +4,41 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
 
-object PhotoDataUriEncoder {
+data class PhotoUploadPayload(
+    val bytes: ByteArray,
+    val mimeType: String = "image/jpeg",
+    val fileName: String = "xiaobaohu_photo.jpg",
+)
+
+object PhotoUploadPreparer {
     private const val MAX_DIMENSION = 1280
     private const val DEFAULT_JPEG_QUALITY = 82
     private const val MAX_IMAGE_BYTES = 4_800_000
     private const val MAX_SOURCE_BYTES = 16_000_000
 
-    fun encodeJpegDataUri(photoFile: File): String {
+    fun prepareJpegUpload(
+        photoFile: File,
+        fileName: String = photoFile.name.ifBlank { "xiaobaohu_photo.jpg" },
+    ): PhotoUploadPayload {
         val bitmap = decodeScaledBitmap(photoFile.readBytes(), MAX_DIMENSION)
             ?: error("photo decode failed")
         val jpegBytes = compressJpegWithinLimit(bitmap)
-        return "data:image/jpeg;base64," + Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
+        return PhotoUploadPayload(
+            bytes = jpegBytes,
+            mimeType = "image/jpeg",
+            fileName = fileName,
+        )
     }
 
-    fun encodeJpegDataUri(
+    fun prepareJpegUpload(
         context: Context,
         uri: Uri,
-    ): String {
+        fileName: String = "xiaobaohu_gallery.jpg",
+    ): PhotoUploadPayload {
         val sourceBytes = context.contentResolver.openInputStream(uri)?.use { input ->
             input.readBytes()
         } ?: error("image open failed")
@@ -35,7 +48,11 @@ object PhotoDataUriEncoder {
         val bitmap = decodeScaledBitmap(sourceBytes, MAX_DIMENSION)
             ?: error("image decode failed")
         val jpegBytes = compressJpegWithinLimit(bitmap)
-        return "data:image/jpeg;base64," + Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
+        return PhotoUploadPayload(
+            bytes = jpegBytes,
+            mimeType = "image/jpeg",
+            fileName = fileName,
+        )
     }
 
     private fun decodeScaledBitmap(

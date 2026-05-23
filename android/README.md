@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成儿童统一聊天、mock 拍题、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式，仍待真机 QA。
+当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 优先播放：后端 MiMo VoiceClone 音频可作为小白狐正式音色，Android 系统 TextToSpeech 保留为 fallback/诊断能力。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式，仍待真机 QA。
 
 ## 当前范围
 
@@ -14,7 +14,7 @@
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
-- “拍给小白狐看”走 mock attachment 流程，不接真实 CameraX，不保存真实图片；“这是作业题”只是其中一个分支。
+- “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo。CameraX 自定义相机不是当前目标。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存孩子小名 / 显示名、父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。小白狐 opening greeting 优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
 - 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
@@ -32,16 +32,17 @@
 3. 父母寄语不会出现在儿童聊天 UI 或 session_state debug 中。
 4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
 5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
-6. “拍题目”仍作为学习场景快捷动作保留，但默认图片能力是“拍给小白狐看”。
+6. “拍给小白狐看”是默认图片入口；旧 mock attachment 不作为儿童端默认路径。
 ```
 
 待 Redmi K60 手动 QA：
 
 ```text
-1. 分享积木/玩具图片 -> 点击“聊聊它”后，小白狐继续围绕图片聊，不进入作业。
-2. 分享图片 -> 点击“编个故事”后，小白狐基于图片摘要编故事。
-3. 选择“这是作业题” -> 仍进入 learning.homework_help，不直接给答案。
-4. 断开后端时，普通图片和作业图片分别显示正确失败文案。
+1. 使用系统相机拍摄非儿童测试图片 -> 上传成功后返回真实 `attachment_id`。
+2. 分享积木/玩具图片 -> 点击“聊聊它”后，小白狐继续围绕图片聊，不进入作业。
+3. 分享图片 -> 点击“编个故事”后，小白狐基于后端 MiMo vision 摘要编故事。
+4. 后端缺 key、`allow_image` 未开或 provider 失败时，儿童端显示失败，不假装看到了。
+5. 断开后端时，普通图片和作业图片分别显示正确失败文案。
 ```
 
 ## 下一阶段语音和小白狐方向
@@ -294,10 +295,10 @@ base URL：http://192.168.0.118:8000/
 
 ## 当前不做
 
-- 当前不接真实相机或 Android ASR 录音 UI。
+- 当前不做 CameraX 或自定义相机 UI；图片输入使用系统相机 / 系统相册。
 - 当前 Android 不直接调用 MiMo，也不保存模型、TTS 或 ASR API key。小白狐正式语音由后端生成 `audio_url`，后端 smoke 已确认可返回可下载 WAV；Android 优先播放远程音频，失败时 fallback 系统 TextToSpeech 或文字。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
-- 不长期保存真实图片；拍题流程只发送 mock OCR 文本和 mock metadata。
+- 不长期保存真实图片；当前图片路径上传真实图片给后端临时处理，后端只把受控 image context 带入 conversation。
 - 不做账号系统。
 - 不把父亲入口 PIN 当作强安全机制；它只是 v0.1 开发期的轻量误触保护。
 - 不在 Android 端放任何模型 API key。
@@ -495,9 +496,9 @@ bash scripts/dev_backend.sh
 ```text
 1. 输入“我回来了”，页面应追加孩子消息和后端回复。
 2. 输入“我有一道题不会”，页面应显示“拍题目”“读题目”等快捷按钮。
-3. 点击“拍题目”，保留默认 mock 题目或编辑题目文字，然后点击“发送题目”。
-4. 页面应通过 /conversation/attachment 创建 attachment，再通过 /conversation/message 携带 attachment_id。
-5. 页面应显示后端返回的题意引导，例如先问“这道题是在问什么”，不显示最终答案。
+3. 点击“拍给小白狐看”，选择“拍照”或“从相册选”，应调用系统相机/相册并上传真实图片。
+4. 页面应通过 `/api/v1/attachments/images` 创建 attachment，再通过 `/conversation/message` 携带 attachment_id。
+5. 页面应显示后端基于 MiMo vision 形成的图片分享引导；如果图片像题目，也不应直接显示最终答案。
 6. 点击“父亲设置”不应直接进入；长按“父亲设置”后输入开发 PIN `0000`，读取当前 policy，修改目标、沟通偏好或时间段，保存后应显示成功提示。
 7. 回到聊天页再发送消息，后端应使用更新后的 parent policy。
 7a. 在父亲设置页填写小名或显示名并保存后，重新进入儿童聊天页，opening greeting 应按“小名 -> 显示名 -> 不称呼”的优先级称呼孩子。

@@ -1,5 +1,8 @@
+import base64
 import json
 import os
+from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -24,6 +27,32 @@ from app.repositories.attachment_repository import (
 )
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.modality_manager import ModalityManager, get_modality_manager
+
+
+ALLOWED_REAL_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+REAL_IMAGE_MAX_BYTES = AttachmentCreateRequest.MAX_IMAGE_BYTES
+
+
+class AttachmentImageValidationError(ValueError):
+    pass
+
+
+class AttachmentVisionProviderBlockedError(RuntimeError):
+    def __init__(self, reason: str, *, status_code: int = 502) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.status_code = status_code
+
+
+@dataclass(frozen=True)
+class RealImageUpload:
+    child_id: str
+    session_id: str
+    image_bytes: bytes
+    mime_type: str
+    filename: str | None = None
+    image_purpose: ImagePurpose = ImagePurpose.SHARE
+    child_caption: str | None = None
 
 
 class HomeworkAttachmentContext(BaseModel):
@@ -62,7 +91,7 @@ class ImageAttachmentContext(BaseModel):
 
 
 class AttachmentService:
-    """Business service for mock homework attachments and OCR decisions."""
+    """Business service for image attachments and OCR/vision decisions."""
 
     def __init__(
         self,
@@ -78,6 +107,9 @@ class AttachmentService:
         self._ocr_provider = ocr_provider or MockOCRProvider()
         self._model_registry = model_registry or get_model_registry()
         self._settings = settings or get_settings()
+        self._image_storage_dir = self._settings.resolve_repo_path(
+            "backend/storage/attachments/images"
+        )
 
     def create_attachment(
         self, request: AttachmentCreateRequest
@@ -117,6 +149,93 @@ class AttachmentService:
             ),
         )
 
+    def create_real_image_upload(
+        self,
+        upload: RealImageUpload,
+    ) -> AttachmentCreateResponse:
+        mime_type = upload.mime_type.lower().split(";", 1)[0].strip()
+        if mime_type not in ALLOWED_REAL_IMAGE_MIME_TYPES:
+            raise AttachmentImageValidationError("unsupported_image_mime_type")
+        if not upload.image_bytes:
+            raise AttachmentImageValidationError("empty_image_upload")
+        if len(upload.image_bytes) > REAL_IMAGE_MAX_BYTES:
+            raise AttachmentImageValidationError("image_upload_too_large")
+
+        attachment_id = f"att_{uuid4().hex}"
+        file_path = self._store_real_image(
+            attachment_id=attachment_id,
+            image_bytes=upload.image_bytes,
+            mime_type=mime_type,
+        )
+        request = AttachmentCreateRequest(
+            child_id=upload.child_id,
+            session_id=upload.session_id,
+            attachment_type=AttachmentType.IMAGE,
+            image_purpose=upload.image_purpose,
+            image_data_uri=self._to_image_data_uri(upload.image_bytes, mime_type),
+            child_caption=upload.child_caption,
+            metadata={
+                "real_image_upload": True,
+                "mime_type": mime_type,
+                "size_bytes": len(upload.image_bytes),
+                "filename_present": bool(upload.filename),
+            },
+        )
+        try:
+            recognized_content = self._recognize_with_model_vision(
+                request,
+                require_real_provider=True,
+            )
+        except AttachmentVisionProviderBlockedError:
+            raise
+        except Exception as exc:
+            raise AttachmentVisionProviderBlockedError(
+                "vision_provider_unavailable",
+                status_code=502,
+            ) from exc
+        decision = self._modality_manager.decide_image_attachment(recognized_content)
+        attachment = self._repository.save(
+            AttachmentRecord(
+                id=attachment_id,
+                child_id=upload.child_id,
+                session_id=upload.session_id,
+                attachment_type=AttachmentType.IMAGE,
+                image_purpose=upload.image_purpose,
+                file_id=None,
+                status=decision.status,
+                recognized_content=decision.recognized_content,
+                metadata={
+                    "mock": False,
+                    "source": "real_image_upload",
+                    "mime_type": mime_type,
+                    "size_bytes": len(upload.image_bytes),
+                    "local_path": str(file_path),
+                    "image_data_uri_stored": False,
+                    "ocr_provider": decision.recognized_content.provider_name,
+                    "image_purpose": upload.image_purpose.value,
+                },
+            )
+        )
+
+        return AttachmentCreateResponse(
+            attachment_id=attachment.id,
+            recognized_content=attachment.recognized_content,
+            reply=Reply(text=decision.reply_text, emotion=decision.reply_emotion),
+            ui_actions=[
+                UiAction(actions=decision.quick_actions)
+            ]
+            if decision.quick_actions
+            else [],
+            session_state=SessionState(
+                base_scene="conversation.open",
+                active_scene=decision.active_scene,
+                needs_input=decision.needs_input,
+            ),
+            mime_type=mime_type,
+            size_bytes=len(upload.image_bytes),
+            created_at=attachment.created_at,
+        )
+
     def _recognize(self, request: AttachmentCreateRequest) -> RecognizedContent:
         if request.image_data_uri and self._should_use_model_vision():
             return self._recognize_with_model_vision(request)
@@ -146,6 +265,8 @@ class AttachmentService:
     def _recognize_with_model_vision(
         self,
         request: AttachmentCreateRequest,
+        *,
+        require_real_provider: bool = False,
     ) -> RecognizedContent:
         prompt = self._vision_prompt(request)
         response = self._model_registry.generate(
@@ -161,10 +282,23 @@ class AttachmentService:
                 },
                 metadata={
                     "contains_image": True,
+                    "contains_child_data": True,
                     "image_data_uri": request.image_data_uri,
                 },
             )
         )
+        if require_real_provider:
+            metadata = response.metadata or {}
+            if metadata.get("policy_blocked"):
+                raise AttachmentVisionProviderBlockedError(
+                    "vision_policy_blocked",
+                    status_code=403,
+                )
+            if response.provider_name != "mimo" or metadata.get("fallback_used"):
+                raise AttachmentVisionProviderBlockedError(
+                    "vision_provider_unavailable",
+                    status_code=502,
+                )
         vision_output = self._parse_vision_output(response.response_text)
         confidence = response.structured_output.get(
             "confidence",
@@ -259,6 +393,27 @@ class AttachmentService:
     def _truncate_vision_text(self, text: str) -> str:
         stripped = text.strip()
         return stripped[:500]
+
+    def _to_image_data_uri(self, image_bytes: bytes, mime_type: str) -> str:
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        return f"data:{mime_type};base64,{encoded}"
+
+    def _store_real_image(
+        self,
+        *,
+        attachment_id: str,
+        image_bytes: bytes,
+        mime_type: str,
+    ) -> Path:
+        suffix = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+        }[mime_type]
+        self._image_storage_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self._image_storage_dir / f"{attachment_id}{suffix}"
+        file_path.write_bytes(image_bytes)
+        return file_path
 
     def _safe_attachment_metadata(
         self,

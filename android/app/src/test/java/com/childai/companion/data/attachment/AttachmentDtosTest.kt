@@ -3,7 +3,6 @@ package com.childai.companion.data.attachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.json.JSONObject
 import org.junit.Test
 
 class AttachmentDtosTest {
@@ -21,22 +20,6 @@ class AttachmentDtosTest {
         assertTrue(json.contains("\"mock_vision_text\""))
         assertTrue(json.contains("\"stores_original_image\":false"))
         assertFalse(json.contains("CameraX"))
-    }
-
-    @Test
-    fun requestCanSendCameraImageDataUriWithoutOriginalStorage() {
-        val json = AttachmentCreateRequest(
-            childId = "child_demo_001",
-            sessionId = "session_001",
-            imagePurpose = "share",
-            imageDataUri = "data:image/jpeg;base64,ZmFrZV9pbWFnZQ==",
-            childCaption = "我拍了一张图片给小白狐看。",
-        ).toJsonString()
-
-        assertTrue(json.contains("\"image_data_uri\":\"data:image/jpeg;base64,ZmFrZV9pbWFnZQ==\""))
-        assertTrue(json.contains("\"source\":\"android_camera_capture\""))
-        assertTrue(json.contains("\"stores_original_image\":false"))
-        assertTrue(JSONObject(json).isNull("file_id"))
     }
 
     @Test
@@ -71,6 +54,42 @@ class AttachmentDtosTest {
         assertEquals("att_001", response.attachmentId)
         assertTrue(response.hasReadyHomeworkText)
         assertFalse(response.reply.text.contains("答案是"))
+    }
+
+    @Test
+    fun responseCanParseRealImageUploadMetadata() {
+        val response = AttachmentCreateResponse.fromJsonString(
+            """
+            {
+              "attachment_id": "att_real_001",
+              "mime_type": "image/jpeg",
+              "size_bytes": 1200,
+              "recognized_content": {
+                "type": "image_observation",
+                "text": "图片里是一张测试图。",
+                "confidence": 0.84,
+                "provider_name": "mimo",
+                "image_purpose": "share"
+              },
+              "reply": {
+                "type": "agent_message",
+                "text": "我看到这张图啦。你想让我陪你聊聊它，还是说说你想问哪里？",
+                "voice_enabled": true,
+                "emotion": "curious"
+              },
+              "ui_actions": [],
+              "session_state": {
+                "base_scene": "conversation.open",
+                "active_scene": "conversation.open"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("att_real_001", response.attachmentId)
+        assertEquals("image/jpeg", response.mimeType)
+        assertEquals(1200, response.sizeBytes)
+        assertEquals("mimo", response.recognizedContent.providerName)
     }
 
     @Test

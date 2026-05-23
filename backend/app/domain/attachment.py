@@ -104,3 +104,6 @@ class AttachmentCreateResponse(BaseModel):
     reply: Reply
     ui_actions: list[UiAction] = Field(default_factory=list)
     session_state: SessionState
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    created_at: datetime | None = None

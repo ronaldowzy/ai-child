@@ -8,6 +8,7 @@ import com.childai.companion.ui.chat.ChatViewModel
 import com.childai.companion.ui.chat.ConversationMessageSender
 import com.childai.companion.ui.chat.MessageAuthor
 import com.childai.companion.ui.chat.PendingImageContextUiState
+import com.childai.companion.ui.chat.QuickActionUi
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
@@ -20,6 +21,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatViewModelStreamTest {
+    @Test
+    fun photoQuickActionsDoNotOpenMockAttachmentFlow() {
+        val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
+
+        viewModel.onQuickAction(QuickActionUi(id = "share_photo", label = "拍给小白狐看"))
+
+        val state = viewModel.uiState.value
+        assertEquals(null, state.mockPhoto)
+        assertEquals(MessageAuthor.Agent, state.messages.last().author)
+        assertTrue(state.messages.last().text.contains("拍给小白狐看"))
+    }
+
     @Test
     fun textDeltaAppendsToCurrentAgentBubbleAndDoneStopsLoading() {
         val viewModel = ChatViewModel(conversationSender = NoopConversationSender())

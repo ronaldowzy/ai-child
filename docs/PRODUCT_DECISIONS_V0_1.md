@@ -717,6 +717,19 @@ Implementation notes: `OpeningService.create_opening()` 默认使用 `OpeningPol
 Docs updated: `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`、`docs/OPENING_GREETING_V2_POLICY_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 后端测试覆盖 opening/report 默认不调用 model、deterministic templates/report、trace runner 不把 deterministic no-trace 标为 P1；Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
 
+#### PD-051
+
+Decision ID: PD-051
+Date: 2026-05-23
+Status: confirmed
+Source: father / VISION-REAL-1
+Decision: 当前测试阶段，“拍给小白狐看”必须走 Android 系统相机或系统相册真实图片上传 + 后端 MiMo vision/multimodal。CameraX 自定义相机后置；mock attachment 只允许作为单元测试替身或外部条件缺失时的异常 fallback，不作为儿童端默认路径。
+Rationale: 用户当前重点是验证实际产品能力，不接受默认 mock/占位路径被写成可测功能。图片分享必须让小白狐真实看到图片；失败时应明确 BLOCKED/FAIL，而不是假装看到了。
+Affected modules: Android `InputBar` / system camera launcher / attachment API client, backend attachment upload API, AttachmentService, ModelRegistry vision routing, docs and QA.
+Implementation notes: Android 使用 `ActivityResultContracts.TakePicture` + `FileProvider` 或系统相册选择，压缩为 JPEG bytes 后 multipart 上传 `POST /api/v1/attachments/images`；后端短期保存图片测试文件并调用 `mimo_vision`。普通纯文字 child_chat 继续使用 `mimo-v2.5-pro`；图片/识图/OCR/multimodal 使用 `mimo-v2.5`。Opening / ParentReport 继续 deterministic default。Android 不保存 MiMo key。
+Docs updated: `docs/VISION_REAL_PATH_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`、`android/README.md`。
+Tests or QA needed: 后端测试覆盖 multipart、MIME 拒绝、mock vision 不能当 real pass、policy blocked；Android unit/compile 覆盖 quick action 不进 mock 默认路径。Redmi K60 / Honor Pad 5 仍需真机验证系统相机、相册、上传、MiMo vision 和失败提示。
+
 ---
 
 ## 3. Current Product Direction
@@ -724,7 +737,7 @@ Tests or QA needed: 后端测试覆盖 opening/report 默认不调用 model、de
 v0.1 第一轮后端和 Android MVP 已完成，当前重点不是扩展开放式聊天，而是进入家庭内测前加固和下一阶段体验设计：
 
 ```text
-1. 先完成完整设备 QA，确认现有文字聊天、学习引导、mock 拍题、父亲治理和安全场景在平板上可用。
+1. 先完成完整设备 QA，确认现有文字聊天、学习引导、系统相机真实图片上传/识图、父亲治理和安全场景在平板上可用。
 2. 语音输入 v1：后端本地 ASR 优先，第一选择是 sherpa-onnx + SenseVoice-Small int8；本地异常后 fallback 到原有 MiMo ASR。Android 负责录音上传和儿童端语音状态；儿童默认自动发送非空 transcript，确认面板仅用于 DevSettings / 父亲调试模式；仍不做常开麦克风或自动连续监听。
 3. 小白狐正式语音输出改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远端音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 4. 语音实现必须先抽象为 VoiceEngine / SpeechInputController / TtsController，并让 remote audio、系统 TTS 和文字 fallback 都走统一生命周期。

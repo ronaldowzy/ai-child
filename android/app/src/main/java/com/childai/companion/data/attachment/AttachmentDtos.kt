@@ -53,6 +53,8 @@ data class AttachmentCreateResponse(
     val reply: ConversationReply,
     val uiActions: List<ConversationUiAction>,
     val sessionState: ConversationSessionState,
+    val mimeType: String? = null,
+    val sizeBytes: Int? = null,
 ) {
     val hasReadyHomeworkText: Boolean
         get() = !recognizedContent.text.isNullOrBlank() &&
@@ -75,6 +77,8 @@ data class AttachmentCreateResponse(
                 sessionState = ConversationSessionState.fromJson(
                     root.getJSONObject("session_state"),
                 ),
+                mimeType = root.optNullableString("mime_type"),
+                sizeBytes = root.optNullableInt("size_bytes"),
             )
         }
     }
@@ -139,4 +143,9 @@ private fun JSONArray?.toAttachmentQuickActions(): List<com.childai.companion.da
 private fun JSONObject.optNullableString(name: String): String? {
     if (!has(name) || isNull(name)) return null
     return optString(name).takeIf { it.isNotBlank() }
+}
+
+private fun JSONObject.optNullableInt(name: String): Int? {
+    if (!has(name) || isNull(name)) return null
+    return optInt(name)
 }

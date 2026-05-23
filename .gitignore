@@ -55,6 +55,7 @@ qa_logs/
 tmp/
 backend/storage/tts_cache/*
 !backend/storage/tts_cache/.gitkeep
+backend/storage/attachments/*
 backend/models/
 *.sqlite
 *.sqlite3

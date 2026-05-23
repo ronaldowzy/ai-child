@@ -9,12 +9,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
-import com.childai.companion.data.attachment.PhotoDataUriEncoder
+import com.childai.companion.data.attachment.PhotoUploadPayload
+import com.childai.companion.data.attachment.PhotoUploadPreparer
 import java.io.File
 
 @Composable
 internal fun rememberImageInputLaunchers(
-    onCaptured: (imageDataUri: String, imagePurpose: String) -> Unit,
+    onCaptured: (payload: PhotoUploadPayload, imagePurpose: String) -> Unit,
     onFailed: (String) -> Unit,
 ): ImageInputLaunchers {
     val context = LocalContext.current
@@ -33,9 +34,9 @@ internal fun rememberImageInputLaunchers(
             return@rememberLauncherForActivityResult
         }
         runCatching {
-            PhotoDataUriEncoder.encodeJpegDataUri(photoFile)
-        }.onSuccess { imageDataUri ->
-            onCaptured(imageDataUri, imagePurpose)
+            PhotoUploadPreparer.prepareJpegUpload(photoFile)
+        }.onSuccess { payload ->
+            onCaptured(payload, imagePurpose)
         }.onFailure {
             onFailed("这张照片没有处理好，我们再拍一次。")
         }
@@ -51,9 +52,9 @@ internal fun rememberImageInputLaunchers(
             return@rememberLauncherForActivityResult
         }
         runCatching {
-            PhotoDataUriEncoder.encodeJpegDataUri(context, uri)
-        }.onSuccess { imageDataUri ->
-            onCaptured(imageDataUri, imagePurpose)
+            PhotoUploadPreparer.prepareJpegUpload(context, uri)
+        }.onSuccess { payload ->
+            onCaptured(payload, imagePurpose)
         }.onFailure {
             onFailed("这张图片没有处理好，我们再选一次。")
         }

@@ -1,6 +1,7 @@
 # Model Debug Trace v0.1
 
-Status: DEV-TRACE-1 implemented for local dev/test only.
+Status: DEV-TRACE-1 implemented for local dev/test only; DEV-TRACE-2 synthetic
+scenario runner and review report added.
 
 ## 1. Scope
 
@@ -135,7 +136,27 @@ Clear traces:
 
 Repository tests also cover `ModelDebugTraceRepository.clear()`.
 
-## 8. Compliance Boundary
+## 8. Synthetic Scenario Review
+
+Run a repeatable mock-provider trace review from the repository root:
+
+```bash
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/run_model_trace_scenarios.py
+```
+
+The runner:
+
+- Forces mock providers and trace enablement for its own process.
+- Clears `model_debug_traces` before execution.
+- Runs synthetic opening, child_chat, and parent_report scenarios.
+- Verifies traces were actually written.
+- Writes `docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`.
+
+The generated review is for prompt and contract analysis only. It is not real
+child QA, not real MiMo output quality, and not Android device validation.
+
+## 9. Compliance Boundary
 
 This is not a production child-data policy and not an app-store/cloud-ready
 observability design. Before any cloud deployment or public release, prompt and

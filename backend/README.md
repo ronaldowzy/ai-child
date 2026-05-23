@@ -456,6 +456,20 @@ Clear traces:
   python scripts/clear_model_debug_traces.py
 ```
 
+Run the repeatable synthetic prompt review:
+
+```bash
+/opt/homebrew/bin/conda run --no-capture-output -n child-ai \
+  python scripts/run_model_trace_scenarios.py
+```
+
+The scenario runner forces mock providers for its own process, clears prior
+trace rows, runs opening / child_chat / parent_report synthetic cases, verifies
+that `model_debug_traces` contains rows, and writes
+`docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. The report is useful for prompt
+contract review, but it is not real MiMo output, real child QA, or Android
+device validation.
+
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed
 under a separate child data compliance process.

@@ -7,7 +7,7 @@
 ```text
 阶段：family-test-prep smoke
 日期：2026-05-22
-目标：用 mock-first 本地 smoke、real provider smoke、自动测试和真机 LAN debug APK 构建确认既有主链路可交付给真机 QA。
+目标：用 本地 smoke、real provider smoke、自动测试和真机 LAN debug APK 构建确认既有主链路可交付给真机 QA。
 ```
 
 已完成范围：

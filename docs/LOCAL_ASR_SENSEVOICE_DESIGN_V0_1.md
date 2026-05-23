@@ -78,12 +78,12 @@ POST /api/v1/asr/transcribe
 
 ## 4. Configuration
 
-默认仍保持 mock，避免未安装本地模型的开发机启动即失败：
+当前测试阶段应显式选择 `local_sensevoice` 并验证本地识别链路；未安装本地模型的机器应标记为 BLOCKED，而不是写成通过：
 
 ```bash
-CHILD_AI_ASR_PROVIDER=mock
+CHILD_AI_ASR_PROVIDER=local_sensevoice
 CHILD_AI_ASR_FALLBACK_PROVIDER=mimo
-CHILD_AI_LOCAL_SENSEVOICE_ENABLED=false
+CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true
 CHILD_AI_LOCAL_SENSEVOICE_MODEL_PATH=backend/models/asr/sensevoice/model.int8.onnx
 CHILD_AI_LOCAL_SENSEVOICE_TOKENS_PATH=backend/models/asr/sensevoice/tokens.txt
 CHILD_AI_LOCAL_SENSEVOICE_NUM_THREADS=4

@@ -150,7 +150,7 @@ Output:
 你是“模型注册与 Mock Provider 会话 S03”。
 
 Goal:
-实现可配置模型抽象层。业务代码只能通过 ModelRegistry 调用模型，默认使用 MockModelProvider。
+实现可配置模型抽象层。业务代码只能通过 ModelRegistry 调用模型；测试阶段按目标选择真实 provider 或 test double，并明确记录结果。
 
 Context:
 请阅读：
@@ -170,7 +170,7 @@ Scope:
 
 Constraints:
 - 不引入真实 API key。
-- OpenAICompatibleProvider 只能做接口骨架，默认 disabled。
+- OpenAICompatibleProvider 必须通过后端受控配置调用，进入测试范围后要用临时 env 验证。
 - 测试不得调用真实网络。
 - 不改变 conversation API 返回结构，除非计划中说明。
 
@@ -774,7 +774,7 @@ Output:
 
 依赖:
 - ModelRegistry 和 OpenAICompatibleProvider 已存在。
-- 真实 provider 默认 disabled，测试不得真实联网。
+- 真实 provider smoke 必须使用临时 env 和合成数据显式验证；单元测试不得依赖真实联网。
 
 测试计划:
 - 先运行 bash scripts/doctor_local_env.sh。
@@ -976,7 +976,7 @@ Output:
 - 如果扫描命中合理历史引用，必须在交接中说明。
 
 Safety note:
-文档不得削弱儿童安全底线。必须明确 Mock 优先、真实模型默认关闭、Android 不放 API key、学习不直接给答案、父亲日报不展示逐字聊天记录。
+文档不得削弱儿童安全底线。必须明确测试阶段真实可用优先、Android 不放 API key、学习不直接给答案、父亲日报不展示逐字聊天记录。
 
 共享上下文更新项:
 - 是否发现新的共性坑。

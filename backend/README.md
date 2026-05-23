@@ -2,10 +2,12 @@
 
 FastAPI backend for the v0.1 child AI growth agent MVP.
 
-The current backend is intentionally local-first and mock-first:
+The current backend is local-first and test-stage real-path focused:
 
-- Uses `MockModelProvider` by default.
-- Does not call real model, OCR, vision, or external network services in tests.
+- Current QA must run the actual provider path for any feature that has entered
+  the active test scope; mock/fake providers are only automatic-test doubles or
+  exception fallbacks.
+- Does not put provider keys or direct model/OCR/vision calls in Android.
 - Keeps all child-facing AI decisions behind backend services such as `SafetyEngine`, `IntentClassifier`, `SceneOrchestrator`, `PromptManager`, and `ModelRegistry`.
 - Routes child-facing replies through `ChildAgentRuntime`: `SceneOrchestrator`
   decides the scene strategy and safe fallback reply, `PromptManager` composes
@@ -47,8 +49,8 @@ The current backend is intentionally local-first and mock-first:
   raises an error, the service can fall back to the configured original ASR
   provider. Child mode auto-sends a non-empty transcript to conversation; the
   pending transcript panel remains only for DevSettings / father debugging.
-  Raw child audio is never stored long-term, and cloud MiMo ASR fallback remains
-  disabled until father authorization and ASR policy flags allow it.
+  Raw child audio is never stored long-term; cloud MiMo ASR fallback remains
+  controlled by father authorization and ASR policy flags.
 - Opening greeting is available at `POST /api/v1/conversation/opening`.
   It uses time context, parent policy names, and parent guidance to return one
   short child-facing greeting, with optional `reply.audio_url`. When a recent
@@ -62,16 +64,17 @@ The current backend is intentionally local-first and mock-first:
   father settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
-  can generate or return a cached wav URL. The default provider is mock and
-  never calls external services. MiMo VoiceClone is disabled until explicit
-  local environment variables and the TTS data policy gate allow child text
-  transmission. Android now prefers `reply.audio_url` playback and falls back
-  to local TextToSpeech or text if remote audio fails.
+  can generate or return a cached wav URL. For QA, enable the intended real TTS
+  provider or mark the missing external condition as BLOCKED/FAIL; local/system
+  TTS remains an exception fallback and diagnostic path. Android now prefers
+  `reply.audio_url` playback and falls back to local TextToSpeech or text if
+  remote audio fails.
 
 If Android replies look like fixed templates such as “听起来可以聊”, the backend
-is probably running with the default mock provider. For real Mimo chat, restart
-the backend with the temporary environment variables in the Mimo section below;
-do not put the real API key into git, Android, docs, tests, or screenshots.
+is probably not running the intended real chat provider for the current QA
+target. Restart with the temporary environment variables in the Mimo section
+below when needed; do not put the real API key into git, Android, docs, tests,
+or screenshots.
 
 ## Current Voice And Presentation Contract
 
@@ -96,10 +99,11 @@ Current backend contract:
   fallback. Android must not call MiMo directly or store provider API keys.
 - Raw audio uploaded for ASR must be short-lived request data only: no database
   persistence, no logs, no memory, no test fixtures with real child recordings.
-- Keep external audio and child text transmission disabled unless a confirmed
-  product decision and provider gate review explicitly allow it. Local ASR does
-  not require the external-audio policy flags but still must not persist raw
-  audio.
+- External audio and child text transmission must pass the confirmed product
+  decision and provider gate review. Once a feature is in active QA, configure
+  that approved provider path explicitly instead of treating an unconfigured
+  runtime as a completed test. Local ASR does not require the external-audio
+  policy flags but still must not persist raw audio.
 - Return `reply.voice_enabled`, optional `reply.audio_url`, `reply.emotion`, and
   `reply.agent_motion` for Android TTS and 小白狐 presentation.
 - Use `POST /api/v1/tts/xiaobaohu` for backend-generated 小白狐 speech audio.
@@ -444,7 +448,7 @@ metadata, selected profile/provider/model, response text, structured output,
 fallback/policy flags, error type, elapsed time, request id, and child/session
 ids plus hashes.
 
-It is disabled by default:
+Enable it explicitly in local test runs:
 
 ```bash
 export CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=true
@@ -478,7 +482,7 @@ Run the repeatable synthetic prompt review:
   python scripts/run_model_trace_scenarios.py
 ```
 
-The scenario runner forces mock providers for its own process, clears prior
+The scenario runner uses synthetic providers for its own process, clears prior
 trace rows, runs opening / child_chat / parent_report synthetic cases, verifies
 that child_chat model traces are recorded, and writes
 `docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. Opening and parent_report use their
@@ -541,7 +545,7 @@ Second-round routing fixes:
 
 ## Optional Xiaomi Mimo Provider
 
-v0.1 remains mock-first. A Xiaomi Mimo OpenAI-compatible provider can be configured for controlled local testing, but it is disabled by default and falls back to mock on provider/configuration failure.
+Xiaomi Mimo OpenAI-compatible provider support is available for controlled local testing and active QA. Use temporary backend environment variables, never Android-side keys or committed files.
 
 Use environment variables only; never commit real API keys:
 
@@ -553,7 +557,7 @@ export CHILD_AI_MIMO_MODEL=mimo-v2.5-pro
 export CHILD_AI_MIMO_API_KEY="..."
 ```
 
-For child-facing traffic, do not enable real external transmission until the safety/data-retention review is complete:
+For child-facing traffic, real external transmission must be backed by the active safety/data-retention review and explicit local configuration:
 
 ```bash
 export CHILD_AI_MIMO_ALLOW_CHILD_DATA=false
@@ -588,11 +592,11 @@ separate review explicitly allows those data types.
 `ModelRegistry.generate()` enforces this as a code-level gate before any
 OpenAI-compatible provider call. When request metadata marks
 `contains_child_data=true`, an external profile must have both
-`allow_child_data=true` and `retention_policy_checked=true`; otherwise it falls
-back to the mock profile without calling the external provider. Metadata
+`allow_child_data=true` and `retention_policy_checked=true`; otherwise it uses
+the configured safe fallback without calling the external provider. Metadata
 `contains_image=true` and `contains_audio=true` also require `allow_image=true`
-and `allow_audio=true`. Mock providers are not blocked by this external
-transmission gate.
+and `allow_audio=true`. Local test doubles are not blocked by this external
+transmission gate, but they are not real provider evidence.
 
 The child-facing runtime always marks child chat model requests with
 `contains_child_data=true`. If prompt composition fails, the model registry
@@ -600,8 +604,8 @@ blocks or falls back from an external provider, the model call fails, the model
 returns empty text, output safety is `high`/`critical`, or a learning-scene
 model output appears to give a direct final answer, the runtime returns the
 existing `SceneRouteDecision.reply_text` fallback instead of model text. This
-keeps the default path mock-first and preserves a deterministic safe reply for
-each routed scene.
+preserves a deterministic safe reply for each routed scene without treating the
+fallback as real provider success.
 
 Output safety also blocks model replies that create secret relationships,
 isolate the child from trusted adults, or imply the AI is the child's only or
@@ -630,7 +634,7 @@ The Android app never stores model API keys. All model configuration belongs on 
 The backend now owns the official 小白狐 voice path. Android should not call
 MiMo directly and must not store any TTS API key.
 
-Default behavior is local and mock-only:
+For real QA, use the configured 小白狐 TTS provider. The endpoint shape is:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/api/v1/tts/xiaobaohu \
@@ -647,8 +651,8 @@ Expected response shape:
   "text": "我们先看这道题在问什么。",
   "emotion": "hint",
   "voiceVersion": "xiaobaohu_v01",
-  "provider": "mock",
-  "model": "mock-tts-v0",
+  "provider": "<actual_provider>",
+  "model": "<actual_model>",
   "cacheHit": false
 }
 ```
@@ -668,17 +672,17 @@ reference sample. It is not an Android asset and is not served through
 cache files are ignored by git. The media route serves only `.wav` files and
 does not serve metadata JSON or the voice sample.
 
-Default TTS environment:
+Example TTS environment for explicit local configuration:
 
 ```bash
-export CHILD_AI_TTS_PROVIDER=mock
-export CHILD_AI_CONVERSATION_TTS_ENABLED=false
-export CHILD_AI_MIMO_TTS_ENABLED=false
+export CHILD_AI_TTS_PROVIDER=mimo
+export CHILD_AI_CONVERSATION_TTS_ENABLED=true
+export CHILD_AI_MIMO_TTS_ENABLED=true
 export CHILD_AI_MIMO_TTS_API_KEY=""
 export CHILD_AI_MIMO_TTS_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
 export CHILD_AI_MIMO_TTS_MODEL=mimo-v2.5-tts-voiceclone
-export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=false
-export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=false
+export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=true
+export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=true
 ```
 
 Only enable MiMo VoiceClone in a local ignored `.env` or temporary shell after
@@ -833,32 +837,32 @@ Current backend status:
 1. ASR v1 target is backend local-first ASR: sherpa-onnx + SenseVoice-Small int8.
 2. Android records/uploads to the backend and child mode auto-sends a non-empty transcript; `requiresConfirmation=true` pending transcript UI is kept only for DevSettings / father debugging.
 3. Android must not call MiMo directly and must not store MiMo API keys.
-4. `POST /api/v1/asr/transcribe` is mounted, but default provider is mock so ordinary dev/test does not require local model files.
+4. `POST /api/v1/asr/transcribe` is mounted; active ASR QA must verify the selected provider in the response instead of assuming recording upload equals real recognition.
 5. `local_sensevoice` is implemented as a formal provider and lazy-loads the ONNX model only on first recognition.
 6. If local SenseVoice raises a provider/config/runtime error, `AsrService` can fall back to `CHILD_AI_ASR_FALLBACK_PROVIDER`; the operational default is `mimo`.
-7. MiMo ASR fallback remains disabled and policy-blocked by default. Real child audio external transmission still requires father authorization and all ASR policy flags.
+7. MiMo ASR fallback remains controlled by policy gates. Real child audio external transmission still requires father authorization and all ASR policy flags.
 8. No real child audio should be used in development smoke; use fake/smoke audio or non-child test audio only.
 9. Raw audio must not be stored in the database, logs, long-term memory, docs, tests, or git.
 ```
 
-ASR environment defaults:
+Example ASR environment for explicit local configuration:
 
 ```bash
-export CHILD_AI_ASR_PROVIDER=mock
+export CHILD_AI_ASR_PROVIDER=local_sensevoice
 export CHILD_AI_ASR_FALLBACK_PROVIDER=mimo
-export CHILD_AI_LOCAL_SENSEVOICE_ENABLED=false
+export CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true
 export CHILD_AI_LOCAL_SENSEVOICE_MODEL_PATH=backend/models/asr/sensevoice/model.int8.onnx
 export CHILD_AI_LOCAL_SENSEVOICE_TOKENS_PATH=backend/models/asr/sensevoice/tokens.txt
 export CHILD_AI_LOCAL_SENSEVOICE_NUM_THREADS=4
 export CHILD_AI_LOCAL_SENSEVOICE_USE_ITN=true
 export CHILD_AI_LOCAL_SENSEVOICE_LANGUAGE=zh
-export CHILD_AI_MIMO_ASR_ENABLED=false
+export CHILD_AI_MIMO_ASR_ENABLED=true
 export CHILD_AI_MIMO_ASR_API_KEY=""
 export CHILD_AI_MIMO_ASR_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
 export CHILD_AI_MIMO_ASR_MODEL=mimo-v2.5
-export CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=false
-export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
-export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
+export CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true
+export CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true
+export CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true
 ```
 
 Install the optional local ASR runtime:
@@ -983,7 +987,7 @@ for key in [
 PY
 ```
 
-If `CHILD_AI_ASR_PROVIDER` is `mock`, the artifact can only test recording,
+If `CHILD_AI_ASR_PROVIDER` points to a non-real test double, the artifact can only test recording,
 upload, confirmation UI, and graceful retry messaging. It must not be described
 as a real recognition test. For local ASR QA, verify the backend response shows
 `provider=local_sensevoice` and uses the intended ONNX file. For cloud fallback
@@ -995,7 +999,7 @@ The existing standard MiMo fallback status check is:
 bash scripts/check_asr_real_status.sh
 ```
 
-`ASR_STATUS=mock_only` means only the mock ASR path is active.
+`ASR_STATUS=mock_only` means only a non-real ASR test-double path is active.
 `ASR_STATUS=policy_blocked` means MiMo ASR is selected but required policy/key
 env is incomplete. `ASR_STATUS=mimo_smoke_pass` is the only script status that
 can be described as a successful real MiMo fallback smoke.
@@ -1031,4 +1035,4 @@ Use `CHILD_AI_MIMO_ASR_API_KEY` only when ASR needs an explicit override.
   check-in/emotion support instead of `safety.guardian`.
 - Learning help refuses direct final answers and asks for problem understanding or first-step thinking.
 - Parent goals may influence wording, but they do not override child safety rules.
-- Tests and demos must use fake child IDs and safe mock content only.
+- Tests and demos must use fake child IDs and safe synthetic content only.

@@ -9,7 +9,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 mock synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening/report deterministic default 已接入后端
+当前阶段：第一轮后端和 Android MVP 已完成，MiMo VoiceClone、动态小白狐和横屏双栏初步跑通；Freedom-first 第二轮与 Ops P0 已完成，Streaming v1 后端和 Android 首版 client 已接入，并完成 segment-level interleaved TTS quick win；Android ASR 已改为儿童默认 voice-first 自动发送；ASR 真实识别主路径已修订为后端本地 SenseVoice 优先、MiMo fallback，local_sensevoice 已用非儿童合成中文 WAV smoke 跑通；opening greeting 首版和父亲设置孩子称呼 UI 已接入；家庭内测前 smoke 脚本、QA checklist、debug APK metadata、本地 PostgreSQL 自动 setup、ASR 状态核对和 MiMo vision opt-in smoke 已补齐；child_chat prompt 已新增儿童语音表达理解和 turn_guidance runtime section；Healthy Engagement 总体设计已进入 docs，并完成 output contract / quick actions / output safety 快速落地；E1 Relationship Memory / Interest Seed thin slice、E1.1 hardening、E2-A Opening Policy Foundation、DEV-TRACE-1 本地模型调用 trace、DEV-TRACE-2 synthetic trace scenario review、DEV-TRACE-3 real MiMo synthetic trace review 和 MVP-CLOSEOUT-1 opening/report deterministic default 已接入后端
 当前目标：默认 conversation.open 自由交流；时间、父母寄语、记忆和图片作为上下文/能力；安全、隐私、学习和睡前边界作为护栏；儿童默认用语音发起对话，小白狐启动时主动短开场；流式链路用后端 NDJSON pseudo streaming + segment interleaved TTS + Android 渐进气泡/audio segment queue 降低同步等待感
 下一步：继续用更多非儿童中文样例评估 local_sensevoice 准确率与 tap-to-transcript 延迟，并用真机 base URL 重新构建 APK 后，在 Redmi K60 / Honor Pad 5 真机复验父亲设置孩子小名/显示名保存、opening greeting 称呼优先级、ASR 权限、录音、自动发送、重说/取消、DevSettings 确认模式、stream 首音频延迟、分段播放、停止/静音和失败 fallback，并重点观察儿童夸张表达、换话题和睡前收尾是否自然；本地 PostgreSQL setup/smoke 已由脚本自动化；MiMo ASR fallback smoke 已用 synthetic fake wav 跑通 provider=mimo/model=mimo-v2.5；MiMo vision real smoke 已用 fake/test image 跑通 provider=mimo/model=mimo-v2.5；MiMo 文本 real synthetic trace 已用 `mimo-v2.5-pro` 复跑 PASS；PROMPT-REAL-HARDEN-1 后 child-facing 自伤回复已改为确定性儿童化可信成人兜底，舞台说明/多问句/睡前明天钩子/换题逐字复述已运行时压制；MVP-CLOSEOUT-1 后 opening/parent_report 默认改为确定性 policy/template/report 主路径，不再把 provider raw empty 作为家庭内测前阻塞，最新真实 trace P0/P1/P2 为 none；未接 CameraX
 ```
@@ -54,13 +54,13 @@ Mock 拍题：done
 | R6 | 对话体验加固 | 真实模型自由聊天质量、语音化输出和小白狐状态预留 | done | R1/A2 | 后端输出更适合语音；Android 轻量映射 emotion/motion；真实语音和复杂动画仍后置 |
 | R7 | 完整设备 QA | 家庭内测前完整平板/模拟器手动验收 | in_progress | E2E/R1-R6 | QA1 已记录当前 v0.1+ 基础闭环事实；新增小白狐命名、语音输入确认、TTS 自动朗读、停止/静音、VoiceProfile、后端 ASR/TTS 评估和 3D/fallback 待验收项 |
 | R8 | 产品决策同步 | confirmed decision 进入文档事实源 | done | R7 | 新想法先写入 PRODUCT_DECISIONS，再进入子会话实现 |
-| V1 | 语音交互 v1 | 后端本地 SenseVoice ASR voice-first 自动发送 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、mock/cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为本地 SenseVoice 优先、MiMo fallback，provider 和 endpoint 已接入，默认 mock；local_sensevoice 本机非儿童 synthetic WAV smoke PASS；Android ASR 录音上传和儿童默认自动发送已接入，调试确认模式保留，待真机 QA |
+| V1 | 语音交互 v1 | 后端本地 SenseVoice ASR voice-first 自动发送 + 后端小白狐 VoiceClone 输出 | in_progress | R7/R8 | 后端 TTS endpoint、cache/policy guard 已接入；真实 MiMo VoiceClone smoke 和 conversation audioUrl 注入已通过；ASR v1 目标已修订为本地 SenseVoice 优先、MiMo fallback，provider 和 endpoint 已接入；local_sensevoice 本机非儿童 synthetic WAV smoke PASS；Android ASR 录音上传和儿童默认自动发送已接入，调试确认模式保留，待真机 QA |
 | F1 | 小白狐体验 v1 | 3D/soft 3D 视觉资源和轻量动画状态机 | in_progress | R7/R8 | animation_v1 runtime 已优化为 512px WebP 序列帧，Android assets 约 4.9MB；静态 fallback 已压缩为 WebP，保留 Canvas fallback；待 Redmi K60 / Honor Pad 5 设备 QA |
 | DB1 | PostgreSQL 本地持久化 | 本地 PostgreSQL、迁移和核心表；逐步替换内存服务 | done | Q1/R3/R8 | DB1-A 基础设施 done；B2 ParentPolicy thin slice done；B3 conversation message/stream turn thin slice done；B4 MemoryService thin slice done；B5 ParentReportService thin slice done；当前是本地家庭库，不是云端多租户 |
 | S-Stream | 流式交互 | 文本 delta + 分句/分段 TTS + Android 渐进显示/播放 | in_progress | V1/F1/R1 | 后端 NDJSON skeleton 已接入；segment-level interleaved TTS 已完成；Android 首版 stream client、渐进 agent bubble 和 audio segment queue 已接入；旧 `/conversation/message` 保留为 fallback |
 | UI-Landscape | 横屏双栏 | 左侧动态小白狐，右侧对话交互，手机也横屏 | planned | F1/V1 | 不做完整美术重设计，不破坏 audioUrl 和 animation_v1 |
 | Fox-Coverage | 小白狐状态覆盖 | 检查 11/12 状态资源、manifest、MascotState、业务触发和 QA | planned | F1 | 输出覆盖矩阵，未触发状态标记 resource_ready_but_not_triggered |
-| ASR-Research | 语音输入调研 | 调研本地 SenseVoice、MiMo ASR fallback 和儿童语音数据边界 | done | V1 | 父亲已确认 ASR v1 本地 SenseVoice 优先、MiMo fallback；已生成本地 ASR 设计和 MiMo 脱敏设计；真实儿童音频外发仍默认 disabled/policy-blocked |
+| ASR-Research | 语音输入调研 | 调研本地 SenseVoice、MiMo ASR fallback 和儿童语音数据边界 | done | V1 | 父亲已确认 ASR v1 本地 SenseVoice 优先、MiMo fallback；已生成本地 ASR 设计和 MiMo 脱敏设计；真实儿童音频外发仍受 policy gate 控制 |
 | Ops-Foundation | 运行基础 | request_id、结构化日志、provider timing、health 扩展和 QA 记录 | in_progress | DB1/V1 | P0 thin slice 已完成：后端 request_id、JSON 日志、request/model/TTS timing、health/detail 和日志脱敏测试；Android 诊断和清理脚本后续 |
 | Freedom-First | 自由对话底座 | 时段/父母寄语/图片/记忆作为上下文，安全/隐私/学习作为护栏 | done | R1/O1 | 学习触发已收窄；after_school/bedtime 不再强锁自由话题；父母寄语进入 prompt 并可 DB 持久化；普通图片后续快捷动作可带 image context 进入 LLM 上下文 |
 
@@ -113,7 +113,7 @@ Mock 拍题：done
 | M3-01 ModelTaskType | done |  | 类型完整 |
 | M3-02 BaseModelProvider | done |  | 抽象接口清晰 |
 | M3-03 MockModelProvider | done |  | 不调外网 |
-| M3-04 OpenAICompatibleProvider skeleton | done |  | 默认 disabled |
+| M3-04 OpenAICompatibleProvider skeleton | done |  | 需显式配置验证 |
 | M3-05 ModelRegistry | done |  | task_type 选择 provider |
 | M3-06 fallback 测试 | done |  | provider 异常可降级 |
 
@@ -188,7 +188,7 @@ Mock 拍题：done
 | R1-01 AgentRuntime 统一执行链路 | done |  | conversation 编排收敛到 ChildAgentRuntime；PromptManager、ModelRegistry、SafetyEngine 均在回复链路中执行 |
 | R1-02 输出安全检查 | done |  | 模型回复后经过 SafetyEngine.classify_output；模型失败、空回复、外发 gate fallback、high/critical 输出或学习场景直接给答案输出均回退场景安全回复 |
 | R2-01 真实模型外发安全闸门 | done |  | child data、image、audio 外发需要显式开关和 retention policy 确认；策略不满足时 fallback mock |
-| R2-02 Mock/真实 provider 切换验收 | done |  | 默认 Mock；真实 provider disabled 或受 gate 保护；测试不走真实外网 |
+| R2-02 Mock/真实 provider 切换验收 | done |  | 当前测试阶段真实 provider smoke 必须使用临时 env 和 policy gate 验证；单元测试仍使用 test double |
 | R3-01 自动记忆写入闭环 | done |  | conversation 后按规则写入 learning/emotion/watch/privacy/safety 摘要记忆；不保存长篇逐字原文 |
 | R3-02 记忆到父亲日报素材闭环 | done |  | 当天结构化记忆可进入日报，不暴露 evidence、quote_summary 或逐字记录 |
 | R4-01 安全场景细分 | done |  | HIGH/CRITICAL -> safety.guardian；WATCH -> safety.gentle_checkin；LOW privacy -> privacy.boundary；低能量表达保留普通 check-in |
@@ -203,7 +203,7 @@ Mock 拍题：done
 | HE-03 Relationship Memory / Interest Seed | done |  | E1/E1.1 thin slice：ConversationMemoryHooks 从儿童自然对话中规则提取低敏 `interest_seed`、`topic_boundary`、`proud_moment`，并加固比赛/创作误伤、跨 session 去重、best-effort 写入；Opening 只回访最新低敏兴趣种子并加强回访安全约束；ParentReportService 生成低压力现实接话建议。不触碰 Android runtime/assets、DB schema/migration；Opening v2 完整产品化和真机 QA 仍未完成 |
 | HE-04 Opening Greeting v2 Policy Foundation | done |  | E2-A done：新增 `OpeningPolicyBuilder` / `OpeningPolicy`，集中判断 `opening_mode`、兴趣回访资格、topic boundary 冷却、睡前收束、分龄长度、父亲目标低压力转译和 forbidden phrases；MVP-CLOSEOUT-1 后 `OpeningService` 默认使用 deterministic policy template，model opening 仅保留为 dev/test 实验 helper，不作为家庭内测主路径。未触碰 Android runtime/assets、DB schema/migration；Opening v2 完整产品化、Redmi K60 / Honor Pad 5 真机 QA 和 CameraX 仍未完成 |
 | R7-01 完整设备 QA | in_progress |  | QA1 已补充 MANUAL_QA_V0_1.md 当前结果；后续采用双设备策略：高配 Android 手机先做功能主验证，Honor Pad 5 Android 9 / 4GB 做低配兼容和大屏验证 |
-| R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；默认仍 Mock 优先 |
+| R7-02 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；当前测试阶段不能用未启用配置替代真实 smoke |
 
 ### 产品决策、语音和小白狐下一阶段
 
@@ -228,7 +228,7 @@ Mock 拍题：done
 | DB1-C Conversation message 持久化 | done |  | thin slice done：普通 `/api/v1/conversation/message` 和 `/api/v1/conversation/stream` 成功 turn 均已 best-effort 保存 session、child message、agent message、routing decision、audio_url/stream audio summary、emotion、agent_motion；持久化失败不阻断回复；不保存 delta 列表、debug、prompt、parent_message_raw、原始音频或照片 |
 | DB1-D MemoryService 持久化 | done |  | thin slice done：MemoryService 优先使用 PostgreSQL `memory_items`，数据库不可用时回退进程内 repository；只保存结构化 summary、tags、evidence summary、visibility/safety flags，不保存 raw media、full transcript、prompt 或 debug internals |
 | DB1-E ParentReport 持久化 | done |  | thin slice done：ParentReportService 优先从 PostgreSQL `parent_reports` 读取已生成日报；缺失或当天有更新会话素材时，结合结构化 memory、当天 `conversation_messages` 和 `routing_decisions` 重新生成并保存；数据库不可用时回退即时生成/进程内缓存；不保存 evidence、quote_summary、raw transcript、prompt、debug 或 provider raw response |
-| DEV-TRACE-1 模型调用 trace | done |  | 新增 dev/test opt-in `model_debug_traces` 临时表；`ModelRegistry.generate()` 统一记录完整 request messages/input/context/metadata 和 response text/structured output/metadata、fallback/policy/error/latency；默认关闭，记录失败不阻断模型调用，过滤 API key/Authorization/raw media/base64；不改 Android 或现有业务表 |
+| DEV-TRACE-1 模型调用 trace | done |  | 新增 dev/test `model_debug_traces` 临时表；相关功能测试必须显式开启并验证写入；`ModelRegistry.generate()` 统一记录完整 request messages/input/context/metadata 和 response text/structured output/metadata、fallback/policy/error/latency；记录失败不阻断模型调用，过滤 API key/Authorization/raw media/base64；不改 Android 或现有业务表 |
 | DEV-TRACE-2 trace scenario review | done |  | 新增 `scripts/run_model_trace_scenarios.py`，强制 mock provider + trace enablement，清空并回放 15 个 synthetic opening/child_chat/parent_report 场景，确认写入 `model_debug_traces` 并生成 `MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`；报告标记 P2 mock 质量观察，明确不代表真实 MiMo、Android 真机或真实儿童 QA |
 | DEV-TRACE-3 real provider trace review | done |  | `run_model_trace_scenarios.py --provider mimo` 已支持显式 opt-in real MiMo synthetic 文本场景；临时 env overlay 不写 `.env`，缺 key 时输出 `REAL_PROVIDER_BLOCKED`；2026-05-23 在 MVP-CLOSEOUT-1 后复跑 `REAL_PROVIDER_SMOKE: PASS`，provider/model=`mimo/mimo-v2.5-pro`，生成 `MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`。child_chat 是当前真实 provider 输出质量证据；opening/parent_report 默认 deterministic，不再要求 provider raw output。最新报告 P0/P1/P2 为 none；报告不代表真机 QA |
 | S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |
@@ -238,9 +238,9 @@ Mock 拍题：done
 | UI-Landscape-1 横屏双栏布局 | done |  | Android 主界面已改为 sensorLandscape 横屏：左侧约 41% 小白狐，右侧约 59% 消息和输入；Android test/assemble/lint 通过，待真机视觉 QA |
 | Fox-Coverage-1 动态小白狐覆盖矩阵 | done |  | 新增 `FOX_AGENT_STATE_COVERAGE_V0_1.md`；manifest 确认 11 个状态，每状态 24 帧；记录 oneshot_hold 后续 QA 风险 |
 | ASR-Research-0 MiMo ASR 调研 | done |  | 新增 `ASR_INPUT_RESEARCH_V0_1.md` 和 `MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；确认 v1 目标 provider、目标模型、非流式 audio input、格式、30s 上限和数据留存缺口 |
-| ASR-Skeleton-0 后端 mock skeleton | done |  | 新增 ASR schema/service/provider/policy guard；默认 mock，MiMo ASR disabled，真实儿童音频外发仍被 policy guard 阻断 |
+| ASR-Skeleton-0 后端 mock skeleton | done |  | 新增 ASR schema/service/provider/policy guard；真实 ASR 测试需显式选择目标 provider，真实儿童音频外发仍被 policy guard 控制 |
 | ASR-Provider-1 MiMo ASR provider | done |  | `/api/v1/asr/transcribe` 已挂载；MiMo `/chat/completions` provider 已实现；默认 policy-blocked；新增 fake-audio smoke 脚本，不使用真实儿童录音 |
-| ASR-Provider-2 Local SenseVoice provider | done |  | 新增 `local_sensevoice` provider、sherpa-onnx optional dependency、模型路径配置、本地 policy allow 和本地异常 fallback；默认仍 mock，模型文件不进 git；2026-05-23 本机非儿童 synthetic WAV smoke PASS：provider=local_sensevoice、model=model.int8.onnx、status=ok |
+| ASR-Provider-2 Local SenseVoice provider | done |  | 新增 `local_sensevoice` provider、sherpa-onnx optional dependency、模型路径配置、本地 policy allow 和本地异常 fallback；模型文件不进 git；2026-05-23 本机非儿童 synthetic WAV smoke PASS：provider=local_sensevoice、model=model.int8.onnx、status=ok |
 | ASR-Android-1 录音上传 voice-first UI | done |  | Android 已接入 RECORD_AUDIO 点击触发、短 WAV 录音、上传后端 ASR、儿童默认自动发送、重说/取消；DevSettings 确认面板保留；不常开麦克风、不自动连续监听 |
 | Opening-1 小白狐启动开场白 | done |  | 后端新增 `/api/v1/conversation/opening`；支持 child_nickname / child_display_name 称呼优先级、时段和父母寄语约束、TTS 失败降级；Android 每 session 请求一次，孩子先说话时不插入 |
 | ParentProfile-1 父亲设置孩子称呼 | done |  | Android 父亲设置页已接入 child_nickname / child_display_name 读取、编辑和保存；opening 使用小名优先、显示名 fallback；待 Redmi K60 / Honor Pad 5 真机 QA |
@@ -280,8 +280,8 @@ Codex 偏差：无；本轮未改 Android runtime、Android assets、ASR/TTS pro
 
 ```text
 今日目标：不要等用户晚上手测，补齐本地 PostgreSQL 自动 setup、ASR real status 核对、MiMo vision/OCR 最小真实 smoke。
-完成任务：新增本地 PostgreSQL setup 脚本，优先 Docker Compose，Docker 不可用时在 macOS 尝试 Homebrew postgresql@16，并在成功后自动运行 migration 与 DB persistence smoke；新增 ASR 状态检查脚本，真实 smoke 目标会用临时 overlay 推进到 MiMo ready / pass / fail / policy blocked；新增 OpenAI-compatible multimodal image payload 支持、AttachmentService image_data_uri 最小 vision path 和 vision opt-in smoke 脚本。默认仍为 MockOCR，不接 CameraX，不保存 raw image/base64。
-阻塞问题：ASR real smoke 已不再被默认 mock 配置阻塞，脚本会使用临时 env overlay 和 synthetic fake wav；本轮真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Vision real smoke 也已不再被缺 image policy 或缺图片路径阻塞，脚本会生成 fake/test PNG 并使用临时 image overlay；已修正全局文本模型覆盖 vision profile 的问题，真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Redmi K60 / Honor Pad 5 仍未真机 QA。
+完成任务：新增本地 PostgreSQL setup 脚本，优先 Docker Compose，Docker 不可用时在 macOS 尝试 Homebrew postgresql@16，并在成功后自动运行 migration 与 DB persistence smoke；新增 ASR 状态检查脚本，真实 smoke 目标会用临时 overlay 推进到 MiMo ready / pass / fail / policy blocked；新增 OpenAI-compatible multimodal image payload 支持、AttachmentService image_data_uri 最小 vision path 和 vision opt-in smoke 脚本。当前测试阶段 vision smoke 使用临时 env overlay 推进真实链路；不接 CameraX，不保存 raw image/base64。
+阻塞问题：ASR real smoke 已不再被未启用配置阻塞，脚本会使用临时 env overlay 和 synthetic fake wav；本轮真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Vision real smoke 也已不再被缺 image policy 或缺图片路径阻塞，脚本会生成 fake/test PNG 并使用临时 image overlay；已修正全局文本模型覆盖 vision profile 的问题，真实执行结果 PASS，provider=mimo、model=mimo-v2.5。Redmi K60 / Honor Pad 5 仍未真机 QA。
 Codex 偏差：无；本轮未修改 Android runtime、Android assets、stream 协议、TTS provider 主逻辑、DB schema/migration、true LLM streaming 或 CameraX。
 需要补充到 AGENTS.md 的规则：暂无。
 明日第一任务：保持 ASR/Vision real smoke 脚本使用临时 overlay，不把 policy flags 固化进 `.env`；随后进入 Redmi K60 / Honor Pad 5 真机 QA。
@@ -300,7 +300,7 @@ Codex 偏差：无；本轮未修改 ASR provider、TTS provider、stream servic
 
 ```text
 今日目标：完成 S13 Android 拍题与父亲页验收，推进 S14 本机/API 联调和 S20a 文档同步，进入 AgentRuntime、模型外发安全闸门、自动记忆闭环、安全场景细分、父亲入口保护和家庭内测前加固阶段。
-完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，默认 mock-first，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI；本轮补充小白狐 v1 候选资源、双设备测试策略、预渲染 PNG/WebP + 轻量 Compose 动画原则、FoxAgentAssetMapper 和低配 fallback 规则；V2 已完成 Android 本地 TTS v1 代码接入，支持默认自动朗读、停止/静音、VoiceProfile 和小白狐 speaking 状态联动；Redmi K60 截图显示上一版 TTS 为 SKIPPED_UNAVAILABLE，TTS-D1 已补 TTS service 查询、初始化竞态修复、系统朗读设置入口和诊断；6 张新增小白狐状态图已进入资源接入流程；Open Conversation Mode 已完成小步后端实现，普通话题进入 conversation.open 并传入短期 history；当前 8000 后端已改为加载本地忽略 `.env` 的 Mimo 配置，Mimo 超时调为 30000ms，普通恐龙话题 smoke 已返回真实模型回复。
+完成任务：Android mock 拍题流程已接入 attachment API 和 conversation API；父亲设置页可读取/保存 goals、沟通偏好和作息时间；父亲日报页可读取后端日报摘要；S14 本机 health、LAN health、E2E API 合约检查通过；新增共享上下文、环境 doctor 和 Android Gradle 包装脚本；已安装 Android Emulator，创建 child_ai_tablet_api35 AVD，并完成 App 安装、聊天 API、父亲日报基础 smoke；Android test、assembleDebug、lintDebug 通过；S20a 修正文档中过期的 C0/未初始化描述，并补齐多会话协同规则和后续子会话提示词；S16 已完成模型外发安全闸门；S19 已完成 Android 父亲入口长按 + dev PIN 轻量保护；S15 已完成 ChildAgentRuntime 主回复链路，模型失败/空回复/高风险输出回退 SceneRouteDecision.reply_text；S18 已完成安全场景细分，HIGH/CRITICAL 进入 safety.guardian，WATCH 进入 safety.gentle_checkin，LOW privacy 进入 privacy.boundary，低能量表达不进 guardian；S17 已完成规则型自动记忆闭环，conversation 会在 runtime 前检索非 safety 记忆，并在路由后写入结构化摘要记忆，父亲日报可读取当天自动记忆素材；S24 已完成真实模型输出质量加固，回复更适合语音播报并拦截秘密关系/唯一朋友/隔离可信成人风险话术；S25 已完成 Android 小白狐轻量状态映射和语音占位 UI；本轮补充小白狐 v1 候选资源、双设备测试策略、预渲染 PNG/WebP + 轻量 Compose 动画原则、FoxAgentAssetMapper 和低配 fallback 规则；V2 已完成 Android 本地 TTS v1 代码接入，支持默认自动朗读、停止/静音、VoiceProfile 和小白狐 speaking 状态联动；Redmi K60 截图显示上一版 TTS 为 SKIPPED_UNAVAILABLE，TTS-D1 已补 TTS service 查询、初始化竞态修复、系统朗读设置入口和诊断；6 张新增小白狐状态图已进入资源接入流程；Open Conversation Mode 已完成小步后端实现，普通话题进入 conversation.open 并传入短期 history；当前 8000 后端已改为加载本地忽略 `.env` 的 Mimo 配置，Mimo 超时调为 30000ms，普通恐龙话题 smoke 已返回真实模型回复。
 阻塞问题：无硬阻塞；完整设备侧手动 QA 仍需继续执行；Mimo 真实 provider 已用临时 env smoke 通过，后续不得重复使用错误模型 id `mimo-v2.5pro`。
 Codex 偏差：S14 子会话把裸 Gradle 的 Java Runtime 报错误判为本机缺少 JDK；主控会话已修正为共享环境未加载问题，并固化标准入口。
 需要补充到 AGENTS.md 的规则：暂无。

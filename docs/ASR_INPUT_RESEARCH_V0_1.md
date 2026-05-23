@@ -1,6 +1,6 @@
 # ASR Input Research v0.1
 
-用途：记录 ASR 能力调研结论，以及本项目在儿童语音输入上的数据边界。父亲已确认 ASR v1 从云端 MiMo 优先修订为本地 ASR 优先：第一选择是 sherpa-onnx + SenseVoice-Small int8；MiMo audio input / ASR 保留为本地异常后的 fallback。本文档仍强调默认 mock、云端 disabled 和 policy gate，不表示已经允许真实儿童音频外发。
+用途：记录 ASR 能力调研结论，以及本项目在儿童语音输入上的数据边界。父亲已确认 ASR v1 从云端 MiMo 优先修订为本地 ASR 优先：第一选择是 sherpa-onnx + SenseVoice-Small int8；MiMo audio input / ASR 保留为本地异常后的 fallback。本文档强调本地 SenseVoice 优先、云端 MiMo fallback 受 policy gate 控制；测试阶段不能把未启用链路写成真实 ASR 通过。
 
 来源：
 
@@ -96,7 +96,7 @@ Provider 定位：
 
 ```text
 1. Android 不长期保存原始音频。
-2. 后端 ASR endpoint 可以在用户主动录音后接收短音频，但默认 provider 为 mock；启用真实识别时优先本地 SenseVoice，MiMo 外发受 policy gate 控制。
+2. 后端 ASR endpoint 可以在用户主动录音后接收短音频；真实识别测试应优先启用本地 SenseVoice，MiMo 外发受 policy gate 控制。
 3. 音频只在一次转写请求中短暂存在，不写数据库、不进日志、不进 memory。
 4. 转写结果在孩子确认前只是 pending transcript，不作为正式 child message。
 5. 孩子确认或父亲确认后，才把编辑后的文本发送到 conversation API。

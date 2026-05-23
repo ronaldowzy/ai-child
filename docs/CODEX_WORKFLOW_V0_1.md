@@ -681,7 +681,7 @@ M3-01 定义 ModelTaskType 枚举：child_chat、intent_classification、safety_
 M3-02 定义 ModelRequest / ModelResponse。
 M3-03 定义 BaseModelProvider 抽象接口。
 M3-04 实现 MockModelProvider。
-M3-05 实现 OpenAICompatibleProvider 骨架，但默认 disabled。
+M3-05 实现 OpenAICompatibleProvider 骨架，并通过受控配置验证。
 M3-06 实现 ModelProfile 配置。
 M3-07 实现 ModelRegistry.select(task_type)。
 M3-08 增加 fallback_provider。
@@ -1133,7 +1133,7 @@ A1-13 添加基本 UI 测试或手动 QA 脚本。
 | 文件或目录 | 默认拥有者 | 合并注意事项 |
 |---|---|---|
 | `backend/app/services/agent_runtime*`、runtime tests | AgentRuntime 会话 | AgentRuntime 只能编排既有服务，不得绕过 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry |
-| `backend/app/providers/model/`、模型外发 gate tests | 模型安全闸门会话 | 真实模型默认 disabled；child data 外发必须有显式开关、data policy 确认和 fallback |
+| `backend/app/providers/model/`、模型外发 gate tests | 模型安全闸门会话 | 真实模型外发必须有显式开关、data policy 确认和 fallback；进入测试范围后应实际验证 |
 | `backend/app/services/memory*`、`backend/app/repositories/memory*`、日报素材 tests | 自动记忆闭环会话 | 不保存长篇原文；高风险记忆和普通检索隔离 |
 | `backend/app/services/safety_engine.py`、`scene_orchestrator.py`、安全场景 tests | 安全场景细分会话 | 高风险优先，不放宽父亲提醒和可信成人引导 |
 | `android/` 父亲设置/日报入口保护相关文件 | 父亲入口保护会话 | v0.1 不做账号系统，但必须避免儿童轻易进入父亲治理页 |

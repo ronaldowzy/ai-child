@@ -9,7 +9,7 @@
 1. ModelRequest 支持 text + image data URI 的多模态 payload。
 2. OpenAICompatibleProvider 在 metadata/context 中存在 image_data_uri 时构造 OpenAI-compatible image_url content array。
 3. AttachmentCreateRequest 支持可选 image_data_uri，并限制为 png/jpeg/webp data URI，解码后最大 5MB。
-4. AttachmentService 默认仍走 MockOCRProvider；只有 CHILD_AI_VISION_PROVIDER=mimo 或 CHILD_AI_MODEL_PROVIDER=mimo 时才进入 ModelRegistry vision path。
+4. AttachmentService 在真实 vision QA 中必须进入 ModelRegistry vision path；只有测试替身或异常兜底才使用 MockOCRProvider。
 5. ModelDataPolicyGuard 要求 image 外发必须 CHILD_AI_MIMO_ALLOW_IMAGE=true 且 CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true。
 6. scripts/smoke_vision_model_opt_in.sh 提供真实 MiMo vision opt-in smoke。
 7. 2026-05-22 真实 smoke 已确认：MiMo image understanding 必须使用 `mimo-v2.5` / `mimo-v2-omni` 这类 multimodal model；`mimo-v2.5-pro` 会触发 `No endpoints found that support image input`。

@@ -263,7 +263,7 @@ MockModelProvider 要能根据 task_type 返回固定结果。
 
 OpenAICompatibleProvider 只做接口骨架：
 - 从环境变量读取 base_url/api_key/model_name。
-- 默认 disabled。
+- 需显式配置验证。
 - 不在测试中调用真实网络。
 
 Constraints:

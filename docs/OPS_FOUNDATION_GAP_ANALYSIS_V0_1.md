@@ -3,7 +3,7 @@
 日期：2026-05-20  
 会话：Ops-Foundation-1  
 范围：运行基础组件缺口分析和小步补齐计划  
-约束：不接第三方 APM，不引入外部日志平台；默认本地开发、家庭内测、Mock 优先；不改变儿童安全和数据边界。
+约束：不接第三方 APM，不引入外部日志平台；本地开发和家庭内测必须按测试目标启用真实可验证链路；不改变儿童安全和数据边界。
 
 ---
 
@@ -361,7 +361,7 @@ TTS cache 建议：
 1. 长期记忆只保存结构化摘要。
 2. 不保存原始音频、原始照片或长篇逐字聊天。
 3. TTS cache metadata 保存 textHash，不保存原始 TTS 文本。
-4. 真实 provider 默认 disabled，外发需要显式 allow 和 retention policy checked。
+4. 真实 provider 外发需要显式 allow 和 retention policy checked；进入测试范围后必须实际验证或标记 BLOCKED/FAIL。
 ```
 
 仍需补齐可执行策略：

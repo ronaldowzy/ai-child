@@ -33,7 +33,7 @@ PD-037：儿童聊天页打开后，小白狐请求 opening greeting；称呼优
 1. 后端已返回 reply.voice_enabled、reply.audio_url、reply.emotion、reply.agent_motion。
 2. Android DTO 已解析这些字段，并已做小白狐轻量状态映射。
 3. Android 语音输入 v1 已接入：点击后请求麦克风权限，录制短 WAV，上传后端 `/api/v1/asr/transcribe`；后端优先本地 SenseVoice ASR，异常后按配置 fallback；儿童默认自动发送非空 transcript，DevSettings / 父亲调试模式可恢复可编辑待确认文本。
-4. 后端已提供 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式开启环境变量和 TTS 数据策略闸门。
+4. 后端已提供 `POST /api/v1/tts/xiaobaohu`；当前测试阶段应启用目标 TTS provider，并通过环境变量和 TTS 数据策略闸门验证真实音频链路。
 5. Android 已实现 remote `reply.audio_url` 优先播放、本地 TextToSpeech fallback 抽象、默认自动朗读、停止/静音控制、VoiceProfile 和小白狐 speaking 状态联动。
 6. mock 拍题和学习求助仍以文字和 mock OCR 为主。
 ```
@@ -101,7 +101,7 @@ VoiceEngine
 
 ```text
 1. 外部规格显示 MiMo chat completions audio input 可作为非流式 ASR，目标模型为 `mimo-v2.5` / `mimo-v2-omni`。
-2. 外部规格未提供可验证的儿童音频 retention、删除和 no-training 承诺，因此真实 provider 继续默认 disabled，直到父亲授权和 policy flags 全部打开。
+2. 云端 ASR 外发必须有父亲授权和 policy flags；缺少可验证的 retention、删除和 no-training 承诺时应标记 BLOCKED，而不是写成通过。
 3. MiMo ASR 只返回 transcript；儿童默认由 Android 自动发送，调试模式才展示待确认文本。
 4. 云端 MiMo ASR 是 v1 目标路线；Android 本地 SpeechRecognizer 不作为当前主路径。
 5. 不做 streaming ASR、常开麦克风、唤醒词或 hands-free conversational mode。
@@ -113,7 +113,7 @@ VoiceEngine
 1. 实测每轮音频发到大模型端识别耗时影响儿童端体验，ASR 真实识别主路径改为本地优先。
 2. 当前第一选择是 sherpa-onnx + SenseVoice-Small int8，本机 Apple M2 / 8GB 可运行，公开中文样例速度明显优于 MiMo 云端识别链路。
 3. 后端保留 MiMo ASR provider 作为本地异常后的 fallback；fallback 仍必须通过父亲授权和 ASR data policy flags。
-4. 默认 provider 仍是 mock，只有安装本地 runtime 和模型文件后才开启 `CHILD_AI_ASR_PROVIDER=local_sensevoice`。
+4. 当前测试阶段应安装本地 runtime 和模型文件并启用 `CHILD_AI_ASR_PROVIDER=local_sensevoice` 验证真实本地识别链路。
 5. 本地 ASR 不改变数据边界：原始音频只在一次请求中存在，不入库、不进日志、不进 memory。
 ```
 
@@ -204,8 +204,8 @@ ChildChatScreen 首次可见
 5. UI 提供停止、静音和短状态提示；开发构建可显示 TTS 诊断文本。
 6. TtsUiState / VoiceDiagnostics 记录 isInitializing、isInitialized、enginePackageName、selectedLocale、selectedVoiceName、setLanguageResult、setVoiceResult、lastSpeakResult 和 lastFailureReason。
 7. 系统 TTS 不可用时显示“我现在不能朗读，但文字还在这里。”并降级为文字。
-8. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，可返回本地缓存 wav 的 `/media/tts/...` URL。
-9. 后端 MiMo VoiceClone provider 已隔离在 provider 层，默认 disabled，必须通过 TtsDataPolicyGuard 才允许外发儿童相关文本。
+8. 后端已新增 `POST /api/v1/tts/xiaobaohu`，可返回本地缓存 wav 的 `/media/tts/...` URL；当前测试阶段应验证目标 TTS provider。
+9. 后端 MiMo VoiceClone provider 已隔离在 provider 层，必须通过 TtsDataPolicyGuard 才允许外发儿童相关文本；进入测试范围后应显式启用验证。
 10. Android Manifest 已声明 TTS service 查询，避免 Android 11+ package visibility 影响引擎发现。
 11. AndroidTtsController 已修复 TextToSpeech 初始化回调早于字段赋值时的误判风险。
 12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
@@ -344,8 +344,8 @@ POST /api/v1/tts/xiaobaohu
 核心约束：
 
 ```text
-1. 默认 `CHILD_AI_TTS_PROVIDER=mock`，不调用 MiMo。
-2. MiMo VoiceClone 默认 disabled，必须显式设置 enabled、API key、allow child text 和 retention policy checked。
+1. 显式设置 `CHILD_AI_TTS_PROVIDER` 以验证目标 TTS provider；测试 double 不能作为真实音频验收。
+2. MiMo VoiceClone 必须显式设置 enabled、API key、allow child text 和 retention policy checked。
 3. TTS text 可能包含儿童上下文、学习内容或个性化对话，因此按儿童相关文本处理。
 4. Android 不直接调用 MiMo，不存 MiMo API key。
 5. 生成音频缓存到 backend/storage/tts_cache，缓存文件不进 git。
@@ -425,13 +425,13 @@ Android system TextToSpeech 只是 fallback 和诊断能力，不作为最终儿
 2. 通过 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager、ModelRegistry 和 ChildAgentRuntime 生成安全回复。
 3. 返回 reply.voice_enabled、reply.audio_url、reply.emotion、reply.agent_motion。
 4. 通过 `POST /api/v1/tts/xiaobaohu` 按需生成小白狐语音音频。
-5. 保持音频和儿童相关文本外发 gate 默认关闭，真实 provider 不默认接收 child text 或 child audio。
+5. 保持音频和儿童相关文本外发 gate；真实 provider 只有在本轮测试目标和 policy 条件满足时才接收 child text 或 child audio。
 ```
 
 ASR 研究后的后端边界：
 
 ```text
-1. `/api/v1/asr/transcribe` 已挂载，但默认 mock/disabled；未满足父亲授权和 ASR policy flags 前不得启用真实 MiMo ASR 外发。
+1. `/api/v1/asr/transcribe` 已挂载；本地 SenseVoice 是当前 ASR 主路径，真实 MiMo ASR 外发必须满足父亲授权和 ASR policy flags。
 2. `/api/v1/asr/transcribe` 只返回 transcript / status / provider metadata；是否自动发送由 Android DevSettings 控制，ASR endpoint 本身不直接调用 conversation runtime。
 3. 自动发送后的 transcript 必须走 conversation message/stream，不得绕过 SafetyEngine、IntentClassifier、SceneOrchestrator、PromptManager 或 ModelRegistry。
 4. 原始音频 base64 不写日志、不写数据库、不进入 memory、不写测试 fixture。
@@ -454,7 +454,7 @@ ASR 研究后的后端边界：
 1. 只处理后端已生成并经过安全规整的小白狐回复文本。
 2. text 默认不超过 300 个汉字或配置的最大长度。
 3. emotion 和 voiceVersion 使用白名单。
-4. 默认 mock provider；MiMo VoiceClone 必须显式通过 TtsDataPolicyGuard。
+4. 测试阶段应验证目标 TTS provider；MiMo VoiceClone 必须显式通过 TtsDataPolicyGuard。
 5. TTS endpoint 失败不应导致 conversation API 失败；最多返回 audio_url=null。
 6. 生成音频缓存可本地保存，但缓存目录忽略 git，metadata 不保存完整儿童文本。
 ```
@@ -535,7 +535,7 @@ ASR 研究后的后端边界：
 
 | 设备 | 定位 | 用途 |
 |---|---|---|
-| Device A：Redmi K60，Android 14 | 功能主验证 | 快速验证后端 ASR 录音上传、默认自动发送、opening greeting、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源和轻量动画、真实模型/Mock 模型对话体验，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device A：Redmi K60，Android 14 | 功能主验证 | 快速验证后端 ASR 录音上传、默认自动发送、opening greeting、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源和轻量动画、真实模型对话体验和异常兜底路径，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
 | Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、后端 ASR 自动发送、opening greeting、TTS 可用性、小白狐资源大小、动画流畅度、发热和卡顿 |
 
 执行顺序：
@@ -578,7 +578,7 @@ TTS 自然度主观评价
 | VQA-13 | 数据检查 | 日志、memory、fixture 中没有原始音频、真实身份或长篇逐字转写 |
 | VQA-14 | TTS 诊断可见 | Redmi K60 等真机上能看到朗读开启、正在准备、不可用或失败原因；开发诊断含 engine、locale、voice、speak 返回值 |
 | VQA-15 | speaking pending | TTS 请求被接受后小白狐先切 speaking pending / speaking；失败或停止后恢复 base state，不一直卡住 |
-| VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 默认 mock 返回 `/media/tts/...wav`；MiMo disabled 时不外发；真实 MiMo smoke 已通过并下载 RIFF/WAV |
+| VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`；当前 QA 应记录实际 provider；真实 MiMo smoke 已通过并下载 RIFF/WAV，policy 不满足时不得写成真实音频通过 |
 | VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时 fallback 到系统 TTS 或文字；代码已实现，待 Redmi K60 真机确认听感和网络播放 |
 | VQA-18 | TTS 数据策略 | MiMo VoiceClone 未显式开启 allow child text 和 retention checked 时不能调用外部 provider |
 | VQA-19 | Opening greeting | App 打开后小白狐请求一次 opening；有小名喊小名，有 display name 用 display name，都没有不强行称呼 |

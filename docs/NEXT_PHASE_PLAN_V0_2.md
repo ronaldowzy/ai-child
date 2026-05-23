@@ -8,7 +8,7 @@
 1. v0.1 第一轮后端和 Android MVP 已完成。
 2. 当前仍需完成完整设备 QA，不能跳过现有文字和安全闭环验收。
 3. 下一阶段优先解决语音交互和小白狐形象体验。
-4. 默认 Mock 优先，真实模型和儿童数据外发仍受后端 gate 约束。
+4. 当前测试阶段真实可用优先；已进入测试范围的真实模型和儿童数据外发链路必须通过后端 gate 后实际启用验证。
 5. 语音输入 ASR v1 目标已修订为后端本地 ASR 优先：第一选择是 sherpa-onnx + SenseVoice-Small int8；本地异常后 fallback 到原有 MiMo ASR。Android 不直接调用 MiMo，只负责录音上传和儿童端语音状态；儿童默认自动发送 transcript，确认面板仅保留为 DevSettings / 父亲调试模式。
 6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
@@ -18,7 +18,7 @@
 11. Redmi K60 / Android 14 截图显示上一版系统 TTS 为 `SKIPPED_UNAVAILABLE`，系统 TTS 不再作为正式小白狐音色方案。
 12. 小白狐 animation_v1 已按运行时包优化为 512px WebP 序列帧，Android assets 约 4.9MB，fallback 链为 animation_v1 -> png_static -> canvas；验收全量包不应整体进入 APK。
 13. 普通聊天已进入 Open Conversation Mode 小步实现：兴趣和日常话题走 `conversation.open`，模型接收进程内短期 history；安全、隐私、学习和睡前边界不放松。
-14. 后端已新增 `POST /api/v1/tts/xiaobaohu`，默认 mock provider，不外发；MiMo VoiceClone 必须显式通过 TTS 数据策略闸门。
+14. 后端已新增 `POST /api/v1/tts/xiaobaohu`；当前测试阶段应启用目标 TTS provider 并通过 TTS 数据策略闸门验证真实音频链路。
 15. 本地持久化数据库已确认选用 PostgreSQL；DB1-A 基础设施已进入代码，B2 ParentPolicy、B3 普通 `/conversation/message` 和 `/conversation/stream` turn、B4 MemoryService、B5 ParentReportService 均已完成 thin slice；当前是本地家庭库和测试闭环，不是云端多租户。
 16. Redmi K60 真机反馈显示 MiMo VoiceClone 音频初步跑通、动态小白狐形象已经可见，但同步链路等待时间仍长，下一阶段不能继续依赖增加 read timeout。
 17. 儿童端主界面下一版改为横屏双栏：左侧动态小白狐，右侧聊天交互；手机也进入横屏。
@@ -29,7 +29,7 @@
 22. 父母寄语需要支持自由文本，作为 Prompt 背景上下文注入；不能机械复述给孩子，不能覆盖儿童安全底线。
 23. Ops P0 已完成 request_id、JSON 日志、request/model/TTS timing 和 `/api/v1/health/detail`。
 24. Streaming v1 后端 skeleton 已新增 `/api/v1/conversation/stream`，采用 NDJSON 和 sentence-level pseudo streaming；Android 首版 stream client、progressive bubble 和 audio segment queue 已接入。
-25. 本地 SenseVoice ASR 方案已归档并接入正式 provider；`/api/v1/asr/transcribe` 已挂载，默认 mock；MiMo `/chat/completions` ASR provider 保留为 fallback，真实儿童音频外发仍 policy-blocked。
+25. 本地 SenseVoice ASR 方案已归档并接入正式 provider；`/api/v1/asr/transcribe` 已挂载；本地 SenseVoice 是 ASR v1 主路径，MiMo `/chat/completions` ASR provider 保留为 policy-gated fallback。
 26. 儿童端默认 voice-first：隐藏文字输入框、发送按钮和可编辑 ASR 文本确认面板；保留重说、取消、停止朗读、静音等大按钮。
 27. 小白狐 opening greeting 已进入 v1 范围：儿童聊天页首次可见时请求后端 opening，称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。
 28. Android 父亲设置页已支持结构化配置孩子小名和显示名；opening greeting 使用小名优先、显示名 fallback，但真机 QA 仍待完成。
@@ -251,7 +251,7 @@ ASR 调研：
 4. 流式 ASR 未确认；儿童音频 retention、删除和 no-training 承诺未确认。
 5. ASR v1 第一选择已修订为本地 SenseVoice，MiMo 作为 fallback；真实儿童音频外发仍需父亲授权和 policy flags。
 6. Android v1 儿童默认 voice-first 自动发送，DevSettings / 父亲模式保留 confirm-before-send；不做 hands-free conversational mode。
-7. 后端已新增 mock-first ASR skeleton、AsrDataPolicyGuard、挂载 `/api/v1/asr/transcribe`，并实现 local SenseVoice provider、MiMo fallback provider；默认 mock，云端 fallback 默认 policy-blocked。
+7. 后端已新增 ASR schema、AsrDataPolicyGuard、挂载 `/api/v1/asr/transcribe`，并实现 local SenseVoice provider、MiMo fallback provider；当前测试阶段应验证 local_sensevoice 主路径，云端 fallback 仍受 policy gate 控制。
 ```
 
 ---
@@ -337,7 +337,7 @@ Ops P0 当前能力（2026-05-21）：
 1. TTS 不绕过 SafetyEngine / ChildAgentRuntime。
 2. 高风险安全回复朗读稳定、低刺激。
 3. TTS 失败时文字仍可读，UI 显示温和提示。
-4. 后端 TTS 默认 mock 时不外发；MiMo policy 不满足时不调用外部 provider。
+4. 后端 TTS 当前测试阶段应验证目标 provider；MiMo policy 不满足时不调用外部 provider，不能写成真实链路通过。
 5. TTS 请求被接受后小白狐进入 speaking pending；失败、停止或结束后恢复 base state。
 6. QA 记录远程音频播放延迟、自然度、孩子接受度和系统 fallback 结果。
 ```
@@ -382,7 +382,7 @@ Ops P0 当前能力（2026-05-21）：
 
 ```text
 1. 新增 `POST /api/v1/tts/xiaobaohu`。
-2. 默认 `CHILD_AI_TTS_PROVIDER=mock`，返回本地 mock wav audioUrl，不调用外部服务。
+2. 显式设置 `CHILD_AI_TTS_PROVIDER` 以验证目标 TTS provider；本地测试 double 只能作为异常兜底或自动测试替身。
 3. 新增 `TtsDataPolicyGuard`，MiMo VoiceClone 必须显式 enabled、API key、allow child text 和 retention policy checked。
 4. 新增本地缓存目录 `backend/storage/tts_cache`，生成缓存不进 git。
 5. `/media/tts/...wav` 只暴露生成音频，不暴露 voice sample 或 metadata。

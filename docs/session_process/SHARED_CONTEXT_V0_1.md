@@ -47,7 +47,7 @@
 | 文件或目录 | 默认拥有者 | 规则 |
 |---|---|---|
 | `backend/app/services/child_agent_runtime.py`、AgentRuntime 相关 tests | S15 ChildAgentRuntime 会话 | 可接 conversation 编排，但不得绕过 SafetyEngine、PromptManager、ModelRegistry |
-| `backend/app/providers/model/`、模型外发 gate 相关配置/tests | S16 模型安全闸门会话 | 真实 provider 默认 disabled；不得提交真实 API key |
+| `backend/app/providers/model/`、模型外发 gate 相关配置/tests | S16 模型安全闸门会话 | 真实 provider 必须通过受控配置验证；不得提交真实 API key |
 | `backend/app/services/memory*`、`backend/app/repositories/memory*`、日报素材接入 tests | S17 自动记忆闭环会话 | 不保存长篇逐字原文，不把 safety 记忆混入普通检索 |
 | `backend/app/services/safety_engine.py`、`scene_orchestrator.py`、安全场景 tests | S18 安全场景细分会话 | 高风险优先；不得放宽儿童安全原则 |
 | `android/` 父亲入口保护相关 UI / ViewModel / tests | S19 Android 父亲入口保护会话 | 不做账号系统，不在客户端加入模型 key |
@@ -247,7 +247,7 @@ export CHILD_AI_MIMO_ALLOW_AUDIO=false
 Mimo 相关协作规则：
 
 ```text
-1. 默认仍是 MockModelProvider，真实 Mimo 只用于人工 smoke 或主控明确要求的临时验证。
+1. 当前测试阶段按目标启用真实 Mimo 或本地 provider 验证；test double 只能作为自动测试替身或异常兜底。
 2. 模型 id 必须是 mimo-v2.5-pro。
 3. 真实 key 只能放在当前 shell 临时 env；不得写入 .env、.env.example、README、docs、测试、Android 或提交记录。
 4. Android 端永远不放模型 key；所有真实模型调用只允许后端通过 ModelRegistry 和 provider gate。

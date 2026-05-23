@@ -65,10 +65,10 @@ deprecated：已废弃，不再作为实现依据。
 | PD-036 | confirmed | 儿童主界面默认隐藏文字输入框、发送按钮和可编辑 ASR 文本确认面板；语音是主输入，保留重说、取消、停止朗读、静音等大按钮。 | Android child UI、InputBar、DevSettings、QA |
 | PD-037 | confirmed | App 打开儿童聊天页后，小白狐应主动请求 opening greeting，基于时间、父母寄语和孩子称呼生成一句短开场白；称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。 | backend opening API、Android ChatViewModel、ParentPolicy、TTS、QA |
 | PD-038 | confirmed | 普通文字对话调用 MiMo `mimo-v2.5-pro`；带图片的 conversation attachment / vision / OCR 链路调用 MiMo `mimo-v2.5`。 | ModelRegistry、OpenAICompatibleProvider、AttachmentService vision path、vision smoke script |
-| PD-039 | confirmed | “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`，隐私边界只由明确隐私意图或后续安全策略触发。 | AttachmentService、MockOCRProvider、PromptManager、Android pending image context、QA |
+| PD-039 | confirmed | “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`，隐私边界只由明确隐私意图或后续安全策略触发。 | AttachmentService、OCR/vision provider、PromptManager、Android pending image context、QA |
 | PD-040 | confirmed | 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory 生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。 | ParentReportService、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen |
-| PD-047 | confirmed | 当前本地测试阶段允许通过 opt-in 临时表 `model_debug_traces` 记录完整模型 prompt 和回复，用于 prompt/体验分析；默认关闭，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
-| PD-048 | confirmed | ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。默认仍为 mock，MiMo fallback 仍需父亲授权和 ASR data policy flags。 | backend ASR provider、AsrService fallback、ASR docs、QA |
+| PD-047 | confirmed | 当前本地测试阶段允许通过临时表 `model_debug_traces` 记录完整模型 prompt 和回复，用于 prompt/体验分析；做相关功能测试时必须显式开启并验证写入，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
+| PD-048 | confirmed | ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。当前测试阶段应启用 local_sensevoice 验证真实本地识别，MiMo fallback 仍需父亲授权和 ASR data policy flags。 | backend ASR provider、AsrService fallback、ASR docs、QA |
 | PD-049 | confirmed | 家庭 MVP 前 opening greeting 和父亲日报默认走 deterministic policy/template/report 主路径；模型生成只保留为 dev/test 实验观察，不作为儿童端或父亲日报主路径。 | OpeningService、ParentReportService、trace runner、QA |
 
 新增执行依据：
@@ -102,7 +102,7 @@ Source: father / product planning; revised by PD-027 for TTS
 Decision: 语音输入 ASR v1 目标修订为后端接 MiMo audio input / ASR；Android 不直接调用 MiMo，只负责点击录音、上传到后端、展示儿童端语音状态，并在儿童默认模式自动发送非空 transcript；确认面板只保留为 DevSettings / 父亲调试模式。TTS 正式音色路径已由 PD-027 修订为后端 MiMo VoiceClone。
 Rationale: 父亲已完成 MiMo ASR 调研并确认 ASR 方案接 MiMo；为了避免 Android 持有 API key 和供应商逻辑，真实 ASR 统一由后端 provider 和 data policy guard 控制。系统 TTS 在 Redmi K60 上不可用或体验不理想，因此不再作为正式小白狐音色方案。
 Affected modules: Android voice、Android permissions、backend ASR API、MiMo ASR provider、privacy policy、QA。
-Implementation notes: 儿童默认 `VOICE_CONFIRM_BEFORE_SEND=false`，ASR ok 且 transcript 非空后自动进入 conversation；开发/父亲调试可打开 `VOICE_CONFIRM_BEFORE_SEND=true` 查看待确认文本。不做常开麦克风；后端 ASR provider 默认 disabled，真实儿童音频外发必须满足父亲授权和 `CHILD_AI_MIMO_ASR_*` policy flags；开发阶段只用 fake/smoke audio。
+Implementation notes: 儿童默认 `VOICE_CONFIRM_BEFORE_SEND=false`，ASR ok 且 transcript 非空后自动进入 conversation；开发/父亲调试可打开 `VOICE_CONFIRM_BEFORE_SEND=true` 查看待确认文本。不做常开麦克风；后端 ASR 真实链路测试必须显式选择目标 provider；真实儿童音频外发必须满足父亲授权和 `CHILD_AI_MIMO_ASR_*` policy flags；开发阶段只用 fake/smoke audio。
 Docs updated: `docs/VOICE_INTERACTION_DESIGN_V0_1.md`、`android/README.md`、`backend/README.md`。
 Tests or QA needed: 权限、识别、失败 fallback、无音频文件保存检查。
 
@@ -427,7 +427,7 @@ Source: father / MiMo Studio voice design
 Decision: 小白狐正式品牌音色方案改为后端 MiMo VoiceClone：`MiMo-V2.5-TTS-VoiceDesign` 只用于前期设计和筛选角色音色且已完成；`MiMo-V2.5-TTS-VoiceClone` 使用已下载的 wav 样本作为正式 App 主音色；`MiMo-V2.5-TTS` 只作为临时测试、内置音色对照或兜底。
 Rationale: Redmi K60 系统 TTS 不可用或体验不理想，且父亲已通过 MiMo Studio 得到满意的小白狐音色样本，后端生成音频可提供更稳定一致的品牌声音。
 Affected modules: backend TTS service、TTS data policy guard、TTS cache、MiMo VoiceClone provider、conversation reply audio_url、Android remote audio playback、QA。
-Implementation notes: 音色样本归档为 `backend/assets/voices/xiaobaohu_voice_v01.wav`，sha256=`8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40`；默认 TTS provider 仍为 mock，MiMo VoiceClone 必须通过独立 TTS env 和 policy guard；真实 VoiceClone smoke 已确认当前 provider 走 `/chat/completions`，返回音频从 `choices[0].message.audio.data` 读取；Android 不直接调用 MiMo，不存 API key；生成音频缓存不提交 git。
+Implementation notes: 音色样本归档为 `backend/assets/voices/xiaobaohu_voice_v01.wav`，sha256=`8eec0f98629350a1dd09bd98a31c2bee80132128bf214d4c0a009331c9a66c40`；当前测试阶段应启用目标 TTS provider 验证小白狐音频链路；MiMo VoiceClone 必须通过独立 TTS env 和 policy guard；真实 VoiceClone smoke 已确认当前 provider 走 `/chat/completions`，返回音频从 `choices[0].message.audio.data` 读取；Android 不直接调用 MiMo，不存 API key；生成音频缓存不提交 git。
 Docs updated: `docs/VOICE_INTERACTION_DESIGN_V0_1.md`、`docs/NEXT_PHASE_PLAN_V0_2.md`、`backend/README.md`、`android/README.md`。
 Tests or QA needed: `/api/v1/tts/xiaobaohu` mock、policy block、cache hit、voice sample missing 和真实 MiMo smoke 已通过；后续 Android audioUrl playback、fallback 和真机听感。
 
@@ -697,7 +697,7 @@ Decision ID: PD-048
 Date: 2026-05-23
 Status: confirmed
 Source: father / local ASR direction confirmation
-Decision: ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。默认 provider 仍保持 mock，避免未安装本地模型的开发机启动失败。
+Decision: ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。当前测试阶段应显式启用 local_sensevoice；缺本地模型或依赖时标记 BLOCKED，不把非真实链路写成通过。
 Rationale: 实际测试中每轮语音上传到当前大模型端做识别耗时较高，影响儿童端体验。本机调研显示 SenseVoice-Small int8 在 Mac mini M2 / 8GB 上可轻量运行，公开中文样例识别速度明显优于云端大模型识别链路。
 Affected modules: backend ASR provider、AsrService fallback、AsrDataPolicyGuard、backend config、ASR docs、QA。
 Implementation notes: 新增 `local_sensevoice` provider，依赖 `sherpa-onnx` + `numpy`，模型文件放在 `backend/models/asr/sensevoice/` 且不提交 git。`CHILD_AI_ASR_PROVIDER=local_sensevoice` 且 `CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true` 时启用本地识别；`CHILD_AI_ASR_FALLBACK_PROVIDER=mimo` 时本地异常后进入 MiMo fallback，但 MiMo 仍必须满足父亲授权、API key、child audio allowed、retention checked 和 no-training confirmed。原始音频不入库、不进日志、不进长期 memory。

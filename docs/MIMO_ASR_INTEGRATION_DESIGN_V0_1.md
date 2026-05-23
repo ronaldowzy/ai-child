@@ -23,7 +23,7 @@ confirm_before_send_debug_mode=true
 2. Android 不直接调用 MiMo，只负责录音、上传后端和儿童端语音状态。
 3. 后端 ASR endpoint 即使存在，也只能返回 transcript，不能直接调用 conversation/message 或 conversation/stream。
 4. Android 仍不得持有 MiMo API key。
-5. MiMo fallback 默认 disabled，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
+5. MiMo fallback 受 policy gate 控制，必须同时满足 enabled、API key、child audio allowed、retention checked 和 no-training confirmed。
 6. 开发阶段先用 fake audio / smoke audio；未取得父亲授权和 policy flags 前，不允许真实儿童音频外发。
 7. Android 儿童默认 voice-first：ASR ok 且 transcript 非空后自动发送到 conversation stream；确认面板仅保留为 DevSettings / 父亲调试模式。
 8. 不做常开麦克风，不做 streaming ASR，不做后端 ASR 自动调用 conversation。
@@ -99,7 +99,7 @@ Safety classification happens after confirmed text enters the existing conversat
 
 ## 4. Proposed Public API
 
-This API is the v1 backend ASR contract. It may be mounted while remaining mock/disabled by default; MiMo network calls still require all policy flags.
+This API is the v1 backend ASR contract. It may be mounted while local SenseVoice is the preferred ASR path; MiMo network calls still require all policy flags.
 
 ```http
 POST /api/v1/asr/transcribe
@@ -231,18 +231,19 @@ The external provider's 25 MB number should not be treated as a product target.
 
 ## 7. Auth And Configuration
 
-Shared config defaults:
+MiMo fallback config example:
 
 ```bash
-CHILD_AI_ASR_PROVIDER=mock
-CHILD_AI_MIMO_ASR_ENABLED=false
+CHILD_AI_ASR_PROVIDER=local_sensevoice
+CHILD_AI_ASR_FALLBACK_PROVIDER=mimo
+CHILD_AI_MIMO_ASR_ENABLED=true
 CHILD_AI_MIMO_ASR_API_KEY=
 CHILD_AI_MIMO_ASR_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
 CHILD_AI_MIMO_ASR_MODEL=mimo-v2.5
 CHILD_AI_MIMO_ASR_TIMEOUT_MS=30000
-CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=false
-CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=false
-CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=false
+CHILD_AI_MIMO_ASR_ALLOW_CHILD_AUDIO=true
+CHILD_AI_MIMO_ASR_RETENTION_POLICY_CHECKED=true
+CHILD_AI_MIMO_ASR_NO_TRAINING_CONFIRMED=true
 ```
 
 Rules:
@@ -285,7 +286,7 @@ Logging policy:
 ```text
 1. Log event=asr_call_finished with request_id, provider, model, duration_ms, audio_bytes, elapsed_ms, status and error_type.
 2. Do not log audio data URI, base64, raw transcript, API key or child real identity.
-3. If transcript preview is needed for debugging, keep it disabled by default and never use real child speech.
+3. If transcript preview is needed for debugging, keep it behind DevSettings or father-mode controls and never use real child speech.
 ```
 
 ---

@@ -85,12 +85,12 @@ docs/session_process/SHARED_CONTEXT_V0_1.md
 ### 4.2 模型规则
 
 ```text
-1. 第一版默认使用 MockModelProvider。
+1. 当前测试阶段已开发的真实 provider / 本地 provider 必须在对应测试环境中启用并验证。
 2. 不在 Android 端放任何模型 API key。
 3. 不在业务代码中直接绑定某家模型 SDK。
-4. OpenAICompatibleProvider 或其他真实 provider 默认 disabled。
+4. 真实 provider 只能由后端通过受控配置、数据策略和临时测试环境调用；不能因为未启用配置而把已开发功能写成完成。
 5. 所有 provider 必须支持超时、错误处理和 fallback。
-6. 测试不得依赖真实外部模型调用。
+6. 单元测试可使用 mock/fake 替身，但功能验收必须区分真实链路 PASS、真实执行 FAIL、外部条件 BLOCKED。
 ```
 
 ### 4.3 Prompt 规则
@@ -109,7 +109,7 @@ docs/session_process/SHARED_CONTEXT_V0_1.md
 1. Android 端是统一智能体入口，不是功能按钮堆叠。
 2. 第一版不要做复杂动画。
 3. 第一版不要做账号系统。
-4. 第一版不要接真实相机和真实语音作为必需功能，可先 mock。
+4. 已开发的真实语音、图片或模型能力进入测试范围后，Android/后端配置必须与目标链路一致；mock/fake 只能作为异常兜底或自动测试替身。
 5. 所有 AI 决策由后端完成，Android 负责展示、输入和轻量状态。
 ```
 
@@ -295,7 +295,7 @@ Known issues:
 ```text
 1. 安全优先于体验。
 2. 可控优先于智能。
-3. Mock 优先于真实外部服务。
+3. 当前测试阶段真实可用优先；已开发功能必须开启验证，mock/兜底不能替代验收。
 4. 小步 PR 优先于大改。
 5. 测试优先于功能堆叠。
 6. 文档事实优先于猜测。

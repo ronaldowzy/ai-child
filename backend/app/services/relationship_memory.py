@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from app.domain.memory import MemoryItem, MemoryType
+from app.domain.memory import MemoryItem, MemorySensitivity, MemoryType
 from app.services.memory_service import MemoryService
 
 
@@ -94,10 +94,22 @@ def latest_interest_seed(
         active_only=True,
         include_safety=False,
     )
-    for memory in memories:
+    candidates = [
+        memory
+        for memory in memories
         if (
             memory.memory_type == MemoryType.INTEREST
+            and memory.sensitivity == MemorySensitivity.LOW
             and is_relationship_memory(memory, relationship_memory_type=INTEREST_SEED)
-        ):
-            return memory
-    return None
+        )
+    ]
+    return max(
+        candidates,
+        key=lambda memory: (
+            memory.updated_at,
+            memory.created_at,
+            memory.importance,
+            memory.confidence,
+        ),
+        default=None,
+    )

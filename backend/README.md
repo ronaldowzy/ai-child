@@ -19,7 +19,9 @@ The current backend is intentionally local-first and mock-first:
   `interest_seed`, `topic_boundary`, and `proud_moment` summaries can be
   created from child conversation turns, while operation asides, bystander
   prompts, privacy details, high-risk safety content, and raw/full transcripts
-  are filtered out before storage.
+  are filtered out before storage. The E1.1 hardening keeps memory writes
+  best-effort, dedupes active interest seeds by child/topic across sessions,
+  and only lets opening lightly revisit the latest low-sensitivity seed.
 - Treats child chat as open-ended conversation. Time periods and scenes provide
   context, safety boundaries, and fallback replies; they should not force every
   ordinary message into a fixed script.

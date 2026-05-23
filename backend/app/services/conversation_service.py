@@ -277,14 +277,26 @@ class ConversationService:
                     evidence=intent.evidence,
                 ),
             )
-        self._memory_hooks.record_turn(
-            child_id=request.child_id,
-            session_id=request.session_id,
-            child_text=request.input.text,
-            safety=safety,
-            intent=intent,
-            route_decision=route_decision,
-        )
+        try:
+            self._memory_hooks.record_turn(
+                child_id=request.child_id,
+                session_id=request.session_id,
+                child_text=request.input.text,
+                safety=safety,
+                intent=intent,
+                route_decision=route_decision,
+            )
+        except Exception as exc:
+            logger.warning(
+                "conversation_memory_hook_failed",
+                extra={
+                    "event": "conversation_memory_hook_failed",
+                    "request_id": get_request_id(),
+                    "child_id_hash": hash_identifier(request.child_id),
+                    "session_id_hash": hash_identifier(request.session_id),
+                    "error_type": exc.__class__.__name__,
+                },
+            )
         self._conversation_history_service.record_turn(
             session_id=request.session_id,
             child_text=request.input.text,

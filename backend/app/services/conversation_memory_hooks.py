@@ -455,21 +455,63 @@ class ConversationMemoryHooks:
         )
 
     def _interest_seed(self, text: str) -> dict[str, str] | None:
-        topic_map: tuple[tuple[tuple[str, ...], str, str], ...] = (
+        creation_topic_map: tuple[tuple[tuple[str, ...], str, str], ...] = (
             (
-                ("跑步", "比赛", "运动", "跑完", "十五公里", "公里", "快的感觉"),
-                "跑步比赛",
-                "下次可问比赛是短跑还是接力，或讲小白狐运动会故事",
+                ("我画", "画画", "画了", "画一幅", "涂色", "作品"),
+                "画画",
+                "下次可问孩子想给画起什么名字",
             ),
+            (
+                ("手工", "剪纸", "折纸", "我做"),
+                "手工",
+                "下次可问孩子最想做哪一步",
+            ),
+            (
+                ("积木", "乐高"),
+                "积木",
+                "下次可问孩子搭的东西最特别的一块在哪里",
+            ),
+            (
+                ("故事", "想象", "编一个", "编个", "我编"),
+                "故事想象",
+                "下次可一起接一句轻松的小故事",
+            ),
+        )
+        for markers, topic, next_hook in creation_topic_map:
+            if self._contains_any(text, markers):
+                return {
+                    "topic": topic,
+                    "next_hook": next_hook,
+                    "content": f"孩子近期自然聊到{topic}，可作为低压力回访的兴趣种子。",
+                    "quote_summary": f"孩子自然提到{topic}相关内容，适合短期轻回访。",
+                }
+
+        if self._is_running_or_sports_interest_text(text):
+            return {
+                "topic": "跑步比赛",
+                "next_hook": "下次可问比赛是短跑还是接力，或讲小白狐运动会故事",
+                "content": "孩子近期自然聊到跑步比赛，可作为低压力回访的兴趣种子。",
+                "quote_summary": "孩子自然提到跑步比赛相关内容，适合短期轻回访。",
+            }
+
+        topic_map: tuple[tuple[tuple[str, ...], str, str], ...] = (
             (("恐龙",), "恐龙", "下次可聊喜欢哪种恐龙，或一起编一个恐龙小故事"),
-            (("动物", "小猫", "小狗", "狐狸"), "动物", "下次可让孩子选一种动物编小故事"),
-            (("画画", "画了", "画一幅", "涂色"), "画画", "下次可问孩子想给画起什么名字"),
-            (("积木", "乐高"), "积木", "下次可问孩子搭的东西最特别的一块在哪里"),
+            (
+                ("动物", "小猫", "小狗", "狐狸"),
+                "动物",
+                "下次可让孩子选一种动物编小故事",
+            ),
             (("玩具",), "玩具", "下次可问孩子想让玩具角色发生什么故事"),
-            (("故事", "想象", "编一个"), "故事想象", "下次可一起接一句轻松的小故事"),
-            (("看书", "读书", "绘本", "书"), "书和阅读", "下次可问孩子最记得哪一页或哪个角色"),
-            (("植物", "花", "树叶"), "植物", "下次可问孩子发现了植物的哪个小变化"),
-            (("手工", "剪纸", "折纸"), "手工", "下次可问孩子最想做哪一步"),
+            (
+                ("看书", "读书", "绘本", "书"),
+                "书和阅读",
+                "下次可问孩子最记得哪一页或哪个角色",
+            ),
+            (
+                ("植物", "花", "树叶"),
+                "植物",
+                "下次可问孩子发现了植物的哪个小变化",
+            ),
         )
         for markers, topic, next_hook in topic_map:
             if self._contains_any(text, markers):
@@ -505,7 +547,7 @@ class ConversationMemoryHooks:
 
     def _proud_moment(self, text: str) -> dict[str, str] | None:
         if (
-            self._contains_any(text, ("比赛", "运动", "跑步"))
+            self._is_running_or_sports_interest_text(text)
             and self._contains_any(text, ("感觉", "项目", "参加", "快"))
         ):
             return {
@@ -524,6 +566,17 @@ class ConversationMemoryHooks:
                 "next_hook": "父亲可先问作品里孩子最喜欢的一处，不做评分。",
             }
         return None
+
+    def _is_running_or_sports_interest_text(self, text: str) -> bool:
+        if "运动比赛" in text:
+            return True
+        return self._contains_any(
+            text,
+            ("跑步", "跑完", "短跑", "接力", "快的感觉", "公里", "十五公里"),
+        ) or (
+            self._contains_any(text, ("运动", "跑"))
+            and not self._contains_any(text, ("英语比赛", "数学比赛", "作文比赛"))
+        )
 
     def _should_skip_relationship_memory(
         self,
@@ -570,9 +623,21 @@ class ConversationMemoryHooks:
             ("妈妈说", "爸爸让我说", "老师让你问", "你跟他说", "大人让我说"),
         ):
             return True
-        operation_markers = ("按一下", "点这个", "说完再按", "取消", "重说", "按钮", "麦克风", "发送", "录音")
+        operation_markers = (
+            "按一下",
+            "点这个",
+            "说完再按",
+            "取消",
+            "重说",
+            "按钮",
+            "麦克风",
+            "发送",
+            "录音",
+        )
         if self._contains_any(text, operation_markers) and not (
-            self._interest_seed(text) or self._topic_boundary(text) or self._proud_moment(text)
+            self._interest_seed(text)
+            or self._topic_boundary(text)
+            or self._proud_moment(text)
         ):
             return True
         if len(text) <= 4:
@@ -600,9 +665,15 @@ class ConversationMemoryHooks:
         )
         for memory in memories:
             for evidence in memory.evidence:
-                if evidence.session_id != session_id:
+                if (
+                    relationship_type != INTEREST_SEED
+                    and evidence.session_id != session_id
+                ):
                     continue
-                if evidence.metadata.get(RELATIONSHIP_MEMORY_TYPE_KEY) != relationship_type:
+                if (
+                    evidence.metadata.get(RELATIONSHIP_MEMORY_TYPE_KEY)
+                    != relationship_type
+                ):
                     continue
                 if evidence.metadata.get("topic") == topic:
                     return True

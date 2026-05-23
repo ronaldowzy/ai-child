@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
@@ -162,6 +162,50 @@ def test_opening_can_use_model_generated_text() -> None:
     assert "当前时间段" in prompt
 
 
+def test_model_opening_prompt_constrains_interest_revisit() -> None:
+    class FakeOpeningModelRegistry:
+        requests: list[ModelRequest]
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.requests.append(request)
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="豆豆，我准备好啦。",
+                structured_output={"text": "豆豆，我准备好啦。"},
+                provider_name="fake",
+                model_name="fake-opening",
+            )
+
+    child_id = "opening_prompt_contract_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    model_registry = FakeOpeningModelRegistry()
+    service = OpeningService(
+        model_registry=model_registry,
+        memory_service=_memory_service_with_interest_seed(
+            child_id=child_id,
+            topic="跑步比赛",
+        ),
+    )
+
+    service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-prompt-contract-session",
+        )
+    )
+
+    prompt = model_registry.requests[0].messages[0].content
+    assert isinstance(prompt, str)
+    assert "最多只轻轻回访一个低敏 topic" in prompt
+    assert "必须给孩子选择权" in prompt
+    assert "小白狐想你了" in prompt
+    assert "每天都要来" in prompt
+    assert "这是我们的小秘密" in prompt
+
+
 def test_opening_tts_failure_still_returns_text() -> None:
     class FailingTts:
         def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
@@ -225,6 +269,76 @@ def test_opening_lightly_revisits_recent_interest_seed() -> None:
     assert "每天都要" not in response.reply.text
 
 
+def test_opening_uses_latest_low_sensitivity_interest_seed() -> None:
+    child_id = "opening_relationship_latest_seed_child"
+    repository = InMemoryMemoryRepository()
+    old_service = MemoryService(
+        repository=repository,
+        now_provider=lambda: datetime(2026, 5, 20, 8, 0, tzinfo=timezone.utc),
+    )
+    _create_interest_seed(
+        memory_service=old_service,
+        child_id=child_id,
+        topic="恐龙",
+    )
+    new_service = MemoryService(
+        repository=repository,
+        now_provider=lambda: datetime(2026, 5, 21, 8, 0, tzinfo=timezone.utc),
+    )
+    _create_interest_seed(
+        memory_service=new_service,
+        child_id=child_id,
+        topic="跑步比赛",
+    )
+    service = OpeningService(memory_service=new_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-relationship-latest-seed",
+        )
+    )
+
+    assert "跑步比赛" in response.reply.text
+    assert "恐龙" not in response.reply.text
+
+
+def test_opening_does_not_revisit_medium_or_high_sensitivity_interest_seed() -> None:
+    child_id = "opening_relationship_sensitivity_seed_child"
+    repository = InMemoryMemoryRepository()
+    low_service = MemoryService(
+        repository=repository,
+        now_provider=lambda: datetime(2026, 5, 20, 8, 0, tzinfo=timezone.utc),
+    )
+    _create_interest_seed(
+        memory_service=low_service,
+        child_id=child_id,
+        topic="恐龙",
+        sensitivity=MemorySensitivity.LOW,
+    )
+    medium_service = MemoryService(
+        repository=repository,
+        now_provider=lambda: datetime(2026, 5, 21, 8, 0, tzinfo=timezone.utc),
+    )
+    _create_interest_seed(
+        memory_service=medium_service,
+        child_id=child_id,
+        topic="跑步比赛",
+        sensitivity=MemorySensitivity.MEDIUM,
+    )
+    service = OpeningService(memory_service=medium_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-relationship-sensitivity-seed",
+        )
+    )
+
+    assert "恐龙" in response.reply.text
+    assert "跑步比赛" not in response.reply.text
+
+
 def test_opening_without_interest_seed_keeps_existing_fallback() -> None:
     service = OpeningService(
         memory_service=MemoryService(repository=InMemoryMemoryRepository())
@@ -269,6 +383,21 @@ def _memory_service_with_interest_seed(
     topic: str,
 ) -> MemoryService:
     memory_service = MemoryService(repository=InMemoryMemoryRepository())
+    _create_interest_seed(
+        memory_service=memory_service,
+        child_id=child_id,
+        topic=topic,
+    )
+    return memory_service
+
+
+def _create_interest_seed(
+    *,
+    memory_service: MemoryService,
+    child_id: str,
+    topic: str,
+    sensitivity: MemorySensitivity = MemorySensitivity.LOW,
+) -> None:
     memory_service.create(
         MemoryCreateRequest(
             child_id=child_id,
@@ -287,12 +416,11 @@ def _memory_service_with_interest_seed(
                     },
                 )
             ],
-            sensitivity=MemorySensitivity.LOW,
+            sensitivity=sensitivity,
             confidence=0.8,
             importance=0.5,
         )
     )
-    return memory_service
 
 
 def _request_model(

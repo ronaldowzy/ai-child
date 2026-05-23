@@ -500,6 +500,33 @@ def test_running_competition_creates_interest_seed_without_raw_text() -> None:
     assert "快的感觉" not in serialized
 
 
+def test_non_sports_competition_does_not_create_running_interest_seed() -> None:
+    for index, text in enumerate(("我参加英语比赛。", "我参加数学比赛。")):
+        child_id = f"child_relationship_non_sports_competition_{index}"
+        memory_service, _, conversation_service, _ = _conversation_stack()
+
+        conversation_service.handle_message(
+            _message(
+                child_id=child_id,
+                session_id=f"session_relationship_non_sports_competition_{index}",
+                text=text,
+            )
+        )
+
+        interests = _relationship_memories(
+            _memories(memory_service, child_id),
+            INTEREST_SEED,
+        )
+        proud = _relationship_memories(
+            _memories(memory_service, child_id),
+            PROUD_MOMENT,
+        )
+        assert all(memory_relationship_topic(memory) != "跑步比赛" for memory in interests)
+        assert all(
+            memory_relationship_topic(memory) != "运动比赛表达" for memory in proud
+        )
+
+
 def test_art_and_story_create_low_sensitive_interest_seeds() -> None:
     child_id = "child_relationship_art_story"
     memory_service, _, conversation_service, _ = _conversation_stack()
@@ -516,9 +543,62 @@ def test_art_and_story_create_low_sensitive_interest_seeds() -> None:
         _memories(memory_service, child_id),
         INTEREST_SEED,
     )
-    assert interests
+    assert len(interests) == 1
     assert {memory.sensitivity for memory in interests} == {MemorySensitivity.LOW}
-    assert any(memory_relationship_topic(memory) == "动物" for memory in interests)
+    assert memory_relationship_topic(interests[0]) in {"画画", "故事想象"}
+    assert memory_relationship_topic(interests[0]) != "动物"
+
+
+def test_animal_content_without_creation_action_creates_animal_interest_seed() -> None:
+    child_id = "child_relationship_animal_interest"
+    memory_service, _, conversation_service, _ = _conversation_stack()
+
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_relationship_animal_interest",
+            text="我喜欢狐狸。",
+        )
+    )
+
+    interests = _relationship_memories(
+        _memories(memory_service, child_id),
+        INTEREST_SEED,
+    )
+    assert len(interests) == 1
+    assert memory_relationship_topic(interests[0]) == "动物"
+
+
+def test_interest_seed_dedupes_across_sessions_for_same_child_and_topic() -> None:
+    child_id = "child_relationship_interest_cross_session_dedupe"
+    memory_service, _, conversation_service, _ = _conversation_stack()
+
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_relationship_interest_first",
+            text="我要参加运动比赛，跑步的时候喜欢快的感觉。",
+        )
+    )
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_relationship_interest_second",
+            text="我还是想聊跑步比赛。",
+        )
+    )
+
+    interests = _relationship_memories(
+        _memories(memory_service, child_id),
+        INTEREST_SEED,
+    )
+    assert len(
+        [
+            memory
+            for memory in interests
+            if memory_relationship_topic(memory) == "跑步比赛"
+        ]
+    ) == 1
 
 
 def test_topic_boundary_and_bedtime_are_recorded_as_strategy_memory() -> None:
@@ -549,6 +629,32 @@ def test_topic_boundary_and_bedtime_are_recorded_as_strategy_memory() -> None:
     assert "换话题边界" in topics
     assert "睡前收尾" in topics
     assert all(memory.memory_type == MemoryType.STRATEGY for memory in boundaries)
+
+
+def test_topic_boundary_dedupes_within_same_session() -> None:
+    child_id = "child_relationship_topic_boundary_dedupe"
+    memory_service, _, conversation_service, _ = _conversation_stack()
+
+    for _ in range(2):
+        conversation_service.handle_message(
+            _message(
+                child_id=child_id,
+                session_id="session_relationship_topic_boundary_dedupe",
+                text="换个话题。",
+            )
+        )
+
+    boundaries = _relationship_memories(
+        _memories(memory_service, child_id),
+        TOPIC_BOUNDARY,
+    )
+    assert len(
+        [
+            memory
+            for memory in boundaries
+            if memory_relationship_topic(memory) == "换话题边界"
+        ]
+    ) == 1
 
 
 def test_competition_project_and_feeling_create_proud_moment() -> None:
@@ -641,3 +747,34 @@ def test_sports_fatigue_relationship_memory_is_not_self_harm_label() -> None:
     assert "self_harm" not in serialized
     assert "自伤" not in serialized
     assert "累死了" not in serialized
+
+
+def test_memory_hook_failure_does_not_block_child_reply(caplog) -> None:
+    class FailingMemoryHooks:
+        def retrieve_context(self, **_kwargs: object) -> list[dict[str, object]]:
+            return []
+
+        def record_turn(self, **_kwargs: object) -> None:
+            raise RuntimeError("contains memory content")
+
+    child_text = "我喜欢恐龙，但是记忆失败也不能阻塞我。"
+    conversation_service = ConversationService(
+        scene_orchestrator=SceneOrchestrator(),
+        child_agent_runtime=CapturingRuntime(),
+        memory_hooks=FailingMemoryHooks(),  # type: ignore[arg-type]
+        debug_enabled=True,
+    )
+    caplog.set_level("WARNING", logger="app.conversation")
+
+    response = conversation_service.handle_message(
+        _message(
+            child_id="child_relationship_memory_hook_failure",
+            session_id="session_relationship_memory_hook_failure",
+            text=child_text,
+        )
+    )
+
+    assert response.reply.text
+    assert "conversation_memory_hook_failed" in caplog.text
+    assert child_text not in caplog.text
+    assert "contains memory content" not in caplog.text

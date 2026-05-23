@@ -106,6 +106,10 @@ class ChildAgentRuntime:
 
         raw_reply_text = model_response.response_text.strip()
         reply_text = self._normalize_model_reply(raw_reply_text, request)
+        image_context_reply = self._image_context_repair_reply(request, reply_text)
+        if image_context_reply:
+            reply_text = image_context_reply
+            model_response.metadata["image_context_reply_repaired"] = True
         if reply_text != raw_reply_text:
             model_response.metadata["reply_normalized"] = True
         if not reply_text:
@@ -297,6 +301,90 @@ class ChildAgentRuntime:
                 request.route_decision.active_scene
             ),
         )
+
+    def _image_context_repair_reply(
+        self,
+        request: AgentRuntimeRequest,
+        reply_text: str,
+    ) -> str | None:
+        image_context = request.conversation_metadata.get("image_context")
+        if not isinstance(image_context, dict):
+            if self._child_is_asking_to_share_image(request.child_text) and (
+                not reply_text or self._looks_like_image_refusal(reply_text)
+            ):
+                return "可以的。请点“拍给小白狐看”拍照或选图，上传后我再跟你一起看。"
+            return None
+        if not self._looks_like_image_refusal(reply_text):
+            return None
+
+        recognized_type = str(image_context.get("recognized_type") or "")
+        recognized_text = str(
+            image_context.get("recognized_text")
+            or image_context.get("text")
+            or ""
+        ).strip()
+        summary = self._short_image_summary(recognized_text)
+        if recognized_type == "homework_problem":
+            if summary:
+                return f"我看到这张图像是一道题，里面大概是：{summary}。我们先看题目在问什么。"
+            return "我看到这张图像是一道题，但内容还不够清楚。你可以把题目读一小句给我听。"
+        if recognized_type == "privacy_sensitive":
+            return "这张图可能有隐私内容，我们先不展开细节。可以请爸爸妈妈一起看一下。"
+        if summary:
+            return f"我看到这张图里像是：{summary}。你最想让我看哪里？"
+        return "图片已经传上来了，但这次识别不够清楚。你可以换一张更清楚的，或者告诉我你想让我看哪里。"
+
+    def _looks_like_image_refusal(self, text: str) -> bool:
+        compact = text.replace(" ", "")
+        refusal_markers = (
+            "看不到图片",
+            "无法看到图片",
+            "不能看到图片",
+            "没办法看到图片",
+            "没有看图功能",
+            "不能看照片",
+            "无法看照片",
+            "看不到照片",
+            "只能看到文字",
+            "把图片里的内容说给我听",
+        )
+        if any(marker in compact for marker in refusal_markers):
+            return True
+        return any(
+            re.search(pattern, compact)
+            for pattern in (
+                r"没办法看(?:到)?[^。！？!?]{0,8}图片",
+                r"无法看(?:到)?[^。！？!?]{0,8}图片",
+                r"不能看(?:到)?[^。！？!?]{0,8}图片",
+                r"看不到[^。！？!?]{0,8}照片",
+                r"没办法看(?:到)?[^。！？!?]{0,8}照片",
+            )
+        )
+
+    def _child_is_asking_to_share_image(self, text: str) -> bool:
+        compact = text.replace(" ", "")
+        return any(
+            marker in compact
+            for marker in (
+                "拍给你看",
+                "拍照给你看",
+                "给你看看",
+                "发张图",
+                "发照片",
+                "看图片",
+                "看照片",
+            )
+        )
+
+    def _short_image_summary(self, text: str) -> str:
+        cleaned = re.sub(r"\s+", " ", text).strip()
+        cleaned = re.sub(r"^(图片描述|context_summary|child_summary)[：:]\s*", "", cleaned)
+        if len(cleaned) <= 80:
+            return cleaned
+        boundary = max(cleaned.rfind(char, 0, 80) for char in ("。", "，", "；", "、", " "))
+        if boundary >= 12:
+            return cleaned[:boundary].strip("，。；、 ")
+        return cleaned[:80].rstrip("，。；、 ")
 
     def _scene_reply_max_chars(self, active_scene: SceneId) -> int:
         if active_scene == SceneId.OPEN_CONVERSATION:

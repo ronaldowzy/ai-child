@@ -61,7 +61,7 @@ class ParentReportViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "没有读到父亲日报，请检查后端是否启动。",
+                        errorMessage = "父亲日报暂时没有生成成功。请确认后端已启动、模型配置可用，然后稍后重试。",
                     )
                 }
             }

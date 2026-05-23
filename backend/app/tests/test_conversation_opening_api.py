@@ -275,7 +275,7 @@ def test_opening_tts_failure_still_returns_text() -> None:
     assert response.reply.audio_url is None
 
 
-def test_same_session_returns_cached_opening_without_regenerating_tts() -> None:
+def test_opening_returns_quickly_without_calling_tts() -> None:
     class CountingTts:
         calls = 0
 
@@ -294,9 +294,9 @@ def test_same_session_returns_cached_opening_without_regenerating_tts() -> None:
     second = service.create_opening(request)
 
     assert first.reply.text == second.reply.text
-    assert first.reply.audio_url == "/media/tts/opening.wav"
-    assert second.reply.audio_url == "/media/tts/opening.wav"
-    assert tts.calls == 1
+    assert first.reply.audio_url is None
+    assert second.reply.audio_url is None
+    assert tts.calls == 0
 
 
 def test_opening_lightly_revisits_recent_interest_seed() -> None:

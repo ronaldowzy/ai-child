@@ -27,6 +27,7 @@ CameraX and custom camera UI are not part of this slice.
 6. Raw image bytes, base64 image data, and provider raw responses must not be logged, stored in model debug traces, or committed.
 7. Missing key, missing `allow_image`, provider HTTP failure, or network failure must be reported as BLOCKED/FAIL, not as a successful vision result.
 8. Unit tests may use test doubles, but QA evidence must distinguish test-double behavior from real provider behavior.
+9. Once `image_context` is available, child-facing replies must not say “小白狐看不到图片 / 没有看图功能”. If the model produces that refusal anyway, runtime repairs it into a short answer based on the controlled image context or asks for a clearer image.
 
 ## Model Routing
 
@@ -43,7 +44,7 @@ Opening greeting:
   deterministic policy/template default
 
 ParentReport:
-  deterministic default
+  model-first via ModelTaskType.PARENT_REPORT; deterministic fallback is not formal success
 
 ASR:
   local_sensevoice first, MiMo ASR fallback
@@ -93,6 +94,7 @@ The endpoint builds an in-memory/short-term attachment record and returns an `at
 6. Follow-up actions such as “聊聊它 / 编个故事 / 问这是什么” send the attachment id to conversation.
 
 The old text-entry attachment demo is not the child-facing default path.
+If the child says “拍照给你看” before an image is attached, the reply should guide them to the “拍给小白狐看” entry instead of saying the app cannot see images.
 
 ## Real-Path Dev Backend
 

@@ -577,6 +577,60 @@ def test_child_agent_runtime_passes_image_context_to_prompt_and_metadata() -> No
     assert "不要把它强行当成作业" in registry.last_request.messages[0].content
 
 
+def test_child_agent_runtime_repairs_image_refusal_when_context_exists() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("小白狐看不到图片，你可以把图片里的内容说给我听。")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="你猜猜图上这是什么，它是什么颜色？",
+            conversation_metadata={
+                "message_id": "msg_runtime_image_context",
+                "contains_image": True,
+                "image_context": {
+                    "attachment_id": "att_image_001",
+                    "image_purpose": "share",
+                    "recognized_type": "image_observation",
+                    "recognized_text": "一个蓝色包装盒，上面有几行中文。",
+                    "child_caption": "你看这个",
+                },
+            },
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert "看不到图片" not in result.reply_text
+    assert "蓝色包装盒" in result.reply_text
+    assert result.model_metadata["image_context_reply_repaired"] is True
+
+
+def test_child_agent_runtime_guides_photo_upload_without_claiming_no_image_feature() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("我没有看图功能，只能听你说文字。")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="我新买了一个东西，拍照给你看看好不好？",
+            conversation_metadata={"message_id": "msg_runtime_image_request"},
+        )
+    )
+
+    assert "没有看图功能" not in result.reply_text
+    assert "拍给小白狐看" in result.reply_text
+
+
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
     route_decision = _route_decision(
         reply_text="安全场景使用固定兜底回复。",

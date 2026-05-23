@@ -104,7 +104,7 @@ class ChatViewModelStreamTest {
     }
 
     @Test
-    fun ttsErrorUsesSystemFallbackTextWhenNotMuted() {
+    fun ttsErrorDoesNotMixSystemFallbackVoiceWhenNotMuted() {
         val ttsController = RecordingTtsController()
         val viewModel = ChatViewModel(
             conversationSender = NoopConversationSender(),
@@ -122,9 +122,11 @@ class ChatViewModelStreamTest {
             ),
         )
 
-        assertEquals(1, ttsController.requests.size)
-        assertEquals(null, ttsController.requests.first().audioUrl)
-        assertEquals("中间这句也应该被读出来。", ttsController.requests.first().text)
+        assertTrue(ttsController.requests.isEmpty())
+        assertEquals(
+            "小白狐这次没有接稳，但已经显示的文字还在这里。",
+            viewModel.uiState.value.tts.errorMessage,
+        )
     }
 
     @Test

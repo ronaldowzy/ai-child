@@ -55,7 +55,9 @@ The current backend is local-first and test-stage real-path focused:
   controlled by father authorization and ASR policy flags.
 - Opening greeting is available at `POST /api/v1/conversation/opening`.
   It uses time context, parent policy names, and parent guidance to return one
-  short child-facing greeting, with optional `reply.audio_url`. When a recent
+  short child-facing greeting. To keep first screen paint fast, the default
+  family QA path returns text without synchronously waiting for remote opening
+  TTS; conversation turns still use segment-level remote TTS. When a recent
   low-sensitivity relationship `interest_seed` exists, opening may lightly
   revisit one topic and still gives the child a clear choice to switch away.
   E2-A routes this through `OpeningPolicyBuilder`; MVP-CLOSEOUT-1 makes the
@@ -114,7 +116,8 @@ Current backend contract:
   base64 in conversation payloads or logs.
 - Use `POST /api/v1/conversation/opening` when the child chat screen first
   becomes visible. Call-name priority is `child_nickname`,
-  `child_display_name`, then no forced call name.
+  `child_display_name`, then no forced call name. Opening should not block on
+  cold TTS generation.
 - Never use voice or presentation metadata to weaken learning-answer, secrecy,
   trusted-adult, or long-term raw-data storage safety rules.
 
@@ -780,7 +783,9 @@ Current stream behavior:
    `text_delta`, `sentence_ready`, `tts_started`, `audio_ready/error`.
 5. Emit `text_final` after all segment TTS attempts, then `done`.
 6. Use sentence-level pseudo streaming first; true MiMo streaming is not assumed.
-7. TTS failure must not fail the text stream.
+7. TTS failure must not fail the text stream. Android should not mix system TTS
+   voice into the same stream segment when a remote segment fails; it should
+   keep the text visible and continue later remote segments.
 8. `app.stream_timing` logs request_id, session_id_hash, active_scene,
    first_text_ms, first_tts_start_ms, first_audio_ms, stream_total_ms,
    text_segment_count, tts_segment_count, audio_segment_count,

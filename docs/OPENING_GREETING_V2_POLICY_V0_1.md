@@ -146,7 +146,9 @@ explicitly forbids them when dev/test runs choose to call it.
 Runtime default:
 
 - `OpeningService.create_opening()` uses these deterministic templates by default.
-- The deterministic path keeps TTS/audioUrl and same-session cache behavior.
+- The deterministic path keeps same-session cache behavior but does not block
+  first-screen response on cold remote TTS generation. If a later experiment
+  attaches audio, it must not delay showing the opening text.
 - `ModelRegistry.generate()` is not called for child-facing opening by default.
 - Model-generated opening remains an explicit dev/test experiment path only and
   should not be treated as family MVP readiness evidence.

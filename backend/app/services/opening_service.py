@@ -292,15 +292,10 @@ class OpeningService:
         )
 
     def _attach_audio_url(self, reply: Reply) -> None:
-        try:
-            audio_url = self._tts_service.generate_for_conversation(
-                text=reply.text,
-                emotion=reply.emotion,
-            )
-        except Exception:
-            return
-        if audio_url:
-            reply.audio_url = audio_url
+        # Opening is shown on first screen paint. Do not block that response on a
+        # cold remote TTS call; Android can still read the short text locally, and
+        # conversation turns keep using segment-level MiMo TTS.
+        return
 
     def _emotion_for(self, time_context: TimeContext) -> str:
         if time_context.time_period == TimePeriod.BEDTIME:

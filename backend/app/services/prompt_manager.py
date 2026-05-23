@@ -303,10 +303,18 @@ class PromptManager:
 
     def _render_image_context(self, image_context: Mapping[str, Any] | Any | None) -> str:
         if image_context is None:
-            return "当前没有图片上下文。不要假装看到了图片。"
+            return (
+                "当前没有图片上下文。不要假装看到了图片。"
+                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传，"
+                "不要说小白狐没有看图功能。"
+            )
         data = self._to_mapping(image_context)
         if not data:
-            return "当前没有可用的图片上下文。不要假装看到了图片。"
+            return (
+                "当前没有可用的图片上下文。不要假装看到了图片。"
+                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传，"
+                "不要说小白狐没有看图功能。"
+            )
 
         text = str(data.get("recognized_text") or data.get("text") or "").strip()
         child_caption = str(data.get("child_caption") or "").strip()
@@ -315,6 +323,7 @@ class PromptManager:
 
         lines = [
             "孩子刚刚分享了一张图片。请把以下内容作为当前对话上下文，而不是长期原始照片。",
+            "你已经拿到了后端图片理解结果，可以基于它自然回应；不要说你看不到图片、不能看图片或没有看图功能。",
             f"图片意图：{purpose}。",
             f"识别类型：{recognized_type}。",
         ]

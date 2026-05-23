@@ -3,6 +3,7 @@ package com.childai.companion.ui.chat
 import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
@@ -16,6 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class ChatTtsViewModelTest {
     @Test
@@ -308,6 +310,34 @@ class ChatTtsViewModelTest {
         assertFalse(viewModel.uiState.value.tts.isSpeaking)
         assertEquals(
             TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE,
+            viewModel.uiState.value.tts.errorMessage,
+        )
+    }
+
+    @Test
+    fun streamTtsErrorDoesNotUseSystemVoiceFallbackForSegment() {
+        val fakeTts = FakeTtsController()
+        val viewModel = ChatViewModel(ttsController = fakeTts)
+
+        viewModel.applyStreamEvent(
+            ConversationStreamEvent(
+                type = "text_delta",
+                payload = JSONObject().put("delta", "我看到这张图里有一个蓝色盒子。"),
+            ),
+        )
+        viewModel.applyStreamEvent(
+            ConversationStreamEvent(
+                type = "error",
+                payload = JSONObject()
+                    .put("stage", "tts")
+                    .put("text", "我看到这张图里有一个蓝色盒子。")
+                    .put("safe_message", "这段朗读没有接上，文字还在这里。"),
+            ),
+        )
+
+        assertTrue(fakeTts.requests.isEmpty())
+        assertEquals(
+            "这段朗读没有接上，文字还在这里。",
             viewModel.uiState.value.tts.errorMessage,
         )
     }

@@ -30,10 +30,13 @@ class TextSegmenter:
             return []
 
         max_chars = hard_max_chars or self._hard_max_chars
+        segment_max_chars = min(max_chars, self._preferred_max_chars)
         raw_sentences = self._split_sentences(stripped_text)
         split_sentences: list[str] = []
         for sentence in raw_sentences:
-            split_sentences.extend(self._split_long_sentence(sentence, max_chars=max_chars))
+            split_sentences.extend(
+                self._split_long_sentence(sentence, max_chars=segment_max_chars)
+            )
 
         merged = self._merge_short_segments(split_sentences, max_chars=max_chars)
         return self._with_ranges(stripped_text, merged)

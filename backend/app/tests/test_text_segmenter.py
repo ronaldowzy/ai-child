@@ -52,5 +52,18 @@ def test_text_segmenter_splits_long_sentence_under_hard_limit() -> None:
     assert "".join(segment.text for segment in segments) == text
 
 
+def test_text_segmenter_splits_long_sentence_by_preferred_max_for_streaming() -> None:
+    text = "我看到这张图片里有一个蓝色的小盒子，上面还有一些字，看起来像是你刚刚想让我一起看的新东西。"
+
+    segments = TextSegmenter(min_chars=8, preferred_max_chars=32).segment(
+        text,
+        hard_max_chars=600,
+    )
+
+    assert len(segments) > 1
+    assert all(len(segment.text) <= 32 for segment in segments)
+    assert "".join(segment.text for segment in segments) == text
+
+
 def test_text_segmenter_ignores_blank_text() -> None:
     assert TextSegmenter().segment("   ") == []

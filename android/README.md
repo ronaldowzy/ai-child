@@ -56,9 +56,9 @@
 - 自动发送后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
 - 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 或非儿童测试音频做 ASR smoke，不用真实儿童录音。
 - 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
-- App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示并按 `audio_url` 自动播放；如果孩子先开口，迟到的 opening 不插入。
+- App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示；后端默认不为了 opening 冷启动远程 TTS 而阻塞首屏，如果返回 `audio_url` 才自动播放。孩子先开口时，迟到的 opening 不插入。
 - opening greeting 的称呼来自父亲设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。
-- TTS 朗读优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频；远程播放失败时 fallback 到系统 TextToSpeech 或文字。
+- TTS 朗读优先播放后端返回的 `reply.audio_url`，朗读后端已安全处理的 `reply.text` 对应音频；普通完整回复远程播放失败时可 fallback 到系统 TextToSpeech 或文字，但 stream 分段 TTS 失败不再混用系统音色朗读同一段。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
 - TTS fallback 已实现 `VoiceProfile`：`preferredVoiceName`、`zh-CN`、稍慢 `speechRate`、偏高但不过度的 `pitch`、fallback 系统默认中文 voice。
@@ -89,8 +89,9 @@
 4. `text_final` 修正最终文本。
 5. `audio_ready` 进入 AudioSegmentQueuePlayer，顺序播放远程音频 segment。
 6. 静音时不播放 audio segment，也不 fallback 系统 TTS。
-7. 停止朗读会停止当前 segment 并清空队列。
-8. stream 失败时 fallback 到旧 `/conversation/message`。
+7. 单个 stream TTS segment 失败时，只保留文字并继续后续 segment，不用系统 TTS 混播失败段。
+8. 停止朗读会停止当前 segment 并清空队列。
+9. stream 失败时 fallback 到旧 `/conversation/message`。
 ```
 
 待手动 QA：

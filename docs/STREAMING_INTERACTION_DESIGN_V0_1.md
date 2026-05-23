@@ -38,7 +38,8 @@ S-Stream-1 后端骨架已新增独立 router/service/schema/text segmenter：
 3. ConversationService 内部注入 no-op TTS，避免旧同步完整 TTS 阻塞 stream 文本。
 4. `text_delta` 不是 raw LLM token，也不是 true LLM streaming；它必须等待 ChildAgentRuntime 得到完整回复并通过输出安全检查后，才按 sentence/chunk 伪流式输出。
 5. P0-A 延迟优化后，segment 按 `text_delta -> sentence_ready -> tts_started -> audio_ready/error` interleave 输出；不再等所有文字和 `text_final` 发完后才开始 TTS。
-6. 所有 segment 处理后再发送 `text_final` 和 `done`；TTS 失败发送 recoverable error，但不影响 text_final 和 done。
+6. 长句会按 preferred segment size 继续切成更短 chunk，避免单个 TTS segment 过长导致超时，也让 Android 气泡更明显地渐进追加。
+7. 所有 segment 处理后再发送 `text_final` 和 `done`；TTS 失败发送 recoverable error，但不影响 text_final 和 done。Android 不再用系统 TTS 混播失败的 stream segment，以保持小白狐音色一致。
 
 Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/conversation/stream` 可通过后端测试和本地 curl 做 NDJSON 验证。Android stream client 已接入，生产 UI 默认优先使用 stream，失败时 fallback 到旧 `/api/v1/conversation/message`。
 

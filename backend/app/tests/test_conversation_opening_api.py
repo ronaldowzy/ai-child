@@ -275,7 +275,7 @@ def test_opening_tts_failure_still_returns_text() -> None:
     assert response.reply.audio_url is None
 
 
-def test_opening_returns_quickly_without_calling_tts() -> None:
+def test_opening_generates_xiaobaihu_audio_url_and_uses_session_cache() -> None:
     class CountingTts:
         calls = 0
 
@@ -294,9 +294,9 @@ def test_opening_returns_quickly_without_calling_tts() -> None:
     second = service.create_opening(request)
 
     assert first.reply.text == second.reply.text
-    assert first.reply.audio_url is None
-    assert second.reply.audio_url is None
-    assert tts.calls == 0
+    assert first.reply.audio_url == "/media/tts/opening.wav"
+    assert second.reply.audio_url == "/media/tts/opening.wav"
+    assert tts.calls == 1
 
 
 def test_opening_lightly_revisits_recent_interest_seed() -> None:

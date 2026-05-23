@@ -59,8 +59,8 @@ import com.childai.companion.ui.parent.ParentEntryPinDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
 import com.childai.companion.ui.parent.ParentPinGate
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
-import com.childai.companion.voice.AndroidTtsController
 import com.childai.companion.voice.MediaPlayerAudioUrlPlayer
+import com.childai.companion.voice.NoOpTtsController
 import com.childai.companion.voice.RemoteAudioTtsController
 import kotlinx.coroutines.delay
 
@@ -76,7 +76,7 @@ fun ChildChatScreen(
     val ttsController = remember {
         RemoteAudioTtsController(
             audioUrlPlayer = MediaPlayerAudioUrlPlayer(),
-            fallbackController = AndroidTtsController(context.applicationContext),
+            fallbackController = NoOpTtsController,
             backendBaseUrl = DevSettings.conversationApiBaseUrl,
         )
     }

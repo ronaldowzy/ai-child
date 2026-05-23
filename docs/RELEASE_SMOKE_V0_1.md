@@ -93,7 +93,7 @@ result: PASS
 summary: generated device debug APK with BuildConfig.CONVERSATION_API_BASE_URL=http://192.168.0.118:8000/.
 apk_path: android/app/build/outputs/apk/debug/app-debug.apk
 apk_size_bytes: 16471142
-apk_sha256: 81bf25c27316261d5b3e0e749ea55cfb80a970c04641d880c477e37431e8e9ce
+apk_sha256: 2afe25e5d62484edf4657e51f96dd12bfdce132daa373e8474b314490103b5db
 ```
 
 ## 4. Smoke Results

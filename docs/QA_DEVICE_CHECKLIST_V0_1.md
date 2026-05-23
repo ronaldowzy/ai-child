@@ -30,7 +30,7 @@ debug APK 构建：已完成，当前真机 QA APK 使用 Mac LAN base URL。
 [ ] 当前本轮 APK metadata：
     path=android/app/build/outputs/apk/debug/app-debug.apk
     size=16471142 bytes
-    sha256=81bf25c27316261d5b3e0e749ea55cfb80a970c04641d880c477e37431e8e9ce
+    sha256=2afe25e5d62484edf4657e51f96dd12bfdce132daa373e8474b314490103b5db
     baseUrl=http://192.168.0.118:8000/
 [ ] 如果 Mac LAN IP 变化，必须重新构建并重新记录 metadata。
 ```

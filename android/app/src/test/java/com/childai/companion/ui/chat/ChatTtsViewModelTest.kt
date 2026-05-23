@@ -276,7 +276,7 @@ class ChatTtsViewModelTest {
     }
 
     @Test
-    fun remoteAudioControllerFallsBackToSystemTtsWhenPlaybackFails() {
+    fun remoteAudioControllerDoesNotFallbackToSystemTtsWhenPlaybackFails() {
         val fakePlayer = FakeAudioUrlPlayer(acceptRequest = false)
         val fallbackTts = FakeTtsController()
         val controller = RemoteAudioTtsController(
@@ -290,9 +290,28 @@ class ChatTtsViewModelTest {
             TtsCallbacks(),
         )
 
-        assertTrue(accepted)
-        assertEquals(listOf("我在这里。"), fallbackTts.requests.map { it.text })
-        assertEquals(null, fallbackTts.requests.single().audioUrl)
+        assertFalse(accepted)
+        assertTrue(fallbackTts.requests.isEmpty())
+    }
+
+    @Test
+    fun remoteAudioControllerDoesNotFallbackToSystemTtsWhenAudioUrlMissing() {
+        val fakePlayer = FakeAudioUrlPlayer()
+        val fallbackTts = FakeTtsController()
+        val controller = RemoteAudioTtsController(
+            audioUrlPlayer = fakePlayer,
+            fallbackController = fallbackTts,
+            backendBaseUrl = "http://127.0.0.1:8000/",
+        )
+
+        val accepted = controller.speak(
+            TtsRequest(text = "我在这里。", audioUrl = null),
+            TtsCallbacks(),
+        )
+
+        assertFalse(accepted)
+        assertTrue(fakePlayer.urls.isEmpty())
+        assertTrue(fallbackTts.requests.isEmpty())
     }
 
     @Test

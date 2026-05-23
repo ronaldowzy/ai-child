@@ -71,7 +71,7 @@ deprecated：已废弃，不再作为实现依据。
 | PD-048 | confirmed | ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。当前测试阶段应启用 local_sensevoice 验证真实本地识别，MiMo fallback 仍需父亲授权和 ASR data policy flags。 | backend ASR provider、AsrService fallback、ASR docs、QA |
 | PD-049 | revised | 家庭 MVP 前 opening greeting 默认走 deterministic policy/template 主路径；父亲日报已由 PD-052 修订为 model-first。 | OpeningService、OpeningPolicyBuilder、QA |
 | PD-052 | confirmed | 父亲日报 v2 必须 model-first：程序只构造当天受控 evidence packet 并调用 `ModelTaskType.PARENT_REPORT`，模型结构化 JSON 才是正式日报；失败时返回明确可重试状态，不用规则日报冒充成功。 | ParentReportService、ModelRegistry、ParentReportScreen、parent_reports |
-| PD-053 | confirmed | 真机 QA 发现有图片上下文时模型仍可能说“看不到图片”，stream TTS 失败时 Android 系统音色混播，opening 首屏被同步 TTS 拉慢；当前修正为：图片上下文优先且禁止拒看话术，stream TTS 失败不再混用系统 TTS 朗读同段，opening 默认先返回文本不等待远程 TTS。 | PromptManager、ChildAgentRuntime、TextSegmenter、OpeningService、Android ChatViewModel、QA |
+| PD-053 | confirmed | 真机 QA 发现有图片上下文时模型仍可能说“看不到图片”，stream TTS 失败时 Android 系统音色混播，opening 首屏发音使用了系统 TTS；当前修正为：图片上下文优先且禁止拒看话术，Android 远程音频失败或缺失时不再 fallback 系统 TTS，opening 后端恢复生成小白狐 `audio_url`。 | PromptManager、ChildAgentRuntime、TextSegmenter、OpeningService、Android TTS、QA |
 
 新增执行依据：
 
@@ -221,7 +221,7 @@ Source: father / TTS decision; revised by PD-027 for voice source
 Decision: TTS 默认自动朗读小白狐回复；必须有停止/静音、DevSettings 或父亲设置开关。系统 `VoiceProfile` 保留为 fallback，正式品牌音色由 PD-027 的 MiMo VoiceClone 承担。
 Rationale: 语音体验应默认可听见，但必须给父亲和孩子保留控制权；系统 TTS 无法保证固定音色且 Redmi K60 体验不理想，因此正式声音来源改为后端生成音频。
 Affected modules: Android TTS、DevSettings、parent settings、VoiceProfile、backend TTS、QA。
-Implementation notes: 只朗读 agent reply，不朗读孩子输入、debug 或 session_state；优先播放 `reply.audio_url`，失败时 fallback 系统 TTS 或文字；高风险和睡前场景低刺激。
+Implementation notes: 只朗读 agent reply，不朗读孩子输入、debug 或 session_state；播放后端 `reply.audio_url`；远程音频失败或缺失时保留文字和错误提示，不再 fallback 系统 TTS；高风险和睡前场景低刺激。
 Docs updated: `docs/VOICE_INTERACTION_DESIGN_V0_1.md`、`docs/NEXT_PHASE_PLAN_V0_2.md`、`android/README.md`。
 Tests or QA needed: 自动朗读、停止/静音、开关、reply.voice_enabled=false。
 
@@ -738,11 +738,11 @@ Decision ID: PD-053
 Date: 2026-05-24
 Status: confirmed
 Source: father / Redmi K60 device QA feedback
-Decision: 图片上下文、stream TTS 和 opening 首屏响应需要以真机体验为准加固：有真实 `attachment_id` / `image_context` 时，小白狐不得说自己没有看图功能或看不到图片；stream segment 的 MiMo 远程音频失败时不再用 Android 系统 TTS 混播同一轮；opening greeting 首屏默认先返回 deterministic 文本，不同步等待远程 TTS。
-Rationale: 真机 QA 显示图片已上传并进入 conversation 后，小白狐仍说看不到；一轮回复中 MiMo VoiceClone 与系统 TTS fallback 混播会破坏角色一致性；opening 等待 TTS 冷启动会让首屏开场白出现太慢。
-Affected modules: PromptManager image context section、ChildAgentRuntime output repair、TextSegmenter stream chunks、OpeningService、Android ChatViewModel、docs/tests。
-Implementation notes: Prompt 明确“已获得后端图片理解结果”；ChildAgentRuntime 对有图片上下文的拒看回复做安全兜底修复；TextSegmenter 按 preferred max 拆长句，减少单段 TTS 超时；Android stream `error(stage=tts)` 只提示文字错误，不把失败段交给系统 TTS 读；OpeningService 不再同步调用 TTS。
-Tests or QA needed: 后端回归覆盖图片拒看修复、拍照意图引导、长句分段和 opening 不调用 TTS；Android 回归覆盖 stream TTS error 不触发系统 TTS。Redmi K60 / Honor Pad 5 需复测 opening 速度、图片续聊和音色一致性。
+Decision: 图片上下文、stream TTS 和 opening 首屏响应需要以真机体验为准加固：有真实 `attachment_id` / `image_context` 时，小白狐不得说自己没有看图功能或看不到图片；MiMo 远程音频失败或缺失时 Android 不再用系统 TTS 混播同一轮；opening greeting 应由后端生成小白狐 `audio_url`，Android 只播放远程小白狐音频，不用系统 TTS 顶替。
+Rationale: 真机 QA 显示图片已上传并进入 conversation 后，小白狐仍说看不到；一轮回复中 MiMo VoiceClone 与系统 TTS fallback 混播会破坏角色一致性；opening 首屏使用系统 TTS 会让声音不像小白狐。
+Affected modules: PromptManager image context section、ChildAgentRuntime output repair、TextSegmenter stream chunks、OpeningService、RemoteAudioTtsController、docs/tests。
+Implementation notes: Prompt 明确“已获得后端图片理解结果”；ChildAgentRuntime 对有图片上下文的拒看回复做安全兜底修复；TextSegmenter 按 preferred max 拆长句，减少单段 TTS 超时；Android stream `error(stage=tts)` 只提示文字错误，不把失败段交给系统 TTS 读；RemoteAudioTtsController 远程音频失败或缺失时不调用系统 TTS fallback；OpeningService 恢复调用后端 TTS 生成小白狐 `audio_url` 并缓存同 session 结果。
+Tests or QA needed: 后端回归覆盖图片拒看修复、拍照意图引导、长句分段和 opening 生成 TTS；Android 回归覆盖 remote audio 失败/缺失不触发系统 TTS。Redmi K60 / Honor Pad 5 需复测 opening 小白狐音色、图片续聊和整轮音色一致性。
 
 #### PD-054
 

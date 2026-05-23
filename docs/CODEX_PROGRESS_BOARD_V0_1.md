@@ -214,12 +214,12 @@ Conversation API：done
 | R8-02 语音交互设计文档 | done |  | 明确儿童默认 voice-first 自动发送、调试用 confirm-before-send、后端 MiMo ASR、默认自动 TTS、VoiceProfile、opening greeting、可替换抽象、原始音频策略、权限、错误文案、安全边界和 QA 指标 |
 | R8-03 下一阶段计划文档 | done |  | 拆分完整设备 QA、语音输入、TTS、小白狐视觉资源、小白狐动画状态机、真实平板家庭内测准备 |
 | V1-01 Android 语音上传 voice-first v1 | done |  | Android 录音上传后端 ASR 后儿童默认自动发送 transcript；DevSettings 确认模式保留；不直接调用 MiMo；future hands-free conversational mode 不进 v1；待真机权限和录音 QA |
-| V1-02 Android TTS 朗读 v1 | in_progress |  | Android 已优先播放 `reply.audio_url`，播放失败时 fallback 系统 TTS 或文字；系统 TTS 已有诊断和停止/静音基础；待 Redmi K60 听感和网络播放 QA |
+| V1-02 Android TTS 朗读 v1 | in_progress |  | Android 播放 `reply.audio_url`；远程音频失败或缺失时只保留文字和错误提示，不再 fallback 系统 TTS，避免小白狐音色与系统音色混播；待 Redmi K60 听感和网络播放 QA |
 | V1-03 Android 语音抽象和 VoiceProfile | in_progress |  | TtsController / AndroidTtsController / VoiceProfile 已完成；SpeechInputController / backend ASR upload 抽象已接入；VoiceProfile 使用 zh-CN、稍慢语速、偏高不过度音高和系统中文 fallback |
 | V1-04 语音 QA 指标记录 | todo |  | 记录识别准确率、延迟、中文效果、儿童声音识别、TTS 自然度和孩子接受度 |
 | V1-05 TTS-D1 可观测性与故障修复 | done |  | 新增 TtsUiState / VoiceDiagnostics 诊断，记录 engine、locale、voice、setLanguage、setVoice、speak 返回值和 failure reason；speaking 状态前移到请求接受阶段；新增 TTS 设置/语音数据入口 |
 | V1-06 后端小白狐 TTS endpoint | done |  | 新增 `/api/v1/tts/xiaobaohu`、TTS schema、mock/MiMo VoiceClone provider 抽象、TtsDataPolicyGuard、本地 wav 缓存和 `/media/tts/...wav` 受控服务；默认不外发；真实 smoke 已确认 `/chat/completions` + `choices[0].message.audio.data` 可生成 RIFF/WAV |
-| V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时优先播放远程音频；失败时 fallback 系统 TTS 或文字；朗读时小白狐切 speaking；Android conversation read timeout 已从 12s 调整为 45s，避免 MiMo TTS 同步生成接近 10s 时误报断网 |
+| V1-07 Android remote audioUrl 播放 | done |  | Android 收到 `reply.audio_url` 时播放远程音频；失败时只保留文字和错误提示，不再 fallback 系统 TTS；朗读时小白狐切 speaking；Android conversation read timeout 已从 12s 调整为 45s，避免 MiMo TTS 同步生成接近 10s 时误报断网 |
 | F1-01 小白狐视觉资源 v1 | in_progress |  | v1 候选资源已扩展：neutral_idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error；目标是 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感 |
 | F1-02 小白狐静态资源接入 | in_progress |  | 已新增 drawable-nodpi 候选资源、FoxAgentAssetMapper 和 DevSettings.FOX_ASSET_MODE；静态资源已压缩为 WebP 并保留 Canvas fallback；6 张新增状态图已接入资源目录和映射，后续需设备侧验证图片显示和低配降级 |
 | F1-03 小白狐动画状态机 v1 | in_progress |  | 已接入 manifest-driven animation_v1、MascotController、FrameSequencePlayer 和三层 fallback；覆盖 11 个状态、12 FPS、24 帧 WebP 序列；Android runtime assets 约 4.9MB，静态 fallback 约 1.5MB，clean assemble debug APK 约 15MB；待真机验证画质、流畅度和低配降级 |

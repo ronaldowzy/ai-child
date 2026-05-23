@@ -8,7 +8,20 @@ class RemoteAudioTtsController(
     override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
         val audioUrl = request.audioUrl?.trim().orEmpty()
         if (audioUrl.isBlank()) {
-            return fallbackController.speak(request, callbacks)
+            callbacks.onDiagnostics(
+                VoiceDiagnostics(
+                    isAvailable = false,
+                    isInitializing = false,
+                    isInitialized = false,
+                    lastRequestedTextPreview = request.text.previewForDiagnostics(),
+                    lastFailureReason = "remote_audio_url_missing",
+                    lastSpeakResult = "SKIPPED_NO_REMOTE_AUDIO",
+                    playbackSource = "remote_audio",
+                    audioUrl = null,
+                ),
+            )
+            callbacks.onError(TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE)
+            return false
         }
 
         val resolvedUrl = resolveAudioUrl(
@@ -27,16 +40,12 @@ class RemoteAudioTtsController(
             ),
         )
 
-        var fallbackAttempted = false
-        var fallbackAccepted = false
-        fun fallbackToSystem(reason: String): Boolean {
-            if (fallbackAttempted) return fallbackAccepted
-            fallbackAttempted = true
+        fun reportRemoteAudioError(reason: String): Boolean {
             callbacks.onDiagnostics(
                 VoiceDiagnostics(
-                    isAvailable = true,
+                    isAvailable = false,
                     isInitializing = false,
-                    isInitialized = true,
+                    isInitialized = false,
                     lastRequestedTextPreview = request.text.previewForDiagnostics(),
                     lastFailureReason = reason,
                     lastSpeakResult = "REMOTE_AUDIO_ERROR",
@@ -44,22 +53,8 @@ class RemoteAudioTtsController(
                     audioUrl = audioUrl,
                 ),
             )
-            fallbackAccepted = fallbackController.speak(
-                request = request.copy(audioUrl = null),
-                callbacks = TtsCallbacks(
-                    onDiagnostics = { diagnostics ->
-                        callbacks.onDiagnostics(
-                            diagnostics.copy(playbackSource = "system_tts_fallback"),
-                        )
-                    },
-                    onStart = callbacks.onStart,
-                    onDone = callbacks.onDone,
-                    onError = {
-                        callbacks.onError(TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE)
-                    },
-                ),
-            )
-            return fallbackAccepted
+            callbacks.onError(TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE)
+            return false
         }
 
         val remoteAccepted = audioUrlPlayer.play(
@@ -81,14 +76,13 @@ class RemoteAudioTtsController(
                 },
                 onDone = callbacks.onDone,
                 onError = { reason ->
-                    fallbackToSystem(reason)
+                    reportRemoteAudioError(reason)
                 },
             ),
         )
 
         if (remoteAccepted) return true
-        if (fallbackAttempted) return fallbackAccepted
-        return fallbackToSystem("remote_audio_play_rejected")
+        return reportRemoteAudioError("remote_audio_play_rejected")
     }
 
     override fun stop() {

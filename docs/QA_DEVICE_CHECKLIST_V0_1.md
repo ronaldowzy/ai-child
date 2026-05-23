@@ -26,11 +26,11 @@ debug APK 构建：已完成，当前真机 QA APK 使用 Mac LAN base URL。
 [ ] 使用真机 base URL 重新构建 APK，或使用本轮已构建的 LAN APK：
     bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
 [ ] 记录 APK size 和 sha256。
-[ ] 确认 Android BuildConfig.CONVERSATION_API_BASE_URL 不是 http://10.0.2.2:8000/。
+[ ] 确认 Android BuildConfig.CONVERSATION_API_BASE_URL 是当前 Mac LAN 地址。
 [ ] 当前本轮 APK metadata：
     path=android/app/build/outputs/apk/debug/app-debug.apk
-    size=16190741 bytes
-    sha256=798a87a6256c9b2523b519aeb337385eec2fe7b9cecc43e25f1feb79bf51f850
+    size=16471142 bytes
+    sha256=81bf25c27316261d5b3e0e749ea55cfb80a970c04641d880c477e37431e8e9ce
     baseUrl=http://192.168.0.118:8000/
 [ ] 如果 Mac LAN IP 变化，必须重新构建并重新记录 metadata。
 ```

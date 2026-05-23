@@ -65,24 +65,9 @@ bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
    http://192.168.0.118:8000/api/v1/health
 ```
 
-### Emulator Debug APK From Previous Smoke
+### Deprecated Non-Device APK Path
 
-```text
-APK path: android/app/build/outputs/apk/debug/app-debug.apk
-build variant: debug
-build time UTC: 2026-05-22T04:00:54Z
-size: 16047291 bytes / 15M
-sha256: 7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10
-base URL in this build: http://10.0.2.2:8000/
-```
-
-注意：
-
-```text
-1. 这个旧 APK 使用默认 emulator base URL，只适合模拟器本机后端。
-2. 真机不得使用 `http://10.0.2.2:8000/`。
-3. Redmi K60 先测，Honor Pad 5 后测。
-```
+旧非真机 APK 路径已废弃。当前阶段只交付 Mac LAN base URL 的 Redmi K60 / Honor Pad 5 真机 APK。
 
 ## 3. Automated Test Results
 
@@ -101,11 +86,14 @@ summary: BUILD SUCCESSFUL; testDebugUnitTest and testReleaseUnitTest up-to-date.
 
 bash scripts/android_gradle.sh assembleDebug
 result: PASS
-summary: BUILD SUCCESSFUL with default emulator base URL; final device APK was rebuilt afterward with Mac LAN base URL.
+summary: BUILD SUCCESSFUL; final device APK uses Mac LAN base URL.
 
 bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
 result: PASS
 summary: generated device debug APK with BuildConfig.CONVERSATION_API_BASE_URL=http://192.168.0.118:8000/.
+apk_path: android/app/build/outputs/apk/debug/app-debug.apk
+apk_size_bytes: 16471142
+apk_sha256: 81bf25c27316261d5b3e0e749ea55cfb80a970c04641d880c477e37431e8e9ce
 ```
 
 ## 4. Smoke Results

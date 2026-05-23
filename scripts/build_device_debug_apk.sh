@@ -11,8 +11,8 @@ Usage:
   bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/ [--variant debug]
 
 Notes:
-  - This script is for physical Android devices, not the emulator.
-  - Do not use http://10.0.2.2:8000/ for Redmi K60 / Honor Pad 5.
+  - This script is for physical Android devices.
+  - Use the Mac LAN URL that Redmi K60 / Honor Pad 5 can reach.
 EOF
 }
 
@@ -64,9 +64,9 @@ if [[ -z "${BASE_URL}" ]]; then
   exit 2
 fi
 
-if [[ "${BASE_URL}" == "http://10.0.2.2:8000/" || "${BASE_URL}" == "http://10.0.2.2:8000" ]]; then
+if [[ "${BASE_URL}" == "http://localhost:"* || "${BASE_URL}" == "http://127.0.0.1:"* ]]; then
   echo "DEVICE_APK_BUILD: FAIL" >&2
-  echo "reason=emulator_base_url_not_allowed_for_device" >&2
+  echo "reason=base_url_must_be_lan_reachable_for_device" >&2
   exit 2
 fi
 

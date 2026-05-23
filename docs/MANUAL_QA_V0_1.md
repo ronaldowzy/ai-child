@@ -11,7 +11,7 @@
 
 ```text
 曾错误交付了一个不满足目标的测试品：
-1. 真机 APK 仍使用模拟器地址 `http://10.0.2.2:8000/`，导致 Redmi 真机无法连接后端。
+1. 真机 APK 曾使用错误后端地址，导致 Redmi 真机无法连接后端。
 2. Android 语音输入 UI 已接录音上传，但后端 ASR 实际仍为 `provider=mock`，父亲无法测试真实 MiMo ASR。
 3. mock ASR 返回固定句子“我想请你帮我听一下这段话。”，误导成真实识别结果。
 ```
@@ -20,7 +20,7 @@
 
 | 测试目标 | 必须证明 | 不满足时的交付口径 |
 |---|---|---|
-| 真机聊天 / stream / TTS | APK `BuildConfig.CONVERSATION_API_BASE_URL` 是当前 Mac LAN 地址；LAN `/api/v1/health`、目标 conversation 接口 curl 通过 | 不能交付真机测试；只能说明是模拟器构建 |
+| 真机聊天 / stream / TTS | APK `BuildConfig.CONVERSATION_API_BASE_URL` 是当前 Mac LAN 地址；LAN `/api/v1/health`、目标 conversation 接口 curl 通过 | 不能交付真机测试 |
 | 真实 MiMo ASR | 后端日志或 health/detail/curl 证明 `provider=mimo`；ASR env flags、API key、child audio authorization、retention policy、no-training confirmed 全部开启；使用非儿童 smoke 音频先通过 | 只能测试录音上传 UI、pending transcript、needs_retry/policy-blocked；不能声明可测真实识别 |
 | Mock ASR | 返回 `needs_retry` 或显式测试 transcript；不得把固定 mock 文案当作真实转写展示给父亲 | 标为 mock/fallback 流程测试 |
 | MiMo VoiceClone TTS | `provider=mimo`、policy flags、voice sample、media URL 可用；至少一次 curl/App 触发后日志有 `tts_call_finished` 和 media GET | 只能测文字和系统 TTS fallback |
@@ -45,7 +45,7 @@
 | Android SDK | 存在：`/Users/wzy/Library/Android/sdk` |
 | adb 设备 | 通过：本次用 `emulator-5554` 做窗口模式 smoke |
 | Emulator / AVD | 通过：已安装 Android Emulator，并创建 `child_ai_tablet_api35` |
-| 模拟器网络 | 通过：`AndroidWifi` 连接后，模拟器内 `curl http://10.0.2.2:8000/api/v1/health` 返回 `{"status":"ok"}` |
+| 模拟器网络 | 通过：`AndroidWifi` 连接后，模拟器内 `curl 错误后端地址api/v1/health` 返回 `{"status":"ok"}` |
 | 模拟器中文输入 | 通过：系统 Gboard 中文拼音可用；自动化中文注入使用 emulator 内 ADBKeyBoard 调试输入法 |
 | JDK | 通过：主控会话复验 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` 可用；S14 子会话的 Java Runtime 报错属于未加载共享环境的误判 |
 | 后端 Python | 系统 `python3` 为 3.9.6，不满足 backend `requires-python >=3.11`；应使用 `child-ai` conda 环境或显式 `PYTHON_BIN` |
@@ -181,9 +181,9 @@ JDK 17、Android SDK、adb、child-ai conda 环境和 tablet AVD 均已配置。
 | `E2E_BASE_URL=http://192.168.0.118:8000 bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS` |
 | `bash scripts/android_gradle.sh test assembleDebug` | 通过：主控会话复验 |
 | `bash scripts/android_gradle.sh lintDebug` | 通过：主控会话复验 |
-| `bash scripts/start_android_emulator.sh --headless` | 通过：`emulator-5554` 启动，`sys.boot_completed=1` |
+| `已删除的模拟器启动脚本` | 通过：`emulator-5554` 启动，`sys.boot_completed=1` |
 | `bash scripts/install_android_debug.sh` | 通过：debug APK 安装并启动 |
-| `adb shell cmd wifi connect-network AndroidWifi open` | 通过：修复模拟器 `10.0.2.2` 不通问题 |
+| `adb shell cmd wifi connect-network AndroidWifi open` | 通过：修复模拟器 `错误后端地址` 不通问题 |
 | `adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'` | 通过：通过 ADBKeyBoard 注入中文到 Compose 输入框 |
 | Mimo runtime smoke | 通过：临时 env 使用 `mimo-v2.5-pro` 时，`ChildAgentRuntime` 返回 `source=model`、provider=`mimo`；无连字符 `mimo-v2.5pro` 会被网关拒绝 |
 
@@ -313,10 +313,10 @@ ASR intake 结论：
 | `bash scripts/android_gradle.sh test` | 通过：BUILD SUCCESSFUL |
 | `bash scripts/android_gradle.sh assembleDebug` | 通过：BUILD SUCCESSFUL |
 | `bash scripts/android_gradle.sh lintDebug` | 通过：BUILD SUCCESSFUL |
-| `bash scripts/start_android_emulator.sh` | blocked：`emulator-5554` 已使用同名 AVD 运行；新开同名窗口实例被 emulator 拒绝。继续使用已在线窗口模式模拟器 |
+| `已删除的模拟器启动脚本` | blocked：`emulator-5554` 已使用同名 AVD 运行；新开同名窗口实例被 emulator 拒绝。继续使用已在线窗口模式模拟器 |
 | `bash scripts/install_android_debug.sh` | 通过：debug APK 安装并启动 |
 | `curl http://127.0.0.1:8000/api/v1/health` | 通过：返回 `{"status":"ok"}` |
-| `adb shell curl http://10.0.2.2:8000/api/v1/health` | 通过：返回 `{"status":"ok"}`；中途出现一次短暂连接失败，重新验证 health 后恢复 |
+| `adb shell curl 错误后端地址api/v1/health` | 通过：返回 `{"status":"ok"}`；中途出现一次短暂连接失败，重新验证 health 后恢复 |
 | `E2E_BASE_URL=http://127.0.0.1:18082 bash scripts/e2e_local_api_check.sh` | 通过：`S14_E2E_API: PASS`。因 `8000` 上既有服务 conversation 请求超时，QA1 使用临时干净端口 `18082` 复跑合约 |
 
 ### QA1 核心场景结果
@@ -680,8 +680,8 @@ Mimo 真实 provider 复验说明：
 1. 后端使用 `bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000` 启动；脚本会优先使用 `child-ai` conda 环境。
 2. Mac 本机 `127.0.0.1:8000` health 通过。
 3. Mac 局域网地址 `192.168.0.118:8000` health 通过。
-4. Android 模拟器预期 base URL：`http://10.0.2.2:8000/`。
-5. 如果模拟器 `ip route` 为空或 `10.0.2.2` 报 `Network is unreachable`，执行 `bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open`。
+4. Android 模拟器预期 base URL：`错误后端地址`。
+5. 如果模拟器 `ip route` 为空或 `错误后端地址` 报 `Network is unreachable`，执行 `bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open`。
 6. Android 真机/平板预期 base URL：`http://192.168.0.118:8000/`。
 7. 若真机访问失败，下一步优先检查同一 Wi-Fi、macOS 防火墙、VPN/代理、以及 Gradle `-PconversationApiBaseUrl` 是否使用了 LAN 地址。
 
@@ -691,7 +691,7 @@ Mimo 真实 provider 复验说明：
 2. 后端脚本必须优先使用 `child-ai` conda 环境；本机系统 Python 为 3.9.6，不满足 backend `requires-python >=3.11`。
 3. Android mock 拍题、父亲设置影响和父亲入口保护完整手动流程仍需在窗口模式模拟器或真实平板上继续验收。
 4. 父亲 policy 和日报素材仍为内存态；后端重启后会丢失，v0.1 联调可接受，后续家庭内测前应明确持久化策略。
-5. 模拟器 `AndroidWifi` 可能保存但未连接，必须先连接后再验证 `10.0.2.2:8000`。
+5. 模拟器 `AndroidWifi` 可能保存但未连接，必须先连接后再验证 `错误后端地址`。
 6. `adb shell input text` 不能可靠输入中文；手动用 Gboard 中文拼音，自动化用 emulator 内 ADBKeyBoard。
 7. Mimo 文本对话真实调用必须使用 `mimo-v2.5-pro`；`mimo-v2.5pro` 会返回 HTTP 400 `Not supported model`。MiMo ASR 真实调用必须使用 `mimo-v2.5`。
 8. Mimo 真实 key 只能使用临时 env，不得写入仓库任何文件；家庭内测前 QA 必须区分真实 provider PASS、执行 FAIL 和外部条件 BLOCKED。

@@ -744,6 +744,18 @@ Affected modules: PromptManager image context section、ChildAgentRuntime output
 Implementation notes: Prompt 明确“已获得后端图片理解结果”；ChildAgentRuntime 对有图片上下文的拒看回复做安全兜底修复；TextSegmenter 按 preferred max 拆长句，减少单段 TTS 超时；Android stream `error(stage=tts)` 只提示文字错误，不把失败段交给系统 TTS 读；OpeningService 不再同步调用 TTS。
 Tests or QA needed: 后端回归覆盖图片拒看修复、拍照意图引导、长句分段和 opening 不调用 TTS；Android 回归覆盖 stream TTS error 不触发系统 TTS。Redmi K60 / Honor Pad 5 需复测 opening 速度、图片续聊和音色一致性。
 
+#### PD-054
+
+Decision ID: PD-054
+Date: 2026-05-24
+Status: confirmed
+Source: father / device QA packaging correction
+Decision: 当前阶段不再维护模拟器包作为默认测试产物；Android 默认构建和交付 APK 必须使用 Mac LAN base URL，面向 Redmi K60 / Honor Pad 5 真机测试。非真机路径不得作为父亲验收包，也不得再用来解释或替代真实设备 QA。
+Rationale: 真机测试中 opening 无响应的直接原因是 APK 使用了非真机可达的后端地址，导致请求没有到达当前后端。当前产品重点已经是真实 ASR、真实拍照、真实后端和真实 provider 路径，继续保留默认非真机包会制造混淆。
+Affected modules: Android Gradle default base URL、device APK build/install scripts、README、QA docs、shared context。
+Implementation notes: `android/app/build.gradle.kts` 默认 `CONVERSATION_API_BASE_URL` 改为当前 Mac LAN 地址；删除本机模拟器启动脚本；安装脚本改为真机构建脚本；文档清除旧地址和默认模拟器包路径。
+Tests or QA needed: 每次交付 APK 前运行真机构建脚本并记录 base URL、APK size 和 sha256；Redmi K60 / Honor Pad 5 真机 QA 仍需执行。
+
 #### PD-051
 
 Decision ID: PD-051

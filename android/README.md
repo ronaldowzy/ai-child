@@ -167,21 +167,19 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 
 当前 animation_v1 runtime assets 约 4.9MB，采用 512px WebP sequence；静态 drawable fallback 约 1.5MB，也已压缩为 WebP。验收全量包只作为美术源包、QA 留档和重新导出母包，不应整体放入 App。Redmi K60 作为功能主验证设备，Honor Pad 5 Android 9 / 4GB 作为低配性能和降级验证设备。
 
-最新 family smoke debug APK：
+最新真机 debug APK：
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-构建时间 UTC：2026-05-22T04:00:54Z
-大小：16047291 bytes / 15M
-SHA256：7468ac8c605bb92f5244e38a39d022b1bb388d79d142bbd3444eb95b620f3e10
-base URL：http://10.0.2.2:8000/
+base URL：http://192.168.0.118:8000/
+大小：16471142 bytes
+SHA256：81bf25c27316261d5b3e0e749ea55cfb80a970c04641d880c477e37431e8e9ce
 ```
 
-这个 APK 使用默认模拟器 base URL。交给 Redmi K60 / Honor Pad 5 前必须用
-Mac LAN IP 重新构建并重新记录 sha256：
+交给 Redmi K60 / Honor Pad 5 前必须使用 Mac LAN IP 构建并重新记录 sha256：
 
 ```bash
-bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://<mac-lan-ip>:8000/
+bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
 shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -310,10 +308,10 @@ base URL：http://192.168.0.118:8000/
 
 ## 后端配置
 
-默认开发 base URL 是 Android Emulator 访问宿主机的地址：
+默认开发 base URL 是当前 Mac LAN 地址，用于 Redmi K60 / Honor Pad 5 真机测试：
 
 ```text
-http://10.0.2.2:8000/
+http://192.168.0.118:8000/
 ```
 
 如需改成真机或其他地址，可以在 Gradle 命令中传入：
@@ -322,7 +320,7 @@ http://10.0.2.2:8000/
 bash scripts/android_gradle.sh assembleDebug -PconversationApiBaseUrl=http://192.168.1.10:8000/
 ```
 
-推荐使用真机打包脚本，它会禁止 `10.0.2.2` 并输出 APK metadata：
+推荐使用真机打包脚本，它会输出 APK metadata：
 
 ```bash
 bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/
@@ -335,7 +333,7 @@ curl --noproxy '*' http://127.0.0.1:8000/api/v1/health
 curl --noproxy '*' http://192.168.1.10:8000/api/v1/health
 ```
 
-模拟器继续使用默认 `http://10.0.2.2:8000/`；真机或平板必须使用 Mac mini 的局域网 IP，并确保设备和 Mac 在同一网络。
+真机或平板必须使用 Mac mini 的局域网 IP，并确保设备和 Mac 在同一网络。
 
 交付真机 APK 前必须复核：
 
@@ -346,7 +344,7 @@ shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
 curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health
 ```
 
-如果 `BuildConfig.CONVERSATION_API_BASE_URL` 仍是 `http://10.0.2.2:8000/`，该 APK 只能用于模拟器，不能交给 Redmi K60 / Honor Pad 5 做真机 QA。
+如果 `BuildConfig.CONVERSATION_API_BASE_URL` 不是当前 Mac LAN 地址，该 APK 不能交给 Redmi K60 / Honor Pad 5 做真机 QA。
 
 本地开发使用 HTTP 明文访问后端；不要在 Android 端写入任何模型 API key 或真实 secret。
 
@@ -366,7 +364,7 @@ bash scripts/smoke_voice_stack.sh
 
 ```text
 1. 后端用 `--host 0.0.0.0` 启动，设备可访问 `http://<mac-lan-ip>:8000/api/v1/health`。
-2. APK 使用真机 LAN base URL 构建，不使用默认 `http://10.0.2.2:8000/`。
+2. APK 使用真机 LAN base URL 构建。
 3. MiMo key 只放后端环境变量，不放 Android、docs、tests 或截图。
 4. ASR 真实 provider smoke 只用非儿童测试音频和 opt-in policy env；真机儿童语音 QA 不等于 provider smoke。
 5. 详细 Redmi K60 / Honor Pad 5 手动步骤见 `docs/QA_DEVICE_CHECKLIST_V0_1.md`。
@@ -425,63 +423,6 @@ bash -lc 'source scripts/android_env.sh && cd android && ./gradlew test assemble
 
 ```bash
 bash scripts/doctor_local_env.sh
-```
-
-## 本机模拟器
-
-本机已按项目共享上下文准备 tablet AVD：
-
-```text
-child_ai_tablet_api35
-```
-
-启动窗口模式模拟器：
-
-```bash
-bash scripts/start_android_emulator.sh
-```
-
-启动无窗口模式用于命令行 smoke test：
-
-```bash
-bash scripts/start_android_emulator.sh --headless
-```
-
-构建、安装并打开 debug 包：
-
-```bash
-bash scripts/install_android_debug.sh
-```
-
-模拟器访问宿主机后端使用默认 `http://10.0.2.2:8000/`。启动后端：
-
-```bash
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
-```
-
-如果模拟器里 App 提示无法连接后端，先确认模拟器网络和宿主机 health：
-
-```bash
-bash scripts/android_env.sh adb shell cmd wifi connect-network AndroidWifi open
-bash scripts/android_env.sh adb shell 'curl -fsS http://10.0.2.2:8000/api/v1/health'
-```
-
-窗口模式手动输入中文时，可切到系统 Gboard 中文拼音：
-
-```bash
-bash scripts/android_env.sh adb shell settings put secure selected_input_method_subtype 617035939
-bash scripts/android_env.sh adb shell ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
-```
-
-自动化 UI QA 需要直接注入中文时，本机 emulator 可临时使用 ADBKeyBoard 调试输入法；它只安装到模拟器，不属于产品 APK：
-
-```bash
-curl -fL -o /tmp/child-ai-qa/adbkeyboard.apk \
-  https://github.com/senzhk/ADBKeyBoard/releases/download/v2.5-dev/keyboardservice-debug.apk
-bash scripts/android_env.sh adb install -r /tmp/child-ai-qa/adbkeyboard.apk
-bash scripts/android_env.sh adb shell ime enable com.android.adbkeyboard/.AdbIME
-bash scripts/android_env.sh adb shell ime set com.android.adbkeyboard/.AdbIME
-bash scripts/android_env.sh adb shell am broadcast -a ADB_INPUT_TEXT --es msg '我有一道题不会'
 ```
 
 ## 手动联调

@@ -79,21 +79,10 @@ if command -v adb >/dev/null 2>&1; then
   if [[ -n "${DEVICE_LINES}" ]]; then
     status_line "adb devices" "OK" "$(echo "${DEVICE_LINES}" | tr '\n' '; ')"
   else
-    status_line "adb devices" "WARN" "no connected Android device or emulator"
+    status_line "adb devices" "WARN" "no connected physical Android device"
   fi
 else
   status_line "adb" "FAIL" "not found after loading scripts/android_env.sh"
-fi
-
-if [[ -x "${ANDROID_HOME:-}/emulator/emulator" ]]; then
-  AVD_LIST="$("${ANDROID_HOME}/emulator/emulator" -list-avds 2>/dev/null || true)"
-  if [[ -n "${AVD_LIST}" ]]; then
-    status_line "Android AVD" "OK" "$(echo "${AVD_LIST}" | tr '\n' ' ')"
-  else
-    status_line "Android AVD" "WARN" "emulator exists, but no AVD is configured"
-  fi
-else
-  status_line "Android emulator" "WARN" "emulator binary not installed"
 fi
 
 DEFAULT_IFACE="$(route get default 2>/dev/null | awk '/interface:/ {print $2; exit}')"

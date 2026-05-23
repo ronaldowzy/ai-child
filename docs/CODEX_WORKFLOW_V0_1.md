@@ -136,7 +136,7 @@ Codex 不应该擅自：
 必须逐项核对：
 
 ```text
-1. APK base URL 是否指向当前可访问后端。真机 APK 不得使用模拟器专用 `10.0.2.2`，必须使用 Mac 局域网地址并用 BuildConfig 或 APK 产物复核。
+1. APK base URL 是否指向当前可访问后端。真机 APK 必须使用 Mac 局域网地址并用 BuildConfig 或 APK 产物复核。
 2. 后端实际运行进程是否加载了本轮代码和目标 env。不能只看源码默认值或旧进程。
 3. provider 状态是否匹配测试目标：
    - 测真实 MiMo ASR 时，`CHILD_AI_ASR_PROVIDER=mimo`、MiMo ASR enabled、effective MiMo key、child-audio authorization、retention policy、no-training flags 必须全部满足；effective key 顺序是 `CHILD_AI_MIMO_ASR_API_KEY`、`CHILD_AI_MIMO_API_KEY`、`CHILD_AI_MIMO_TTS_API_KEY`。
@@ -979,7 +979,7 @@ A1-13 添加基本 UI 测试或手动 QA 脚本。
 ### 15.4 验收
 
 ```text
-1. 平板或模拟器能打开 ChildChatScreen。
+1. 真机平板能打开 ChildChatScreen。
 2. 输入“我回来了”能看到低压力回复。
 3. 输入“我有一道题不会”能出现“拍题目 / 读题目” action。
 4. 点击“拍题目”能 mock 上传并进入题目引导。
@@ -1231,7 +1231,7 @@ Compose UI tests：
 - ParentSettingsScreen 保存按钮
 
 Manual QA：
-- 模拟器或平板端到端流程
+- 真机平板端到端流程
 ```
 
 ### 20.3 每个 PR 最低测试要求

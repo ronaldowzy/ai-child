@@ -56,9 +56,9 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
 
     assert generated_path == report_path
     assert len(scenarios) >= 15
-    assert len(traces) >= 14
+    assert len(traces) >= 1
     assert any(trace.task_type == "child_chat" for trace in traces)
-    assert any(trace.task_type == "parent_report" for trace in traces)
+    assert not any(trace.task_type == "parent_report" for trace in traces)
     assert all(trace.provider_name == "mock" for trace in traces)
     assert repository.list_recent(limit=500)
 
@@ -67,6 +67,9 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
     assert "运动夸张表达" in report
     assert "父亲日报" in report
     assert "mock responses do not represent real MiMo quality" in report
+    assert "deterministic_default/no_model_trace" in report
+    assert "opening deterministic default used: yes" in report
+    assert "parent_report deterministic default used: yes" in report
     assert "Trace count" in report
 
 
@@ -228,6 +231,62 @@ def test_real_provider_report_flags_empty_opening_raw_response() -> None:
     assert "final_child_facing_text chars:" in report
     assert "P1: real provider empty raw response" in report
     assert "fallback covered the child-facing text" in report
+
+
+def test_real_provider_report_treats_opening_and_report_no_trace_as_deterministic() -> None:
+    runner = _import_runner_module()
+    opening = runner.ScenarioResult(
+        scenario_id="opening-interest-callback",
+        title="interest callback: low seed 跑步比赛",
+        category="opening",
+        child_id="trace_opening_interest",
+        session_id="opening-interest-callback-session",
+        response_text="豆豆，我记得你提过跑步比赛。今天想聊它，还是换个轻松的？",
+    )
+    parent_report = runner.ScenarioResult(
+        scenario_id="parent-report-relationship-summary",
+        title="父亲日报：interest_seed / proud_moment / topic_boundary",
+        category="parent_report",
+        child_id="trace_parent_report_relationship",
+        session_id=None,
+        response_text="今天孩子围绕跑步比赛表达了兴趣。",
+    )
+    child_chat = runner.ScenarioResult(
+        scenario_id="child-chat-topic-change",
+        title="换话题",
+        category="child_chat",
+        child_id="trace_chat_topic_change",
+        session_id="child-chat-topic-change-session",
+        response_text="好呀，我们换一个轻松的。",
+    )
+    trace = SimpleNamespace(
+        child_id="trace_chat_topic_change",
+        session_id="child-chat-topic-change-session",
+        task_type="child_chat",
+        provider_name="mimo",
+        model_name="mimo-v2.5-pro",
+        fallback_used=False,
+        policy_blocked=False,
+        error_type=None,
+        response_text="好呀，我们换一个轻松的。",
+        request_messages_json=[{"role": "system", "content": "## turn_guidance\n输出契约"}],
+        request_input_text="",
+        request_context_json={},
+        request_metadata_json={},
+    )
+
+    report = runner.build_report(
+        scenarios=[opening, parent_report, child_chat],
+        traces=[trace],
+        provider_mode="mimo",
+    )
+
+    assert "deterministic_default/no_model_trace" in report
+    assert "opening deterministic default used: yes" in report
+    assert "parent_report deterministic default used: yes" in report
+    assert "P0: scenario did not produce a trace" not in report
+    assert "real provider empty raw response in opening-interest-callback" not in report
+    assert "child_chat/provider=mimo/model=mimo-v2.5-pro" in report
 
 
 def test_real_provider_report_uses_final_child_facing_text_for_quality_issues() -> None:

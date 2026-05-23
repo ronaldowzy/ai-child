@@ -54,9 +54,10 @@ The current backend is intentionally local-first and mock-first:
   short child-facing greeting, with optional `reply.audio_url`. When a recent
   low-sensitivity relationship `interest_seed` exists, opening may lightly
   revisit one topic and still gives the child a clear choice to switch away.
-  E2-A routes this through `OpeningPolicyBuilder`, so fallback text and model
-  prompt share the same `opening_mode`, boundary cooldown, bedtime closure,
-  age-band length, parent-goal translation, and forbidden-phrase rules.
+  E2-A routes this through `OpeningPolicyBuilder`; MVP-CLOSEOUT-1 makes the
+  deterministic policy template the default child-facing path. Model-generated
+  opening remains available only as a dev/test experiment helper, not the
+  family MVP default.
 - Parent policy supports `child_nickname` and `child_display_name`; Android
   father settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.
@@ -418,7 +419,9 @@ Data boundary:
 - `parent_reports` stores parent-facing daily summary text, observations,
   structured safety alerts, and suggested parent actions. It must not store
   memory evidence, quote summaries, raw chat transcripts, prompts, debug
-  internals, provider raw responses, or API keys.
+  internals, provider raw responses, or API keys. Family MVP report generation
+  is deterministic by default and does not call `ModelRegistry.generate()`; the
+  model report path is retained only for dev/test experiments.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
 - `model_debug_traces` is a dev/test opt-in temporary table for prompt analysis.
@@ -477,10 +480,12 @@ Run the repeatable synthetic prompt review:
 
 The scenario runner forces mock providers for its own process, clears prior
 trace rows, runs opening / child_chat / parent_report synthetic cases, verifies
-that `model_debug_traces` contains rows, and writes
-`docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. The report is useful for prompt
-contract review, but it is not real MiMo output, real child QA, or Android
-device validation.
+that child_chat model traces are recorded, and writes
+`docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`. Opening and parent_report use their
+deterministic default paths in the runner and are marked `deterministic_default`
+instead of being treated as missing model traces. The report is useful for
+prompt contract review, but it is not real MiMo output, real child QA, or
+Android device validation.
 
 Run the explicit real MiMo synthetic text-only review:
 
@@ -493,18 +498,19 @@ CHILD_AI_MIMO_API_KEY=... \
 ```
 
 Real-provider mode is opt-in only. It applies a process-local MiMo overlay for
-`mimo_child_chat` / `mimo_parent_report`, never writes `.env`, and does not use
-real child audio/images, Android, CameraX, ASR, TTS, or vision. If the MiMo key
-is missing the runner exits with `REAL_PROVIDER_BLOCKED` and does not report a
-mock pass as real provider evidence. The current real synthetic review reached
+child_chat, never writes `.env`, and does not use real child audio/images,
+Android, CameraX, ASR, TTS, or vision. If the MiMo key is missing the runner
+exits with `REAL_PROVIDER_BLOCKED` and does not report a mock pass as real
+provider evidence. The current real synthetic review reached
 `REAL_PROVIDER_SMOKE: PASS` for provider/model `mimo/mimo-v2.5-pro`; the report
-is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`. PROMPT-REAL-HARDEN-1 now
-keeps child-facing self-harm replies on a deterministic trusted-adult fallback,
+is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`. PROMPT-REAL-HARDEN-1 keeps
+child-facing self-harm replies on a deterministic trusted-adult fallback,
 strips stage directions, suppresses multi-question replies, removes bedtime
-"tomorrow" hooks, and avoids verbatim topic-change echo. The latest report keeps
-provider raw-output quality separate from child-facing safety: P0/P2 are none,
-while remaining P1 items are opening/parent_report raw empty responses covered
-by explicit fallback/retry.
+"tomorrow" hooks, and avoids verbatim topic-change echo. MVP-CLOSEOUT-1 moves
+opening and parent_report to deterministic default paths, so the latest report
+uses child_chat traces as provider quality evidence and no longer treats
+opening/report raw empty responses as family MVP blockers; P0/P1/P2 are none in
+the synthetic checks.
 
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed

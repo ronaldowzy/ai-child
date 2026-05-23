@@ -4,8 +4,10 @@
 
 E2-A covers the backend Opening Policy Foundation and minimal runtime wiring.
 It converts relationship memory, time context, parent policy, and healthy-use
-rules into a structured `OpeningPolicy` used by both fallback text and model
-prompt composition.
+rules into a structured `OpeningPolicy`. MVP-CLOSEOUT-1 makes this policy the
+default deterministic opening path: child-facing opening text is produced by
+policy templates, while model-generated opening is retained only for dev/test
+experiments and trace observation.
 
 ## 2. Non-goals
 
@@ -15,6 +17,7 @@ prompt composition.
 - No CameraX.
 - No DB schema or Alembic migration.
 - No full Opening v2 productization or device QA claim.
+- No model-generated opening as the family MVP default path.
 
 ## 3. Priority
 
@@ -126,7 +129,8 @@ Opening policy carries a unified forbidden list, including:
 我们继续上次那个，不要换
 ```
 
-Fallback opening rejects these phrases; model prompt explicitly forbids them.
+Deterministic opening rejects these phrases; the experimental model prompt also
+explicitly forbids them when dev/test runs choose to call it.
 
 ## 11. Templates
 
@@ -138,6 +142,14 @@ Fallback opening rejects these phrases; model prompt explicitly forbids them.
 - Parent bridge: `{name}这句话也可以告诉爸爸妈妈。小白狐先听你说一点点。`
 
 `{name}` is empty when no child nickname/display name exists.
+
+Runtime default:
+
+- `OpeningService.create_opening()` uses these deterministic templates by default.
+- The deterministic path keeps TTS/audioUrl and same-session cache behavior.
+- `ModelRegistry.generate()` is not called for child-facing opening by default.
+- Model-generated opening remains an explicit dev/test experiment path only and
+  should not be treated as family MVP readiness evidence.
 
 ## 12. Test Matrix
 
@@ -151,7 +163,7 @@ Covered by backend tests:
 - learning goal low-pressure translation;
 - age 5-6 and 9-10 limits;
 - memory read failure fallback;
-- OpeningService fallback and model prompt contract;
+- OpeningService deterministic default and experimental model prompt contract;
 - TTS failure and same-session cache regressions.
 
 ## 13. E2-B Plan

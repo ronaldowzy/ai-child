@@ -69,11 +69,12 @@ deprecated：已废弃，不再作为实现依据。
 | PD-040 | confirmed | 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory 生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。 | ParentReportService、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen |
 | PD-047 | confirmed | 当前本地测试阶段允许通过 opt-in 临时表 `model_debug_traces` 记录完整模型 prompt 和回复，用于 prompt/体验分析；默认关闭，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
 | PD-048 | confirmed | ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。默认仍为 mock，MiMo fallback 仍需父亲授权和 ASR data policy flags。 | backend ASR provider、AsrService fallback、ASR docs、QA |
+| PD-049 | confirmed | 家庭 MVP 前 opening greeting 和父亲日报默认走 deterministic policy/template/report 主路径；模型生成只保留为 dev/test 实验观察，不作为儿童端或父亲日报主路径。 | OpeningService、ParentReportService、trace runner、QA |
 
 新增执行依据：
 
 ```text
-PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正。
+PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/父母寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正；PD-049 是家庭 MVP 前 opening/parent report 的默认生成路径。
 不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
 ```
 
@@ -673,7 +674,7 @@ Source: E2-A Opening Greeting v2 policy foundation
 Decision: Opening Greeting v2 使用后端 policy engine，而不是只靠 prompt 或“有 seed 就回访”。Opening 必须是轻邀请、可退出、尊重边界、睡前收束，并把父亲目标转译为低压力提示。
 Rationale: Healthy Engagement 要让小白狐像温柔的门口，而不是钩子。孩子可以说、可以不说、可以换话题，也可以去找爸爸妈妈；opening 不应制造留存压力、排他关系或睡前兴奋。
 Affected modules: OpeningPolicyBuilder、OpeningService、relationship memory helpers、opening tests、backend docs。
-Implementation notes: `OpeningPolicyBuilder` 输出 `OpeningPolicy`，包含 `opening_mode`、age band、max chars、interest recall allowed/reason、topic boundary cooldown、bedtime defer、parent bridge、parent goal hint、forbidden phrases 和 prompt rules。`OpeningService` fallback text 和 model prompt 共用同一 policy；memory read failure 不阻塞 opening；同 session cache 与 TTS fallback 保持不变。本轮不改 Android、不改 DB schema、不做 push notification、不做 Growing Nest 或 CameraX。
+Implementation notes: `OpeningPolicyBuilder` 输出 `OpeningPolicy`，包含 `opening_mode`、age band、max chars、interest recall allowed/reason、topic boundary cooldown、bedtime defer、parent bridge、parent goal hint、forbidden phrases 和 prompt rules。MVP-CLOSEOUT-1 后 `OpeningService` 默认使用 deterministic policy template；model prompt 仍共用同一 policy，但只作为 dev/test 实验路径。memory read failure 不阻塞 opening；同 session cache 与 TTS fallback 保持不变。本轮不改 Android、不改 DB schema、不做 push notification、不做 Growing Nest 或 CameraX。
 Docs updated: `docs/OPENING_GREETING_V2_POLICY_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`docs/HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 后端测试覆盖 interest callback、default light、boundary respect、bedtime closure/defer、no-school policy、father learning goal translation、age limits、memory failure fallback、model prompt contract、TTS failure 和 session cache；Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
 
@@ -702,6 +703,19 @@ Affected modules: backend ASR provider、AsrService fallback、AsrDataPolicyGuar
 Implementation notes: 新增 `local_sensevoice` provider，依赖 `sherpa-onnx` + `numpy`，模型文件放在 `backend/models/asr/sensevoice/` 且不提交 git。`CHILD_AI_ASR_PROVIDER=local_sensevoice` 且 `CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true` 时启用本地识别；`CHILD_AI_ASR_FALLBACK_PROVIDER=mimo` 时本地异常后进入 MiMo fallback，但 MiMo 仍必须满足父亲授权、API key、child audio allowed、retention checked 和 no-training confirmed。原始音频不入库、不进日志、不进长期 memory。
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md`、`docs/ASR_INPUT_RESEARCH_V0_1.md`、`docs/VOICE_INTERACTION_DESIGN_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 后端测试覆盖 provider 选择、本地 policy allow、本地异常 fallback 和旧 MiMo/mock 路径；真机 QA 需记录 SenseVoice 对儿童中文、噪声、远场平板麦克风的准确率和 tap-to-transcript 延迟。
+
+#### PD-049
+
+Decision ID: PD-049
+Date: 2026-05-23
+Status: confirmed
+Source: MVP-CLOSEOUT-1 / real MiMo trace quality closeout
+Decision: 家庭 MVP 前 `opening greeting` 和父亲日报默认走 deterministic policy/template/report 主路径；model-generated opening/report 只保留为 dev/test 实验观察，不作为儿童端或父亲日报默认路径。
+Rationale: DEV-TRACE-3 与 PROMPT-REAL-HARDEN-1 的真实 MiMo synthetic trace 显示 `child_chat` 质量可通过 prompt/output safety 加固继续观察，但 opening 和 parent_report 的 provider raw response 多次为空。fallback 能保护用户体验，但不应把不稳定 provider 输出作为家庭内测前强依赖。
+Affected modules: OpeningService、OpeningPolicyBuilder、ParentReportService、model trace scenario runner、backend docs、opening/report tests。
+Implementation notes: `OpeningService.create_opening()` 默认使用 `OpeningPolicyBuilder` + deterministic templates，保留 TTS 和 session cache，不再默认调用 `ModelRegistry.generate()`。`ParentReportService.generate_daily_report()` / `get_daily_report()` 默认使用 deterministic report builder，保留 relationship memory starter + avoid 和 safety parent-attention 建议，不输出 prompt/debug/provider。`run_model_trace_scenarios.py --provider mimo` 现在把 opening/report 标为 deterministic default，child_chat traces 才作为 real provider output-quality evidence。
+Docs updated: `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`、`docs/OPENING_GREETING_V2_POLICY_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 后端测试覆盖 opening/report 默认不调用 model、deterministic templates/report、trace runner 不把 deterministic no-trace 标为 P1；Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
 
 ---
 

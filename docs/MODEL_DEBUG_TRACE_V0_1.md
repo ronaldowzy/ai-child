@@ -152,7 +152,9 @@ The runner:
 - Forces mock providers and trace enablement for its own process.
 - Clears `model_debug_traces` before execution.
 - Runs synthetic opening, child_chat, and parent_report scenarios.
-- Verifies traces were actually written.
+- Verifies child_chat model traces were actually written.
+- Marks opening and parent_report as `deterministic_default` because the family
+  MVP no longer calls the model for those default paths.
 - Writes `docs/MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`.
 
 The generated review is for prompt and contract analysis only. It is not real
@@ -173,8 +175,9 @@ The real-provider mode:
 - Is never the default.
 - Loads local `.env` values into the runner process only and does not print
   secrets.
-- Applies a temporary process env overlay for `mimo_child_chat` and
-  `mimo_parent_report`.
+- Applies a temporary process env overlay for child_chat real-provider calls.
+- Keeps opening and parent_report on deterministic defaults; they are not real
+  provider quality evidence in this runner.
 - Runs synthetic text scenarios only; it does not use real child audio, images,
   photos, Android, CameraX, ASR, TTS, or vision.
 - Writes `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`.
@@ -182,10 +185,10 @@ The real-provider mode:
   available instead of falling back to mock and calling it pass.
 
 The current 2026-05-23 real MiMo synthetic run reached
-`REAL_PROVIDER_SMOKE: PASS` with provider/model `mimo/mimo-v2.5-pro`; the review
-still found prompt-quality issues that need later hardening, including empty raw
-responses covered by runtime fallback, adult-clinical self-harm wording, and
-multi-question replies in some child_chat scenarios.
+`REAL_PROVIDER_SMOKE: PASS` with provider/model `mimo/mimo-v2.5-pro`. After
+PROMPT-REAL-HARDEN-1 and MVP-CLOSEOUT-1, the runner uses child_chat traces as
+real-provider quality evidence and reports opening/parent_report deterministic
+defaults separately; the latest synthetic checks show P0/P1/P2 as none.
 
 ## 9. Compliance Boundary
 

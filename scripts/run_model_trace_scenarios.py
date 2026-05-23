@@ -366,8 +366,6 @@ def run_trace_scenarios(
         raise RuntimeError("No model_debug_traces were recorded.")
     if not any(trace.task_type == "child_chat" for trace in traces):
         raise RuntimeError("No child_chat traces were recorded.")
-    if not any(trace.task_type == "parent_report" for trace in traces):
-        raise RuntimeError("No parent_report traces were recorded.")
 
     report = build_report(
         scenarios=scenarios,
@@ -791,10 +789,13 @@ def build_report(
     )
     provider_note = (
         "Synthetic real-provider trace review. This is not real child QA, not "
-        "Android device validation, and not a production data policy."
+        "Android device validation, and not a production data policy. Opening "
+        "and parent_report use deterministic default paths; child_chat traces "
+        "are the provider quality evidence."
         if provider_mode == PROVIDER_MIMO
         else "Synthetic trace review for local prompt analysis. This is not real "
-        "child QA, not real MiMo output, and not Android device validation."
+        "child QA, not real MiMo output, and not Android device validation. "
+        "Opening and parent_report use deterministic default paths."
     )
     provider_models = sorted(
         {
@@ -820,6 +821,9 @@ def build_report(
         + (f" ({status_reason})" if status_reason else ""),
         f"- Provider/model names: `{', '.join(provider_models) or 'none'}`",
         "- Trace source: local opt-in `model_debug_traces`.",
+        "- Opening default path: `deterministic_policy_template`.",
+        "- ParentReport default path: `deterministic_report_builder`.",
+        "- Provider quality evidence: `child_chat` traces only.",
         f"- Scenario count: `{len(scenarios)}`",
         f"- Trace count: `{len(traces)}`",
         "- Data boundary: synthetic text only; no real child audio/image/data.",
@@ -977,6 +981,23 @@ def _review_scenario(
     traces: list[Any],
     provider_mode: str,
 ) -> TraceReview:
+    if _uses_deterministic_default(scenario=scenario, traces=traces):
+        issues = list(
+            _response_issues(
+                scenario,
+                "",
+                traces=traces,
+                provider_mode=provider_mode,
+            )
+        )
+        return TraceReview(
+            scenario=scenario,
+            trace_count=0,
+            task_summaries=("deterministic_default/no_model_trace",),
+            checks=_deterministic_default_checks(scenario),
+            issues=tuple(issues),
+        )
+
     task_summaries = tuple(_trace_summary(trace) for trace in traces) or ("none",)
     full_prompt = "\n".join(_trace_messages_text(trace) for trace in traces)
     response_text = "\n".join(str(trace.response_text or "") for trace in traces)
@@ -1003,6 +1024,35 @@ def _review_scenario(
         task_summaries=task_summaries,
         checks=tuple(checks),
         issues=tuple(issues),
+    )
+
+
+def _uses_deterministic_default(
+    *,
+    scenario: ScenarioResult,
+    traces: list[Any],
+) -> bool:
+    return scenario.category in {"opening", "parent_report"} and not traces
+
+
+def _deterministic_default_checks(scenario: ScenarioResult) -> tuple[str, ...]:
+    child_facing_text = scenario.response_text or ""
+    return (
+        "Trace count: 0",
+        "Model path: deterministic_default",
+        "Model trace expected: no",
+        "provider_raw_empty: no",
+        "child_facing_fallback_used: no",
+        f"final_child_facing_text chars: {len(child_facing_text)}",
+        "Response forbidden phrase check: "
+        + ("pass" if not _contains_forbidden(child_facing_text) else "fail"),
+        "Raw media/secret check: "
+        + (
+            "pass"
+            if not _contains_secret_or_raw_media(child_facing_text)
+            else "fail"
+        ),
+        f"{scenario.category} deterministic default used: yes",
     )
 
 
@@ -1035,17 +1085,20 @@ def _provider_smoke_status(
 ) -> tuple[str, str | None]:
     if provider_mode == PROVIDER_MOCK:
         return "PASS", "mock synthetic review"
-    if not traces:
-        return "FAIL", "no traces were recorded"
-    if any(trace.policy_blocked for trace in traces):
+    provider_traces = [trace for trace in traces if trace.task_type == "child_chat"]
+    if not provider_traces:
+        return "FAIL", "no child_chat provider traces were recorded"
+    if any(trace.policy_blocked for trace in provider_traces):
         return "BLOCKED", "policy_blocked trace present"
-    if any(trace.error_type for trace in traces):
-        error_types = sorted({str(trace.error_type) for trace in traces if trace.error_type})
+    if any(trace.error_type for trace in provider_traces):
+        error_types = sorted(
+            {str(trace.error_type) for trace in provider_traces if trace.error_type}
+        )
         return "FAIL", f"provider/model error: {','.join(error_types)}"
-    if any(trace.fallback_used for trace in traces):
+    if any(trace.fallback_used for trace in provider_traces):
         return "FAIL", "fallback_used trace present"
-    if not all(trace.provider_name == PROVIDER_MIMO for trace in traces):
-        providers = sorted({str(trace.provider_name) for trace in traces})
+    if not all(trace.provider_name == PROVIDER_MIMO for trace in provider_traces):
+        providers = sorted({str(trace.provider_name) for trace in provider_traces})
         return "FAIL", f"non-mimo provider trace present: {','.join(providers)}"
     return "PASS", None
 

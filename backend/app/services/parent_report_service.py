@@ -175,15 +175,7 @@ class ParentReportService:
             suggested_parent_actions=actions,
             created_at=self._now(),
         )
-        model_report = self._model_daily_report(
-            child_id=child_id,
-            target_date=target_date,
-            memories=memories,
-            conversation_messages=conversation_messages,
-            conversation=conversation,
-            fallback_report=fallback_report,
-        )
-        return model_report or fallback_report
+        return fallback_report
 
     def _model_daily_report(
         self,

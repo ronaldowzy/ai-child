@@ -6,7 +6,6 @@ from app.domain.memory import (
     MemorySensitivity,
     MemoryType,
 )
-from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.repositories.conversation_persistence_repository import ConversationReportMessage
 from app.repositories.parent_report_repository import (
@@ -69,22 +68,6 @@ class FakeConversationRepository:
             for message in self.messages
             if message.created_at.date() == report_date
         ]
-
-
-class FakeParentReportModelRegistry:
-    def __init__(self, output: dict[str, object] | None = None) -> None:
-        self.output = output
-        self.requests: list[ModelRequest] = []
-
-    def generate(self, request: ModelRequest) -> ModelResponse:
-        self.requests.append(request)
-        return ModelResponse(
-            task_type=ModelTaskType.PARENT_REPORT,
-            response_text="model report",
-            structured_output={"daily_report": self.output or {}},
-            provider_name="fake_model",
-            model_name="fake-parent-report",
-        )
 
 
 def _services() -> tuple[
@@ -261,17 +244,15 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     assert "数学题不会做" not in report_json
 
 
-def test_parent_report_service_prefers_model_summary_from_daily_conversation() -> None:
-    model_registry = FakeParentReportModelRegistry(
-        {
-            "summary": "今天孩子主要通过图片开启交流，表达直接但能持续围绕同一个对象追问。",
-            "learning_observations": ["出现题目线索，但更需要先确认孩子是在分享还是求助。"],
-            "expression_observations": ["孩子用短句和图片表达需求，适合让他先指出最想看的地方。"],
-            "emotion_observations": ["未看到明显强烈情绪，重点是降低追问压力。"],
-            "safety_alerts": [],
-            "suggested_parent_actions": ["今晚先问孩子“这张图你最想让我看哪里”。"],
-        }
-    )
+def test_parent_report_service_default_does_not_call_model_from_daily_conversation() -> None:
+    class NoCallModelRegistry:
+        requests = 0
+
+        def generate(self, _request):
+            self.requests += 1
+            raise AssertionError("parent report default path must not call model")
+
+    model_registry = NoCallModelRegistry()
     memory_service = MemoryService(
         repository=InMemoryMemoryRepository(),
         now_provider=_fixed_now,
@@ -300,52 +281,19 @@ def test_parent_report_service_prefers_model_summary_from_daily_conversation() -
         report_date=date(2026, 5, 18),
     )
 
-    assert model_registry.requests
-    assert "通过图片开启交流" in report.summary
-    assert report.suggested_parent_actions == [
-        "今晚先问孩子“这张图你最想让我看哪里”。"
-    ]
-    payload = model_registry.requests[0].messages[1].content
-    assert isinstance(payload, str)
-    assert "conversation_snippets" in payload
+    assert model_registry.requests == 0
+    assert "会话消息" in report.summary
+    assert any("你最想让我看哪里" in action for action in report.suggested_parent_actions)
     assert "逐字聊天记录" not in report.model_dump_json()
 
 
-def test_parent_report_service_retries_empty_model_response() -> None:
+def test_parent_report_service_default_does_not_retry_empty_model_response() -> None:
     class EmptyThenReportModelRegistry:
-        requests: list[ModelRequest]
+        requests = 0
 
-        def __init__(self) -> None:
-            self.requests = []
-
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            self.requests.append(request)
-            if len(self.requests) == 1:
-                return ModelResponse(
-                    task_type=ModelTaskType.PARENT_REPORT,
-                    response_text="",
-                    structured_output={},
-                    provider_name="fake_model",
-                    model_name="fake-parent-report",
-                )
-            return ModelResponse(
-                task_type=ModelTaskType.PARENT_REPORT,
-                response_text="",
-                structured_output={
-                    "daily_report": {
-                        "summary": "今天孩子用图片和短句开启交流，能围绕对象继续表达。",
-                        "learning_observations": [],
-                        "expression_observations": ["孩子能用短句说明自己想看的地方。"],
-                        "emotion_observations": ["整体情绪平稳。"],
-                        "safety_alerts": [],
-                        "suggested_parent_actions": [
-                            "今晚可以问：你最想让我看图里的哪一处？避免连续追问。"
-                        ],
-                    }
-                },
-                provider_name="fake_model",
-                model_name="fake-parent-report",
-            )
+        def generate(self, _request):
+            self.requests += 1
+            raise AssertionError("parent report default path must not retry model")
 
     model_registry = EmptyThenReportModelRegistry()
     report_service = ParentReportService(
@@ -371,26 +319,19 @@ def test_parent_report_service_retries_empty_model_response() -> None:
         report_date=date(2026, 5, 18),
     )
 
-    assert report.summary == "今天孩子用图片和短句开启交流，能围绕对象继续表达。"
-    assert len(model_registry.requests) == 2
-    assert model_registry.requests[0].metadata["parent_report_retry"] is False
-    assert model_registry.requests[1].metadata["parent_report_retry"] is True
-    assert model_registry.requests[1].messages[1].content.startswith(
-        "上一次输出为空或不可解析。请只返回严格 JSON object"
-    )
+    assert report.summary
+    assert model_registry.requests == 0
 
 
 def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() -> None:
     class EmptyReportModelRegistry:
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            return ModelResponse(
-                task_type=ModelTaskType.PARENT_REPORT,
-                response_text="",
-                structured_output={},
-                provider_name="fake_model",
-                model_name="fake-parent-report",
-            )
+        requests = 0
 
+        def generate(self, _request):
+            self.requests += 1
+            raise AssertionError("parent report default path must not call model")
+
+    model_registry = EmptyReportModelRegistry()
     report_service = ParentReportService(
         memory_service=MemoryService(
             repository=InMemoryMemoryRepository(),
@@ -404,7 +345,7 @@ def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() ->
                 )
             ]
         ),
-        model_registry=EmptyReportModelRegistry(),
+        model_registry=model_registry,
         now_provider=_fixed_now,
     )
 
@@ -415,6 +356,7 @@ def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() ->
 
     assert report.summary
     assert report.suggested_parent_actions
+    assert model_registry.requests == 0
     assert "我今天想聊画画" not in report.model_dump_json()
 
 

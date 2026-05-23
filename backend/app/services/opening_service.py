@@ -77,12 +77,7 @@ class OpeningService:
             parent_policy=parent_policy,
             opening_policy=opening_policy,
         )
-        text = self._generate_model_opening(
-            parent_policy=parent_policy,
-            time_context=time_context,
-            opening_policy=opening_policy,
-            fallback_text=fallback_text,
-        )
+        text = fallback_text
         reply = Reply(
             text=text,
             voice_enabled=True,

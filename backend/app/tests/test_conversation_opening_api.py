@@ -8,7 +8,6 @@ from app.domain.memory import (
     MemorySensitivity,
     MemoryType,
 )
-from app.domain.model_types import ModelRequest, ModelResponse, ModelTaskType
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.domain.schemas.parent_policy import ParentPolicyUpdateRequest
 from app.main import app
@@ -126,80 +125,53 @@ def test_parent_message_can_block_school_checkin() -> None:
     assert "今天在学校怎么样" not in text
 
 
-def test_opening_can_use_model_generated_text() -> None:
-    class FakeOpeningModelRegistry:
-        requests: list[ModelRequest]
-
-        def __init__(self) -> None:
-            self.requests = []
-
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            self.requests.append(request)
-            return ModelResponse(
-                task_type=ModelTaskType.CHILD_CHAT,
-                response_text="豆豆，晚上好，我们轻轻聊一句你想说的小事。",
-                structured_output={"text": "豆豆，晚上好，我们轻轻聊一句你想说的小事。"},
-                provider_name="fake",
-                model_name="fake-opening",
-            )
+def test_opening_default_is_deterministic_and_does_not_call_model() -> None:
+    class NoCallOpeningModelRegistry:
+        def generate(self, _request):
+            raise AssertionError("opening default path must not call model")
 
     child_id = "opening_model_child"
     _update_policy(child_id, child_nickname="豆豆", parent_message_raw="晚上要低刺激。")
-    model_registry = FakeOpeningModelRegistry()
-    service = OpeningService(model_registry=model_registry)
+    service = OpeningService(model_registry=NoCallOpeningModelRegistry())
     request = _request_model(
         child_id=child_id,
         session_id="opening-model-session",
+        device_time="2026-05-21T20:40:00+08:00",
     )
 
     response = service.create_opening(request)
 
-    assert response.reply.text == "豆豆，晚上好，我们轻轻聊一句你想说的小事。"
-    assert model_registry.requests
-    prompt = model_registry.requests[0].messages[0].content
-    assert isinstance(prompt, str)
-    assert "晚上要低刺激" in prompt
-    assert "当前时间段" in prompt
-    assert "opening_mode" in prompt
-    assert "不输出空内容、none、null" in prompt
+    assert response.reply.text.startswith("豆豆，")
+    assert "一小句" in response.reply.text
 
 
 def test_model_opening_prompt_constrains_interest_revisit() -> None:
-    class FakeOpeningModelRegistry:
-        requests: list[ModelRequest]
-
-        def __init__(self) -> None:
-            self.requests = []
-
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            self.requests.append(request)
-            return ModelResponse(
-                task_type=ModelTaskType.CHILD_CHAT,
-                response_text="豆豆，我准备好啦。",
-                structured_output={"text": "豆豆，我准备好啦。"},
-                provider_name="fake",
-                model_name="fake-opening",
-            )
-
     child_id = "opening_prompt_contract_child"
     _update_policy(child_id, child_nickname="豆豆")
-    model_registry = FakeOpeningModelRegistry()
     service = OpeningService(
-        model_registry=model_registry,
         memory_service=_memory_service_with_interest_seed(
             child_id=child_id,
             topic="跑步比赛",
         ),
     )
-
-    service.create_opening(
-        _request_model(
-            child_id=child_id,
-            session_id="opening-prompt-contract-session",
-        )
+    parent_policy = get_parent_policy_service().get_policy(child_id)
+    time_context = service._time_context_service.build_context(
+        device_time=datetime.fromisoformat("2026-05-21T16:30:00+08:00"),
+        timezone="Asia/Shanghai",
+        schedule=parent_policy.schedule,
+    )
+    opening_policy = service._opening_policy_builder.build(
+        child_id=child_id,
+        parent_policy=parent_policy,
+        time_context=time_context,
     )
 
-    prompt = model_registry.requests[0].messages[0].content
+    prompt = service._opening_prompt(
+        parent_policy=parent_policy,
+        time_context=time_context,
+        opening_policy=opening_policy,
+    )
+
     assert isinstance(prompt, str)
     assert "最多只轻轻回访一个低敏 topic" in prompt
     assert "必须给孩子选择权" in prompt
@@ -208,34 +180,17 @@ def test_model_opening_prompt_constrains_interest_revisit() -> None:
     assert "这是我们的小秘密" in prompt
 
 
-def test_opening_empty_model_response_retries_then_returns_text() -> None:
-    class EmptyThenOpeningModelRegistry:
-        requests: list[ModelRequest]
+def test_opening_default_does_not_retry_model_response() -> None:
+    class CountingOpeningModelRegistry:
+        requests = 0
 
-        def __init__(self) -> None:
-            self.requests = []
-
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            self.requests.append(request)
-            if len(self.requests) == 1:
-                return ModelResponse(
-                    task_type=ModelTaskType.CHILD_CHAT,
-                    response_text="",
-                    structured_output={},
-                    provider_name="fake",
-                    model_name="fake-opening",
-                )
-            return ModelResponse(
-                task_type=ModelTaskType.CHILD_CHAT,
-                response_text="豆豆，我在这里。你可以慢慢说一句。",
-                structured_output={"text": "豆豆，我在这里。你可以慢慢说一句。"},
-                provider_name="fake",
-                model_name="fake-opening",
-            )
+        def generate(self, _request):
+            self.requests += 1
+            raise AssertionError("opening default path must not retry model")
 
     child_id = "opening_empty_retry_child"
     _update_policy(child_id, child_nickname="豆豆")
-    model_registry = EmptyThenOpeningModelRegistry()
+    model_registry = CountingOpeningModelRegistry()
     service = OpeningService(model_registry=model_registry)
 
     response = service.create_opening(
@@ -245,23 +200,15 @@ def test_opening_empty_model_response_retries_then_returns_text() -> None:
         )
     )
 
-    assert response.reply.text == "豆豆，我在这里。你可以慢慢说一句。"
-    assert len(model_registry.requests) == 2
-    assert model_registry.requests[0].metadata["opening_retry"] is False
-    assert model_registry.requests[1].metadata["opening_retry"] is True
-    assert model_registry.requests[1].input_text == "请只输出一句中文开场白，不要解释，不要 JSON。"
+    assert response.reply.text
+    assert response.reply.text.startswith("豆豆，")
+    assert model_registry.requests == 0
 
 
-def test_opening_empty_model_response_falls_back_to_nonempty_text() -> None:
+def test_opening_default_returns_nonempty_text_without_model() -> None:
     class EmptyOpeningModelRegistry:
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            return ModelResponse(
-                task_type=ModelTaskType.CHILD_CHAT,
-                response_text="",
-                structured_output={},
-                provider_name="fake",
-                model_name="fake-opening",
-            )
+        def generate(self, _request):
+            raise AssertionError("opening default path must not call model")
 
     child_id = "opening_empty_fallback_child"
     _update_policy(child_id, child_nickname="豆豆")
@@ -279,26 +226,20 @@ def test_opening_empty_model_response_falls_back_to_nonempty_text() -> None:
 
 
 def test_model_opening_prompt_honors_no_school_check_without_school_word() -> None:
-    class FakeOpeningModelRegistry:
-        requests: list[ModelRequest]
-
-        def __init__(self) -> None:
-            self.requests = []
-
-        def generate(self, request: ModelRequest) -> ModelResponse:
-            self.requests.append(request)
-            return ModelResponse(
-                task_type=ModelTaskType.CHILD_CHAT,
-                response_text="豆豆，我在这里。",
-                structured_output={"text": "豆豆，我在这里。"},
-                provider_name="fake",
-                model_name="fake-opening",
-            )
-
     child_id = "opening_prompt_no_school_child"
     _update_policy(child_id, child_nickname="豆豆", parent_message_raw="不要查岗学校。")
-    model_registry = FakeOpeningModelRegistry()
-    service = OpeningService(model_registry=model_registry)
+    service = OpeningService()
+    parent_policy = get_parent_policy_service().get_policy(child_id)
+    time_context = service._time_context_service.build_context(
+        device_time=datetime.fromisoformat("2026-05-21T16:30:00+08:00"),
+        timezone="Asia/Shanghai",
+        schedule=parent_policy.schedule,
+    )
+    opening_policy = service._opening_policy_builder.build(
+        child_id=child_id,
+        parent_policy=parent_policy,
+        time_context=time_context,
+    )
 
     response = service.create_opening(
         _request_model(
@@ -307,7 +248,11 @@ def test_model_opening_prompt_honors_no_school_check_without_school_word() -> No
         )
     )
 
-    prompt = model_registry.requests[0].messages[0].content
+    prompt = service._opening_prompt(
+        parent_policy=parent_policy,
+        time_context=time_context,
+        opening_policy=opening_policy,
+    )
     assert isinstance(prompt, str)
     assert "学校" not in prompt
     assert "学校" not in response.reply.text

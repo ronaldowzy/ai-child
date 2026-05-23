@@ -196,37 +196,14 @@ class ParentReportService:
         fallback_report: ParentReport,
     ) -> ParentReport | None:
         try:
-            response = self._model_registry.generate(
-                ModelRequest(
-                    task_type=ModelTaskType.PARENT_REPORT,
-                    messages=[
-                        ModelMessage(
-                            role="system",
-                            content=self._parent_report_system_prompt(),
-                        ),
-                        ModelMessage(
-                            role="user",
-                            content=json.dumps(
-                                self._parent_report_model_payload(
-                                    target_date=target_date,
-                                    memories=memories,
-                                    conversation_messages=conversation_messages,
-                                    conversation=conversation,
-                                    fallback_report=fallback_report,
-                                ),
-                                ensure_ascii=False,
-                            ),
-                        ),
-                    ],
-                    context={"conversation": {"child_id": child_id}},
-                    metadata={
-                        "report_date": target_date.isoformat(),
-                        "material_counts": {
-                            "memories": len(memories),
-                            "conversation_messages": len(conversation_messages),
-                        },
-                    },
-                )
+            response = self._request_model_report(
+                child_id=child_id,
+                target_date=target_date,
+                memories=memories,
+                conversation_messages=conversation_messages,
+                conversation=conversation,
+                fallback_report=fallback_report,
+                retry=False,
             )
         except Exception as exc:  # noqa: BLE001 - report generation must not block.
             self._log_model_fallback(
@@ -245,6 +222,29 @@ class ParentReportService:
             or response.structured_output.get("text")
             or response.response_text,
         )
+        if parsed is None and not response.metadata.get("mock"):
+            try:
+                retry_response = self._request_model_report(
+                    child_id=child_id,
+                    target_date=target_date,
+                    memories=memories,
+                    conversation_messages=conversation_messages,
+                    conversation=conversation,
+                    fallback_report=fallback_report,
+                    retry=True,
+                )
+            except Exception as exc:  # noqa: BLE001 - report fallback must hold.
+                self._log_model_fallback(
+                    child_id=child_id,
+                    report_date=target_date,
+                    error_type=exc.__class__.__name__,
+                )
+                return None
+            parsed = self._parse_model_report(
+                retry_response.structured_output.get("daily_report")
+                or retry_response.structured_output.get("text")
+                or retry_response.response_text,
+            )
         if parsed is None:
             return None
         return ParentReport(
@@ -261,6 +261,55 @@ class ParentReportService:
             suggested_parent_actions=parsed["suggested_parent_actions"]
             or fallback_report.suggested_parent_actions,
             created_at=self._now(),
+        )
+
+    def _request_model_report(
+        self,
+        *,
+        child_id: str,
+        target_date: date,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+        conversation: dict[str, list[str]],
+        fallback_report: ParentReport,
+        retry: bool,
+    ):
+        payload = self._parent_report_model_payload(
+            target_date=target_date,
+            memories=memories,
+            conversation_messages=conversation_messages,
+            conversation=conversation,
+            fallback_report=fallback_report,
+        )
+        user_prefix = (
+            "上一次输出为空或不可解析。请只返回严格 JSON object，不要解释。\n"
+            if retry
+            else ""
+        )
+        return self._model_registry.generate(
+            ModelRequest(
+                task_type=ModelTaskType.PARENT_REPORT,
+                messages=[
+                    ModelMessage(
+                        role="system",
+                        content=self._parent_report_system_prompt(),
+                    ),
+                    ModelMessage(
+                        role="user",
+                        content=user_prefix
+                        + json.dumps(payload, ensure_ascii=False),
+                    ),
+                ],
+                context={"conversation": {"child_id": child_id}},
+                metadata={
+                    "report_date": target_date.isoformat(),
+                    "parent_report_retry": retry,
+                    "material_counts": {
+                        "memories": len(memories),
+                        "conversation_messages": len(conversation_messages),
+                    },
+                },
+            )
         )
 
     def _parent_report_system_prompt(self) -> str:

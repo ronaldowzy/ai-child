@@ -498,8 +498,13 @@ real child audio/images, Android, CameraX, ASR, TTS, or vision. If the MiMo key
 is missing the runner exits with `REAL_PROVIDER_BLOCKED` and does not report a
 mock pass as real provider evidence. The current real synthetic review reached
 `REAL_PROVIDER_SMOKE: PASS` for provider/model `mimo/mimo-v2.5-pro`; the report
-is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md` and records remaining prompt
-quality issues separately from provider connectivity.
+is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`. PROMPT-REAL-HARDEN-1 now
+keeps child-facing self-harm replies on a deterministic trusted-adult fallback,
+strips stage directions, suppresses multi-question replies, removes bedtime
+"tomorrow" hooks, and avoids verbatim topic-change echo. The latest report keeps
+provider raw-output quality separate from child-facing safety: P0/P2 are none,
+while remaining P1 items are opening/parent_report raw empty responses covered
+by explicit fallback/retry.
 
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed

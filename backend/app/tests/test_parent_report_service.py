@@ -311,6 +311,113 @@ def test_parent_report_service_prefers_model_summary_from_daily_conversation() -
     assert "逐字聊天记录" not in report.model_dump_json()
 
 
+def test_parent_report_service_retries_empty_model_response() -> None:
+    class EmptyThenReportModelRegistry:
+        requests: list[ModelRequest]
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                return ModelResponse(
+                    task_type=ModelTaskType.PARENT_REPORT,
+                    response_text="",
+                    structured_output={},
+                    provider_name="fake_model",
+                    model_name="fake-parent-report",
+                )
+            return ModelResponse(
+                task_type=ModelTaskType.PARENT_REPORT,
+                response_text="",
+                structured_output={
+                    "daily_report": {
+                        "summary": "今天孩子用图片和短句开启交流，能围绕对象继续表达。",
+                        "learning_observations": [],
+                        "expression_observations": ["孩子能用短句说明自己想看的地方。"],
+                        "emotion_observations": ["整体情绪平稳。"],
+                        "safety_alerts": [],
+                        "suggested_parent_actions": [
+                            "今晚可以问：你最想让我看图里的哪一处？避免连续追问。"
+                        ],
+                    }
+                },
+                provider_name="fake_model",
+                model_name="fake-parent-report",
+            )
+
+    model_registry = EmptyThenReportModelRegistry()
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_retry_photo",
+                    text="我拍了一张图给小白狐看。",
+                    attachments_count=1,
+                )
+            ]
+        ),
+        model_registry=model_registry,
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.summary == "今天孩子用图片和短句开启交流，能围绕对象继续表达。"
+    assert len(model_registry.requests) == 2
+    assert model_registry.requests[0].metadata["parent_report_retry"] is False
+    assert model_registry.requests[1].metadata["parent_report_retry"] is True
+    assert model_registry.requests[1].messages[1].content.startswith(
+        "上一次输出为空或不可解析。请只返回严格 JSON object"
+    )
+
+
+def test_parent_report_service_empty_model_response_keeps_nonempty_fallback() -> None:
+    class EmptyReportModelRegistry:
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            return ModelResponse(
+                task_type=ModelTaskType.PARENT_REPORT,
+                response_text="",
+                structured_output={},
+                provider_name="fake_model",
+                model_name="fake-parent-report",
+            )
+
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_empty_report",
+                    text="我今天想聊画画。",
+                )
+            ]
+        ),
+        model_registry=EmptyReportModelRegistry(),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.summary
+    assert report.suggested_parent_actions
+    assert "我今天想聊画画" not in report.model_dump_json()
+
+
 def test_parent_report_service_refreshes_stale_report_when_conversation_is_newer() -> None:
     memory_service, report_repository, _ = _services_with_report_repository()
     old_report_service = ParentReportService(

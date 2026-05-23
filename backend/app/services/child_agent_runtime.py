@@ -22,6 +22,17 @@ from app.services.turn_guidance_builder import (
 class ChildAgentRuntime:
     """Executes the child-facing model turn after scene routing."""
 
+    SELF_HARM_GUARDIAN_REPLY = (
+        "谢谢你告诉我。这个时候不要一个人待着，先去找爸爸妈妈、"
+        "老师或身边安全的大人，好吗？小白狐会提醒爸爸来陪你。"
+    )
+    BEDTIME_CLOSE_REPLY = "好的，我们今天先轻轻收个尾。晚安，睡个好觉。"
+    _STAGE_DIRECTION_PATTERN = re.compile(
+        r"[（(]\s*(?:用|以)?[^（）()]{0,30}"
+        r"(?:语气|语调|口吻|声音|温柔|温和|轻声|轻轻|平静|柔和|好奇)"
+        r"[^（）()]{0,30}[）)]"
+    )
+
     def __init__(
         self,
         *,
@@ -106,6 +117,15 @@ class ChildAgentRuntime:
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
             )
+        if self._requires_deterministic_self_harm_reply(request):
+            return self._fallback_result(
+                request,
+                fallback_reason="deterministic_self_harm_guardian",
+                prompt_versions=prompt_versions,
+                provider_name=model_response.provider_name,
+                model_name=model_response.model_name,
+                model_metadata=model_response.metadata,
+            )
 
         output_safety = self._safety_engine.classify_output(reply_text)
         if output_safety.risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL}:
@@ -150,8 +170,12 @@ class ChildAgentRuntime:
         model_metadata: dict[str, Any] | None = None,
         output_risk_level: RiskLevel | None = None,
     ) -> AgentRuntimeResult:
+        reply_text = request.route_decision.reply_text
+        if self._requires_deterministic_self_harm_reply(request):
+            reply_text = self.SELF_HARM_GUARDIAN_REPLY
+            fallback_reason = "deterministic_self_harm_guardian"
         return AgentRuntimeResult(
-            reply_text=request.route_decision.reply_text,
+            reply_text=reply_text,
             source=AgentRuntimeSource.FALLBACK,
             provider_name=provider_name,
             model_name=model_name,
@@ -259,8 +283,14 @@ class ChildAgentRuntime:
             return ""
 
         text = self._strip_markdown_for_voice(text)
+        text = self._strip_stage_directions(text)
+        text = self._soften_topic_change_echo(request, text)
         text = re.sub(r"\s+", " ", text).strip()
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
+        if self._should_force_bedtime_close(request, text):
+            return self.BEDTIME_CLOSE_REPLY
+        if request.route_decision.active_scene != SceneId.SAFETY_GUARDIAN:
+            text = self._keep_one_main_question(text)
         return self._limit_to_sentence_boundary(
             text,
             max_chars=self._scene_reply_max_chars(
@@ -295,6 +325,35 @@ class ChildAgentRuntime:
         text = re.sub(r"^\s*(?:小白狐|小狐狸|助手|AI|ai)\s*[：:]\s*", "", text)
         return text
 
+    def _strip_stage_directions(self, text: str) -> str:
+        previous = None
+        cleaned = text
+        while previous != cleaned:
+            previous = cleaned
+            cleaned = self._STAGE_DIRECTION_PATTERN.sub("", cleaned)
+        cleaned = re.sub(
+            r"(?:舞台说明|语气说明)\s*[：:].*?(?=[。！？!?]|$)",
+            "",
+            cleaned,
+        )
+        return cleaned.strip()
+
+    def _soften_topic_change_echo(
+        self,
+        request: AgentRuntimeRequest,
+        text: str,
+    ) -> str:
+        normalized = request.child_text.replace(" ", "")
+        if not any(
+            marker in normalized
+            for marker in ("换个话题", "换一个话题", "聊点别的", "别聊这个")
+        ):
+            return text
+        text = text.replace("我们换个话题", "我们换一个轻松的")
+        text = text.replace("换个话题", "换一个轻松的")
+        text = text.replace("换一个话题", "换一个轻松的")
+        return text
+
     def _keep_one_main_question(self, text: str) -> str:
         question_positions = [
             position
@@ -304,6 +363,44 @@ class ChildAgentRuntime:
         if len(question_positions) <= 1:
             return text
         return text[: question_positions[0] + 1].strip()
+
+    def _requires_deterministic_self_harm_reply(
+        self,
+        request: AgentRuntimeRequest,
+    ) -> bool:
+        if request.route_decision.active_scene != SceneId.SAFETY_GUARDIAN:
+            return False
+        signals = request.route_decision.signals or {}
+        evidence = signals.get("safety_evidence")
+        if isinstance(evidence, list) and "self_harm" in evidence:
+            return True
+        normalized = request.child_text.replace(" ", "")
+        return request.route_decision.risk_level == RiskLevel.CRITICAL and any(
+            marker in normalized
+            for marker in ("不想活", "想死", "自杀", "伤害自己", "杀了自己")
+        )
+
+    def _should_force_bedtime_close(
+        self,
+        request: AgentRuntimeRequest,
+        text: str,
+    ) -> bool:
+        normalized = request.child_text.replace(" ", "")
+        bedtime_requested = any(
+            marker in normalized
+            for marker in ("明天再聊", "我要睡觉", "我得睡觉", "晚安", "困了")
+        )
+        if not bedtime_requested and (
+            request.route_decision.active_scene != SceneId.DAILY_BEDTIME_REFLECTION
+        ):
+            return False
+        return (
+            "？" in text
+            or "?" in text
+            or "明天" in text
+            or "下次" in text
+            or "再聊" in text
+        )
 
     def _limit_to_sentence_boundary(self, text: str, *, max_chars: int) -> str:
         if len(text) <= max_chars:

@@ -72,6 +72,7 @@ def _route_decision(
     reply_text: str = "可以，我们一起一步一步拆开它。你先不用急着要答案。",
     active_scene: SceneId = SceneId.LEARNING_HOMEWORK_HELP,
     risk_level: RiskLevel = RiskLevel.NONE,
+    signals: dict[str, object] | None = None,
 ) -> SceneRouteDecision:
     return SceneRouteDecision(
         session_id="runtime_session",
@@ -97,6 +98,7 @@ def _route_decision(
         reason="runtime_test_route",
         needs_input="problem_content",
         reply_text=reply_text,
+        signals=signals or {},
         quick_actions=[
             SceneAction(id="speak_problem", label="读题目"),
         ],
@@ -108,11 +110,12 @@ def _runtime_request(
     route_decision: SceneRouteDecision | None = None,
     conversation_history: list[ModelMessage] | None = None,
     conversation_metadata: dict[str, object] | None = None,
+    child_text: str = "我有一道题不会",
 ) -> AgentRuntimeRequest:
     return AgentRuntimeRequest(
         child_id="child_runtime_test",
         session_id="runtime_session",
-        child_text="我有一道题不会",
+        child_text=child_text,
         route_decision=route_decision or _route_decision(),
         time_context=_time_context(),
         parent_policy={
@@ -251,12 +254,163 @@ def test_child_agent_runtime_normalizes_model_reply_for_voice() -> None:
 
     assert result.source == AgentRuntimeSource.MODEL
     assert result.reply_text == (
-        "好呀！我也喜欢恐龙！你最喜欢哪种恐龙呢？是霸王龙吗？还是三角龙？"
+        "好呀！我也喜欢恐龙！你最喜欢哪种恐龙呢？"
     )
     assert "🦕" not in result.reply_text
     assert "**" not in result.reply_text
-    assert result.reply_text.count("？") == 3
+    assert result.reply_text.count("？") == 1
     assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_strips_stage_direction_from_model_reply() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("（用温和的语调）题目是什么呀？")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.LEARNING_HOMEWORK_HELP,
+        reply_text="我们先看题目在问什么。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "题目是什么呀？"
+    assert "（" not in result.reply_text
+    assert "语调" not in result.reply_text
+    assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_keeps_only_one_main_question_for_creative_share() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("你画的小狐狸很有画面感。它在哪里呢？你想让它做什么？")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="我画了一只小狐狸，还想编一个故事。",
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "你画的小狐狸很有画面感。它在哪里呢？"
+    assert result.reply_text.count("？") == 1
+
+
+def test_child_agent_runtime_keeps_only_one_main_question_for_learning_help() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("我们先不直接要答案。题目问的是什么？你已经知道哪些条件？")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.LEARNING_HOMEWORK_HELP,
+        reply_text="我们先看题目在问什么。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "我们先不直接要答案。题目问的是什么？"
+    assert result.reply_text.count("？") == 1
+
+
+def test_child_agent_runtime_does_not_echo_topic_change_request_verbatim() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("好的呀，我们换个话题。你想聊画画吗？")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="可以，我们换一个轻松的。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="我们换个话题。",
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert "我们换个话题" not in result.reply_text
+    assert "换一个轻松的" in result.reply_text
+
+
+def test_child_agent_runtime_bedtime_closeout_removes_open_question() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("好呀，睡前我们轻轻说一句。你今天最开心的是什么？")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_BEDTIME_REFLECTION,
+        reply_text="晚安，我们明天再聊。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="明天再聊，我得睡觉了。",
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == ChildAgentRuntime.BEDTIME_CLOSE_REPLY
+    assert "？" not in result.reply_text
+
+
+def test_child_agent_runtime_bedtime_closeout_removes_tomorrow_hook() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response("好呀，晚安。明天你想聊什么都可以哦。")
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_BEDTIME_REFLECTION,
+        reply_text="晚安，我们今天先收个尾。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="明天再聊，我得睡觉了。",
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == ChildAgentRuntime.BEDTIME_CLOSE_REPLY
+    assert "明天" not in result.reply_text
+
+
+def test_child_agent_runtime_self_harm_critical_uses_child_facing_fallback() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "我非常抱歉听到你现在的感受。自杀是一个非常严重的问题，请找心理健康专业人士。"
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.SAFETY_GUARDIAN,
+        risk_level=RiskLevel.CRITICAL,
+        reply_text="请告诉爸爸妈妈或可信任的大人。",
+        signals={"safety_evidence": ["self_harm"]},
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="我不想活了。",
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.FALLBACK
+    assert result.fallback_reason == "deterministic_self_harm_guardian"
+    assert "爸爸妈妈" in result.reply_text
+    assert "老师" in result.reply_text
+    assert "安全的大人" in result.reply_text
+    assert "心理健康专业人士" not in result.reply_text
+    assert "自杀是一个非常严重的问题" not in result.reply_text
 
 
 def test_child_agent_runtime_allows_longer_open_conversation_reply() -> None:

@@ -208,6 +208,76 @@ def test_model_opening_prompt_constrains_interest_revisit() -> None:
     assert "这是我们的小秘密" in prompt
 
 
+def test_opening_empty_model_response_retries_then_returns_text() -> None:
+    class EmptyThenOpeningModelRegistry:
+        requests: list[ModelRequest]
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                return ModelResponse(
+                    task_type=ModelTaskType.CHILD_CHAT,
+                    response_text="",
+                    structured_output={},
+                    provider_name="fake",
+                    model_name="fake-opening",
+                )
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="豆豆，我在这里。你可以慢慢说一句。",
+                structured_output={"text": "豆豆，我在这里。你可以慢慢说一句。"},
+                provider_name="fake",
+                model_name="fake-opening",
+            )
+
+    child_id = "opening_empty_retry_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    model_registry = EmptyThenOpeningModelRegistry()
+    service = OpeningService(model_registry=model_registry)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-empty-retry-session",
+        )
+    )
+
+    assert response.reply.text == "豆豆，我在这里。你可以慢慢说一句。"
+    assert len(model_registry.requests) == 2
+    assert model_registry.requests[0].metadata["opening_retry"] is False
+    assert model_registry.requests[1].metadata["opening_retry"] is True
+    assert model_registry.requests[1].input_text == "请只输出一句中文开场白，不要解释，不要 JSON。"
+
+
+def test_opening_empty_model_response_falls_back_to_nonempty_text() -> None:
+    class EmptyOpeningModelRegistry:
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="",
+                structured_output={},
+                provider_name="fake",
+                model_name="fake-opening",
+            )
+
+    child_id = "opening_empty_fallback_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    service = OpeningService(model_registry=EmptyOpeningModelRegistry())
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-empty-fallback-session",
+        )
+    )
+
+    assert response.reply.text
+    assert response.reply.text.startswith("豆豆，")
+
+
 def test_model_opening_prompt_honors_no_school_check_without_school_word() -> None:
     class FakeOpeningModelRegistry:
         requests: list[ModelRequest]

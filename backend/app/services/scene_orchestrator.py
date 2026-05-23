@@ -158,6 +158,17 @@ class SceneOrchestrator:
 
     def _safety_guardian(self, request: SceneRouteRequest) -> SceneRouteDecision:
         scene_id = SceneId.SAFETY_GUARDIAN
+        if "self_harm" in request.safety_evidence:
+            reply_text = (
+                "谢谢你告诉我。这个时候不要一个人待着，先去找爸爸妈妈、"
+                "老师或身边安全的大人，好吗？小白狐会提醒爸爸来陪你。"
+            )
+        else:
+            reply_text = (
+                "这件事需要让爸爸妈妈或可信任的大人知道。"
+                "你不用一个人处理，也不用替别人保守让你不舒服的秘密。"
+                "如果那个人还在附近，请先去爸爸妈妈、老师或安全的大人身边。"
+            )
         return SceneRouteDecision(
             message_id=request.message_id,
             session_id=request.session_id,
@@ -171,11 +182,7 @@ class SceneOrchestrator:
             reason="safety_priority",
             requires_parent_attention=True,
             needs_input=self._scene_registry.get(scene_id).default_needs_input,
-            reply_text=(
-                "这件事需要让爸爸妈妈或可信任的大人知道。"
-                "你不用一个人处理，也不用替别人保守让你不舒服的秘密。"
-                "如果那个人还在附近，请先去爸爸妈妈、老师或安全的大人身边。"
-            ),
+            reply_text=reply_text,
             reply_emotion="steady",
             quick_actions=[
                 SceneAction(id="tell_parent", label="告诉爸爸妈妈"),

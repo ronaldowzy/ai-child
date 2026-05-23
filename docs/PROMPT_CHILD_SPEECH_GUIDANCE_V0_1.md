@@ -51,6 +51,18 @@ Sports-context exaggerated fatigue is now watch-lite:
 
 IntentClassifier maps watch-lite child speech to `EMOTION_EXPRESSION` with sub-intent `body_discomfort_watch_lite` or `exaggerated_fatigue`, instead of escalating to high-risk intent.
 
+## Runtime Output Hardening
+
+PROMPT-REAL-HARDEN-1 adds deterministic child-facing safeguards after real MiMo trace review:
+
+- Critical self-harm turns use a fixed 5-10-year-old-friendly trusted-adult reply instead of relying on model wording.
+- Parenthetical stage directions such as "（用温和的语调）" are stripped before the child sees or hears the reply.
+- Ordinary child_chat replies keep at most one main question.
+- Bedtime closeout removes open questions and "tomorrow hook" wording such as continuing the topic tomorrow.
+- Explicit topic-change requests are not echoed verbatim back to the child.
+
+The latest synthetic real-provider trace has P0/P2 none for child-facing output. Remaining P1 items are provider raw empty responses for opening/parent_report, with runtime fallback covering the child-facing text.
+
 ## Parent Report Extraction
 
 ParentReportService now treats sports/competition/running phrases as a sports topic, not learning help. It also recognizes topic-change requests as boundary/transition expression and describes "要死了/累死了" in sports context as post-run exaggerated fatigue, not self-harm.

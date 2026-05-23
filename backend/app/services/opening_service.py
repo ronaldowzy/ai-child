@@ -118,39 +118,72 @@ class OpeningService:
         fallback_text: str,
     ) -> str:
         try:
-            response = self._model_registry.generate(
-                ModelRequest(
-                    task_type=ModelTaskType.CHILD_CHAT,
-                    messages=[
-                        ModelMessage(
-                            role="system",
-                            content=self._opening_prompt(
-                                parent_policy=parent_policy,
-                                time_context=time_context,
-                                opening_policy=opening_policy,
-                            ),
-                        ),
-                        ModelMessage(role="user", content="请生成开场白。"),
-                    ],
-                    input_text="请生成开场白。",
-                    context={
-                        "conversation": {
-                            "child_id": parent_policy.child_id,
-                        }
-                    },
-                    metadata={"opening_greeting": True},
-                )
+            response = self._request_model_opening(
+                parent_policy=parent_policy,
+                time_context=time_context,
+                opening_policy=opening_policy,
+                user_content="请生成开场白。",
+                retry=False,
             )
         except Exception:
             return fallback_text
         if response.metadata.get("mock"):
             return fallback_text
+        text = self._sanitize_opening_text(
+            response.response_text,
+            opening_policy=opening_policy,
+        )
+        if text:
+            return text
+        try:
+            retry_response = self._request_model_opening(
+                parent_policy=parent_policy,
+                time_context=time_context,
+                opening_policy=opening_policy,
+                user_content="请只输出一句中文开场白，不要解释，不要 JSON。",
+                retry=True,
+            )
+        except Exception:
+            return fallback_text
         return (
             self._sanitize_opening_text(
-                response.response_text,
+                retry_response.response_text,
                 opening_policy=opening_policy,
             )
             or fallback_text
+        )
+
+    def _request_model_opening(
+        self,
+        *,
+        parent_policy: ParentPolicy,
+        time_context: TimeContext,
+        opening_policy: OpeningPolicy,
+        user_content: str,
+        retry: bool,
+    ):
+        return self._model_registry.generate(
+            ModelRequest(
+                task_type=ModelTaskType.CHILD_CHAT,
+                messages=[
+                    ModelMessage(
+                        role="system",
+                        content=self._opening_prompt(
+                            parent_policy=parent_policy,
+                            time_context=time_context,
+                            opening_policy=opening_policy,
+                        ),
+                    ),
+                    ModelMessage(role="user", content=user_content),
+                ],
+                input_text=user_content,
+                context={
+                    "conversation": {
+                        "child_id": parent_policy.child_id,
+                    }
+                },
+                metadata={"opening_greeting": True, "opening_retry": retry},
+            )
         )
 
     def _opening_prompt(

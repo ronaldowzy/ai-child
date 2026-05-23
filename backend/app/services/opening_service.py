@@ -9,9 +9,13 @@ from app.domain.schemas.conversation import (
 from app.domain.schemas.parent_policy import ParentPolicy
 from app.domain.time import TimeContext, TimePeriod
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
-from app.domain.memory import MemoryItem
 from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
+from app.services.opening_policy import (
+    OpeningMode,
+    OpeningPolicy,
+    OpeningPolicyBuilder,
+)
 from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
@@ -19,10 +23,6 @@ from app.services.parent_policy_service import (
 from app.services.time_context_service import (
     TimeContextService,
     get_time_context_service,
-)
-from app.services.relationship_memory import (
-    latest_interest_seed,
-    memory_relationship_topic,
 )
 from app.services.tts_service import TtsService, get_tts_service
 
@@ -38,6 +38,7 @@ class OpeningService:
         tts_service: TtsService | None = None,
         model_registry: ModelRegistry | None = None,
         memory_service: MemoryService | None = None,
+        opening_policy_builder: OpeningPolicyBuilder | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -46,6 +47,10 @@ class OpeningService:
         self._tts_service = tts_service or get_tts_service()
         self._model_registry = model_registry or get_model_registry()
         self._memory_service = memory_service or get_memory_service()
+        self._opening_policy_builder = (
+            opening_policy_builder
+            or OpeningPolicyBuilder(memory_service=self._memory_service)
+        )
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
 
     def create_opening(
@@ -63,16 +68,19 @@ class OpeningService:
             timezone=request.client_context.timezone,
             schedule=parent_policy.schedule,
         )
-        interest_seed = self._safe_latest_interest_seed(request.child_id)
-        fallback_text = self._build_opening_text(
+        opening_policy = self._opening_policy_builder.build(
+            child_id=request.child_id,
             parent_policy=parent_policy,
             time_context=time_context,
-            interest_seed=interest_seed,
+        )
+        fallback_text = self._build_opening_text(
+            parent_policy=parent_policy,
+            opening_policy=opening_policy,
         )
         text = self._generate_model_opening(
             parent_policy=parent_policy,
             time_context=time_context,
-            interest_seed=interest_seed,
+            opening_policy=opening_policy,
             fallback_text=fallback_text,
         )
         reply = Reply(
@@ -94,6 +102,10 @@ class OpeningService:
                 requires_parent_attention=None,
             ),
         )
+        self._opening_policy_builder.record_policy_used(
+            child_id=request.child_id,
+            policy=opening_policy,
+        )
         self._session_cache[cache_key] = response
         return response
 
@@ -102,7 +114,7 @@ class OpeningService:
         *,
         parent_policy: ParentPolicy,
         time_context: TimeContext,
-        interest_seed: MemoryItem | None,
+        opening_policy: OpeningPolicy,
         fallback_text: str,
     ) -> str:
         try:
@@ -115,7 +127,7 @@ class OpeningService:
                             content=self._opening_prompt(
                                 parent_policy=parent_policy,
                                 time_context=time_context,
-                                interest_seed=interest_seed,
+                                opening_policy=opening_policy,
                             ),
                         ),
                         ModelMessage(role="user", content="请生成开场白。"),
@@ -133,99 +145,122 @@ class OpeningService:
             return fallback_text
         if response.metadata.get("mock"):
             return fallback_text
-        return self._sanitize_opening_text(response.response_text) or fallback_text
+        return (
+            self._sanitize_opening_text(
+                response.response_text,
+                opening_policy=opening_policy,
+            )
+            or fallback_text
+        )
 
     def _opening_prompt(
         self,
         *,
         parent_policy: ParentPolicy,
         time_context: TimeContext,
-        interest_seed: MemoryItem | None = None,
+        opening_policy: OpeningPolicy,
     ) -> str:
         name = self._child_call_name(parent_policy)
-        parent_message = (parent_policy.parent_message_raw or "").strip()
-        goals = "；".join(parent_policy.goals[:4])
+        parent_message = self._parent_message_for_prompt(parent_policy, opening_policy)
         preferences = parent_policy.communication_preferences
-        seed_topic = memory_relationship_topic(interest_seed) if interest_seed else ""
+        prompt_rules = "\n- ".join(opening_policy.prompt_rules)
+        forbidden = "；".join(self._forbidden_phrases_for_prompt(opening_policy))
+        schedule_goal = self._text_for_prompt(
+            time_context.schedule_goal or "无",
+            opening_policy,
+        )
+        preferred_interactions = [
+            self._text_for_prompt(value, opening_policy)
+            for value in time_context.preferred_interactions
+        ]
+        avoid = [
+            self._text_for_prompt(value, opening_policy)
+            for value in time_context.avoid
+        ]
         return (
             "你是小白狐。请给孩子一句自然、短、亲切的开场白，适合直接朗读。"
             "根据当前时间段、父母寄语、孩子称呼和家庭沟通偏好调整语气。"
-            "不要像老师点名，不要查岗，不要强行问学校，不要每次都问今天在学校怎么样。"
+            "不要像老师点名，不要查岗，不要强行追问日间经历，不要每次都问固定日常问题。"
             "如果是晚上，低刺激、短句；如果刚放学，轻松欢迎回来。"
-            "如果存在可轻回访兴趣，最多只轻轻回访一个低敏 topic，必须给孩子选择权，"
-            "例如继续聊、换话题或讲个轻松小故事；不要暗示孩子必须继续这个话题。"
-            "晚上不要拉长，不抛新强刺激问题。"
-            "禁止说“小白狐想你了”“你昨天没来”“每天都要来”“只有我记得你”"
-            "或“这是我们的小秘密”。"
+            "opening 必须遵守 opening policy，不要自己扩大目标。"
             "只输出一句或两句，不使用 Markdown。"
             f"\n孩子称呼：{name or '无'}"
             f"\n当前时间段：{time_context.time_period.value}"
-            f"\n时间目标：{time_context.schedule_goal or '无'}"
-            f"\n推荐互动：{'、'.join(time_context.preferred_interactions)}"
-            f"\n避免事项：{'、'.join(time_context.avoid)}"
-            f"\n父亲目标：{goals}"
+            f"\n时间目标：{schedule_goal}"
+            f"\n推荐互动：{'、'.join(preferred_interactions)}"
+            f"\n避免事项：{'、'.join(avoid)}"
             f"\n沟通偏好：{preferences}"
-            f"\n可轻回访兴趣：{seed_topic or '无'}"
+            f"\nopening_mode：{opening_policy.mode.value}"
+            f"\n年龄段：{opening_policy.age_band}"
+            f"\n最大字数：{opening_policy.max_chars}"
+            f"\n最多口头选项数：{opening_policy.max_spoken_options}"
+            f"\n可轻回访兴趣：{opening_policy.seed_topic or '无'}"
+            f"\n兴趣回访允许：{opening_policy.seed_recall_allowed}"
+            f"\n回访原因：{opening_policy.seed_recall_reason or '无'}"
+            f"\n边界类型：{opening_policy.boundary_kind or '无'}"
+            f"\n边界冷却中：{opening_policy.boundary_cooldown_active}"
+            f"\n父亲目标低压力转译：{opening_policy.parent_goal_hint or '无'}"
+            f"\n必须给孩子选择权：{opening_policy.must_offer_topic_switch}"
+            f"\n必须允许孩子不聊：{opening_policy.must_allow_no_chat}"
+            f"\nopening policy rules：\n- {prompt_rules}"
+            f"\n禁止话术：{forbidden}"
             f"\n父母寄语背景：{parent_message[:500]}"
         )
 
-    def _sanitize_opening_text(self, text: str) -> str:
+    def _sanitize_opening_text(
+        self,
+        text: str,
+        *,
+        opening_policy: OpeningPolicy,
+    ) -> str:
         compact = " ".join(text.strip().split())
         compact = compact.strip("\"'“”")
         if not compact:
             return ""
-        if len(compact) > 80:
-            compact = compact[:80].rstrip("，。！？,.!? ") + "。"
+        if self._contains_forbidden_phrase(compact, opening_policy):
+            return ""
+        if len(compact) > opening_policy.max_chars:
+            compact = compact[: opening_policy.max_chars].rstrip("，。！？,.!? ") + "。"
         return compact
 
     def _build_opening_text(
         self,
         *,
         parent_policy: ParentPolicy,
-        time_context: TimeContext,
-        interest_seed: MemoryItem | None = None,
+        opening_policy: OpeningPolicy,
     ) -> str:
         name = self._child_call_name(parent_policy)
         prefix = f"{name}，" if name else ""
-        parent_message = (parent_policy.parent_message_raw or "").strip()
-        avoid_school_check = (
-            "不要查岗学校" in parent_message
-            or "不要问学校" in parent_message
-            or "别问学校" in parent_message
+        topic = opening_policy.seed_topic or ""
+        if opening_policy.mode == OpeningMode.INTEREST_CALLBACK and topic:
+            if opening_policy.age_band == "age_5_6":
+                text = f"{prefix}小白狐记得{topic}。聊它，还是听小故事？"
+            elif opening_policy.age_band == "age_9_10":
+                text = f"{prefix}我记得你提过{topic}。想聊它、换轻松的，还是做个小计划？"
+            else:
+                text = f"{prefix}我记得你提过{topic}。今天想聊它，还是换个轻松的？"
+        elif opening_policy.mode == OpeningMode.BOUNDARY_RESPECT:
+            text = f"{prefix}上次那个我们先不聊。今天想说新的，还是让小白狐先讲一句？"
+        elif opening_policy.mode == OpeningMode.LOW_EXPRESSION_SUPPORT:
+            text = f"{prefix}你可以只说一个词。说不完整也没关系。"
+        elif opening_policy.mode == OpeningMode.BEDTIME_CLOSURE:
+            text = f"{prefix}晚上好。我们只说一小句，说完就休息。"
+        elif opening_policy.mode == OpeningMode.BEDTIME_DEFER_INTEREST and topic:
+            text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
+        elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
+            text = f"{prefix}这句话也可以告诉爸爸妈妈。小白狐先听你说一点点。"
+        else:
+            text = f"{prefix}我在这里。你可以慢慢说一句，也可以先听小白狐说一句。"
+        return self._sanitize_opening_text(
+            text,
+            opening_policy=opening_policy,
         )
-        seed_topic = memory_relationship_topic(interest_seed) if interest_seed else ""
-
-        if time_context.time_period == TimePeriod.BEDTIME:
-            if seed_topic:
-                return (
-                    f"{prefix}晚上好。{seed_topic}我们可以明天再慢慢说，"
-                    "现在轻轻收个尾就好。"
-                )
-            return f"{prefix}晚上好。我们轻轻说一小句就好。"
-        if seed_topic:
-            return (
-                f"{prefix}我还记得你上次聊到{seed_topic}。"
-                "今天想继续聊一点，还是先换个轻松小故事？"
-            )
-        if time_context.time_period == TimePeriod.AFTER_SCHOOL:
-            if avoid_school_check:
-                return f"{prefix}回来啦。我们不急着汇报，先说你想说的。"
-            return f"{prefix}回来啦。我们先慢慢聊一件你想说的小事。"
-        if time_context.time_period == TimePeriod.MORNING_BEFORE_SCHOOL:
-            return f"{prefix}早上好。我准备好陪你轻轻开始今天。"
-        return f"{prefix}我准备好啦。你想说什么都可以慢慢说。"
 
     def _child_call_name(self, parent_policy: ParentPolicy) -> str:
         return (
             (parent_policy.child_nickname or "").strip()
             or (parent_policy.child_display_name or "").strip()
         )
-
-    def _safe_latest_interest_seed(self, child_id: str) -> MemoryItem | None:
-        try:
-            return latest_interest_seed(self._memory_service, child_id=child_id)
-        except Exception:
-            return None
 
     def _attach_audio_url(self, reply: Reply) -> None:
         try:
@@ -247,6 +282,41 @@ class OpeningService:
         if time_context.time_period == TimePeriod.BEDTIME:
             return "sleepy_blink"
         return "gentle_idle"
+
+    def _contains_forbidden_phrase(
+        self,
+        text: str,
+        opening_policy: OpeningPolicy,
+    ) -> bool:
+        return any(phrase in text for phrase in opening_policy.forbidden_phrases)
+
+    def _forbidden_phrases_for_prompt(
+        self,
+        opening_policy: OpeningPolicy,
+    ) -> tuple[str, ...]:
+        if not any("不提固定场所" in rule for rule in opening_policy.prompt_rules):
+            return opening_policy.forbidden_phrases
+        return tuple(
+            phrase.replace("学校", "日间场所")
+            for phrase in opening_policy.forbidden_phrases
+        )
+
+    def _parent_message_for_prompt(
+        self,
+        parent_policy: ParentPolicy,
+        opening_policy: OpeningPolicy,
+    ) -> str:
+        parent_message = (parent_policy.parent_message_raw or "").strip()
+        return self._text_for_prompt(parent_message, opening_policy)
+
+    def _text_for_prompt(
+        self,
+        text: str,
+        opening_policy: OpeningPolicy,
+    ) -> str:
+        if any("不提固定场所" in rule for rule in opening_policy.prompt_rules):
+            return text.replace("学校", "日间场所")
+        return text
 
 
 _opening_service = OpeningService()

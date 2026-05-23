@@ -662,6 +662,19 @@ Implementation notes: E1 复用现有 `MemoryType.INTEREST` / `STRATEGY` / `EXPR
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
 Tests or QA needed: 后端测试覆盖跑步比赛/画画/故事兴趣、换话题/睡前边界、proud_moment、过滤 raw/full transcript、Opening 有/无 seed 和睡前分支、父亲日报低压力接话建议；Redmi K60 / Honor Pad 5 仍需真机观察回复自然度和是否过度回访。
 
+#### PD-046
+
+Decision ID: PD-046
+Date: 2026-05-23
+Status: confirmed
+Source: E2-A Opening Greeting v2 policy foundation
+Decision: Opening Greeting v2 使用后端 policy engine，而不是只靠 prompt 或“有 seed 就回访”。Opening 必须是轻邀请、可退出、尊重边界、睡前收束，并把父亲目标转译为低压力提示。
+Rationale: Healthy Engagement 要让小白狐像温柔的门口，而不是钩子。孩子可以说、可以不说、可以换话题，也可以去找爸爸妈妈；opening 不应制造留存压力、排他关系或睡前兴奋。
+Affected modules: OpeningPolicyBuilder、OpeningService、relationship memory helpers、opening tests、backend docs。
+Implementation notes: `OpeningPolicyBuilder` 输出 `OpeningPolicy`，包含 `opening_mode`、age band、max chars、interest recall allowed/reason、topic boundary cooldown、bedtime defer、parent bridge、parent goal hint、forbidden phrases 和 prompt rules。`OpeningService` fallback text 和 model prompt 共用同一 policy；memory read failure 不阻塞 opening；同 session cache 与 TTS fallback 保持不变。本轮不改 Android、不改 DB schema、不做 push notification、不做 Growing Nest 或 CameraX。
+Docs updated: `docs/OPENING_GREETING_V2_POLICY_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`docs/HEALTHY_ENGAGEMENT_MASTER_DESIGN_V0_1.md`、`backend/README.md`。
+Tests or QA needed: 后端测试覆盖 interest callback、default light、boundary respect、bedtime closure/defer、no-school policy、father learning goal translation、age limits、memory failure fallback、model prompt contract、TTS failure 和 session cache；Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
+
 ---
 
 ## 3. Current Product Direction

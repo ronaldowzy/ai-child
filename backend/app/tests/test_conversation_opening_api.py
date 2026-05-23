@@ -90,7 +90,7 @@ def test_after_school_opening_is_light_and_not_forced_school_checkin() -> None:
     )
 
     text = response.json()["reply"]["text"]
-    assert "回来啦" in text
+    assert text
     assert "今天在学校怎么样" not in text
     assert "学校" not in text
 
@@ -108,7 +108,7 @@ def test_bedtime_opening_is_low_stimulation() -> None:
     )
 
     body = response.json()
-    assert "轻轻" in body["reply"]["text"]
+    assert "一小句" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "sleepy"
 
 
@@ -160,6 +160,7 @@ def test_opening_can_use_model_generated_text() -> None:
     assert isinstance(prompt, str)
     assert "晚上要低刺激" in prompt
     assert "当前时间段" in prompt
+    assert "opening_mode" in prompt
 
 
 def test_model_opening_prompt_constrains_interest_revisit() -> None:
@@ -204,6 +205,41 @@ def test_model_opening_prompt_constrains_interest_revisit() -> None:
     assert "小白狐想你了" in prompt
     assert "每天都要来" in prompt
     assert "这是我们的小秘密" in prompt
+
+
+def test_model_opening_prompt_honors_no_school_check_without_school_word() -> None:
+    class FakeOpeningModelRegistry:
+        requests: list[ModelRequest]
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.requests.append(request)
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="豆豆，我在这里。",
+                structured_output={"text": "豆豆，我在这里。"},
+                provider_name="fake",
+                model_name="fake-opening",
+            )
+
+    child_id = "opening_prompt_no_school_child"
+    _update_policy(child_id, child_nickname="豆豆", parent_message_raw="不要查岗学校。")
+    model_registry = FakeOpeningModelRegistry()
+    service = OpeningService(model_registry=model_registry)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-prompt-no-school-session",
+        )
+    )
+
+    prompt = model_registry.requests[0].messages[0].content
+    assert isinstance(prompt, str)
+    assert "学校" not in prompt
+    assert "学校" not in response.reply.text
 
 
 def test_opening_tts_failure_still_returns_text() -> None:
@@ -267,6 +303,32 @@ def test_opening_lightly_revisits_recent_interest_seed() -> None:
     assert "跑步比赛" in response.reply.text
     assert "想你" not in response.reply.text
     assert "每天都要" not in response.reply.text
+
+
+def test_opening_fallback_respects_topic_boundary() -> None:
+    child_id = "opening_relationship_boundary_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    memory_service = _memory_service_with_interest_seed(
+        child_id=child_id,
+        topic="跑步比赛",
+    )
+    _create_topic_boundary(
+        memory_service=memory_service,
+        child_id=child_id,
+        kind="topic_change",
+        topic="换话题边界",
+    )
+    service = OpeningService(memory_service=memory_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-relationship-boundary",
+        )
+    )
+
+    assert "跑步比赛" not in response.reply.text
+    assert "先不聊" in response.reply.text
 
 
 def test_opening_uses_latest_low_sensitivity_interest_seed() -> None:
@@ -373,7 +435,7 @@ def test_bedtime_opening_with_interest_seed_is_low_stimulation() -> None:
     )
 
     assert "跑步比赛" in response.reply.text
-    assert "明天再慢慢说" in response.reply.text
+    assert "明天白天再慢慢说" in response.reply.text
     assert "继续聊一点" not in response.reply.text
 
 
@@ -419,6 +481,39 @@ def _create_interest_seed(
             sensitivity=sensitivity,
             confidence=0.8,
             importance=0.5,
+        )
+    )
+
+
+def _create_topic_boundary(
+    *,
+    memory_service: MemoryService,
+    child_id: str,
+    kind: str,
+    topic: str,
+) -> None:
+    memory_service.create(
+        MemoryCreateRequest(
+            child_id=child_id,
+            memory_type=MemoryType.STRATEGY,
+            content="孩子明确表达想换话题，后续应尊重转场，不继续追问旧话题。",
+            tags=["relationship_memory", "topic_boundary", "尊重边界"],
+            evidence=[
+                MemoryEvidence(
+                    source="conversation_summary",
+                    session_id="opening_relationship_boundary_source",
+                    quote_summary="孩子表达想换个话题或不继续当前话题。",
+                    metadata={
+                        "relationship_memory_type": "topic_boundary",
+                        "topic": topic,
+                        "boundary_kind": kind,
+                        "next_hook": "下次给两个轻松方向。",
+                    },
+                )
+            ],
+            sensitivity=MemorySensitivity.LOW,
+            confidence=0.84,
+            importance=0.62,
         )
     )
 

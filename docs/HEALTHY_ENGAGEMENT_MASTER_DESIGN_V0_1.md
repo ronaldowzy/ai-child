@@ -678,12 +678,12 @@ Non-goals: 不做 Growing Nest UI。
 ### E2: Opening Greeting v2
 
 Goal: opening 从通用问候升级为轻量回访。
-Backend: OpeningService 读取 relationship memory。
+Backend: E2-A 已新增 OpeningPolicyBuilder，OpeningService fallback 与 model prompt 共用结构化 OpeningPolicy；完整 E2 仍后续。
 Android: 复用现有 opening display/audioUrl。
-Prompt: 回访最多一个兴趣或项目，必须给选择权。
-Tests: 有兴趣种子、有小名、睡前、无记忆等分支。
-Acceptance: “昨天你说跑步比赛”式轻回访可生成。
-Non-goals: 不做推送。
+Prompt: 回访最多一个低敏兴趣或项目，必须给选择权，并尊重 topic boundary、睡前收束、分龄长度和 forbidden phrases。
+Tests: E2-A 覆盖 interest callback、boundary respect、bedtime closure/defer、no-school policy、父亲目标低压力转译、分龄和 memory failure fallback。
+Acceptance: policy engine 能决定 opening_mode，并让 fallback / model prompt 遵守同一套规则。
+Non-goals: 不做推送、Android 改动、DB schema、Growing Nest、CameraX 或真机 QA 结论。
 
 ### E3: Conversation Arc State
 

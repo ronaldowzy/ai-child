@@ -52,6 +52,9 @@ The current backend is intentionally local-first and mock-first:
   short child-facing greeting, with optional `reply.audio_url`. When a recent
   low-sensitivity relationship `interest_seed` exists, opening may lightly
   revisit one topic and still gives the child a clear choice to switch away.
+  E2-A routes this through `OpeningPolicyBuilder`, so fallback text and model
+  prompt share the same `opening_mode`, boundary cooldown, bedtime closure,
+  age-band length, parent-goal translation, and forbidden-phrase rules.
 - Parent policy supports `child_nickname` and `child_display_name`; Android
   father settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.

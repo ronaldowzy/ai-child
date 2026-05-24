@@ -10,6 +10,10 @@ from app.domain.enums import RiskLevel
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
 from app.domain.prompt import PromptVersion
 from app.domain.scene import SceneAction, SceneId
+from app.services.age_band_policy import (
+    AgeBandReplyPolicy,
+    derive_age_band_reply_policy,
+)
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.prompt_manager import PromptManager, get_prompt_manager
 from app.services.safety_engine import SafetyEngine, get_safety_engine
@@ -49,6 +53,7 @@ class ChildAgentRuntime:
     def run(self, request: AgentRuntimeRequest) -> AgentRuntimeResult:
         prompt_versions: dict[str, PromptVersion] = {}
         turn_guidance_context = self._build_turn_guidance_context(request)
+        age_policy = derive_age_band_reply_policy(request.parent_policy)
         try:
             composed_prompt = self._prompt_manager.compose(
                 request.route_decision.active_scene.value,
@@ -74,11 +79,12 @@ class ChildAgentRuntime:
                 ModelMessage(role="user", content=request.child_text),
             ],
             input_text=request.child_text,
-            context=self._model_context(request, turn_guidance_context),
+            context=self._model_context(request, turn_guidance_context, age_policy),
             metadata=self._model_metadata(
                 request,
                 prompt_versions,
                 turn_guidance_context,
+                age_policy,
             ),
         )
 
@@ -104,8 +110,19 @@ class ChildAgentRuntime:
                 model_metadata=model_response.metadata,
             )
 
+        model_response.metadata.setdefault("age_band", age_policy.age_band)
+        model_response.metadata.setdefault("reply_char_budget", age_policy.reply_char_budget)
+        model_response.metadata.setdefault(
+            "turn_guidance_hints",
+            list(turn_guidance_context.hints),
+        )
         raw_reply_text = model_response.response_text.strip()
-        reply_text = self._normalize_model_reply(raw_reply_text, request)
+        reply_text = self._normalize_model_reply(
+            raw_reply_text,
+            request,
+            turn_guidance_context,
+            age_policy,
+        )
         image_context_reply = self._image_context_repair_reply(request, reply_text)
         if image_context_reply:
             reply_text = image_context_reply
@@ -202,6 +219,7 @@ class ChildAgentRuntime:
         self,
         request: AgentRuntimeRequest,
         turn_guidance_context: TurnGuidanceContext,
+        age_policy: AgeBandReplyPolicy,
     ) -> dict[str, Any]:
         decision = request.route_decision
         return {
@@ -215,6 +233,7 @@ class ChildAgentRuntime:
             "parent_policy": self._dump_context_value(request.parent_policy),
             "memory_context": self._dump_context_value(request.memory_context),
             "turn_guidance": turn_guidance_context.model_dump(mode="json"),
+            "age_policy": age_policy.model_dump(),
             "scene_route": {
                 "base_scene": decision.base_scene.value,
                 "active_scene": decision.active_scene.value,
@@ -237,6 +256,7 @@ class ChildAgentRuntime:
         request: AgentRuntimeRequest,
         prompt_versions: dict[str, PromptVersion],
         turn_guidance_context: TurnGuidanceContext,
+        age_policy: AgeBandReplyPolicy,
     ) -> dict[str, Any]:
         return {
             "contains_child_data": True,
@@ -245,6 +265,8 @@ class ChildAgentRuntime:
             "task_type": ModelTaskType.CHILD_CHAT.value,
             "active_scene": request.route_decision.active_scene.value,
             "reply_style": "voice_first_short_natural_one_question",
+            "age_band": age_policy.age_band,
+            "reply_char_budget": age_policy.reply_char_budget,
             "uses_recent_conversation_history": bool(request.conversation_history),
             "prompt_version_layers": sorted(prompt_versions.keys()),
             "turn_guidance_hints": list(turn_guidance_context.hints),
@@ -280,7 +302,11 @@ class ChildAgentRuntime:
         return any(re.search(pattern, normalized) for pattern in math_answer_patterns)
 
     def _normalize_model_reply(
-        self, reply_text: str, request: AgentRuntimeRequest
+        self,
+        reply_text: str,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+        age_policy: AgeBandReplyPolicy,
     ) -> str:
         text = reply_text.strip()
         if not text:
@@ -294,12 +320,13 @@ class ChildAgentRuntime:
         if self._should_force_bedtime_close(request, text):
             return self.BEDTIME_CLOSE_REPLY
         if request.route_decision.active_scene != SceneId.SAFETY_GUARDIAN:
-            text = self._keep_one_main_question(text)
+            if self._should_remove_question_hook(request, turn_guidance_context):
+                text = self._remove_question_hook(text, request, turn_guidance_context)
+            else:
+                text = self._keep_one_main_question(text)
         return self._limit_to_sentence_boundary(
             text,
-            max_chars=self._scene_reply_max_chars(
-                request.route_decision.active_scene
-            ),
+            max_chars=self._reply_max_chars(request.route_decision.active_scene, age_policy),
         )
 
     def _image_context_repair_reply(
@@ -386,6 +413,13 @@ class ChildAgentRuntime:
             return cleaned[:boundary].strip("，。；、 ")
         return cleaned[:80].rstrip("，。；、 ")
 
+    def _reply_max_chars(
+        self,
+        active_scene: SceneId,
+        age_policy: AgeBandReplyPolicy,
+    ) -> int:
+        return min(self._scene_reply_max_chars(active_scene), age_policy.max_chars)
+
     def _scene_reply_max_chars(self, active_scene: SceneId) -> int:
         if active_scene == SceneId.OPEN_CONVERSATION:
             return 520
@@ -452,6 +486,48 @@ class ChildAgentRuntime:
             return text
         return text[: question_positions[0] + 1].strip()
 
+    def _should_remove_question_hook(
+        self,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> bool:
+        if request.route_decision.active_scene != SceneId.OPEN_CONVERSATION:
+            return False
+        hints = set(turn_guidance_context.hints)
+        return bool(
+            hints
+            & {
+                "too_many_recent_questions",
+                "child_requests_topic_change",
+                "bedtime_close_requested",
+                "child_correction",
+            }
+        )
+
+    def _remove_question_hook(
+        self,
+        text: str,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> str:
+        segments = re.findall(r"[^。！？!?]+[。！？!?]?", text)
+        kept = [
+            segment.strip()
+            for segment in segments
+            if segment.strip() and "？" not in segment and "?" not in segment
+        ]
+        if kept:
+            return "".join(kept).strip()
+
+        hints = set(turn_guidance_context.hints)
+        if "bedtime_close_requested" in hints:
+            return self.BEDTIME_CLOSE_REPLY
+        if "child_correction" in hints:
+            return "我可能听错了。我们先按你刚才说的来。"
+        if "child_requests_topic_change" in hints:
+            return "好，我们换一个轻松的。"
+        return "我听见了。我们先顺着你刚才说的聊。"
+
     def _requires_deterministic_self_harm_reply(
         self,
         request: AgentRuntimeRequest,
@@ -476,7 +552,7 @@ class ChildAgentRuntime:
         normalized = request.child_text.replace(" ", "")
         bedtime_requested = any(
             marker in normalized
-            for marker in ("明天再聊", "我要睡觉", "我得睡觉", "晚安", "困了")
+            for marker in ("明天再聊", "我要睡觉", "我得睡觉", "睡觉了", "晚安", "困了")
         )
         if not bedtime_requested and (
             request.route_decision.active_scene != SceneId.DAILY_BEDTIME_REFLECTION
@@ -504,7 +580,8 @@ class ChildAgentRuntime:
             if selected and total + len(segment) > max_chars:
                 break
             if not selected and len(segment) > max_chars:
-                return segment[:max_chars].rstrip("，,；;：: ") + "。"
+                suffix = "。" if max_chars > 1 else ""
+                return segment[: max_chars - len(suffix)].rstrip("，,；;：: ") + suffix
             selected.append(segment)
             total += len(segment)
         if selected:

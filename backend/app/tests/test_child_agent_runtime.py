@@ -110,6 +110,7 @@ def _runtime_request(
     route_decision: SceneRouteDecision | None = None,
     conversation_history: list[ModelMessage] | None = None,
     conversation_metadata: dict[str, object] | None = None,
+    parent_policy: dict[str, object] | None = None,
     child_text: str = "我有一道题不会",
 ) -> AgentRuntimeRequest:
     return AgentRuntimeRequest(
@@ -118,7 +119,8 @@ def _runtime_request(
         child_text=child_text,
         route_decision=route_decision or _route_decision(),
         time_context=_time_context(),
-        parent_policy={
+        parent_policy=parent_policy
+        or {
             "version": 2,
             "goals": ["学习问题先引导思路，不直接给答案"],
             "safety_rules": {"no_secret_requests": True},
@@ -428,13 +430,125 @@ def test_child_agent_runtime_allows_longer_open_conversation_reply() -> None:
     )
 
     result = ChildAgentRuntime(model_registry=registry).run(
-        _runtime_request(route_decision=route_decision)
+        _runtime_request(
+            route_decision=route_decision,
+            parent_policy={
+                "version": 2,
+                "communication_preferences": {"age_band": "age_9_10"},
+            },
+        )
     )
 
     assert result.source == AgentRuntimeSource.MODEL
     assert result.reply_text == long_reply
     assert len(result.reply_text) > 150
     assert result.reply_text.endswith("你现在最想先了解哪一种恐龙？")
+
+
+def test_child_agent_runtime_applies_age_band_reply_budget() -> None:
+    long_reply = (
+        "恐龙这个话题可以从身体、食物和生活环境慢慢看。"
+        "霸王龙有很强的咬合力，三角龙有角和盾一样的头盾，"
+        "有些小型恐龙可能还长着羽毛。"
+        "我们可以先挑一个线索，再慢慢想它为什么会这样生活。"
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    young = ChildAgentRuntime(
+        model_registry=CapturingModelRegistry(response=_model_response(long_reply))
+    ).run(
+        _runtime_request(
+            route_decision=route_decision,
+            parent_policy={
+                "version": 2,
+                "communication_preferences": {"child_age": 6},
+            },
+        )
+    )
+    older = ChildAgentRuntime(
+        model_registry=CapturingModelRegistry(response=_model_response(long_reply))
+    ).run(
+        _runtime_request(
+            route_decision=route_decision,
+            parent_policy={
+                "version": 2,
+                "communication_preferences": {"child_age": 10},
+            },
+        )
+    )
+
+    assert young.source == AgentRuntimeSource.MODEL
+    assert older.source == AgentRuntimeSource.MODEL
+    assert len(young.reply_text) <= 80
+    assert len(older.reply_text) > len(young.reply_text)
+    assert older.model_metadata["age_band"] == "age_9_10"
+    assert young.model_metadata["age_band"] == "age_5_6"
+
+
+def test_child_agent_runtime_throttles_consecutive_question_hooks() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "我记得你刚才一直在说跑步比赛。你还想继续讲比赛吗？"
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="嗯",
+            conversation_history=[
+                ModelMessage(role="assistant", content="你参加的是跑步吗？"),
+                ModelMessage(role="user", content="是"),
+                ModelMessage(role="assistant", content="你跑起来是什么感觉？"),
+            ],
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert "？" not in result.reply_text
+    assert "too_many_recent_questions" in registry.last_request.metadata[
+        "turn_guidance_hints"
+    ]
+    assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_respects_boundary_and_correction_without_new_hook() -> None:
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+    boundary = ChildAgentRuntime(
+        model_registry=CapturingModelRegistry(
+            response=_model_response("好的，那我们换个话题。你想聊积木吗？")
+        )
+    ).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="不聊了，换个话题。",
+        )
+    )
+    correction = ChildAgentRuntime(
+        model_registry=CapturingModelRegistry(
+            response=_model_response("我可能听错了。那你想说的是还没跑吗？")
+        )
+    ).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="不是，你说错了，我还没跑。",
+        )
+    )
+
+    assert "？" not in boundary.reply_text
+    assert "？" not in correction.reply_text
+    assert "换个话题" not in boundary.reply_text
+    assert "我可能听错了" in correction.reply_text
 
 
 def test_child_agent_runtime_does_not_cut_story_at_first_question_mark() -> None:

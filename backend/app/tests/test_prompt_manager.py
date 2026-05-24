@@ -67,6 +67,23 @@ def test_prompt_manager_injects_parent_message_as_background() -> None:
     assert "每 3-5 轮自然出现一次" in prompt.prompt
 
 
+def test_prompt_manager_injects_age_band_reply_policy() -> None:
+    default_prompt = PromptManager().compose("conversation.open")
+    explicit_prompt = PromptManager().compose(
+        "conversation.open",
+        parent_policy={
+            "version": 3,
+            "communication_preferences": {"age_band": "age_5_6"},
+        },
+    )
+
+    assert "age_band: age_7_8" in default_prompt.prompt
+    assert "reply_char_budget: 60-140 个汉字" in default_prompt.prompt
+    assert "question_policy:" in default_prompt.prompt
+    assert "age_band: age_5_6" in explicit_prompt.prompt
+    assert "reply_char_budget: 30-80 个汉字" in explicit_prompt.prompt
+
+
 def test_prompt_manager_injects_turn_guidance_section() -> None:
     prompt = PromptManager().compose(
         "conversation.open",
@@ -138,6 +155,7 @@ def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None
 def test_global_prompt_contains_no_secret_safety_rule() -> None:
     prompt = PromptManager().compose("daily.after_school_checkin")
 
+    assert "面向 5-10 岁儿童" in prompt.prompt
     assert "不能要求孩子保密或保守秘密" in prompt.prompt
     assert "不能鼓励孩子隐瞒父母" in prompt.prompt
     assert "悄悄告诉我" in prompt.prompt
@@ -150,6 +168,7 @@ def test_output_contract_is_voice_first_and_not_markdown() -> None:
     prompt = PromptManager().compose("daily.after_school_checkin")
 
     assert "不输出内部分析、舞台说明、括号里的语气提示" in prompt.prompt
+    assert "长度遵守 child_profile 中的 reply_char_budget" in prompt.prompt
     assert "不使用 Markdown、标题、项目符号、编号列表、表格、代码块或链接格式" in prompt.prompt
     assert "最多只问一个主要问题" in prompt.prompt
     assert "不要连续抛出两个以上问句" in prompt.prompt

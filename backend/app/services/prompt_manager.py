@@ -9,6 +9,7 @@ from app.domain.prompt import (
     PromptTemplateSpec,
     PromptVersion,
 )
+from app.services.age_band_policy import derive_age_band_reply_policy
 
 
 class PromptManagerError(RuntimeError):
@@ -244,8 +245,20 @@ class PromptManager:
         raw_message = str(data.get("parent_message_raw") or "").strip()
         nickname = str(data.get("child_nickname") or "").strip()
         display_name = str(data.get("child_display_name") or "").strip()
+        age_policy = derive_age_band_reply_policy(parent_policy)
+        age_lines = [
+            "年龄与回复节奏是内部提示，不要直接说给孩子：",
+            f"- age_band: {age_policy.age_band}",
+            f"- reply_char_budget: {age_policy.reply_char_budget}",
+            f"- question_policy: {age_policy.question_policy}",
+        ]
         if not raw_message and not nickname and not display_name:
-            return "当前没有单独的孩子画像。不要编造孩子的小名、性格或家庭信息。"
+            return "\n".join(
+                [
+                    "当前没有单独的孩子画像。不要编造孩子的小名、性格或家庭信息。",
+                    *age_lines,
+                ]
+            )
         lines = [
             "孩子画像来自结构化父亲设置和父母寄语的背景信息。可以用它理解孩子的兴趣、近期状态和沟通节奏；不要把它当成固定标签，也不要编造寄语中没有的事实。"
         ]
@@ -253,6 +266,7 @@ class PromptManager:
             lines.append(f"- child_nickname: {nickname}")
         if display_name:
             lines.append(f"- child_display_name: {display_name}")
+        lines.extend(age_lines)
         return "\n".join(lines)
 
     def _render_parent_message(self, parent_policy: Any | None) -> str:

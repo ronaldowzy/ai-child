@@ -119,6 +119,25 @@ def test_turn_guidance_detects_body_topic_change_and_bedtime_closeout() -> None:
     assert "bedtime_close_requested" in bedtime.hints
     assert "短收尾，不再提问" in bedtime.guidance["bedtime_close_requested"]
 
+    correction = TurnGuidanceBuilder().build(child_text="不是，你说错了，我还没跑。")
+
+    assert "child_correction" in correction.hints
+    assert "不要新增追问钩子" in correction.guidance["child_correction"]
+
+
+def test_turn_guidance_detects_consecutive_question_throttle() -> None:
+    guidance = TurnGuidanceBuilder().build(
+        child_text="嗯",
+        conversation_history=[
+            ModelMessage(role="assistant", content="你参加的是跑步吗？"),
+            ModelMessage(role="user", content="是"),
+            ModelMessage(role="assistant", content="你跑起来是什么感觉？"),
+        ],
+    )
+
+    assert "too_many_recent_questions" in guidance.hints
+    assert "不再添加新的追问钩子" in guidance.guidance["too_many_recent_questions"]
+
 
 def test_child_agent_runtime_includes_turn_guidance_in_prompt_and_metadata() -> None:
     registry = CapturingModelRegistry()

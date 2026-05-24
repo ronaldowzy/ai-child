@@ -118,4 +118,6 @@ Prompt 规则：
 4. 普通图片分享后，后续“聊聊它 / 编个故事 / 问这是什么”会带上 attachment_id 和图片摘要进入对话上下文。
 5. 父母寄语优先写入 PostgreSQL parent_policies；本地数据库不可用时 dev 模式回退内存。
 6. 父母寄语仍不会出现在儿童端 debug 或 UI 中。
+7. child_chat prompt 和 runtime 已接入 age_band thin slice：从父亲沟通偏好里的 `age_band`、`child_age` 或 `age` 派生 age_5_6 / age_7_8 / age_9_10 / unknown，默认 age_7_8，并把 `reply_char_budget` 和 `question_policy` 作为内部提示注入。
+8. 开放对话已接入连续追问 thin slice：最近多轮都是小白狐提问、孩子说“换个话题 / 不聊了 / 睡觉了”，或孩子纠正“不是 / 你说错了 / 我还没跑”时，本轮不新增追问钩子，优先尊重边界或修正理解。
 ```

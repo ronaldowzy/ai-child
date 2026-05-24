@@ -49,6 +49,9 @@ class TurnGuidanceBuilder:
         "换个话题",
         "聊点别的",
         "别聊这个",
+        "不聊了",
+        "不想聊了",
+        "不要聊了",
         "不说了",
         "算了",
     )
@@ -56,8 +59,16 @@ class TurnGuidanceBuilder:
         "明天再聊",
         "我要睡觉",
         "我得睡觉",
+        "睡觉了",
         "晚安",
         "困了",
+    )
+    _CORRECTION_MARKERS = (
+        "不是",
+        "你说错了",
+        "我还没跑",
+        "我没有跑",
+        "听错了",
     )
 
     def build(
@@ -112,11 +123,26 @@ class TurnGuidanceBuilder:
             markers=self._BEDTIME_CLOSE_MARKERS,
             instruction="孩子表达明天再聊、睡觉或晚安时，短收尾，不再提问，不拉长对话。",
         )
+        self._add_hint(
+            normalized,
+            hints=hints,
+            guidance=guidance,
+            hint="child_correction",
+            markers=self._CORRECTION_MARKERS,
+            instruction="孩子在纠正你或 ASR 误听时，先承认可能理解错了，按孩子修正后的说法继续；本轮不要新增追问钩子。",
+        )
 
         recent_topic, same_topic_score = self._recent_topic(
             child_text=child_text,
             conversation_history=conversation_history or [],
         )
+        if self._recent_assistant_question_count(conversation_history or []) >= 2:
+            self._set_hint(
+                hints=hints,
+                guidance=guidance,
+                hint="too_many_recent_questions",
+                instruction="最近小白狐已经连续提问，本轮先回应和陈述，不再添加新的追问钩子；需要转场时给一个轻松陈述或短收束。",
+            )
         if same_topic_score >= 4 and self._is_short_or_boundary_reply(normalized):
             self._set_hint(
                 hints=hints,
@@ -161,6 +187,22 @@ class TurnGuidanceBuilder:
         if body_score >= 3:
             return "身体感受", body_score
         return None, max(sports_score, body_score)
+
+    def _recent_assistant_question_count(
+        self,
+        conversation_history: Sequence[ModelMessage],
+    ) -> int:
+        count = 0
+        for message in reversed(conversation_history[-6:]):
+            if message.role == "user":
+                continue
+            if message.role != "assistant" or not isinstance(message.content, str):
+                continue
+            if "？" in message.content or "?" in message.content:
+                count += 1
+                continue
+            break
+        return count
 
     def _add_hint(
         self,

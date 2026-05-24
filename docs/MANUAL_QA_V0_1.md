@@ -5,6 +5,46 @@
 时区：Asia/Shanghai
 测试数据：仅使用虚构 `child_e2e_s14_001` / `child_demo_001` 和 mock 题目文本；未使用真实儿童数据、真实家庭信息、真实照片或真实音频。
 
+## Task 04 Family Beta QA baseline
+
+日期：2026-05-24
+范围：新增家庭内测 checklist/runbook 基线，不宣称真机已通过。
+
+新增独立清单：
+
+```text
+docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
+```
+
+本轮清单覆盖：
+
+```text
+1. Build and environment
+2. Backend health and PostgreSQL
+3. Android install and horizontal layout
+4. Opening greeting
+5. Voice-first ASR
+6. TTS remote audio / segment queue / stop / mute
+7. Xiaobaihu state coverage
+8. Age-banded reply and question throttle
+9. Image sharing
+10. Parent entry
+11. Father report
+12. Healthy Engagement boundaries
+13. Weak network/backend down
+14. Redmi K60 / Honor Pad 5 device notes
+```
+
+当前执行状态：
+
+| 项目 | 结果 |
+|---|---|
+| 标准环境检查 | `bash scripts/doctor_local_env.sh` 已运行；本机环境可用，但没有连接物理 Android 设备 |
+| Redmi K60 真机 QA | NOT_RUN |
+| Honor Pad 5 真机 QA | NOT_RUN |
+| 数据边界 | 清单要求只记录 request_id、日志路径、视频时间点和非敏感统计；不记录儿童原文、完整回复、原始音频、原图或父母寄语原文 |
+| 自动化测试 | 代码和单元测试结果见本轮提交记录；自动化通过不等于真机通过 |
+
 ## QA Artifact Readiness Gate
 
 2026-05-21 复盘：

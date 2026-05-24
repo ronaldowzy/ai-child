@@ -69,10 +69,14 @@ The current backend is local-first and test-stage real-path focused:
   display name second, then no forced call name.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
   can generate or return a cached wav URL. For QA, enable the intended real TTS
-  provider or mark the missing external condition as BLOCKED/FAIL; local/system
-  TTS remains an exception fallback and diagnostic path. Android now prefers
-  `reply.audio_url` playback and falls back to local TextToSpeech or text if
-  remote audio fails.
+  provider or mark the missing external condition as BLOCKED/FAIL. Android now
+  prefers `reply.audio_url` playback; system TextToSpeech is not used as the
+  child-facing automatic fallback when remote audio fails.
+- Task 04 adds Healthy Engagement observability through
+  `app.healthy_engagement` logs. These records contain counts, boundary
+  signals, age band, scene, latency, request_id, and hashed IDs only; they must
+  not contain full child text, full assistant text, raw audio, raw images,
+  parent_message_raw, provider keys, or full provider bodies.
 
 If Android replies look like fixed templates such as “听起来可以聊”, the backend
 is probably not running the intended real chat provider for the current QA
@@ -82,9 +86,9 @@ or screenshots.
 
 ## Current Voice And Presentation Contract
 
-The backend remains the decision and safety boundary. Android may record and
-upload short audio to backend ASR later, and now uses remote audio playback plus
-TextToSpeech fallback for voice output, but child-facing content still flows through:
+The backend remains the decision and safety boundary. Android records explicit
+tap-to-talk audio for backend ASR and uses remote 小白狐 audio for voice output;
+child-facing content still flows through:
 
 ```text
 SafetyEngine -> IntentClassifier -> SceneOrchestrator -> PromptManager -> ModelRegistry -> output safety check
@@ -259,6 +263,16 @@ return evidence fields, quote summaries, or full chat transcripts.
 
 Family-test smoke scripts live under `scripts/` and are designed to catch
 configuration drift before handing an APK to device QA.
+
+The current family-beta device runbook is:
+
+```text
+docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
+```
+
+Use it to separate automated smoke results from Redmi K60 / Honor Pad 5 real
+device QA. Evidence should be request_id, log path, APK hash, or video
+timestamp, not raw child content or raw media.
 
 ```bash
 bash scripts/setup_local_postgres.sh

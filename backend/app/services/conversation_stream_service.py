@@ -96,6 +96,7 @@ class ConversationStreamService:
         first_audio_ms: float | None = None
         active_scene: str | None = None
         error_type: str | None = None
+        healthy_engagement: dict[str, object] | None = None
         audio_segment_count = 0
         tts_segment_count = 0
         tts_error_count = 0
@@ -150,10 +151,15 @@ class ConversationStreamService:
                 audio_segment_count=audio_segment_count,
                 tts_error_count=tts_error_count,
                 error_type=error_type,
+                healthy_engagement=healthy_engagement,
             )
             return
 
         active_scene = response.session_state.active_scene
+        if response.debug and response.debug.healthy_engagement:
+            healthy_engagement = response.debug.healthy_engagement.model_dump(
+                mode="json"
+            )
         yield builder.event("route_decision", self._route_payload(response))
 
         segments = self._text_segmenter.segment(
@@ -260,6 +266,7 @@ class ConversationStreamService:
             audio_segment_count=audio_segment_count,
             tts_error_count=tts_error_count,
             error_type="tts_segment_failed" if tts_error_count else error_type,
+            healthy_engagement=healthy_engagement,
         )
 
     def _record_stream_turn_best_effort(
@@ -453,7 +460,9 @@ class ConversationStreamService:
         audio_segment_count: int,
         tts_error_count: int,
         error_type: str | None,
+        healthy_engagement: dict[str, object] | None,
     ) -> None:
+        stream_total_ms = self._elapsed_ms(started_at)
         logging.getLogger("app.stream_timing").info(
             "conversation_stream_finished",
             extra={
@@ -464,7 +473,7 @@ class ConversationStreamService:
                 "first_text_ms": first_text_ms,
                 "first_tts_start_ms": first_tts_start_ms,
                 "first_audio_ms": first_audio_ms,
-                "stream_total_ms": self._elapsed_ms(started_at),
+                "stream_total_ms": stream_total_ms,
                 "text_segment_count": text_segment_count,
                 "tts_segment_count": tts_segment_count,
                 "audio_segment_count": audio_segment_count,
@@ -472,3 +481,33 @@ class ConversationStreamService:
                 "error_type": error_type,
             },
         )
+        if healthy_engagement is None:
+            return
+        payload = dict(healthy_engagement)
+        payload.update(
+            {
+                "event": "healthy_engagement_stream",
+                "request_id": get_request_id(),
+                "session_id_hash": hash_identifier(request.session_id),
+                "active_scene": active_scene,
+                "first_text_ms": first_text_ms,
+                "first_audio_ms": first_audio_ms,
+                "turn_total_ms": stream_total_ms,
+                "stream_error_type": error_type,
+            }
+        )
+        try:
+            logging.getLogger("app.healthy_engagement").info(
+                "healthy_engagement_stream",
+                extra=payload,
+            )
+        except Exception as exc:
+            logging.getLogger("app.stream_timing").warning(
+                "healthy_engagement_stream_log_failed",
+                extra={
+                    "event": "healthy_engagement_stream_log_failed",
+                    "request_id": get_request_id(),
+                    "session_id_hash": hash_identifier(request.session_id),
+                    "error_type": exc.__class__.__name__,
+                },
+            )

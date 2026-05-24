@@ -4,6 +4,14 @@
 
 当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，并补上图片本地确认卡和父亲入口降噪 thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
 
+Task 04 家庭内测 QA runbook 已新增：
+
+```text
+docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
+```
+
+该清单是 Redmi K60 / Honor Pad 5 真机执行入口；`./gradlew test` 通过不代表真机 QA 通过。证据只记录 request_id、日志路径、视频时间点和非敏感统计，不记录儿童原文、完整回复、原始音频、原图或父母寄语原文。
+
 ## 当前范围
 
 - 单一儿童聊天入口。
@@ -11,6 +19,7 @@
   `reply.agent_motion` 做轻量状态变化。
 - 儿童默认 voice-first 输入：主按钮用于开始说话 / 说完了 / 正在听懂；文字输入框和发送按钮默认隐藏，可通过 DevSettings 打开。
 - Android 已新增 `ChildTurnUiPhase` / `ChildInteractionPresentation` thin slice，把 Ready、Listening、Recognizing、Thinking、SpeakingPending、Speaking、ImageProcessing、NeedsRetry、PermissionNeeded、ServiceError 等儿童可见 phase 统一派生为小白狐状态、短状态文案、InputBar 主按钮、图片按钮可见性和 TTS stop 控制。
+- Task 04 已补 `XiaobaohuStateCoverageTest` 和 `FOX_AGENT_VISUAL_DESIGN_V0_1.md` 状态覆盖矩阵，固定 ChildTurnUiPhase / backend scene signal 到 FoxMood、FoxMotion、MascotState 的映射；Resting 目前为 phase/test covered，但业务触发仍待后续扩展。
 - 默认优先调用后端 `POST /api/v1/conversation/stream`；失败时 fallback 到 `POST /api/v1/conversation/message`。
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和

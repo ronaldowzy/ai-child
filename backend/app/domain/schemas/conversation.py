@@ -89,11 +89,30 @@ class ParentPolicyDebug(BaseModel):
     safety_rules: dict[str, Any]
 
 
+class HealthyEngagementDebug(BaseModel):
+    turn_index: int | None = None
+    recent_history_turns: int
+    active_scene: str
+    age_band: str
+    reply_char_count: int
+    question_count: int
+    turn_guidance_hints: list[str] = Field(default_factory=list)
+    boundary_signal: str | None = None
+    boundary_respected: bool | None = None
+    same_topic_score: int = 0
+    consecutive_recent_questions: int = 0
+    reply_normalized: bool = False
+    first_text_ms: float | None = None
+    first_audio_ms: float | None = None
+    turn_total_ms: float | None = None
+
+
 class ConversationDebug(BaseModel):
     time_context: TimeContext
     parent_policy: ParentPolicyDebug
     safety: SafetyDebug | None = None
     intent: IntentDebug | None = None
+    healthy_engagement: HealthyEngagementDebug | None = None
 
 
 class ConversationMessageResponse(BaseModel):

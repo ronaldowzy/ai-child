@@ -137,6 +137,8 @@ class ChildAgentRuntime:
                 provider_name=model_response.provider_name,
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
+                turn_guidance_context=turn_guidance_context,
+                age_policy=age_policy,
             )
         if self._requires_deterministic_self_harm_reply(request):
             return self._fallback_result(
@@ -146,6 +148,8 @@ class ChildAgentRuntime:
                 provider_name=model_response.provider_name,
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
+                turn_guidance_context=turn_guidance_context,
+                age_policy=age_policy,
             )
 
         output_safety = self._safety_engine.classify_output(reply_text)
@@ -158,6 +162,8 @@ class ChildAgentRuntime:
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
                 output_risk_level=output_safety.risk_level,
+                turn_guidance_context=turn_guidance_context,
+                age_policy=age_policy,
             )
         if self._looks_like_direct_homework_answer(request, reply_text):
             return self._fallback_result(
@@ -168,8 +174,18 @@ class ChildAgentRuntime:
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
                 output_risk_level=output_safety.risk_level,
+                turn_guidance_context=turn_guidance_context,
+                age_policy=age_policy,
             )
 
+        self._attach_healthy_engagement_metrics(
+            model_response.metadata,
+            request=request,
+            turn_guidance_context=turn_guidance_context,
+            age_policy=age_policy,
+            reply_text=reply_text,
+            reply_normalized=model_response.metadata.get("reply_normalized") is True,
+        )
         return AgentRuntimeResult(
             reply_text=reply_text,
             source=AgentRuntimeSource.MODEL,
@@ -190,11 +206,23 @@ class ChildAgentRuntime:
         model_name: str | None = None,
         model_metadata: dict[str, Any] | None = None,
         output_risk_level: RiskLevel | None = None,
+        turn_guidance_context: TurnGuidanceContext | None = None,
+        age_policy: AgeBandReplyPolicy | None = None,
     ) -> AgentRuntimeResult:
         reply_text = request.route_decision.reply_text
         if self._requires_deterministic_self_harm_reply(request):
             reply_text = self.SELF_HARM_GUARDIAN_REPLY
             fallback_reason = "deterministic_self_harm_guardian"
+        metadata = dict(model_metadata or {})
+        self._attach_healthy_engagement_metrics(
+            metadata,
+            request=request,
+            turn_guidance_context=turn_guidance_context
+            or self._build_turn_guidance_context(request),
+            age_policy=age_policy or derive_age_band_reply_policy(request.parent_policy),
+            reply_text=reply_text,
+            reply_normalized=metadata.get("reply_normalized") is True,
+        )
         return AgentRuntimeResult(
             reply_text=reply_text,
             source=AgentRuntimeSource.FALLBACK,
@@ -202,7 +230,7 @@ class ChildAgentRuntime:
             model_name=model_name,
             fallback_reason=fallback_reason,
             prompt_versions=prompt_versions,
-            model_metadata=model_metadata or {},
+            model_metadata=metadata,
             output_risk_level=output_risk_level,
         )
 
@@ -278,6 +306,61 @@ class ChildAgentRuntime:
         if metadata.get("fallback_used") is True:
             return "model_registry_fallback"
         return None
+
+    def _attach_healthy_engagement_metrics(
+        self,
+        metadata: dict[str, Any],
+        *,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+        age_policy: AgeBandReplyPolicy,
+        reply_text: str,
+        reply_normalized: bool,
+    ) -> None:
+        metadata["healthy_engagement"] = self._healthy_engagement_metrics(
+            request=request,
+            turn_guidance_context=turn_guidance_context,
+            age_policy=age_policy,
+            reply_text=reply_text,
+            reply_normalized=reply_normalized,
+        )
+
+    def _healthy_engagement_metrics(
+        self,
+        *,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+        age_policy: AgeBandReplyPolicy,
+        reply_text: str,
+        reply_normalized: bool,
+    ) -> dict[str, Any]:
+        question_count = self._question_count(reply_text)
+        boundary_signal = turn_guidance_context.boundary_signal
+        boundary_respected = None
+        if boundary_signal is not None:
+            boundary_respected = question_count == 0
+        return {
+            "turn_index": None,
+            "recent_history_turns": len(request.conversation_history),
+            "active_scene": request.route_decision.active_scene.value,
+            "age_band": age_policy.age_band,
+            "reply_char_count": len(reply_text),
+            "question_count": question_count,
+            "turn_guidance_hints": list(turn_guidance_context.hints),
+            "boundary_signal": boundary_signal,
+            "boundary_respected": boundary_respected,
+            "same_topic_score": turn_guidance_context.same_topic_score,
+            "consecutive_recent_questions": (
+                turn_guidance_context.consecutive_recent_questions
+            ),
+            "reply_normalized": reply_normalized,
+            "first_text_ms": None,
+            "first_audio_ms": None,
+            "turn_total_ms": None,
+        }
+
+    def _question_count(self, text: str) -> int:
+        return text.count("？") + text.count("?")
 
     def _looks_like_direct_homework_answer(
         self, request: AgentRuntimeRequest, reply_text: str

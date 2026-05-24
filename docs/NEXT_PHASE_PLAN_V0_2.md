@@ -10,7 +10,7 @@
 3. 下一阶段优先解决语音交互和小白狐形象体验。
 4. 当前测试阶段真实可用优先；已进入测试范围的真实模型和儿童数据外发链路必须通过后端 gate 后实际启用验证。
 5. 语音输入 ASR v1 目标已修订为后端本地 ASR 优先：第一选择是 sherpa-onnx + SenseVoice-Small int8；本地异常后 fallback 到原有 MiMo ASR。Android 不直接调用 MiMo，只负责录音上传和儿童端语音状态；儿童默认自动发送 transcript，确认面板仅保留为 DevSettings / 父亲调试模式。
-6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 保留为 fallback 和诊断能力。
+6. 小白狐语音输出主路径改为后端 MiMo VoiceClone 生成 `audio_url`，Android 优先播放远程音频；系统 TextToSpeech 只保留为开发诊断/平台能力观察，不作为儿童端自动朗读 fallback。
 7. 小白狐视觉优先 3D 卡通 / soft 3D / 毛绒感 / 儿童动画质感；Compose Canvas / 2D 只是 fallback。
 8. 小白狐 v1 候选形象资产已生成，当前静态资源包含 11 个状态；动态 animation_v1 资源包以 `mascot_manifest.json` 为准，当前实际状态也是 11 个：idle、listening、speaking、jumping_happy、thinking、calm、sleepy、safety_concern、privacy_boundary、homework_focus、network_error。
 9. Android 第一版优先预渲染 3D PNG/WebP 状态图 + 本地 WebP 序列帧轻量播放，不引入实时 3D 引擎或大型动画依赖作为必需能力。
@@ -34,6 +34,7 @@
 27. 小白狐 opening greeting 已进入 v1 范围：儿童聊天页首次可见时请求后端 opening，称呼优先 child_nickname，其次 child_display_name，都没有则不强行称呼。
 28. Android 父亲设置页已支持结构化配置孩子小名和显示名；opening greeting 使用小名优先、显示名 fallback，但真机 QA 仍待完成。
 29. 家庭内测前 smoke 脚本和 QA checklist 已补齐：backend local smoke、voice stack mock smoke 可本地通过；DB persistence smoke 需要本地 PostgreSQL；MiMo ASR real smoke 只在 opt-in policy env、MiMo key 和非儿童测试音频同时满足时执行。
+30. Task 04 已新增 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md`，作为 Redmi K60 / Honor Pad 5 家庭内测前统一 runbook；默认状态均为 `NOT_RUN`，自动化测试通过不能替代真机 QA。
 ```
 
 ---
@@ -73,7 +74,7 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 2. 不使用真实儿童身份、真实家庭信息、真实照片或真实音频。
 3. 发现环境共性坑时由主控更新 SHARED_CONTEXT。
 4. 不把未验证能力写成 done。
-5. 家庭内测前按 `docs/QA_DEVICE_CHECKLIST_V0_1.md` 记录 Redmi K60 和 Honor Pad 5 结果；debug APK 自动构建成功不等于真机通过。
+5. 家庭内测前按 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md` 记录 Redmi K60 和 Honor Pad 5 结果；debug APK 自动构建成功不等于真机通过。
 ```
 
 ---
@@ -125,13 +126,13 @@ Device B：Honor Pad 5，Android 9，RAM 4GB，低配兼容性和大屏目标设
 
 ## Phase 3：TTS 朗读 v1
 
-目标：用后端 MiMo VoiceClone 生成小白狐回复音频，Android 优先播放 `reply.audio_url`。Android 系统 TTS 只作为 fallback 和诊断能力，朗读内容必须来自后端已安全处理的 reply。
+目标：用后端 MiMo VoiceClone 生成小白狐回复音频，Android 优先播放 `reply.audio_url`。Android 系统 TTS 不作为儿童端自动朗读 fallback；开发诊断可以观察平台 TTS 能力，但朗读内容必须来自后端已安全处理的 reply。
 
 设备顺序：
 
 ```text
-1. 先在高配 Android 手机上跑通 `reply.audio_url` 远程音频播放、停止、关闭、speaking 状态和系统 TTS fallback。
-2. 再在 Honor Pad 5 上验证远程 wav 播放、延迟、卡顿、缓存音频体积、系统 TTS fallback 是否可用，以及是否需要关闭自动朗读作为低配默认。
+1. 先在高配 Android 手机上跑通 `reply.audio_url` 远程音频播放、停止、关闭、speaking 状态和远程失败时不混播系统音色。
+2. 再在 Honor Pad 5 上验证远程 wav 播放、延迟、卡顿、缓存音频体积、远程失败提示，以及是否需要关闭自动朗读作为低配默认。
 ```
 
 ## Phase 7：PostgreSQL Local Persistence
@@ -317,8 +318,8 @@ Ops P0 当前能力（2026-05-21）：
 5. 朗读状态和小白狐轻量状态联动。
 6. 提供停止当前朗读和静音 / 关闭自动朗读入口。
 7. 提供 DevSettings 或父亲设置开关。
-8. 通过 TtsController / AudioUrlPlayer 抽象接入远程音频播放；系统 TextToSpeech 作为 fallback。
-9. 系统 fallback 保留 VoiceProfile：preferredVoiceName、zh-CN、speechRate 稍慢、pitch 偏高不过度、fallback 系统默认中文 voice。
+8. 通过 TtsController / AudioUrlPlayer 抽象接入远程音频播放；系统 TextToSpeech 不作为儿童端自动朗读 fallback。
+9. DevSettings 诊断可观察平台 TTS 能力，但远程音频失败时默认保留文字和温和提示，不混播系统音色。
 10. 正式音色方向由 MiMo VoiceClone v01 承担：小孩子般干净、清脆、中性、活泼可爱，但不能过度尖锐或幼稚。
 ```
 
@@ -339,12 +340,12 @@ Ops P0 当前能力（2026-05-21）：
 3. TTS 失败时文字仍可读，UI 显示温和提示。
 4. 后端 TTS 当前测试阶段应验证目标 provider；MiMo policy 不满足时不调用外部 provider，不能写成真实链路通过。
 5. TTS 请求被接受后小白狐进入 speaking pending；失败、停止或结束后恢复 base state。
-6. QA 记录远程音频播放延迟、自然度、孩子接受度和系统 fallback 结果。
+6. QA 记录远程音频播放延迟、自然度、孩子接受度，以及远程失败时是否没有系统音色混播。
 ```
 
 ### Phase 3.1：TTS-D1 可观测性与故障修复
 
-目标：先判断 Android 系统 TTS fallback 链路是否触发、初始化、选中中文 voice、调用 speak()，并作为 remote audioUrl 失败时的诊断和降级能力。
+目标：先判断 Android 平台 TTS 诊断链路是否初始化、选中中文 voice、调用 speak()。该能力只用于开发诊断，不作为儿童端 remote audioUrl 失败时的自动朗读 fallback。
 
 范围：
 

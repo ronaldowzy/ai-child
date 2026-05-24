@@ -10,6 +10,8 @@ class TurnGuidanceContext(BaseModel):
     guidance: dict[str, str] = Field(default_factory=dict)
     recent_topic: str | None = None
     same_topic_score: int = 0
+    consecutive_recent_questions: int = 0
+    boundary_signal: str | None = None
 
 
 class TurnGuidanceBuilder:
@@ -136,7 +138,10 @@ class TurnGuidanceBuilder:
             child_text=child_text,
             conversation_history=conversation_history or [],
         )
-        if self._recent_assistant_question_count(conversation_history or []) >= 2:
+        consecutive_recent_questions = self._recent_assistant_question_count(
+            conversation_history or []
+        )
+        if consecutive_recent_questions >= 2:
             self._set_hint(
                 hints=hints,
                 guidance=guidance,
@@ -156,6 +161,8 @@ class TurnGuidanceBuilder:
             guidance=guidance,
             recent_topic=recent_topic,
             same_topic_score=same_topic_score,
+            consecutive_recent_questions=consecutive_recent_questions,
+            boundary_signal=self._boundary_signal(normalized, hints),
         )
 
     def _recent_topic(
@@ -238,6 +245,20 @@ class TurnGuidanceBuilder:
         if len(normalized) <= 8:
             return True
         return self._contains_any(normalized, self._TOPIC_CHANGE_MARKERS)
+
+    def _boundary_signal(self, normalized: str, hints: list[str]) -> str | None:
+        if "bedtime_close_requested" in hints:
+            return "bedtime"
+        if "child_requests_topic_change" in hints:
+            if self._contains_any(
+                normalized,
+                ("不聊", "不想聊", "不要聊", "不说", "算了"),
+            ):
+                return "no_chat"
+            return "topic_change"
+        if "child_correction" in hints:
+            return "correction"
+        return None
 
     def _normalize(self, text: str) -> str:
         return text.strip().lower().replace(" ", "")

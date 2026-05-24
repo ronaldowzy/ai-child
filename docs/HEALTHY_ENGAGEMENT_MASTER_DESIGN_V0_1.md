@@ -643,6 +643,56 @@ Growing Nest：
 父亲端正向反馈：父亲认为日报建议可执行的比例。
 ```
 
+Task 04 已落地一个观测 thin slice，用于家庭内测前排查体验节奏，不作为留存优化或拉长会话目标。后端在 `app.healthy_engagement` 记录结构化事件：
+
+```text
+event=healthy_engagement_turn
+event=healthy_engagement_stream
+```
+
+当前字段只包含非原文统计和分类：
+
+```text
+recent_history_turns
+active_scene
+age_band
+reply_char_count
+question_count
+turn_guidance_hints
+boundary_signal
+boundary_respected
+same_topic_score
+consecutive_recent_questions
+reply_normalized
+first_text_ms
+first_audio_ms
+turn_total_ms
+runtime_source
+fallback_reason
+request_id
+child_id_hash
+session_id_hash
+```
+
+禁止写入：
+
+```text
+完整儿童输入
+完整小白狐回复
+父母寄语原文
+原始音频、原图或本地文件路径
+provider key、Authorization、完整 provider request/response body
+```
+
+用途限制：
+
+```text
+1. 用于确认小白狐是否尊重“换话题 / 不聊了 / 睡觉”等边界。
+2. 用于确认连续追问是否被 throttle。
+3. 用于确认 stream 首字、首音频和总时延是否符合家庭内测体验。
+4. 不把会话时长、连续使用天数或高频回访当作成功目标。
+```
+
 ### 12.2 Risk Metrics
 
 ```text

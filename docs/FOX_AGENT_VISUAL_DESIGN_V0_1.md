@@ -297,6 +297,37 @@ assets/fox/v1/3d/fox_3d_network_error.webp
 4. 2D fallback：在 3D 资源未完成前可用于占位，但必须明确标注为 fallback。
 ```
 
+## 7.2 Task 04 状态覆盖矩阵
+
+本节是 Android unified interaction state / mascot coverage 的当前基线。它只说明状态覆盖和 QA 入口，不代表所有真机表现已完成验收。
+
+| Phase / Scene | FoxMood | FoxMotion | MascotState / asset | Fallback | 代码路径 | QA 场景 ID | 状态 |
+|---|---|---|---|---|---|---|---|
+| Ready | `Warm` | `GentleIdle` | `Idle` / `idle` | static `fox_3d_neutral_idle` -> Canvas | `ChildTurnUiPhase.Ready` -> `MascotState.fromAgent` | `FOX-STATE-READY` | covered_by_unit_test；真机待验 |
+| Listening | `Listening` | `ListeningTail` | `Listening` / `listening` | static `fox_3d_listening` -> Canvas | `VoiceInputMode.Listening` -> `ChildTurnUiPhase.Listening` | `FOX-STATE-LISTENING` | covered_by_unit_test；真机待验 |
+| Recognizing | `Thinking` | `ThinkingBlink` | `Thinking` / `thinking` | static `fox_3d_thinking` -> Canvas | `VoiceInputMode.Uploading` -> `ChildTurnUiPhase.Recognizing` | `FOX-STATE-RECOGNIZING` | covered_by_unit_test；真机待验 |
+| Thinking | `Thinking` | `ThinkingBlink` | `Thinking` / `thinking` | static `fox_3d_thinking` -> Canvas | `isSending` / stream session -> `ChildTurnUiPhase.Thinking` | `FOX-STATE-THINKING` | covered_by_unit_test；真机待验 |
+| SpeakingPending | `Warm` + current reply mood | `Speaking` | `Speaking` / `speaking` | static `fox_3d_speaking` -> Canvas | `TtsUiState.isSpeakingPending` -> `ChildTurnUiPhase.SpeakingPending` | `FOX-STATE-SPEAKING-PENDING` | covered_by_unit_test；真机待验 |
+| Speaking | `Warm` + current reply mood | `Speaking` | `Speaking` / `speaking` | static `fox_3d_speaking` -> Canvas | `TtsUiState.isSpeaking` -> `ChildTurnUiPhase.Speaking` | `FOX-STATE-SPEAKING` | covered_by_unit_test；真机待验 |
+| ImageProcessing | `Thinking` | `ThinkingBlink` | `Thinking` / `thinking` | static `fox_3d_thinking` -> Canvas | image upload/select flow -> `ChildTurnUiPhase.ImageProcessing` | `FOX-STATE-IMAGE-PROCESSING` | covered_by_unit_test；真机待验 |
+| NeedsRetry | `Listening` | `ListeningTail` | `Listening` / `listening` | static `fox_3d_listening` -> Canvas | ASR retry -> `ChildTurnUiPhase.NeedsRetry` | `FOX-STATE-NEEDS-RETRY` | covered_by_unit_test；真机待验 |
+| PermissionNeeded | `SafetyConcern` | `ConcernedStill` | `SafetyConcern` / `safety_concern` | static `fox_3d_safety_concern` -> Canvas | microphone permission denied -> `ChildTurnUiPhase.PermissionNeeded` | `FOX-STATE-PERMISSION` | covered_by_unit_test；真机待验 |
+| Resting | `Calm` | `CalmStill` | `Calm` / `calm` | static `fox_3d_calm` -> Canvas | `ChildTurnUiPhase.Resting` phase hint | `FOX-STATE-RESTING` | covered_by_unit_test；业务触发待扩展 |
+| ServiceError | `NetworkError` | `NetworkError` | `NetworkError` / `network_error` | static `fox_3d_network_error` -> Canvas | network / stream / upload failure -> `ChildTurnUiPhase.ServiceError` | `FOX-STATE-SERVICE-ERROR` | covered_by_unit_test；真机待验 |
+| OpeningGreeting | `Warm` | `GentleIdle` or `Speaking` | `Idle` or `Speaking` | static idle/speaking -> Canvas | `ChatViewModel.requestOpeningGreeting()` | `FOX-STATE-OPENING` | covered_by_unit_test；真机待验 |
+| PrivacyBoundary | `PrivacyBoundary` | `SteadyBoundary` | `PrivacyBoundary` / `privacy_boundary` | static `fox_3d_privacy_boundary` -> Canvas | backend `reply.emotion` / `reply.agent_motion` -> `toFoxAgentUiState()` | `FOX-STATE-PRIVACY` | covered_by_unit_test；真机待验 |
+| SafetyConcern | `SafetyConcern` | `ConcernedStill` | `SafetyConcern` / `safety_concern` | static `fox_3d_safety_concern` -> Canvas | backend `reply.emotion` / `reply.agent_motion` -> `toFoxAgentUiState()` | `FOX-STATE-SAFETY` | covered_by_unit_test；真机待验 |
+| HomeworkFocus | `HomeworkFocus` | `HomeworkFocus` | `HomeworkFocus` / `homework_focus` | static `fox_3d_homework_focus` -> Canvas | backend `reply.emotion` / `reply.agent_motion` -> `toFoxAgentUiState()` | `FOX-STATE-HOMEWORK` | covered_by_unit_test；真机待验 |
+| NetworkError | `NetworkError` | `NetworkError` | `NetworkError` / `network_error` | static `fox_3d_network_error` -> Canvas | service / stream exception -> network error agent fallback | `FOX-STATE-NETWORK` | covered_by_unit_test；真机待验 |
+
+覆盖测试：
+
+```text
+android/app/src/test/java/com/childai/companion/ui/chat/XiaobaohuStateCoverageTest.kt
+```
+
+该测试固定 `ChildTurnUiPhase` -> `FoxMood` / `FoxMotion` -> `MascotState` 的映射，并验证没有 manifest 或未知状态 ID 时回到 `Idle`，不崩溃。Redmi K60 / Honor Pad 5 真机仍需逐项检查动画切换、资源内存和横屏布局。
+
 ## 8. Android 集成方式
 
 当前 Android 端已有 Compose Canvas fallback，并根据后端 `reply.emotion` 和 `reply.agent_motion` 做轻量状态映射。第一版资源接入原则如下：

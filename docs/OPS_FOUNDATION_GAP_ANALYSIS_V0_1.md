@@ -189,6 +189,50 @@ Authorization / API key / token
 }
 ```
 
+### 4.5 Healthy Engagement observability
+
+Task 04 已新增 `app.healthy_engagement` 本地结构化日志，用于家庭内测前看清小白狐是否尊重儿童边界、是否过度追问、以及 stream 首字/首音频是否过慢。该日志不是留存、签到或成瘾指标。
+
+非 stream turn：
+
+```json
+{
+  "event": "healthy_engagement_turn",
+  "request_id": "req_...",
+  "child_id_hash": "sha256:...",
+  "session_id_hash": "sha256:...",
+  "active_scene": "conversation.open",
+  "age_band": "age_7_8",
+  "reply_char_count": 32,
+  "question_count": 0,
+  "turn_guidance_hints": ["child_requests_topic_change"],
+  "boundary_signal": "no_chat",
+  "boundary_respected": true,
+  "same_topic_score": 1,
+  "consecutive_recent_questions": 0,
+  "reply_normalized": true,
+  "first_text_ms": null,
+  "first_audio_ms": null,
+  "turn_total_ms": 245.1,
+  "runtime_source": "model",
+  "fallback_reason": null
+}
+```
+
+stream turn 完成时会补一条 `healthy_engagement_stream`，把 `first_text_ms`、`first_audio_ms`、`turn_total_ms` 写入同一类非原文字段。
+
+禁止字段保持不变：
+
+```text
+完整 child_text
+完整 reply_text
+父母寄语原文
+原始音频路径
+原始照片路径
+完整 provider request/response body
+Authorization / API key / token
+```
+
 ---
 
 ## 5. Health 扩展建议

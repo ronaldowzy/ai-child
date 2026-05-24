@@ -1,4 +1,5 @@
 import logging
+import time
 
 from app.core.logging import hash_identifier
 from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
@@ -7,6 +8,7 @@ from app.domain.schemas.conversation import (
     ConversationDebug,
     ConversationMessageRequest,
     ConversationMessageResponse,
+    HealthyEngagementDebug,
     IntentDebug,
     ParentPolicyDebug,
     QuickAction,
@@ -68,6 +70,7 @@ from app.services.tts_service import TtsService, get_tts_service
 
 
 logger = logging.getLogger("app.conversation")
+healthy_engagement_logger = logging.getLogger("app.healthy_engagement")
 
 
 class ConversationService:
@@ -115,6 +118,7 @@ class ConversationService:
     def handle_message(
         self, request: ConversationMessageRequest
     ) -> ConversationMessageResponse:
+        started_at = time.perf_counter()
         parent_policy = self._parent_policy_service.get_policy(request.child_id)
         time_context = self._time_context_service.build_context(
             device_time=request.client_context.device_time,
@@ -249,6 +253,15 @@ class ConversationService:
             runtime_result=runtime_result,
             response=response,
         )
+        healthy_engagement_debug = self._healthy_engagement_debug(
+            runtime_result,
+            turn_total_ms=self._elapsed_ms(started_at),
+        )
+        self._log_healthy_engagement_metrics(
+            request=request,
+            runtime_result=runtime_result,
+            healthy_engagement=healthy_engagement_debug,
+        )
 
         if self._debug_enabled:
             response.debug = ConversationDebug(
@@ -276,6 +289,7 @@ class ConversationService:
                     confidence=intent.confidence,
                     evidence=intent.evidence,
                 ),
+                healthy_engagement=healthy_engagement_debug,
             )
         try:
             self._memory_hooks.record_turn(
@@ -363,6 +377,62 @@ class ConversationService:
                 "quick_actions": len(response.ui_actions),
             },
         )
+
+    def _healthy_engagement_debug(
+        self,
+        runtime_result: AgentRuntimeResult,
+        *,
+        turn_total_ms: float,
+    ) -> HealthyEngagementDebug | None:
+        metrics = runtime_result.model_metadata.get("healthy_engagement")
+        if not isinstance(metrics, dict):
+            return None
+        sanitized_metrics = dict(metrics)
+        sanitized_metrics["turn_total_ms"] = turn_total_ms
+        try:
+            return HealthyEngagementDebug.model_validate(sanitized_metrics)
+        except Exception:
+            return None
+
+    def _log_healthy_engagement_metrics(
+        self,
+        *,
+        request: ConversationMessageRequest,
+        runtime_result: AgentRuntimeResult,
+        healthy_engagement: HealthyEngagementDebug | None,
+    ) -> None:
+        if healthy_engagement is None:
+            return
+        payload = healthy_engagement.model_dump(mode="json")
+        payload.update(
+            {
+                "event": "healthy_engagement_turn",
+                "request_id": get_request_id(),
+                "child_id_hash": hash_identifier(request.child_id),
+                "session_id_hash": hash_identifier(request.session_id),
+                "runtime_source": runtime_result.source.value,
+                "fallback_reason": runtime_result.fallback_reason,
+            }
+        )
+        try:
+            healthy_engagement_logger.info(
+                "healthy_engagement_turn",
+                extra=payload,
+            )
+        except Exception as exc:
+            logger.warning(
+                "healthy_engagement_log_failed",
+                extra={
+                    "event": "healthy_engagement_log_failed",
+                    "request_id": get_request_id(),
+                    "child_id_hash": hash_identifier(request.child_id),
+                    "session_id_hash": hash_identifier(request.session_id),
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+
+    def _elapsed_ms(self, started_at: float) -> float:
+        return round((time.perf_counter() - started_at) * 1000, 1)
 
     def _response_from_route_decision(
         self,

@@ -7,6 +7,9 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.voice.SpeechInputController
 import com.childai.companion.voice.SpeechInputResult
+import com.childai.companion.voice.TtsCallbacks
+import com.childai.companion.voice.TtsController
+import com.childai.companion.voice.TtsRequest
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
@@ -147,16 +150,52 @@ class ChatViewModelVoiceInputTest {
         assertEquals("没有麦克风权限，我们可以请大人打开。", viewModel.uiState.value.voice.statusText)
     }
 
+    @Test
+    fun startVoiceRecordingStopsCurrentTts() {
+        val sender = RecordingConversationSender()
+        val tts = VoiceInputRecordingTtsController(autoComplete = false)
+        val viewModel = viewModel(sender = sender, ttsController = tts)
+
+        viewModel.renderAgentReply(
+            response = ConversationMessageResponse(
+                reply = ConversationReply(
+                    type = "agent_message",
+                    text = "我先说一句。",
+                    voiceEnabled = true,
+                    audioUrl = "/media/tts/fox.wav",
+                    emotion = "warm",
+                    agentMotion = "gentle_idle",
+                ),
+                uiActions = emptyList(),
+                sessionState = ConversationSessionState(
+                    baseScene = "conversation.open",
+                    activeScene = "conversation.open",
+                    needsInput = null,
+                    requiresParentAttention = false,
+                ),
+            ),
+        )
+        val stopCountAfterReply = tts.stopCount
+
+        viewModel.startVoiceRecording(tempDir())
+
+        assertEquals(stopCountAfterReply + 1, tts.stopCount)
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+        assertEquals(VoiceInputMode.Listening, viewModel.uiState.value.voice.inputMode)
+    }
+
     private fun viewModel(
         sender: RecordingConversationSender,
         speech: SpeechInputController = FakeSpeechInputController(),
         voiceConfirmBeforeSend: Boolean = false,
         feedbackTts: XiaobaohuTtsAudioGenerator = RecordingFeedbackTtsAudioGenerator(),
+        ttsController: TtsController = NoOpRecordingTtsController,
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = sender,
             speechInputController = speech,
             feedbackTtsAudioGenerator = feedbackTts,
+            ttsController = ttsController,
             sendDispatcher = Dispatchers.Unconfined,
             voiceConfirmBeforeSend = voiceConfirmBeforeSend,
         )
@@ -240,4 +279,30 @@ private class RecordingConversationSender : ConversationMessageSender {
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
     ) = Unit
+}
+
+private object NoOpRecordingTtsController : TtsController {
+    override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean = false
+    override fun stop() = Unit
+    override fun shutdown() = Unit
+}
+
+private class VoiceInputRecordingTtsController(
+    private val autoComplete: Boolean = true,
+) : TtsController {
+    var stopCount = 0
+
+    override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
+        callbacks.onStart()
+        if (autoComplete) {
+            callbacks.onDone()
+        }
+        return true
+    }
+
+    override fun stop() {
+        stopCount += 1
+    }
+
+    override fun shutdown() = Unit
 }

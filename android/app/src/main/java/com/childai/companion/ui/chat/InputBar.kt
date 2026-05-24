@@ -195,6 +195,17 @@ fun InputBar(
                         )
                     }
                 }
+                if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
+                    OutlinedButton(
+                        onClick = onToggleTtsMuted,
+                        modifier = Modifier.heightIn(min = 58.dp),
+                    ) {
+                        Text(
+                            text = inputBarMuteToggleText(tts),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
                 if (interactionPresentation.showImageInput) {
                     OutlinedButton(
                         onClick = { showImageSourceDialog = true },
@@ -279,9 +290,9 @@ fun InputBar(
                         Text(text = "取消语音")
                     }
                 }
-                if (interactionPresentation.showMuteToggle || !useChildVoiceFirstInput) {
+                if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
                     TextButton(onClick = onToggleTtsMuted) {
-                        Text(text = if (tts.isMuted) "打开朗读" else "静音")
+                        Text(text = inputBarMuteToggleText(tts))
                     }
                 }
             }
@@ -371,6 +382,17 @@ internal fun inputBarShouldShowCancelAction(
 ): Boolean {
     return inputMode == VoiceInputMode.Listening ||
         (useChildVoiceFirstInput && inputMode == VoiceInputMode.PendingTranscript)
+}
+
+internal fun inputBarShouldShowMuteToggle(
+    useChildVoiceFirstInput: Boolean,
+    presentation: ChildInteractionPresentation,
+): Boolean {
+    return presentation.showMuteToggle || !useChildVoiceFirstInput
+}
+
+internal fun inputBarMuteToggleText(tts: TtsUiState): String {
+    return if (tts.isMuted) "打开朗读" else "静音"
 }
 
 @Composable

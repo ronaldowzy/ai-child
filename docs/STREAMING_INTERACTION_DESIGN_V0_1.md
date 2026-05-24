@@ -768,7 +768,7 @@ VoiceProfile
 2. Mute 后继续显示文本，不播放后续 segment。
 3. Auto TTS off 时仍可请求 text stream；后端可通过 include_tts=false 减少 TTS 成本。
 4. 离开页面或 ViewModel cleared 时取消 stream、停止 audio queue。
-5. 本轮 Android unified interaction state thin slice 已保证 voice-first 下 TTS pending/speaking 时可见“停一下”；静音 toggle 在儿童输入栏的常驻可见性留待下一轮收敛。
+5. 本轮 Android TTS/phase closeout 已保证 voice-first 下 TTS pending/speaking 时可见“停一下”和“静音/打开朗读”；停止会清空当前播放和 segment queue，静音会阻止后续自动朗读，仍需 Redmi K60 / Honor Pad 5 真机 QA。
 ```
 
 儿童 UI：

@@ -202,7 +202,7 @@ ChildChatScreen 首次可见
 2. ChatViewModel 在 agent reply 到达后，根据 reply.voice_enabled、AUTO_TTS_ENABLED 和静音状态决定是否自动朗读。
 3. TTS 请求被接受后先进入 speaking pending / speaking 视觉反馈，不再完全依赖系统 onStart 回调。
 4. 朗读结束或停止后恢复后端 reply 对应的 base mood / motion。
-5. UI 提供停止、静音和短状态提示；开发构建可显示 TTS 诊断文本。本轮 unified interaction state thin slice 已保证 voice-first 下 TTS pending/speaking 时显示“停一下”，点击后走现有 stop path 并清空当前播放/segment queue。
+5. UI 提供停止、静音和短状态提示；开发构建可显示 TTS 诊断文本。本轮 Android TTS/phase closeout 已保证 voice-first 下 TTS pending/speaking 时显示“停一下”和“静音/打开朗读”；停止走现有 stop path 并清空当前播放/segment queue，静音阻止后续自动朗读。
 6. TtsUiState / VoiceDiagnostics 记录 isInitializing、isInitialized、enginePackageName、selectedLocale、selectedVoiceName、setLanguageResult、setVoiceResult、lastSpeakResult 和 lastFailureReason。
 7. 系统 TTS 不可用时显示“我现在不能朗读，但文字还在这里。”并降级为文字。
 8. 后端已新增 `POST /api/v1/tts/xiaobaohu`，可返回本地缓存 wav 的 `/media/tts/...` URL；当前测试阶段应验证目标 TTS provider。
@@ -212,7 +212,7 @@ ChildChatScreen 首次可见
 12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
 13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
 14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败时保留文字和温和错误提示，不再 fallback 到系统 TextToSpeech。
-15. 真实设备听感、远程音频播放、停止按钮可发现性、延迟和 Honor Pad 5 低配表现仍需 QA；voice-first 静音 toggle 的常驻可见性仍是下一轮任务，不应把本轮写成语音体验全部完成。
+15. 真实设备听感、远程音频播放、停止/静音按钮可发现性、延迟和 Honor Pad 5 低配表现仍需 QA；不应把本轮写成语音体验全部完成。
 16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式和 TTS 分句/分段播放设计。
 ```
 
@@ -573,7 +573,7 @@ TTS 自然度主观评价
 | VQA-07 | 学习求助语音 | 回复仍不直接给答案，先引导题意和步骤 |
 | VQA-08 | 高风险语音文本 | 确认发送后进入安全场景，鼓励告诉可信成人并触发父亲提醒 |
 | VQA-09 | TTS 默认自动朗读 | 默认自动朗读小白狐回复，只朗读后端安全回复，不朗读内部 debug 或 session_state |
-| VQA-10 | 停止和静音 | voice-first 下 TTS pending/speaking 时可见“停一下”并停止当前朗读；静音可通过 DevSettings 或父亲设置治理，儿童输入栏常驻静音可见性留待下一轮 |
+| VQA-10 | 停止和静音 | voice-first 下 TTS pending/speaking 时可见“停一下”和“静音/打开朗读”；停止当前朗读并清空 segment queue，静音阻止后续自动朗读，仍需 Redmi K60 / Honor Pad 5 真机确认 |
 | VQA-11 | VoiceProfile | 使用 zh-CN、稍慢语速、略高但不过度 pitch；找不到 preferred voice 时 fallback 系统默认中文 voice |
 | VQA-12 | 抽象边界 | UI 通过 VoiceEngine / SpeechInputController / TtsController 使用语音能力，不直接散落平台调用 |
 | VQA-13 | 数据检查 | 日志、memory、fixture 中没有原始音频、真实身份或长篇逐字转写 |

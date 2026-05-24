@@ -291,6 +291,7 @@ class ChatViewModel(
         if (_uiState.value.isSending) return
 
         childInteractionStarted = true
+        stopCurrentTts(restoreBaseAgent = true)
         recordChildMessage(text)
         _uiState.update {
             it.copy(
@@ -351,9 +352,12 @@ class ChatViewModel(
 
     fun onQuickAction(action: QuickActionUi) {
         when (action.id) {
-            "take_photo", "share_photo" -> appendAgentMessage(
-                "请点下方“拍给小白狐看”，直接拍照或从相册选一张。",
-            )
+            "take_photo", "share_photo" -> {
+                stopCurrentTts(restoreBaseAgent = true)
+                appendAgentMessage(
+                    "请点下方“拍给小白狐看”，直接拍照或从相册选一张。",
+                )
+            }
             "talk_about_image", "make_story", "ask_what_is_this" ->
                 continuePendingImageConversation(action)
             else -> sendText(action.label)
@@ -403,6 +407,7 @@ class ChatViewModel(
             return
         }
 
+        stopCurrentTts(restoreBaseAgent = true)
         appendMessage(
             ChatMessage(
                 id = nextMessageId("child-photo"),
@@ -463,6 +468,7 @@ class ChatViewModel(
         imagePurpose: String = IMAGE_PURPOSE_SHARE,
     ) {
         if (_uiState.value.isSending || payload.bytes.isEmpty()) return
+        stopCurrentTts(restoreBaseAgent = true)
         childInteractionStarted = true
         appendMessage(
             ChatMessage(

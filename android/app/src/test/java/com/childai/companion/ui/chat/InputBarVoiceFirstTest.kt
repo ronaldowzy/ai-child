@@ -1,5 +1,6 @@
 package com.childai.companion.ui.chat
 
+import com.childai.companion.voice.TtsUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -94,10 +95,21 @@ class InputBarVoiceFirstTest {
     @Test
     fun ttsSpeakingPresentationShowsStopSpeaking() {
         val presentation = childInteractionPresentation(
-            tts = com.childai.companion.voice.TtsUiState(isSpeaking = true),
+            tts = TtsUiState(isSpeaking = true),
         )
 
         assertTrue(presentation.showStopSpeaking)
+        assertTrue(presentation.showMuteToggle)
         assertEquals("小白狐在说", inputBarPrimaryVoiceButtonText(presentation))
+        assertTrue(inputBarShouldShowMuteToggle(useChildVoiceFirstInput = true, presentation))
+        assertEquals("静音", inputBarMuteToggleText(TtsUiState(isSpeaking = true)))
+        assertEquals("打开朗读", inputBarMuteToggleText(TtsUiState(isMuted = true)))
+    }
+
+    @Test
+    fun voiceFirstReadyDoesNotShowMuteToggle() {
+        val presentation = childInteractionPresentation()
+
+        assertFalse(inputBarShouldShowMuteToggle(useChildVoiceFirstInput = true, presentation))
     }
 }

@@ -60,7 +60,7 @@
 - App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示；后端 opening 默认尝试生成小白狐 `audio_url`，Android 只播放该远程音频，不用系统 TTS 顶替。孩子先开口时，迟到的 opening 不插入。
 - opening greeting 的称呼来自父亲设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。
 - TTS 朗读只播放后端返回的 `reply.audio_url` 对应音频；远程播放失败或缺失 `audio_url` 时保留文字和温和错误提示，不用系统 TextToSpeech 混播。
-- TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。本轮保证 voice-first 下 TTS pending/speaking 时儿童可见“停一下”；静音 toggle 在儿童 voice-first 输入栏的常驻可见性仍是下一轮收敛点。
+- TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。本轮保证 voice-first 下 TTS pending/speaking 时儿童可见“停一下”和“静音/打开朗读”；停止会清空当前播放和 segment queue，静音会阻止后续自动朗读。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
 - Redmi K60 / Android 14 反馈说明系统 TTS 即使可用，声音也不适合作为小白狐正式音色；当前儿童端自动朗读不使用系统 TTS fallback。
 - Android 不直接调用 MiMo，不保存 MiMo API key；正式音频由后端 `/api/v1/tts/xiaobaohu` 生成并通过 `/media/tts/...wav` 返回。后端真实 MiMo VoiceClone smoke 已通过，Android 已接入 `reply.audio_url` 远程播放优先级。
@@ -99,7 +99,7 @@
 
 ```text
 1. Redmi K60：普通聊天能看到渐进文字，不出现重复 agent bubble。
-2. Redmi K60：MiMo TTS segment 能按顺序播放，小白狐切 speaking，TTS pending/speaking 时“停一下”可见且生效；静音治理仍需结合 DevSettings/父亲设置和下一轮 UI 收敛确认。
+2. Redmi K60：MiMo TTS segment 能按顺序播放，小白狐切 speaking，TTS pending/speaking 时“停一下”和“静音/打开朗读”可见且生效；静音治理仍需结合 DevSettings/父亲设置做真机确认。
 3. 后端断开或 stream 中断：已显示文本不被清空，旧接口 fallback 或温和错误可见。
 4. Honor Pad 5：横屏双栏、animation_v1 和 stream 更新同时运行不卡顿；必要时记录低性能降级。
 ```

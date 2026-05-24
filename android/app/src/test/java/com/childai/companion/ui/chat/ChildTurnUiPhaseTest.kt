@@ -63,7 +63,22 @@ class ChildTurnUiPhaseTest {
         assertEquals(ChildTurnUiPhase.Speaking, presentation.phase)
         assertEquals("小白狐正在说。", presentation.statusText)
         assertTrue(presentation.showStopSpeaking)
+        assertTrue(presentation.showMuteToggle)
         assertEquals(FoxMotion.Speaking, presentation.agent.motion)
+    }
+
+    @Test
+    fun mapsSpeakingPendingPhaseAndShowsStopAndMute() {
+        val presentation = childInteractionPresentation(
+            tts = TtsUiState(isSpeakingPending = true),
+        )
+
+        assertEquals(ChildTurnUiPhase.SpeakingPending, presentation.phase)
+        assertEquals("小白狐准备说。", presentation.statusText)
+        assertTrue(presentation.showStopSpeaking)
+        assertTrue(presentation.showMuteToggle)
+        assertEquals("小白狐在说", presentation.primaryButtonText)
+        assertFalse(presentation.primaryButtonEnabled)
     }
 
     @Test

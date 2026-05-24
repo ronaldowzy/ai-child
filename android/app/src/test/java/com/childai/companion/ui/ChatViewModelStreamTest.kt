@@ -203,6 +203,40 @@ class ChatViewModelStreamTest {
     }
 
     @Test
+    fun childTextStopsCurrentTtsBeforeSending() {
+        val ttsController = RecordingTtsController(autoComplete = false)
+        lateinit var viewModel: ChatViewModel
+        val sender = TtsStateRecordingConversationSender {
+            viewModel.uiState.value.tts
+        }
+        viewModel = ChatViewModel(
+            conversationSender = sender,
+            ttsController = ttsController,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.applyStreamEvent(
+            streamEvent(
+                "audio_ready",
+                "audioUrl" to "/media/tts/segment.wav",
+                "text" to "我还在说",
+                "index" to 0,
+            ),
+        )
+        assertEquals(
+            ChildTurnUiPhase.Speaking,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
+
+        viewModel.sendText("我们聊别的")
+
+        assertTrue(sender.ttsActiveWhenSending.isNotEmpty())
+        assertTrue(sender.ttsActiveWhenSending.none { it })
+        assertTrue(ttsController.stopCalled)
+        assertFalse(viewModel.uiState.value.tts.isSpeaking)
+    }
+
+    @Test
     fun textAfterImageUploadCarriesPendingAttachmentContext() {
         val sender = AttachmentRecordingConversationSender()
         val viewModel = ChatViewModel(
@@ -325,6 +359,55 @@ private class StreamFailureConversationSender : ConversationMessageSender {
         onEvent(streamEvent("session_started"))
         onEvent(streamEvent("text_delta", "delta" to "partial"))
         error("stream failed")
+    }
+}
+
+private class TtsStateRecordingConversationSender(
+    private val ttsStateProvider: () -> TtsUiState,
+) : ConversationMessageSender {
+    val ttsActiveWhenSending = mutableListOf<Boolean>()
+
+    override suspend fun sendTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+    ): ConversationMessageResponse {
+        ttsActiveWhenSending += ttsStateProvider().let {
+            it.isSpeaking || it.isSpeakingPending
+        }
+        return ConversationMessageResponse(
+            reply = ConversationReply(
+                type = "agent_message",
+                text = "fallback",
+                voiceEnabled = false,
+                audioUrl = null,
+                emotion = "warm",
+                agentMotion = "gentle_idle",
+            ),
+            uiActions = emptyList(),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+            ),
+        )
+    }
+
+    override suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+        includeTts: Boolean,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) {
+        ttsActiveWhenSending += ttsStateProvider().let {
+            it.isSpeaking || it.isSpeakingPending
+        }
     }
 }
 

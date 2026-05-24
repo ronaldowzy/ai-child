@@ -82,6 +82,17 @@ backend/README.md
 
 If `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md` does not yet exist, stop and execute Task 04 first.
 
+## 2.1 Task 04 review closeout notes
+
+The master review accepted Task 04 as a good thin slice, with two closeout items that should be handled or explicitly triaged in this task:
+
+```text
+1. Healthy Engagement `boundary_respected` is currently a lightweight boundary + no-question check. Task 05 should either improve it to also detect obvious revival of the previous topic, or document it as a v0.1 thin-slice limitation in known issues.
+2. `ConversationStreamService._tts_error_payload()` still contains stale internal fallback wording `system_tts_or_text`. Since Android no longer uses system TTS as the child-facing automatic fallback, replace this with text/audio-unavailable wording that cannot be misread as reintroducing system TTS mixing.
+```
+
+These are closeout/hardening corrections, not new features.
+
 ---
 
 # Lane A — Real-provider synthetic trace review
@@ -98,6 +109,8 @@ This lane checks whether MiMo / configured providers behave naturally after the 
 backend/app/services/child_agent_runtime.py
 backend/app/services/parent_report_service.py
 backend/app/services/modality_manager.py
+backend/app/services/conversation_stream_service.py
+backend/app/services/turn_guidance_builder.py
 backend/app/prompts/**/*
 backend/tests/**/*trace* or backend/tests/**/*scenario*
 scripts/*trace* or scripts/*smoke*
@@ -140,6 +153,8 @@ Create or extend a trace script/checklist covering at least:
 3. If a real provider output is too long, too adult, too many questions, or violates boundary, file a follow-up issue in docs known issues.
 4. Deterministic safety fallback remains active for critical safety cases.
 5. Parent report does not expose raw transcript or provider/debug wording.
+6. Stream TTS error payload no longer says `system_tts_or_text`.
+7. Boundary respect limitation is either improved or documented as a known issue.
 ```
 
 ---
@@ -239,6 +254,7 @@ Known issues should include at least:
 4. CameraX deferred.
 5. Production auth/account/data deletion deferred.
 6. Parent report real model success/failure still needs device-family review unless tested.
+7. Healthy Engagement boundary_respected is v0.1 heuristic unless Lane A improves it beyond no-question detection.
 ```
 
 ## C4. Acceptance criteria

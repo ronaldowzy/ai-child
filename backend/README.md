@@ -417,6 +417,10 @@ bash scripts/db_migrate.sh
 bash scripts/smoke_db_persistence.sh
 ```
 
+`smoke_db_persistence.sh` is a local DB persistence smoke, not a provider
+quality test. It uses synthetic data and a local smoke parent-report registry so
+PostgreSQL checks do not depend on external model availability.
+
 To reset the local schema during development:
 
 ```bash
@@ -554,15 +558,35 @@ Real-provider mode is opt-in only. It applies a process-local MiMo overlay for
 child_chat and parent_report, never writes `.env`, and does not use real child
 audio/images, Android, CameraX, ASR, TTS, or vision. If the MiMo key is missing the runner
 exits with `REAL_PROVIDER_BLOCKED` and does not report a mock pass as real
-provider evidence. The current real synthetic review reached
-`REAL_PROVIDER_SMOKE: PASS` for provider/model `mimo/mimo-v2.5-pro`; the report
-is `docs/MODEL_TRACE_REAL_PROVIDER_REVIEW_V0_1.md`. PROMPT-REAL-HARDEN-1 keeps
-child-facing self-harm replies on a deterministic trusted-adult fallback,
-strips stage directions, suppresses multi-question replies, removes bedtime
-"tomorrow" hooks, and avoids verbatim topic-change echo. Opening remains
-deterministic by default. ParentReport was revised in PD-052 to model-first, so
-parent_report traces are again required for model report QA; model failure is
-reported as failed/blocked rather than replaced with a successful rule report.
+provider evidence. The Task 05 closeout run on 2026-05-24 reached
+`REAL_PROVIDER_SMOKE: REVIEW_NEEDED` for 19 synthetic scenarios / 14 traces:
+child_chat traces used provider/model `mimo/mimo-v2.5-pro` without fallback, the
+deterministic self-harm trusted-adult fallback remained active, one parent_report
+scenario timed out and fell back to mock, and one creative-share checker flagged
+P2 review. The report for that run was written to `/tmp` and was not committed,
+because it may contain synthetic provider outputs. Opening remains deterministic
+by default. ParentReport was revised in PD-052 to model-first, so parent_report
+traces are again required for model report QA; model failure is reported as
+failed/blocked rather than replaced with a successful rule report.
+
+Task 05 release-candidate smoke commands observed on 2026-05-24:
+
+```bash
+cd backend && conda run -n child-ai pytest
+cd backend && conda run -n child-ai ruff check .
+bash scripts/smoke_db_persistence.sh
+conda run -n child-ai python scripts/run_model_trace_scenarios.py \
+  --output /tmp/task05_model_trace_mock.md
+conda run -n child-ai python scripts/run_model_trace_scenarios.py \
+  --provider mimo \
+  --output /tmp/task05_model_trace_real_provider.md
+```
+
+Observed results: backend pytest 417 passed, ruff passed, DB persistence smoke
+passed with synthetic data, mock trace passed with 21 scenarios / 14 traces, and
+real-provider synthetic trace returned `REVIEW_NEEDED` because parent_report
+still needs review. None of these commands is real child QA or Android device
+QA.
 
 This table is not a production child-data strategy. Before any cloud deployment
 or app-store release, prompt/response tracing must be redesigned and reviewed

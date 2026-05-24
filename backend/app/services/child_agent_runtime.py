@@ -336,9 +336,13 @@ class ChildAgentRuntime:
     ) -> dict[str, Any]:
         question_count = self._question_count(reply_text)
         boundary_signal = turn_guidance_context.boundary_signal
+        previous_topic_revived = self._revives_previous_topic(
+            reply_text,
+            turn_guidance_context,
+        )
         boundary_respected = None
         if boundary_signal is not None:
-            boundary_respected = question_count == 0
+            boundary_respected = question_count == 0 and not previous_topic_revived
         return {
             "turn_index": None,
             "recent_history_turns": len(request.conversation_history),
@@ -349,6 +353,7 @@ class ChildAgentRuntime:
             "turn_guidance_hints": list(turn_guidance_context.hints),
             "boundary_signal": boundary_signal,
             "boundary_respected": boundary_respected,
+            "previous_topic_revived": previous_topic_revived,
             "same_topic_score": turn_guidance_context.same_topic_score,
             "consecutive_recent_questions": (
                 turn_guidance_context.consecutive_recent_questions
@@ -361,6 +366,42 @@ class ChildAgentRuntime:
 
     def _question_count(self, text: str) -> int:
         return text.count("？") + text.count("?")
+
+    def _revives_previous_topic(
+        self,
+        reply_text: str,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> bool:
+        if turn_guidance_context.boundary_signal is None:
+            return False
+        recent_topic = turn_guidance_context.recent_topic
+        if not recent_topic:
+            return False
+        normalized = reply_text.strip().lower().replace(" ", "")
+        if any(marker in normalized for marker in ("不聊", "先不聊", "不说这个")):
+            return False
+        topic_markers = self._topic_markers(recent_topic)
+        if not topic_markers or not any(marker in normalized for marker in topic_markers):
+            return False
+        revival_markers = (
+            "继续",
+            "接着",
+            "再聊",
+            "聊聊",
+            "再说",
+            "说说",
+            "回到",
+            "刚才",
+            "还是",
+        )
+        return any(marker in normalized for marker in revival_markers)
+
+    def _topic_markers(self, recent_topic: str) -> tuple[str, ...]:
+        if recent_topic == "运动比赛/跑步":
+            return ("运动", "比赛", "跑步", "跑")
+        if recent_topic == "身体感受":
+            return ("身体", "腿", "疼", "酸", "累", "喘")
+        return ()
 
     def _looks_like_direct_homework_answer(
         self, request: AgentRuntimeRequest, reply_text: str

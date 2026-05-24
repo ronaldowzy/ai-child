@@ -682,7 +682,28 @@ Codex 推送后，主会话按以下清单复核：
 
 ---
 
-## 10. End State For This Optimization Cycle
+## 10. Execution Summary For Tasks 01-04
+
+截至 Task 05 closeout，体验优化 Tasks 01-04 的代码状态如下：
+
+```text
+1. Task 01 Android unified interaction state：已完成 thin slice。ChildTurnUiPhase / ChildInteractionPresentation 统一派生小白狐状态、短状态文案、InputBar 主按钮、图片按钮和 TTS stop/mute 可见性；未声称真机通过。
+2. Task 02 Parallel Experience Foundation：Lane A 已补 voice-first 下 TTS pending/speaking 的“停一下”和“静音/打开朗读”；Lane B 已补 backend age-banded replies 与连续追问 throttle thin slice。
+3. Task 03 Image and Parent Bridge：Lane A 已补普通图片具体安全细节回复和 Android 本地缩略确认卡；Lane B 已补儿童端父亲入口降噪和父亲日报“今晚可以怎么接一句”。
+4. Task 04 Healthy QA and State Coverage：已补 Healthy Engagement 非原文观测、家庭内测 QA checklist/runbook 和小白狐 phase/scene 状态覆盖矩阵。
+```
+
+Task 05 自动 closeout 结果：
+
+```text
+1. 后端 pytest / ruff、Android JVM test / assembleDebug、PostgreSQL smoke、mock synthetic trace 已通过。
+2. real-provider synthetic trace 为 REVIEW_NEEDED：child_chat provider 链路可跑通，但 parent_report 一个场景 fallback，creative-share synthetic checker 标记 P2。
+3. Stream TTS error payload 已去掉 stale `system_tts_or_text` wording，改为 text/audio unavailable 语义。
+4. Healthy Engagement `boundary_respected` 已增强为会标记明显旧话题复活的 v0.1 heuristic。
+5. Redmi K60 / Honor Pad 5 真机 QA 仍为 NOT_RUN；自动化通过不能替代儿童端体验验收。
+```
+
+## 11. End State For This Optimization Cycle
 
 本轮体验优化完成时，应达到：
 

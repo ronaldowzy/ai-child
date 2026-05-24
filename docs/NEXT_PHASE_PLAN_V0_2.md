@@ -35,6 +35,19 @@
 28. Android 父亲设置页已支持结构化配置孩子小名和显示名；opening greeting 使用小名优先、显示名 fallback，但真机 QA 仍待完成。
 29. 家庭内测前 smoke 脚本和 QA checklist 已补齐：backend local smoke、voice stack mock smoke 可本地通过；DB persistence smoke 需要本地 PostgreSQL；MiMo ASR real smoke 只在 opt-in policy env、MiMo key 和非儿童测试音频同时满足时执行。
 30. Task 04 已新增 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md`，作为 Redmi K60 / Honor Pad 5 家庭内测前统一 runbook；默认状态均为 `NOT_RUN`，自动化测试通过不能替代真机 QA。
+31. Task 05 已完成 release-candidate 自动 closeout：backend pytest/ruff、Android JVM test、debug APK build、PostgreSQL persistence smoke、mock synthetic trace 均通过；real-provider synthetic trace 返回 `REVIEW_NEEDED`，因为 child_chat 链路通过但一个 parent_report 场景超时 fallback，且 creative-share checker 仍需人工 review。
+```
+
+Task 05 known issues / next actions:
+
+```text
+1. Redmi K60 / Honor Pad 5 全量真机 QA 仍为 NOT_RUN；负责人：父亲/设备测试；下一步：按 QA_FAMILY_BETA_CHECKLIST_V0_1.md 逐行记录。
+2. 真实儿童 ASR 准确率 NOT_VALIDATED；负责人：父亲/设备测试；下一步：仅在授权和数据策略满足时用非敏感测试语音记录准确率与延迟。
+3. real-provider naturalness NEEDS_REVIEW；负责人：后端/prompt；下一步：人工复核 age-band、question throttle、creative-share 和 parent_report trace，不用 mock pass 代替。
+4. ParentReport model-first 仍需真实家庭语境 review；负责人：后端/prompt + 父亲；下一步：复查超时/fallback 和“今晚可以怎么接一句”自然度。
+5. CameraX deferred；负责人：Android；下一步：系统相机/相册先继续作为 v0.1 路径。
+6. 生产 auth/account/data deletion deferred；负责人：产品/架构；下一步：家庭内测后单独设计，不用 dev PIN 冒充生产账号。
+7. Healthy Engagement `boundary_respected` 已增强到明显旧话题复活检测，但仍是 v0.1 heuristic；负责人：后端；下一步：用真机 QA 和 synthetic trace 继续观察误报/漏报。
 ```
 
 ---

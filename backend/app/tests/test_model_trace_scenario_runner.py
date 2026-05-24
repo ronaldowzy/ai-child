@@ -65,12 +65,19 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
     report = report_path.read_text(encoding="utf-8")
     assert "default after-school opening" in report
     assert "运动夸张表达" in report
+    assert "age_5_6 short free chat" in report
+    assert "age_9_10 dinosaur story planning" in report
+    assert "连续追问 throttle" in report
+    assert "图片分享：积木城堡" in report
+    assert "图片分享：低置信兜底" in report
     assert "父亲日报" in report
     assert "mock responses do not represent real MiMo quality" in report
     assert "deterministic_default/no_model_trace" in report
     assert "opening deterministic default used: yes" in report
     assert "ParentReport default path: `model_first_parent_report`" in report
     assert "Trace count" in report
+    assert "Request IDs" in report
+    assert "trace_child-chat-image-share-ordinary" in report
 
 
 def test_trace_scenario_report_does_not_include_secrets_or_raw_base64(
@@ -155,6 +162,7 @@ def test_real_provider_report_format_can_be_generated(tmp_path: Path) -> None:
     assert "Provider mode: `mimo`" in real_report
     assert "Provider smoke status" in real_report
     assert "Response summary" in real_report
+    assert "Request IDs" in real_report
     assert "d1d1524" not in real_report
 
 
@@ -304,6 +312,32 @@ def test_real_provider_report_treats_opening_as_deterministic_and_report_as_mode
     assert "child_chat/provider=mimo/model=mimo-v2.5-pro" in report
 
 
+def test_real_provider_smoke_marks_parent_report_fallback_review_needed() -> None:
+    runner = _import_runner_module()
+    child_chat_trace = SimpleNamespace(
+        task_type="child_chat",
+        provider_name="mimo",
+        fallback_used=False,
+        policy_blocked=False,
+        error_type=None,
+    )
+    parent_report_trace = SimpleNamespace(
+        task_type="parent_report",
+        provider_name="mock",
+        fallback_used=True,
+        policy_blocked=False,
+        error_type="ModelProviderTimeoutError",
+    )
+
+    status, reason = runner._provider_smoke_status(
+        provider_mode="mimo",
+        traces=[child_chat_trace, parent_report_trace],
+    )
+
+    assert status == "REVIEW_NEEDED"
+    assert reason == "parent_report fallback/error trace present"
+
+
 def test_real_provider_report_uses_final_child_facing_text_for_quality_issues() -> None:
     runner = _import_runner_module()
     scenario = runner.ScenarioResult(
@@ -412,6 +446,59 @@ def test_real_provider_report_flags_multiple_child_chat_questions() -> None:
 
     assert "P2: response asks multiple questions" in report
     assert "ask at most one main question" in report
+
+
+def test_task05_tts_error_payload_uses_audio_unavailable_wording() -> None:
+    from app.services.conversation_stream_service import ConversationStreamService
+    from app.services.text_segmenter import TextSegment
+
+    service = ConversationStreamService(tts_enabled=False)
+    payload = service._tts_error_payload(
+        TextSegment(
+            index=0,
+            text="synthetic segment",
+            start=0,
+            end=17,
+            is_sentence_end=True,
+        ),
+        code="tts_timeout",
+    )
+
+    assert payload["fallback"] == "audio_unavailable_text_preserved"
+    assert "system_tts_or_text" not in str(payload)
+    assert "provider timeout" not in str(payload)
+
+
+def test_task05_boundary_metrics_detect_previous_topic_revival() -> None:
+    from app.services.age_band_policy import AgeBandReplyPolicy
+    from app.services.child_agent_runtime import ChildAgentRuntime
+    from app.services.turn_guidance_builder import TurnGuidanceContext
+
+    request = SimpleNamespace(
+        conversation_history=[SimpleNamespace(), SimpleNamespace()],
+        route_decision=SimpleNamespace(
+            active_scene=SimpleNamespace(value="conversation.open")
+        ),
+    )
+    metrics = ChildAgentRuntime()._healthy_engagement_metrics(
+        request=request,
+        turn_guidance_context=TurnGuidanceContext(
+            recent_topic="运动比赛/跑步",
+            boundary_signal="no_chat",
+        ),
+        age_policy=AgeBandReplyPolicy(
+            age_band="age_7_8",
+            min_chars=60,
+            max_chars=140,
+            question_policy="test",
+        ),
+        reply_text="那我们继续聊跑步比赛。",
+        reply_normalized=False,
+    )
+
+    assert metrics["question_count"] == 0
+    assert metrics["previous_topic_revived"] is True
+    assert metrics["boundary_respected"] is False
 
 
 def test_trace_scripts_compile() -> None:

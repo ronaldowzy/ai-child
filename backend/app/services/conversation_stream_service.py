@@ -405,7 +405,7 @@ class ConversationStreamService:
             "text": segment.text,
             "text_chars": len(segment.text),
             "text_range": {"start": segment.start, "end": segment.end},
-            "fallback": "system_tts_or_text",
+            "fallback": "audio_unavailable_text_preserved",
             "safe_message": "这段声音没有放出来，但文字还在这里。",
         }
 

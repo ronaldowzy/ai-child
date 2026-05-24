@@ -1,6 +1,6 @@
 # Family Beta QA Checklist v0.1
 
-Status: Task 04 family-beta runbook baseline  
+Status: Task 05 release-candidate automated closeout snapshot added; real-device QA remains NOT_RUN
 Scope: Redmi K60 primary functional QA, Honor Pad 5 Android 9 / 4GB compatibility QA  
 Data policy: use only fictional child IDs, synthetic/fake audio, non-child test images, and non-private family settings. Do not record raw child text, full assistant text, raw audio, raw photos, parent_message_raw, provider keys, or private family data in this checklist or logs.
 
@@ -22,10 +22,10 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. |  | NOT_RUN |  | Automated smoke only. |
-| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. |  | NOT_RUN |  | No real provider key in output. |
-| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test`. | JVM tests pass. |  | NOT_RUN |  | Does not replace device QA. |
-| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. |  | NOT_RUN |  | Rebuild after backend URL changes. |
+| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. | 2026-05-24 doctor OK for conda/JDK/Android SDK/adb; adb reported no connected physical device. | PASS | local terminal | Automated smoke only; not device QA. |
+| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. | `cd backend && conda run -n child-ai pytest`: 417 passed. Bare `pytest` was not on shell PATH, so standard conda env was used. | PASS | local terminal | No real provider key in output. |
+| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test`. | JVM tests pass. | `cd android && ./gradlew test`: BUILD SUCCESSFUL. | PASS | local terminal | Does not replace device QA. |
+| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. | 2026-05-24 PASS with base URL `http://192.168.0.118:8000/`; size 16471142; sha256 `a666007b69be16efc1651b7246362d9b3a8755ee2c39856ffa0c02b45ec4c074`. | PASS | local terminal | Rebuild after backend URL changes; no install attempted because no device connected. |
 
 ## 2. Backend health and PostgreSQL
 
@@ -34,7 +34,7 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-BE-01 | Simple health local | `curl --noproxy '*' http://127.0.0.1:8000/api/v1/health`. | `{"status":"ok"}` and response has `X-Request-ID`. |  | NOT_RUN |  |  |
 | QA-BE-02 | Simple health LAN | From Mac and device browser/curl if available, open `http://<mac-lan-ip>:8000/api/v1/health`. | LAN health reachable before APK testing. |  | NOT_RUN |  |  |
 | QA-BE-03 | Health detail | `curl --noproxy '*' http://127.0.0.1:8000/api/v1/health/detail`. | Shows api/postgres/tts_cache/voice sample/provider config statuses without secrets. |  | NOT_RUN |  | Degraded components must be explained. |
-| QA-BE-04 | PostgreSQL persistence smoke | Run `bash scripts/smoke_db_persistence.sh` if PostgreSQL is expected for this run. | PASS or explicit SKIP/BLOCKED reason recorded. |  | NOT_RUN |  | Local family DB only. |
+| QA-BE-04 | PostgreSQL persistence smoke | Run `bash scripts/smoke_db_persistence.sh` if PostgreSQL is expected for this run. | PASS or explicit SKIP/BLOCKED reason recorded. | 2026-05-24 PASS after Alembic migration; policy, conversation, routing, synthetic memory, and generated parent_report rows persisted. | PASS | local terminal | Local family DB only; smoke uses synthetic data and no external provider call. |
 
 ## 3. Android install and horizontal layout
 
@@ -158,6 +158,22 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-DEVICE-RK60-02 | Redmi K60 audio latency | Record first text/audio timing from logs for 3 normal turns. | Timings captured with request_id; no raw text in evidence. |  | NOT_RUN |  |  |
 | QA-DEVICE-HP5-01 | Honor Pad 5 layout/performance | Run sections 3, 6, 7, 9, 13 on Honor Pad 5. | Android 9 compatible; animation and layout acceptable or degradation need recorded. |  | NOT_RUN |  | Low-end target. |
 | QA-DEVICE-HP5-02 | Honor Pad 5 low-performance fallback | Force static/canvas mode if needed. | 小白狐 remains visible and app remains usable; record chosen fallback. |  | NOT_RUN |  | Do not mark animation fully passed if fallback used. |
+
+## 15. Task 05 automated closeout snapshot
+
+```text
+Date: 2026-05-24
+Backend: pytest 417 passed; ruff check passed.
+Android: ./gradlew test passed; ./gradlew assembleDebug passed.
+APK: android/app/build/outputs/apk/debug/app-debug.apk
+APK base URL: http://192.168.0.118:8000/
+APK sha256: a666007b69be16efc1651b7246362d9b3a8755ee2c39856ffa0c02b45ec4c074
+PostgreSQL smoke: PASS with synthetic data only.
+Mock trace: PASS, 21 scenarios / 14 traces.
+Real-provider synthetic trace: REVIEW_NEEDED, 19 scenarios / 14 traces.
+Real-provider note: child_chat used mimo/mimo-v2.5-pro without fallback; one parent_report scenario timed out and fell back to mock; one creative-share checker returned P2.
+Real-device QA: NOT_RUN; adb listed no attached device.
+```
 
 ## Closeout rules
 

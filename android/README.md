@@ -187,8 +187,21 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 base URL：http://192.168.0.118:8000/
 大小：16471142 bytes
-SHA256：2afe25e5d62484edf4657e51f96dd12bfdce132daa373e8474b314490103b5db
+SHA256：a666007b69be16efc1651b7246362d9b3a8755ee2c39856ffa0c02b45ec4c074
 ```
+
+Task 05 release-candidate 本机构建结果（2026-05-24）：
+
+```text
+cd android && ./gradlew test：BUILD SUCCESSFUL
+cd android && ./gradlew assembleDebug：BUILD SUCCESSFUL
+bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/：PASS
+adb devices：未连接物理设备
+```
+
+上述结果只说明本机 JVM 测试和 debug APK 构建可用；Redmi K60 /
+Honor Pad 5 安装、音频、录音、横屏布局、图片缩略图、stream/TTS stop/mute
+和低配动画表现仍必须按 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md` 真机记录。
 
 交给 Redmi K60 / Honor Pad 5 前必须使用 Mac LAN IP 构建并重新记录 sha256：
 

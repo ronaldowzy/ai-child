@@ -710,12 +710,12 @@ Non-goals: 不做游戏经济。
 ### E5: Parent Bridge v2
 
 Goal: 父亲端获得现实可执行接话建议。
-Backend: ParentBridgeService / ParentReportService 增加 starter/avoid/tomorrow_seed。
-Android: 父亲日报 UI 增加“今晚可以这样问”。
+Backend: Task 03 thin slice 已在 ParentReportService / ParentReport domain 增加 `tonight_parent_bridge`，模型输出可直接提供；缺失时从当天主题和 suggested_parent_actions 派生。完整 ParentBridgeService / tomorrow_seed 仍后续。
+Android: Task 03 thin slice 已在父亲日报 UI 顶部增加“今晚可以怎么接一句”，失败态改为家庭化文案；儿童聊天页父亲入口默认降噪为小“大人”按钮，长按 + PIN 后仍可进父亲日报/设置。
 Prompt: 父亲端不是监控，而是支持。
-Tests: 报告不含原话、不贴标签、建议可执行。
-Acceptance: 跑步比赛样例生成低压力接话建议。
-Non-goals: 不做复杂家长社交功能。
+Tests: 已覆盖 bridge 字段解析、空素材不追问、失败态不暴露工程词、固定负面标签替换和不返回逐字记录；仍需真实模型自然度观察。
+Acceptance: 父亲日报首屏能给现实接话建议，且不把报告做成监控面板。
+Non-goals: 不做复杂家长社交功能，不做生产级账号/auth，不展示逐字聊天记录。
 
 ### E6: Growing Nest Android UI
 

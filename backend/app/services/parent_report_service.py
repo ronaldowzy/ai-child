@@ -202,6 +202,12 @@ class ParentReportService:
             has_safety=bool(safety_alerts),
             conversation_topics=conversation["topics"],
         )
+        tonight_parent_bridge = self._tonight_parent_bridge(
+            actions=actions,
+            topics=conversation["topics"],
+            has_material=bool(memories or conversation_messages),
+            has_safety=bool(safety_alerts),
+        )
 
         return ParentReport(
             child_id=child_id,
@@ -221,6 +227,7 @@ class ParentReportService:
             emotion_observations=emotion,
             safety_alerts=safety_alerts,
             suggested_parent_actions=actions,
+            tonight_parent_bridge=tonight_parent_bridge,
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -326,6 +333,13 @@ class ParentReportService:
                 emotion_observations=parsed["emotion_observations"],
                 safety_alerts=parsed["safety_alerts"],
                 suggested_parent_actions=parsed["suggested_parent_actions"],
+                tonight_parent_bridge=parsed["tonight_parent_bridge"]
+                or self._tonight_parent_bridge(
+                    actions=parsed["suggested_parent_actions"],
+                    topics=conversation["topics"],
+                    has_material=bool(memories or conversation_messages),
+                    has_safety=bool(parsed["safety_alerts"]),
+                ),
                 created_at=self._now(),
                 generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
                 generated_by="model",
@@ -366,6 +380,10 @@ class ParentReportService:
             emotion_observations=[],
             safety_alerts=[],
             suggested_parent_actions=["请稍后重试生成父亲日报；不要把当前失败状态当作孩子当天表现。"],
+            tonight_parent_bridge=(
+                "今天的小结还没准备好。今晚先轻松陪孩子做一件日常小事，"
+                "不要追问孩子在小白狐里聊了什么。"
+            ),
             created_at=self._now(),
             generation_status=status,
             generated_by="model",
@@ -431,8 +449,10 @@ class ParentReportService:
             "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
             "必须输出非空、可解析的严格 JSON object；不要返回空字符串、none、null、Markdown 或解释文字。"
             "suggested_parent_actions 每条建议都应包含 starter + avoid 语义：可以怎么轻轻开口，以及避免怎么追问。"
+            "tonight_parent_bridge 必须是一句现实可执行的父亲接话或动作，不要像监控报告，"
+            "孩子不想说时要提醒不追问或换轻松方式。"
             "返回严格 JSON，字段为 summary、learning_observations、expression_observations、"
-            "emotion_observations、safety_alerts、suggested_parent_actions。"
+            "emotion_observations、safety_alerts、suggested_parent_actions、tonight_parent_bridge。"
         )
 
     def _parent_report_model_payload(
@@ -472,10 +492,15 @@ class ParentReportService:
                 "emotion_observations": "list[str]",
                 "safety_alerts": "list[str]",
                 "suggested_parent_actions": "list[str]，每条包含 starter + avoid 语义",
+                "tonight_parent_bridge": (
+                    "非空中文字符串。父亲今晚可以自然接的一句话或一个动作；"
+                    "不要逐字引用敏感内容，不要追问，孩子不想说时换轻松方式。"
+                ),
             },
             "deterministic_fallback_hints": {
                 "topics": conversation["topics"],
                 "state_summary": conversation["state_summary"],
+                "tonight_parent_bridge": fallback_report.tonight_parent_bridge,
                 "relationship_parent_actions": [
                     action
                     for action in fallback_report.suggested_parent_actions
@@ -522,6 +547,9 @@ class ParentReportService:
             "suggested_parent_actions": self._model_list(
                 raw,
                 "suggested_parent_actions",
+            ),
+            "tonight_parent_bridge": self._safe_bridge_text(
+                str(raw.get("tonight_parent_bridge") or ""),
             ),
         }
 
@@ -741,7 +769,6 @@ class ParentReportService:
         attachment_count = sum(message.attachments_count for message in child_messages)
         child_turn_count = len(child_messages)
         agent_turn_count = len([message for message in messages if message.actor == "agent"])
-        short_turn_count = sum(len(text.strip()) <= 8 for text in child_texts)
         image_question_count = sum(
             1
             for text in child_texts
@@ -782,7 +809,7 @@ class ParentReportService:
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
-                f"孩子今天发起了 {attachment_count} 次图片相关互动；更像是在把看到的东西交给小白狐一起看，父亲可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
+                "孩子今天把图片作为表达入口；更像是在把看到的东西交给小白狐一起看，父亲可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
             )
         elif image_question_count:
             topics.append("看图交流")
@@ -823,12 +850,12 @@ class ParentReportService:
         )
         if avg_len <= 8:
             expression_observations.append(
-                f"孩子今天共有 {child_turn_count} 次输入，其中 {short_turn_count} 次是短句或指令式表达；父亲可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
+                "孩子今天更多使用短句或指令式表达；父亲可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
             )
             state_summary.append("孩子今天更多是短句或指令式表达，需要更具体、低压力的追问来展开。")
         else:
             expression_observations.append(
-                f"孩子今天共有 {child_turn_count} 次输入，整体能连续表达；父亲可以围绕孩子主动提到的主题继续追问一个具体细节。"
+                "孩子今天整体能连续表达；父亲可以围绕孩子主动提到的主题轻轻接一个具体细节，不要连续追问。"
             )
             state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
         if attachment_count:
@@ -837,7 +864,7 @@ class ParentReportService:
             state_summary.append("孩子今天的主线更接近运动比赛和跑步体验，不应误判为学习求助。")
         if agent_turn_count and child_turn_count:
             state_summary.append(
-                f"当天记录到 {child_turn_count} 次孩子输入和 {agent_turn_count} 次小白狐回复，可作为今晚沟通的实际依据。"
+                "当天有孩子和小白狐的互动摘要，可作为今晚低压力沟通的参考。"
             )
 
         return {
@@ -998,6 +1025,64 @@ class ParentReportService:
             )
         return self._dedupe_and_limit(actions, limit=6)
 
+    def _tonight_parent_bridge(
+        self,
+        *,
+        actions: list[str],
+        topics: list[str],
+        has_material: bool,
+        has_safety: bool,
+    ) -> str:
+        if not has_material:
+            return (
+                "今晚可以轻轻说：“今天如果不想聊也没关系，我们一起做一件轻松的小事。”"
+                "不要追问孩子今天在小白狐里说了什么。"
+            )
+        if has_safety:
+            return (
+                "今晚先用平静语气确认孩子有没有不舒服或需要大人帮忙的事；"
+                "如果孩子不想说，先陪在身边，不追问细节。"
+            )
+        if "图片分享" in topics or "看图交流" in topics:
+            return (
+                "今晚可以轻轻问：“你今天那张图，最想让我看哪里？”"
+                "如果孩子不想说，就一起看一眼图片或换轻松话题，不追问。"
+            )
+        if "运动比赛/跑步" in topics:
+            return (
+                "今晚可以轻轻问：“你今天说到跑步，最有意思的是哪一段？”"
+                "如果孩子不想说，就换成整理鞋子或喝水休息，不追问。"
+            )
+        if "学习求助" in topics:
+            return (
+                "今晚可以轻轻说：“如果有题卡住，我们先听你说题目在问什么。”"
+                "如果孩子不想说，就先休息，不追问答案。"
+            )
+
+        first_action = next((action for action in actions if action.strip()), "")
+        if first_action.startswith("今晚可以"):
+            bridge = first_action
+        else:
+            bridge = "今晚可以轻轻问：“今天有没有一件还不错的小事？”"
+            if first_action:
+                bridge += f" 也可以参考：{first_action}"
+        if not self._contains_any(bridge, ("不追问", "不要追问", "避免连续追问", "换轻松")):
+            bridge += " 如果孩子不想说，就换轻松方式，不追问。"
+        return self._safe_bridge_text(bridge) or (
+            "今晚可以轻轻问一个小细节；如果孩子不想说，就换轻松方式，不追问。"
+        )
+
+    def _safe_bridge_text(self, text: str) -> str | None:
+        safe = self._safe_text(text)
+        if not safe:
+            return None
+        if self._contains_any(
+            safe,
+            ("backend", "provider", "config", "debug", "模型配置", "后端", "逐字聊天记录"),
+        ):
+            return None
+        return safe[:260]
+
     def _relationship_parent_actions(self, memories: list[MemoryItem]) -> list[str]:
         actions: list[str] = []
         for memory in relationship_memories(
@@ -1059,7 +1144,7 @@ class ParentReportService:
             return "今天暂无可汇总的结构化会话素材。建议保持轻量观察，不做额外判断。"
         if has_safety:
             return (
-                f"今天记录了 {len(memories)} 条结构化观察和 {len(conversation_messages)} 条会话消息，其中包含需要父亲关注的安全信号或隐私边界。"
+                "今天的结构化素材里包含需要父亲关注的安全信号或隐私边界。"
                 "建议先完成安全确认，再进行学习或日常交流。"
             )
 
@@ -1080,7 +1165,7 @@ class ParentReportService:
             "整体适合用低压力提问和具体小步骤支持孩子。"
         )
         return (
-            f"今天记录了 {len(memories)} 条结构化观察和 {len(conversation_messages)} 条会话消息，重点集中在{focus_text}。"
+            f"今天的结构化素材重点集中在{focus_text}。"
             f"{state_text}"
         )
 

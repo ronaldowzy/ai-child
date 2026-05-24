@@ -11,12 +11,18 @@ data class ParentReport(
     val emotionObservations: List<String>,
     val safetyAlerts: List<String>,
     val suggestedParentActions: List<String>,
+    val tonightParentBridge: String? = null,
     val generationStatus: String = "legacy",
     val generatedBy: String = "legacy",
     val generationErrorCode: String? = null,
 ) {
     val isGeneratedSuccessfully: Boolean
         get() = generationStatus == "model_generated"
+
+    val bridgeText: String
+        get() = tonightParentBridge
+            ?: suggestedParentActions.firstOrNull { it.isNotBlank() }
+            ?: "今晚先轻松陪孩子做一件日常小事，不追问孩子今天在小白狐里聊了什么。"
 
     companion object {
         fun fromJsonString(rawJson: String): ParentReport {
@@ -39,6 +45,7 @@ data class ParentReport(
                 suggestedParentActions = root.optJSONArray(
                     "suggested_parent_actions",
                 ).toParentReportStringList(),
+                tonightParentBridge = root.optNullableString("tonight_parent_bridge"),
                 generationStatus = root.optString("generation_status", "legacy"),
                 generatedBy = root.optString("generated_by", "legacy"),
                 generationErrorCode = root.optNullableString(

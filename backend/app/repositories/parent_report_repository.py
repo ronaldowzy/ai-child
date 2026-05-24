@@ -219,6 +219,9 @@ class ParentReportRepository:
             emotion_observations=list(record.emotion_observations or []),
             safety_alerts=list(record.safety_alerts or []),
             suggested_parent_actions=list(record.suggested_parent_actions or []),
+            tonight_parent_bridge=self._bridge_from_actions(
+                list(record.suggested_parent_actions or []),
+            ),
             created_at=self._aware_datetime(record.created_at),
             generation_status=ParentReportGenerationStatus(
                 record.generation_status or ParentReportGenerationStatus.LEGACY.value
@@ -232,6 +235,25 @@ class ParentReportRepository:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value
+
+    def _bridge_from_actions(self, actions: list[str]) -> str | None:
+        for action in actions:
+            clean = " ".join(action.strip().split())
+            if not clean:
+                continue
+            if clean.startswith("今晚可以"):
+                return clean[:260]
+            if "图片" in clean:
+                return (
+                    "今晚可以轻轻问：“你今天那张图，最想让我看哪里？”"
+                    "如果孩子不想说，就换轻松方式，不追问。"
+                )
+            if "学习" in clean or "作业" in clean:
+                return (
+                    "今晚可以轻轻说：“如果有题卡住，我们先听你说题目在问什么。”"
+                    "如果孩子不想说，就先休息，不追问答案。"
+                )
+        return None
 
     def _record_id(self, child_id: str, report_date: date) -> str:
         digest = sha256(f"{child_id}:{report_date.isoformat()}".encode()).hexdigest()

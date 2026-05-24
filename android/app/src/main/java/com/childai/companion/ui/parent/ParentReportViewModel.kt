@@ -61,7 +61,7 @@ class ParentReportViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "父亲日报暂时没有生成成功。请确认后端已启动、模型配置可用；如果刚开始生成，可能需要几十秒，请稍后重试。",
+                        errorMessage = PARENT_REPORT_LOAD_FAILURE_MESSAGE,
                     )
                 }
             }
@@ -83,3 +83,5 @@ private fun todayDateText(): String {
 }
 
 private val DATE_PATTERN = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+
+internal const val PARENT_REPORT_LOAD_FAILURE_MESSAGE = "今天的小结还没准备好，请稍后再试。"

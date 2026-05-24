@@ -400,6 +400,16 @@ android/app/src/main/java/com/childai/companion/data/attachment/*
 6. 空素材日报提示父亲不要追问孩子。
 ```
 
+Task 03 thin slice 状态：
+
+```text
+1. Android 儿童端默认父亲入口已收敛为小“大人”按钮；普通点击只提示，长按后选择父亲日报 / 父亲设置，并继续走 PIN。
+2. ParentReport domain/API 增加兼容字段 tonight_parent_bridge；Android 父亲日报顶部显示“今晚可以怎么接一句”。
+3. 失败态默认文案已家庭化，不展示 backend/model/provider/config。
+4. 父亲日报仍是 model-first；模型失败不把规则日报冒充成功。
+5. 这不是生产级账号/auth；Redmi K60 / Honor Pad 5 真机 QA 仍待验。
+```
+
 ### 关键文件
 
 ```text

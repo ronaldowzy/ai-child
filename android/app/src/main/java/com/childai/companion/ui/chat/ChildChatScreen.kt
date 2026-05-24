@@ -160,6 +160,7 @@ private fun ChildChatScreenContent(
     var parentPinInput by rememberSaveable { mutableStateOf("") }
     var parentPinError by rememberSaveable { mutableStateOf<String?>(null) }
     var parentEntryHint by rememberSaveable { mutableStateOf<String?>(null) }
+    var showParentEntryChoices by rememberSaveable { mutableStateOf(false) }
 
     fun resetParentGate() {
         pendingParentEntry = null
@@ -169,6 +170,7 @@ private fun ChildChatScreenContent(
 
     fun openParentGate(target: ParentEntryTarget) {
         parentEntryHint = null
+        showParentEntryChoices = false
         pendingParentEntry = target
         parentPinInput = ""
         parentPinError = null
@@ -209,6 +211,12 @@ private fun ChildChatScreenContent(
             onDismiss = ::resetParentGate,
         )
     }
+    if (showParentEntryChoices) {
+        ParentEntryTargetDialog(
+            onOpenTarget = ::openParentGate,
+            onDismiss = { showParentEntryChoices = false },
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -246,13 +254,11 @@ private fun ChildChatScreenContent(
                     parentEntryHint = parentEntryHint,
                     presentation = uiState.interactionPresentation,
                     onParentEntryTap = {
-                        parentEntryHint = "请让大人长按父亲入口。"
+                        parentEntryHint = parentEntryTapHint()
                     },
-                    onOpenParentSettings = {
-                        openParentGate(ParentEntryTarget.Settings)
-                    },
-                    onOpenParentReport = {
-                        openParentGate(ParentEntryTarget.Report)
+                    onParentEntryLongPress = {
+                        parentEntryHint = null
+                        showParentEntryChoices = true
                     },
                     onSend = onSend,
                     onQuickAction = onQuickAction,
@@ -534,8 +540,7 @@ private fun ChatPanel(
     parentEntryHint: String?,
     presentation: ChildInteractionPresentation,
     onParentEntryTap: () -> Unit,
-    onOpenParentSettings: () -> Unit,
-    onOpenParentReport: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
     onSend: (String) -> Unit,
     onQuickAction: (QuickActionUi) -> Unit,
     onStopTts: () -> Unit,
@@ -556,8 +561,7 @@ private fun ChatPanel(
             statusText = presentation.statusText,
             compactLandscape = compactLandscape,
             onParentEntryTap = onParentEntryTap,
-            onOpenParentSettings = onOpenParentSettings,
-            onOpenParentReport = onOpenParentReport,
+            onParentEntryLongPress = onParentEntryLongPress,
         )
         Spacer(modifier = Modifier.height(panelGap))
         ChatConversationPanel(
@@ -591,6 +595,15 @@ private fun ChatPanel(
         )
     }
 }
+
+internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
+
+internal fun parentEntryTapHint(): String = "这是给大人看的，请让大人长按进入。"
+
+internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
+
+internal fun parentEntryLongPressTargets(): List<ParentEntryTarget> =
+    listOf(ParentEntryTarget.Report, ParentEntryTarget.Settings)
 
 @Composable
 private fun QuickActionsRow(
@@ -637,8 +650,7 @@ private fun AgentTopBar(
     statusText: String,
     compactLandscape: Boolean,
     onParentEntryTap: () -> Unit,
-    onOpenParentSettings: () -> Unit,
-    onOpenParentReport: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
 ) {
     val horizontalPadding = if (compactLandscape) 16.dp else 24.dp
     val verticalPadding = if (compactLandscape) 10.dp else 18.dp
@@ -675,15 +687,9 @@ private fun AgentTopBar(
                     )
                 }
                 ParentEntryButton(
-                    label = "父亲日报",
+                    label = PARENT_ENTRY_COMPACT_LABEL,
                     onTap = onParentEntryTap,
-                    onLongPress = onOpenParentReport,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                ParentEntryButton(
-                    label = "父亲设置",
-                    onTap = onParentEntryTap,
-                    onLongPress = onOpenParentSettings,
+                    onLongPress = onParentEntryLongPress,
                 )
             }
             parentEntryHint?.let { hint ->
@@ -718,26 +724,50 @@ private fun ParentEntryButton(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "长按进入",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
     }
+}
+
+@Composable
+private fun ParentEntryTargetDialog(
+    onOpenTarget: (ParentEntryTarget) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "给大人的角落")
+        },
+        text = {
+            Text(
+                text = "请选择要进入的页面，下一步需要大人输入 PIN。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onOpenTarget(ParentEntryTarget.Report) }) {
+                Text(text = ParentEntryTarget.Report.label)
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onOpenTarget(ParentEntryTarget.Settings) }) {
+                    Text(text = ParentEntryTarget.Settings.label)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(text = "取消")
+                }
+            }
+        },
+    )
 }
 
 @Composable

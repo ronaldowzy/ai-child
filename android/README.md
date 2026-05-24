@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
+当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，并补上图片本地确认卡和父亲入口降噪 thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
 
 ## 当前范围
 
@@ -16,10 +16,11 @@
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo。CameraX 自定义相机不是当前目标。
+- 拍照/相册发送后，儿童消息区显示本地临时图片确认卡：优先展示压缩缩略图，并显示图片类型、大小和上传状态；本地路径不进入模型 prompt，上传文件名会去掉本地目录。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 父亲设置页可读取和保存孩子小名 / 显示名、父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。小白狐 opening greeting 优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
-- 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要。
-- 儿童聊天页中的父亲设置和父亲日报入口使用轻量误触保护：点击只提示，长按后输入开发 PIN 才进入。
+- 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”；失败态不默认暴露后端/model/provider/config 文案。
+- 儿童聊天页中的父亲入口降噪为一个小“大人”入口：点击只提示，长按后选择父亲日报或父亲设置，再输入开发 PIN 才进入。该入口不是生产级账号/auth。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
 - 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、父母寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
 
@@ -44,6 +45,9 @@
 3. 分享图片 -> 点击“编个故事”后，小白狐基于后端 MiMo vision 摘要编故事。
 4. 后端缺 key、`allow_image` 未开或 provider 失败时，儿童端显示失败，不假装看到了。
 5. 断开后端时，普通图片和作业图片分别显示正确失败文案。
+6. 拍照/相册发送后，消息区缩略图/图片确认卡在上传中、成功、失败状态下不挤占横屏消息区。
+7. 父亲入口默认只显示小“大人”入口；长按 + PIN 后父亲日报和设置都仍可进入。
+8. 父亲日报顶部“今晚可以怎么接一句”和失败态家庭化文案在真机可读。
 ```
 
 ## 下一阶段语音和小白狐方向

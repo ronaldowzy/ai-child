@@ -74,8 +74,9 @@ class FakeConversationRepository:
 
 
 class SuccessfulParentReportModelRegistry:
-    def __init__(self) -> None:
+    def __init__(self, *, bridge_text: str | None = None) -> None:
         self.requests = []
+        self.bridge_text = bridge_text
 
     def generate(self, request):
         self.requests.append(request)
@@ -135,6 +136,8 @@ class SuccessfulParentReportModelRegistry:
             "safety_alerts": safety,
             "suggested_parent_actions": actions,
         }
+        if self.bridge_text is not None:
+            data["tonight_parent_bridge"] = self.bridge_text
         return ModelResponse(
             task_type=ModelTaskType.PARENT_REPORT,
             response_text="",
@@ -263,6 +266,8 @@ def test_parent_report_service_generates_normal_daily_report() -> None:
     ]
     assert report.safety_alerts == []
     assert any("直接给最终答案" in action for action in report.suggested_parent_actions)
+    assert report.tonight_parent_bridge is not None
+    assert "不追问" in report.tonight_parent_bridge
     assert "逐字返回" not in report.model_dump_json()
 
 
@@ -329,6 +334,72 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     assert any("图片" in item for item in report.expression_observations)
     assert "我发了一张家里的照片" not in report_json
     assert "数学题不会做" not in report_json
+    assert report.tonight_parent_bridge is not None
+    assert "不追问" in report.tonight_parent_bridge
+
+
+def test_parent_report_model_parse_accepts_optional_bridge_text() -> None:
+    bridge = (
+        "今晚可以轻轻问：“你今天那张图，最想让我看哪里？”"
+        "如果孩子不想说，就换轻松方式，不追问。"
+    )
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_bridge_photo",
+                    text="我拍了一张图给小白狐看。",
+                    attachments_count=1,
+                )
+            ]
+        ),
+        model_registry=SuccessfulParentReportModelRegistry(bridge_text=bridge),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    assert report.generation_status == ParentReportGenerationStatus.MODEL_GENERATED
+    assert report.tonight_parent_bridge == bridge
+    assert "逐字聊天记录" not in report.model_dump_json()
+
+
+def test_parent_report_deterministic_empty_material_bridge_avoids_interrogation() -> None:
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(),
+        model_registry=SuccessfulParentReportModelRegistry(),
+        now_provider=_fixed_now,
+    )
+    report = report_service._deterministic_fallback_report(
+        child_id="child_parent_report_service_test",
+        target_date=date(2026, 5, 18),
+        memories=[],
+        conversation_messages=[],
+        conversation={
+            "topics": [],
+            "state_summary": [],
+            "learning_observations": [],
+            "expression_observations": [],
+            "emotion_observations": [],
+            "safety_alerts": [],
+        },
+    )
+
+    assert report.tonight_parent_bridge is not None
+    assert "不想聊也没关系" in report.tonight_parent_bridge
+    assert "不要追问" in report.tonight_parent_bridge
+    assert "监控" not in report.model_dump_json()
 
 
 def test_parent_report_service_model_first_uses_daily_conversation_materials() -> None:

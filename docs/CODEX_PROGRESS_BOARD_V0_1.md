@@ -176,7 +176,7 @@ Conversation API：done
 | A2-02 ui_actions 渲染 | done |  | 快捷按钮可显示；session_state 用于续会话和开发排查，默认不在儿童界面展示 |
 | A3-01 系统相机真实图片上传 | in_progress |  | Android 调系统相机/相册并 multipart 上传；后端返回真实 attachment_id；CameraX 不在本轮范围；真机 QA 待验 |
 | A4-01 ParentSettingsScreen | done |  | policy 可修改 |
-| A4-02 ParentReportScreen | review |  | report 可读取；model_failed/model_blocked 时展示“日报暂时生成失败，请稍后重试”，不展示 fallback 正文；真机 QA 待验 |
+| A4-02 ParentReportScreen | review |  | report 可读取；model_failed/model_blocked 时展示“日报暂时生成失败，请稍后重试”，不展示 fallback 正文；父亲日报 client read timeout 已调到 70s 覆盖 model-first 首次生成耗时；真机 QA 待验 |
 | E2E-01 本机/LAN API QA | done |  | MANUAL_QA_V0_1.md 记录 S14_E2E_API: PASS |
 | E2E-02 Android 历史基础 smoke | done |  | 历史 App 安装、聊天 API、父亲日报读取通过 |
 | E2E-03 Android 完整手动 QA | in_progress |  | QA1 通过历史设备 smoke 验证基础聊天、放学后、学习入口动作、父亲入口普通点击不进入、错误 PIN 不进入和后端不可达温和错误；正确 PIN、父亲设置修改、设备侧完整 mock 拍题和真实平板仍待复验 |

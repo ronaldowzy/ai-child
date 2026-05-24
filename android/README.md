@@ -478,4 +478,4 @@ bash scripts/e2e_local_api_check.sh
 GET /api/v1/parent/reports/{child_id}?date=YYYY-MM-DD
 ```
 
-Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议父亲动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；如果返回 `model_failed` / `model_blocked`，父亲端只显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。
+Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议父亲动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；首次生成可能需要几十秒，Android 父亲日报 client read timeout 为 70s，避免前端先超时而后端稍后生成成功。如果返回 `model_failed` / `model_blocked`，父亲端只显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。

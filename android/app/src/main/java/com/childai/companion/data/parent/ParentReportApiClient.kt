@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 class ParentReportApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
-    private val readTimeoutMs: Int = 12_000,
+    private val readTimeoutMs: Int = PARENT_REPORT_READ_TIMEOUT_MS,
 ) {
     suspend fun getReport(childId: String, date: String): ParentReport =
         withContext(Dispatchers.IO) {
@@ -49,6 +49,8 @@ class ParentReportApiClient(
             "${childId.urlEncode()}?date=${date.urlEncode()}"
     }
 }
+
+internal const val PARENT_REPORT_READ_TIMEOUT_MS = 70_000
 
 class ParentReportApiException(
     message: String,

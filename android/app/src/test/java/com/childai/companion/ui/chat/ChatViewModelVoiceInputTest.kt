@@ -26,6 +26,10 @@ class ChatViewModelVoiceInputTest {
 
         viewModel.startVoiceRecording(tempDir())
         assertEquals(VoiceInputMode.Listening, viewModel.uiState.value.voice.inputMode)
+        assertEquals(
+            ChildTurnUiPhase.Listening,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
         assertTrue(speech.started)
 
         viewModel.stopVoiceRecordingAndUpload()
@@ -116,6 +120,10 @@ class ChatViewModelVoiceInputTest {
 
         assertTrue(sender.sentTexts.isEmpty())
         assertEquals(VoiceInputMode.NeedsRetry, viewModel.uiState.value.voice.inputMode)
+        assertEquals(
+            ChildTurnUiPhase.NeedsRetry,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
         assertEquals(message, viewModel.uiState.value.voice.errorMessage)
         assertEquals(MessageAuthor.Agent, viewModel.uiState.value.messages.last().author)
         assertEquals(message, viewModel.uiState.value.messages.last().text)
@@ -132,6 +140,10 @@ class ChatViewModelVoiceInputTest {
 
         assertTrue(sender.sentTexts.isEmpty())
         assertEquals(VoiceInputMode.PermissionDenied, viewModel.uiState.value.voice.inputMode)
+        assertEquals(
+            ChildTurnUiPhase.PermissionNeeded,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
         assertEquals("没有麦克风权限，我们可以请大人打开。", viewModel.uiState.value.voice.statusText)
     }
 

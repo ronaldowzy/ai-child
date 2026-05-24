@@ -77,6 +77,11 @@ class ChatTtsViewModelTest {
         assertEquals(listOf("我在这里。"), fakeTts.requests.map { it.text })
         assertFalse(viewModel.uiState.value.tts.isSpeaking)
         assertTrue(viewModel.uiState.value.tts.isSpeakingPending)
+        assertEquals(
+            ChildTurnUiPhase.SpeakingPending,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
+        assertTrue(viewModel.uiState.value.interactionPresentation.showStopSpeaking)
         assertEquals(FoxMotion.Speaking, viewModel.uiState.value.agent.motion)
         assertEquals("我在这里。", viewModel.uiState.value.tts.lastRequestedTextPreview)
     }

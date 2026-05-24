@@ -1,6 +1,6 @@
 # Voice Interaction Design v0.1
 
-用途：定义儿童端语音输入、TTS 朗读、opening greeting、音频数据边界和 QA 验收清单。本文档区分已实现能力和待设备验收项；Android 语音输入 v1 已实现点击录音、上传后端 ASR、儿童默认自动发送 transcript，确认面板仅保留为 DevSettings / 父亲调试模式，仍待 Redmi K60 / Honor Pad 5 真机 QA。ASR 真实识别主路径已修订为后端本地 sherpa-onnx + SenseVoice-Small int8，MiMo ASR 仅作为本地异常后的云端 fallback。小白狐语音输出主路径已从 Android 系统 TTS 调整为后端 MiMo VoiceClone 音频生成，Android 系统 TTS 保留为 fallback 和诊断能力。
+用途：定义儿童端语音输入、TTS 朗读、opening greeting、音频数据边界和 QA 验收清单。本文档区分已实现能力和待设备验收项；Android 语音输入 v1 已实现点击录音、上传后端 ASR、儿童默认自动发送 transcript，确认面板仅保留为 DevSettings / 父亲调试模式，仍待 Redmi K60 / Honor Pad 5 真机 QA。ASR 真实识别主路径已修订为后端本地 sherpa-onnx + SenseVoice-Small int8，MiMo ASR 仅作为本地异常后的云端 fallback。小白狐语音输出主路径已从 Android 系统 TTS 调整为后端 MiMo VoiceClone 音频生成；当前儿童端自动朗读不使用系统 TTS fallback，系统 TTS 仅保留为开发诊断/未来评估背景。
 
 关联决策：
 
@@ -34,8 +34,9 @@ PD-037：儿童聊天页打开后，小白狐请求 opening greeting；称呼优
 2. Android DTO 已解析这些字段，并已做小白狐轻量状态映射。
 3. Android 语音输入 v1 已接入：点击后请求麦克风权限，录制短 WAV，上传后端 `/api/v1/asr/transcribe`；后端优先本地 SenseVoice ASR，异常后按配置 fallback；儿童默认自动发送非空 transcript，DevSettings / 父亲调试模式可恢复可编辑待确认文本。
 4. 后端已提供 `POST /api/v1/tts/xiaobaohu`；当前测试阶段应启用目标 TTS provider，并通过环境变量和 TTS 数据策略闸门验证真实音频链路。
-5. Android 已实现 remote `reply.audio_url` 优先播放、本地 TextToSpeech fallback 抽象、默认自动朗读、停止/静音控制、VoiceProfile 和小白狐 speaking 状态联动。
-6. mock 拍题和学习求助仍以文字和 mock OCR 为主。
+5. Android 已实现 remote `reply.audio_url` 优先播放、默认自动朗读、停止/静音控制、VoiceProfile 诊断和小白狐 speaking 状态联动；儿童端自动朗读不再 fallback 到系统 TextToSpeech。
+6. Android unified interaction state thin slice 已新增 `ChildTurnUiPhase` / `ChildInteractionPresentation`，统一派生 ASR listening/recognizing、stream thinking、TTS pending/speaking、image processing、needs retry、permission needed 和 service error 的儿童可见状态。
+7. mock 拍题和学习求助仍以文字和 mock OCR 为主。
 ```
 
 ### 1.2 v0.2 Voice Scope
@@ -44,7 +45,7 @@ PD-037：儿童聊天页打开后，小白狐请求 opening greeting；称呼优
 1. 语音输入 v1：Android 点击录音后上传短音频到后端 ASR，后端优先调用本地 sherpa-onnx + SenseVoice-Small int8；本地异常时再走配置的原有识别方式。
 2. 儿童默认不展示可编辑识别文本，ASR ok 且 transcript 非空后自动发送 conversation stream；确认面板只作为 DevSettings / 父亲调试模式。
 3. TTS 朗读 v1：后端使用小白狐 VoiceClone 生成 `audio_url`，Android 优先播放 `audio_url`。
-4. `audio_url` 不可用时，Android fallback 到系统 TextToSpeech；系统 TTS 不再作为正式小白狐音色方案。
+4. `audio_url` 不可用或播放失败时，Android 保留文字和温和提示，不用系统 TextToSpeech 顶替儿童端自动朗读；系统 TTS 不再作为正式小白狐音色方案。
 5. 后端 ASR endpoint 可以接收一次性短音频做转写，但原始音频不入长期库、不进日志、不进入 memory；语音输入正式进入对话的仍是自动发送后的文本。
 6. Hands-free conversational mode 是 future，不进入 v1。
 7. 本地 ASR 方案见 `docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md`；MiMo ASR / audio input 仍作为 fallback 和对照测试路径，结论见 `docs/ASR_INPUT_RESEARCH_V0_1.md` 和 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；真实儿童音频外发必须由父亲授权和 ASR policy flags 控制。
@@ -70,7 +71,7 @@ VoiceEngine
 |---|---|---|
 | VoiceEngine | 管理语音输入和 TTS 的总入口、权限状态、开关状态和生命周期 | Android voice engine |
 | SpeechInputController | 处理点击语音、录音、上传后端 ASR、识别结果、自动发送、取消、错误和调试用 confirm-before-send 状态 | Android recorder + backend ASR upload wrapper |
-| TtsController | 处理自动朗读、停止、静音、远程音频播放、系统 TTS fallback、错误和生命周期释放 | Remote audio player + Android TextToSpeech fallback |
+| TtsController | 处理自动朗读、停止、静音、远程音频播放、错误和生命周期释放；儿童端自动朗读不混播系统 TTS fallback | Remote audio player + diagnostic fallback abstraction |
 | VoiceProfile | 管理语言、voice 名称、语速、音高和 fallback | zh-CN system voice profile |
 
 ---
@@ -187,7 +188,7 @@ ChildChatScreen 首次可见
 4. 必须提供静音或关闭自动朗读的开关。
 5. 自动朗读开关必须可放在 DevSettings 或父亲设置中；进入家庭内测前优先收敛到父亲可治理。
 6. 如果 reply.voice_enabled=false，则不自动朗读。
-7. 如果 reply.audio_url 为空或播放失败，Android 使用本地系统 TTS fallback；系统 TTS 只作诊断和降级，不作为正式品牌音色。
+7. 如果 reply.audio_url 为空或播放失败，Android 只保留文字和温和提示，不使用本地系统 TTS 混播儿童端自动朗读；系统 TTS 只作诊断和未来评估背景，不作为正式品牌音色。
 8. TTS 文本必须使用后端已规整、经过输出安全检查的 voice-first 短句回复。
 9. 高风险安全回复可以生成语音，但 emotion 使用 safety，语气稳定、温和，不做戏剧化刺激表现。
 10. TTS 能力必须封装在 TtsController / AudioUrlPlayer，UI 不直接依赖 TextToSpeech 或 MediaPlayer。
@@ -201,7 +202,7 @@ ChildChatScreen 首次可见
 2. ChatViewModel 在 agent reply 到达后，根据 reply.voice_enabled、AUTO_TTS_ENABLED 和静音状态决定是否自动朗读。
 3. TTS 请求被接受后先进入 speaking pending / speaking 视觉反馈，不再完全依赖系统 onStart 回调。
 4. 朗读结束或停止后恢复后端 reply 对应的 base mood / motion。
-5. UI 提供停止、静音和短状态提示；开发构建可显示 TTS 诊断文本。
+5. UI 提供停止、静音和短状态提示；开发构建可显示 TTS 诊断文本。本轮 unified interaction state thin slice 已保证 voice-first 下 TTS pending/speaking 时显示“停一下”，点击后走现有 stop path 并清空当前播放/segment queue。
 6. TtsUiState / VoiceDiagnostics 记录 isInitializing、isInitialized、enginePackageName、selectedLocale、selectedVoiceName、setLanguageResult、setVoiceResult、lastSpeakResult 和 lastFailureReason。
 7. 系统 TTS 不可用时显示“我现在不能朗读，但文字还在这里。”并降级为文字。
 8. 后端已新增 `POST /api/v1/tts/xiaobaohu`，可返回本地缓存 wav 的 `/media/tts/...` URL；当前测试阶段应验证目标 TTS provider。
@@ -210,8 +211,8 @@ ChildChatScreen 首次可见
 11. AndroidTtsController 已修复 TextToSpeech 初始化回调早于字段赋值时的误判风险。
 12. TTS 不可用时 UI 提供“检查朗读设置”和“安装语音数据”入口，便于 Redmi K60 复测。
 13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
-14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败再 fallback 到系统 TextToSpeech 或文字。
-15. 真实设备听感、远程音频播放、系统 TTS fallback、中文 voice 可用性、延迟和 Honor Pad 5 低配表现仍需 QA。
+14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败时保留文字和温和错误提示，不再 fallback 到系统 TextToSpeech。
+15. 真实设备听感、远程音频播放、停止按钮可发现性、延迟和 Honor Pad 5 低配表现仍需 QA；voice-first 静音 toggle 的常驻可见性仍是下一轮任务，不应把本轮写成语音体验全部完成。
 16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式和 TTS 分句/分段播放设计。
 ```
 
@@ -283,15 +284,15 @@ TTS-D1 诊断字段：
 
 ### 5.1 VoiceProfile v1
 
-`VoiceProfile` 用于集中管理 Android 系统 TTS fallback 的调优。它不再代表正式小白狐品牌音色；正式主路径由后端 MiMo VoiceClone 生成音频。
+`VoiceProfile` 保留为 Android 平台 TTS 诊断和未来评估配置，不再作为儿童端自动朗读 fallback 的产品路径。正式主路径由后端 MiMo VoiceClone 生成音频。
 
 | 字段 | v1 默认 |
 |---|---|
-| `preferredVoiceName` | 优先选择可用的中文系统 voice；找不到时为空并走 fallback |
+| `preferredVoiceName` | 优先选择可用的中文系统 voice；找不到时为空并只记录诊断 |
 | `locale` | `zh-CN` |
 | `speechRate` | 稍慢，便于 8 岁儿童听清 |
 | `pitch` | 略高但不过度，目标是干净、清脆、中性、活泼可爱，不做尖锐或过度幼稚音色 |
-| `fallbackVoice` | 系统默认中文 voice；仍不可用时只显示文字 |
+| `fallbackVoice` | 系统默认中文 voice 诊断字段；儿童端自动朗读不可用时只显示文字 |
 
 音色方向：
 
@@ -300,7 +301,7 @@ TTS-D1 诊断字段：
 2. 不过度尖锐、不婴儿化、不做夸张动画配音腔。
 3. 睡前场景可降低语速和刺激感。
 4. 高风险安全回复保持稳定、温和，不使用戏剧化情绪音色。
-5. 系统 TTS 不承诺固定专属音色；如果系统 TTS 效果不好，记录 QA 并 fallback 为文字或后端 audioUrl。
+5. 系统 TTS 不承诺固定专属音色；如果平台 TTS 效果不好，只记录诊断，不顶替小白狐自动朗读。
 ```
 
 ### 4.2 MiMo VoiceClone Little White Fox Voice
@@ -535,16 +536,16 @@ ASR 研究后的后端边界：
 
 | 设备 | 定位 | 用途 |
 |---|---|---|
-| Device A：Redmi K60，Android 14 | 功能主验证 | 快速验证后端 ASR 录音上传、默认自动发送、opening greeting、远程 audioUrl 播放、系统 TTS fallback、小白狐状态切换、图片资源和轻量动画、真实模型对话体验和异常兜底路径，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
-| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、后端 ASR 自动发送、opening greeting、TTS 可用性、小白狐资源大小、动画流畅度、发热和卡顿 |
+| Device A：Redmi K60，Android 14 | 功能主验证 | 快速验证后端 ASR 录音上传、默认自动发送、opening greeting、远程 audioUrl 播放、小白狐状态切换、图片资源和轻量动画、真实模型对话体验和异常兜底路径，以及自由聊天、学习求助、直接要答案、安全场景、隐私边界和父亲入口保护等核心流程 |
+| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9 兼容性、4GB 内存性能、平板横屏/大屏 UI、儿童真实使用尺寸、后端 ASR 自动发送、opening greeting、远程 TTS 播放、小白狐资源大小、动画流畅度、发热和卡顿 |
 
 执行顺序：
 
 ```text
 1. V1 语音输入先在 Device A 跑通点击语音 -> 录音 -> 上传后端 ASR -> 自动发送 transcript -> conversation stream；DevSettings 确认模式单独验证。
 2. 再在 Honor Pad 5 验证权限申请、录音格式、中文识别、儿童声音识别、延迟、失败提示和是否可接受。
-3. V2 TTS 先在 Device A 跑通 `reply.audio_url` 远程音频播放、默认自动朗读、停止、关闭和系统 TTS fallback。
-4. 再在 Honor Pad 5 验证远程 wav 播放、缓存音频体积、播放延迟、是否卡顿、系统 TTS fallback 是否可用，以及是否需要关闭自动朗读作为低配默认。
+3. V2 TTS 先在 Device A 跑通 `reply.audio_url` 远程音频播放、默认自动朗读、停止、关闭和失败时保留文字提示。
+4. 再在 Honor Pad 5 验证远程 wav 播放、缓存音频体积、播放延迟、是否卡顿，以及是否需要关闭自动朗读作为低配默认。
 5. 如果 Honor Pad 5 语音效果不好，允许降级为文字优先，但必须记录结果和降级原因。
 ```
 
@@ -572,14 +573,14 @@ TTS 自然度主观评价
 | VQA-07 | 学习求助语音 | 回复仍不直接给答案，先引导题意和步骤 |
 | VQA-08 | 高风险语音文本 | 确认发送后进入安全场景，鼓励告诉可信成人并触发父亲提醒 |
 | VQA-09 | TTS 默认自动朗读 | 默认自动朗读小白狐回复，只朗读后端安全回复，不朗读内部 debug 或 session_state |
-| VQA-10 | 停止和静音 | 可停止当前朗读，可通过 DevSettings 或父亲设置关闭自动朗读 |
+| VQA-10 | 停止和静音 | voice-first 下 TTS pending/speaking 时可见“停一下”并停止当前朗读；静音可通过 DevSettings 或父亲设置治理，儿童输入栏常驻静音可见性留待下一轮 |
 | VQA-11 | VoiceProfile | 使用 zh-CN、稍慢语速、略高但不过度 pitch；找不到 preferred voice 时 fallback 系统默认中文 voice |
 | VQA-12 | 抽象边界 | UI 通过 VoiceEngine / SpeechInputController / TtsController 使用语音能力，不直接散落平台调用 |
 | VQA-13 | 数据检查 | 日志、memory、fixture 中没有原始音频、真实身份或长篇逐字转写 |
 | VQA-14 | TTS 诊断可见 | Redmi K60 等真机上能看到朗读开启、正在准备、不可用或失败原因；开发诊断含 engine、locale、voice、speak 返回值 |
 | VQA-15 | speaking pending | TTS 请求被接受后小白狐先切 speaking pending / speaking；失败或停止后恢复 base state，不一直卡住 |
 | VQA-16 | 后端小白狐 TTS endpoint | `POST /api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`；当前 QA 应记录实际 provider；真实 MiMo smoke 已通过并下载 RIFF/WAV，policy 不满足时不得写成真实音频通过 |
-| VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时 fallback 到系统 TTS 或文字；代码已实现，待 Redmi K60 真机确认听感和网络播放 |
+| VQA-17 | Android remote audio 优先 | `reply.audio_url` 非空时优先播放远程音频；失败时保留文字和温和提示，不 fallback 到系统 TTS；代码已实现，待 Redmi K60 真机确认听感、网络播放和停止按钮可发现性 |
 | VQA-18 | TTS 数据策略 | MiMo VoiceClone 未显式开启 allow child text 和 retention checked 时不能调用外部 provider |
 | VQA-19 | Opening greeting | App 打开后小白狐请求一次 opening；有小名喊小名，有 display name 用 display name，都没有不强行称呼 |
 | VQA-20 | Opening 不打断孩子 | 如果孩子先点击语音或发送文本，迟到的 opening 不插入、不覆盖孩子消息 |
@@ -591,6 +592,6 @@ TTS 自然度主观评价
 2. 从点击语音到识别文本出现的延迟。
 3. 中文普通话识别效果。
 4. 儿童声音识别效果。
-5. 后端 VoiceClone 或系统 TTS fallback 的自然度。
+5. 后端 VoiceClone 的自然度；系统 TTS 不作为儿童端自动朗读 fallback 评分项。
 6. 孩子接受度。
 ```

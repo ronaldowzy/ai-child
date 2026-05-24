@@ -5,6 +5,7 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.ui.chat.ChatViewModel
+import com.childai.companion.ui.chat.ChildTurnUiPhase
 import com.childai.companion.ui.chat.ConversationMessageSender
 import com.childai.companion.ui.chat.MessageAuthor
 import com.childai.companion.ui.chat.PendingImageContextUiState
@@ -38,6 +39,10 @@ class ChatViewModelStreamTest {
         val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
 
         viewModel.applyStreamEvent(streamEvent("session_started"))
+        assertEquals(
+            ChildTurnUiPhase.Thinking,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
         viewModel.applyStreamEvent(streamEvent("text_delta", "delta" to "你好"))
         viewModel.applyStreamEvent(streamEvent("text_delta", "delta" to "呀"))
         viewModel.applyStreamEvent(streamEvent("done"))
@@ -78,6 +83,10 @@ class ChatViewModelStreamTest {
         )
 
         assertEquals(1, ttsController.requests.size)
+        assertEquals(
+            ChildTurnUiPhase.Ready,
+            viewModel.uiState.value.interactionPresentation.phase,
+        )
         assertEquals("/media/tts/segment.wav", ttsController.requests.first().audioUrl)
         assertEquals("你好", ttsController.requests.first().text)
     }
@@ -166,6 +175,10 @@ class ChatViewModelStreamTest {
                 "text" to "你好",
                 "index" to 0,
             ),
+        )
+        assertEquals(
+            ChildTurnUiPhase.Speaking,
+            viewModel.uiState.value.interactionPresentation.phase,
         )
         viewModel.stopTtsPlayback()
 

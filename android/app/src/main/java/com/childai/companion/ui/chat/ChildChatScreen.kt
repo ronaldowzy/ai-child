@@ -221,8 +221,7 @@ private fun ChildChatScreenContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AgentPanel(
-                    agent = uiState.agent,
-                    agentReplyText = uiState.agentReplyText,
+                    presentation = uiState.interactionPresentation,
                     compactLandscape = compactLandscape,
                     modifier = Modifier
                         .weight(0.41f)
@@ -233,6 +232,7 @@ private fun ChildChatScreenContent(
                     uiState = uiState,
                     compactLandscape = compactLandscape,
                     parentEntryHint = parentEntryHint,
+                    presentation = uiState.interactionPresentation,
                     onParentEntryTap = {
                         parentEntryHint = "请让大人长按父亲入口。"
                     },
@@ -373,6 +373,7 @@ private fun ChatPanel(
     uiState: ChatUiState,
     compactLandscape: Boolean,
     parentEntryHint: String?,
+    presentation: ChildInteractionPresentation,
     onParentEntryTap: () -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
@@ -393,6 +394,7 @@ private fun ChatPanel(
     Column(modifier = modifier) {
         AgentTopBar(
             parentEntryHint = parentEntryHint,
+            statusText = presentation.statusText,
             compactLandscape = compactLandscape,
             onParentEntryTap = onParentEntryTap,
             onOpenParentSettings = onOpenParentSettings,
@@ -420,6 +422,7 @@ private fun ChatPanel(
             enabled = !uiState.isSending,
             voice = uiState.voice,
             tts = uiState.tts,
+            presentation = presentation,
             onStopTts = onStopTts,
             onToggleTtsMuted = onToggleTtsMuted,
             onOpenTtsSettings = onOpenTtsSettings,
@@ -472,6 +475,7 @@ private fun SessionStateStrip(sessionState: ConversationSessionState) {
 @Composable
 private fun AgentTopBar(
     parentEntryHint: String?,
+    statusText: String,
     compactLandscape: Boolean,
     onParentEntryTap: () -> Unit,
     onOpenParentSettings: () -> Unit,
@@ -504,7 +508,7 @@ private fun AgentTopBar(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "准备听你说",
+                        text = statusText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -579,8 +583,7 @@ private fun ParentEntryButton(
 
 @Composable
 private fun AgentPanel(
-    agent: FoxAgentUiState,
-    agentReplyText: String,
+    presentation: ChildInteractionPresentation,
     compactLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -599,7 +602,7 @@ private fun AgentPanel(
             verticalArrangement = Arrangement.Center,
         ) {
             CartoonAgentView(
-                agent = agent,
+                agent = presentation.agent,
                 debugMascotState = debugMascotState,
                 modifier = Modifier.sizeIn(
                     maxWidth = mascotMaxSize,
@@ -608,7 +611,7 @@ private fun AgentPanel(
             )
             Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 16.dp))
             AgentReplyCarouselText(
-                text = agentReplyText.ifBlank { agent.statusText },
+                text = presentation.statusText,
                 compactLandscape = compactLandscape,
             )
             if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {

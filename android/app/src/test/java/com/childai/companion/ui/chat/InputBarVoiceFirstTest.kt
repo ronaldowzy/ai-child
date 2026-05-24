@@ -53,20 +53,51 @@ class InputBarVoiceFirstTest {
 
     @Test
     fun primaryVoiceButtonLabelsMatchRecordingState() {
-        assertEquals("按一下开始说", inputBarPrimaryVoiceButtonText(VoiceInputMode.Idle))
-        assertEquals("说完了", inputBarPrimaryVoiceButtonText(VoiceInputMode.Listening))
         assertEquals(
-            "正在听懂你说的话",
-            inputBarPrimaryVoiceButtonText(VoiceInputMode.Uploading),
+            "按一下开始说",
+            inputBarPrimaryVoiceButtonText(childInteractionPresentation()),
         )
-        assertEquals("再说一次", inputBarPrimaryVoiceButtonText(VoiceInputMode.NeedsRetry))
+        assertEquals(
+            "说完了",
+            inputBarPrimaryVoiceButtonText(
+                childInteractionPresentation(
+                    voice = VoiceUiState(inputMode = VoiceInputMode.Listening),
+                ),
+            ),
+        )
+        assertEquals(
+            "正在听懂",
+            inputBarPrimaryVoiceButtonText(
+                childInteractionPresentation(
+                    voice = VoiceUiState(inputMode = VoiceInputMode.Uploading),
+                ),
+            ),
+        )
+        assertEquals(
+            "再说一次",
+            inputBarPrimaryVoiceButtonText(
+                childInteractionPresentation(
+                    voice = VoiceUiState(inputMode = VoiceInputMode.NeedsRetry),
+                ),
+            ),
+        )
         assertEquals(
             "请大人检查后再说",
-            inputBarPrimaryVoiceButtonText(VoiceInputMode.Failed),
+            inputBarPrimaryVoiceButtonText(
+                childInteractionPresentation(
+                    voice = VoiceUiState(inputMode = VoiceInputMode.PermissionDenied),
+                ),
+            ),
         )
-        assertEquals(
-            "请大人检查后再说",
-            inputBarPrimaryVoiceButtonText(VoiceInputMode.PermissionDenied),
+    }
+
+    @Test
+    fun ttsSpeakingPresentationShowsStopSpeaking() {
+        val presentation = childInteractionPresentation(
+            tts = com.childai.companion.voice.TtsUiState(isSpeaking = true),
         )
+
+        assertTrue(presentation.showStopSpeaking)
+        assertEquals("小白狐在说", inputBarPrimaryVoiceButtonText(presentation))
     }
 }

@@ -44,6 +44,11 @@ fun InputBar(
     enabled: Boolean = true,
     voice: VoiceUiState = VoiceUiState(),
     tts: TtsUiState = TtsUiState(),
+    presentation: ChildInteractionPresentation = childInteractionPresentation(
+        voice = voice,
+        tts = tts,
+        isSending = !enabled,
+    ),
     onStopTts: () -> Unit = {},
     onToggleTtsMuted: () -> Unit = {},
     onOpenTtsSettings: () -> Unit = {},
@@ -89,6 +94,7 @@ fun InputBar(
     }
 
     val useChildVoiceFirstInput = inputBarUsesChildVoiceFirstInput()
+    val interactionPresentation = presentation
     val shouldAutoSendPendingTranscript = inputBarShouldAutoSendHiddenPendingTranscript(
         useChildVoiceFirstInput = useChildVoiceFirstInput,
         enabled = enabled,
@@ -168,25 +174,38 @@ fun InputBar(
                             startVoiceRecordingWithPermission()
                         }
                     },
-                    enabled = inputBarPrimaryVoiceButtonEnabled(enabled, voice.inputMode),
+                    enabled = enabled && interactionPresentation.primaryButtonEnabled,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 58.dp),
                 ) {
                     Text(
-                        text = inputBarPrimaryVoiceButtonText(voice.inputMode),
+                        text = inputBarPrimaryVoiceButtonText(interactionPresentation),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
-                OutlinedButton(
-                    onClick = { showImageSourceDialog = true },
-                    enabled = enabled && !voice.isRecording && !voice.isUploading,
-                    modifier = Modifier.heightIn(min = 58.dp),
-                ) {
-                    Text(
-                        text = "拍给小白狐看",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                if (interactionPresentation.showStopSpeaking) {
+                    OutlinedButton(
+                        onClick = onStopTts,
+                        modifier = Modifier.heightIn(min = 58.dp),
+                    ) {
+                        Text(
+                            text = "停一下",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+                if (interactionPresentation.showImageInput) {
+                    OutlinedButton(
+                        onClick = { showImageSourceDialog = true },
+                        enabled = enabled && !voice.isRecording && !voice.isUploading,
+                        modifier = Modifier.heightIn(min = 58.dp),
+                    ) {
+                        Text(
+                            text = "拍给小白狐看",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                 }
             }
         } else {
@@ -237,14 +256,14 @@ fun InputBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "${voice.statusText} · ${tts.statusText}",
+                    text = interactionPresentation.statusText,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                if (tts.isSpeaking || tts.isSpeakingPending) {
+                if (interactionPresentation.showStopSpeaking) {
                     TextButton(onClick = onStopTts) {
-                        Text(text = "停止")
+                        Text(text = "停一下")
                     }
                 }
                 if (inputBarShouldShowResayAction(useChildVoiceFirstInput, voice.inputMode)) {
@@ -260,8 +279,10 @@ fun InputBar(
                         Text(text = "取消语音")
                     }
                 }
-                TextButton(onClick = onToggleTtsMuted) {
-                    Text(text = if (tts.isMuted) "打开朗读" else "静音")
+                if (interactionPresentation.showMuteToggle || !useChildVoiceFirstInput) {
+                    TextButton(onClick = onToggleTtsMuted) {
+                        Text(text = if (tts.isMuted) "打开朗读" else "静音")
+                    }
                 }
             }
             if (tts.needsSystemSetup) {
@@ -317,24 +338,17 @@ internal fun inputBarShouldAutoSendHiddenPendingTranscript(
         pendingTranscript.trim().isNotEmpty()
 }
 
-internal fun inputBarPrimaryVoiceButtonText(inputMode: VoiceInputMode): String {
-    return when (inputMode) {
-        VoiceInputMode.Listening -> "说完了"
-        VoiceInputMode.Uploading -> "正在听懂你说的话"
-        VoiceInputMode.NeedsRetry -> "再说一次"
-        VoiceInputMode.Failed,
-        VoiceInputMode.PermissionDenied -> "请大人检查后再说"
-        else -> "按一下开始说"
-    }
+internal fun inputBarPrimaryVoiceButtonText(
+    presentation: ChildInteractionPresentation,
+): String {
+    return presentation.primaryButtonText
 }
 
 internal fun inputBarPrimaryVoiceButtonEnabled(
     enabled: Boolean,
-    inputMode: VoiceInputMode,
+    presentation: ChildInteractionPresentation,
 ): Boolean {
-    return enabled &&
-        inputMode != VoiceInputMode.Uploading &&
-        inputMode != VoiceInputMode.PendingTranscript
+    return enabled && presentation.primaryButtonEnabled
 }
 
 internal fun inputBarShouldShowResayAction(

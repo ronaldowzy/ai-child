@@ -156,16 +156,15 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 quickActions = emptyList(),
+                childTurnPhaseHint = ChildTurnUiPhase.Listening,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.Listening,
                     pendingTranscript = "",
                     errorMessage = null,
                 ),
-                agent = FoxAgentUiState(
-                    mood = FoxMood.Listening,
-                    motion = FoxMotion.ListeningTail,
-                    statusText = "我在听你说。",
-                ),
+                agent = childInteractionPresentation(
+                    phaseHint = ChildTurnUiPhase.Listening,
+                ).agent,
             )
         }
 
@@ -177,11 +176,14 @@ class ChatViewModel(
                 voiceRecordingAutoStopJob?.cancel()
                 _uiState.update { current ->
                     current.copy(
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         voice = current.voice.copy(
                             inputMode = VoiceInputMode.Failed,
                             errorMessage = "这次麦克风没有准备好，可以请大人检查一下。",
                         ),
-                        agent = baseAgentState,
+                        agent = childInteractionPresentation(
+                            phaseHint = ChildTurnUiPhase.ServiceError,
+                        ).agent,
                     )
                 }
             }
@@ -195,15 +197,14 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isSending = true,
+                childTurnPhaseHint = ChildTurnUiPhase.Recognizing,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.Uploading,
                     errorMessage = null,
                 ),
-                agent = FoxAgentUiState(
-                    mood = FoxMood.Thinking,
-                    motion = FoxMotion.ThinkingBlink,
-                    statusText = "我在听懂你刚才说的话。",
-                ),
+                agent = childInteractionPresentation(
+                    phaseHint = ChildTurnUiPhase.Recognizing,
+                ).agent,
             )
         }
 
@@ -227,6 +228,7 @@ class ChatViewModel(
         childInteractionStarted = true
         _uiState.update {
             it.copy(
+                childTurnPhaseHint = ChildTurnUiPhase.PermissionNeeded,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.PermissionDenied,
                     errorMessage = null,
@@ -269,6 +271,7 @@ class ChatViewModel(
         voiceRecordingAutoStopJob?.cancel()
         _uiState.update {
             it.copy(
+                childTurnPhaseHint = null,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.Idle,
                     pendingTranscript = "",
@@ -292,6 +295,7 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isSending = true,
+                childTurnPhaseHint = ChildTurnUiPhase.Sending,
                 quickActions = emptyList(),
             )
         }
@@ -327,6 +331,7 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         quickActions = emptyList(),
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
                             motion = FoxMotion.NetworkError,
@@ -412,6 +417,7 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isSending = true,
+                childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
                 quickActions = emptyList(),
                 mockPhoto = mockPhoto.copy(isSubmitting = true, errorMessage = null),
             )
@@ -443,6 +449,7 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         isSending = false,
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         quickActions = emptyList(),
                         mockPhoto = null,
                     )
@@ -467,13 +474,12 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isSending = true,
+                childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
                 quickActions = emptyList(),
                 mockPhoto = null,
-                agent = FoxAgentUiState(
-                    mood = FoxMood.Thinking,
-                    motion = FoxMotion.ThinkingBlink,
-                    statusText = "我在看这张图片。",
-                ),
+                agent = childInteractionPresentation(
+                    phaseHint = ChildTurnUiPhase.ImageProcessing,
+                ).agent,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.Idle,
                     pendingTranscript = "",
@@ -500,6 +506,7 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         isSending = false,
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         quickActions = emptyList(),
                         mockPhoto = null,
                         agent = FoxAgentUiState(
@@ -518,6 +525,7 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isSending = false,
+                childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                 mockPhoto = null,
                 agent = FoxAgentUiState(
                     mood = FoxMood.NetworkError,
@@ -578,6 +586,7 @@ class ChatViewModel(
                 it.copy(
                     quickActions = emptyList(),
                     sessionState = attachmentResponse.sessionState,
+                    childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                     agent = FoxAgentUiState(
                         mood = FoxMood.NetworkError,
                         motion = FoxMotion.NetworkError,
@@ -649,16 +658,15 @@ class ChatViewModel(
                         _uiState.update { state ->
                             state.copy(
                                 isSending = false,
+                                childTurnPhaseHint = ChildTurnUiPhase.Sending,
                                 voice = state.voice.copy(
                                     inputMode = VoiceInputMode.Idle,
                                     pendingTranscript = "",
                                     errorMessage = null,
                                 ),
-                                agent = FoxAgentUiState(
-                                    mood = FoxMood.Thinking,
-                                    motion = FoxMotion.ThinkingBlink,
-                                    statusText = "我听到了，我们来聊这个。",
-                                ),
+                                agent = childInteractionPresentation(
+                                    phaseHint = ChildTurnUiPhase.Sending,
+                                ).agent,
                             )
                         }
                         sendText(transcript)
@@ -668,6 +676,7 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
+                        childTurnPhaseHint = null,
                         voice = state.voice.copy(
                             inputMode = VoiceInputMode.PendingTranscript,
                             pendingTranscript = result.text,
@@ -686,16 +695,15 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
+                        childTurnPhaseHint = ChildTurnUiPhase.NeedsRetry,
                         voice = state.voice.copy(
                             inputMode = VoiceInputMode.NeedsRetry,
                             pendingTranscript = "",
                             errorMessage = result.message,
                         ),
-                        agent = FoxAgentUiState(
-                            mood = FoxMood.Listening,
-                            motion = FoxMotion.ListeningTail,
-                            statusText = "我刚才没听清，可以再说一次。",
-                        ),
+                        agent = childInteractionPresentation(
+                            phaseHint = ChildTurnUiPhase.NeedsRetry,
+                        ).agent,
                     )
                 }
                 speakAgentFeedback(result.message)
@@ -705,6 +713,7 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         voice = state.voice.copy(
                             inputMode = VoiceInputMode.Failed,
                             pendingTranscript = "",
@@ -719,16 +728,15 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
+                        childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         voice = state.voice.copy(
                             inputMode = VoiceInputMode.Failed,
                             pendingTranscript = "",
                             errorMessage = result.message,
                         ),
-                        agent = FoxAgentUiState(
-                            mood = FoxMood.NetworkError,
-                            motion = FoxMotion.NetworkError,
-                            statusText = "我们先请大人检查一下。",
-                        ),
+                        agent = childInteractionPresentation(
+                            phaseHint = ChildTurnUiPhase.ServiceError,
+                        ).agent,
                     )
                 }
             }
@@ -840,6 +848,7 @@ class ChatViewModel(
                 quickActions = uiActions.toQuickActionUi(),
                 sessionState = sessionState,
                 agent = nextAgentState,
+                childTurnPhaseHint = null,
                 voice = state.voice.withReplyVoice(reply),
                 tts = state.tts.copy(
                     isSpeaking = false,
@@ -884,11 +893,10 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         isSending = true,
-                        agent = FoxAgentUiState(
-                            mood = FoxMood.Thinking,
-                            motion = FoxMotion.ThinkingBlink,
-                            statusText = "我先想一想。",
-                        ),
+                        childTurnPhaseHint = ChildTurnUiPhase.Thinking,
+                        agent = childInteractionPresentation(
+                            phaseHint = ChildTurnUiPhase.Thinking,
+                        ).agent,
                     )
                 }
             }
@@ -900,7 +908,10 @@ class ChatViewModel(
             "done" -> {
                 streamingAgentMessageId = null
                 _uiState.update { state ->
-                    state.copy(isSending = false)
+                    state.copy(
+                        isSending = false,
+                        childTurnPhaseHint = null,
+                    )
                 }
             }
             "error" -> applyStreamError(event)
@@ -975,13 +986,6 @@ class ChatViewModel(
     private fun enqueueStreamAudio(event: ConversationStreamEvent) {
         val audioUrl = event.audioUrl ?: return
         if (!_uiState.value.tts.isAutoReadEnabled || _uiState.value.tts.isMuted) return
-        audioSegmentQueuePlayer.enqueue(
-            AudioSegment(
-                audioUrl = audioUrl,
-                text = event.audioText,
-                index = event.payload.optInt("index", 0),
-            ),
-        )
         _uiState.update { state ->
             state.copy(
                 tts = state.tts.copy(
@@ -991,6 +995,13 @@ class ChatViewModel(
                 ),
             )
         }
+        audioSegmentQueuePlayer.enqueue(
+            AudioSegment(
+                audioUrl = audioUrl,
+                text = event.audioText,
+                index = event.payload.optInt("index", 0),
+            ),
+        )
     }
 
     private fun applyStreamError(event: ConversationStreamEvent) {
@@ -1003,6 +1014,11 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 tts = state.tts.copy(errorMessage = message),
+                childTurnPhaseHint = if (hasPartialText) {
+                    state.childTurnPhaseHint
+                } else {
+                    ChildTurnUiPhase.ServiceError
+                },
                 agent = if (hasPartialText) state.agent else FoxAgentUiState(
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
@@ -1224,6 +1240,7 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 agent = if (restoreBaseAgent) baseAgentState else state.agent,
+                childTurnPhaseHint = if (restoreBaseAgent) null else state.childTurnPhaseHint,
                 tts = state.tts.copy(
                     isSpeaking = false,
                     isSpeakingPending = false,
@@ -1240,6 +1257,7 @@ class ChatViewModel(
     private fun clearVoiceInputState() {
         _uiState.update {
             it.copy(
+                childTurnPhaseHint = null,
                 voice = it.voice.copy(
                     inputMode = VoiceInputMode.Idle,
                     pendingTranscript = "",
@@ -1254,6 +1272,7 @@ class ChatViewModel(
         openingRequested = true
         _uiState.update { state ->
             state.copy(
+                childTurnPhaseHint = null,
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
@@ -1281,6 +1300,7 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         agent = baseAgentState,
+                        childTurnPhaseHint = null,
                         isSending = false,
                     )
                 }
@@ -1321,9 +1341,19 @@ data class ChatUiState(
     val voice: VoiceUiState = VoiceUiState(),
     val tts: TtsUiState = TtsUiState(),
     val isSending: Boolean = false,
+    val childTurnPhaseHint: ChildTurnUiPhase? = null,
     val mockPhoto: MockPhotoUiState? = null,
     val pendingImageContext: PendingImageContextUiState? = null,
-)
+) {
+    val interactionPresentation: ChildInteractionPresentation
+        get() = childInteractionPresentation(
+            voice = voice,
+            tts = tts,
+            isSending = isSending,
+            phaseHint = childTurnPhaseHint,
+            fallbackAgent = agent,
+        )
+}
 
 data class QuickActionUi(
     val id: String,

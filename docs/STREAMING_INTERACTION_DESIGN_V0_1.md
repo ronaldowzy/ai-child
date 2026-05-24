@@ -607,7 +607,7 @@ TTS 分段输入必须来自最终安全 reply。
       "start": 0,
       "end": 28
     },
-    "fallback": "system_tts_or_text",
+    "fallback": "text_only",
     "safe_message": "这段声音没有放出来，但文字还在这里。"
   }
 }
@@ -617,7 +617,7 @@ TTS 分段输入必须来自最终安全 reply。
 
 ```text
 1. TTS 失败不得中断文本流。
-2. Android 可按父亲设置和 DevSettings 决定是否用系统 TTS fallback。
+2. Android 儿童端自动朗读不使用系统 TTS fallback；失败时保留文字和温和提示。
 3. 若静音或自动朗读关闭，只记录 segment skipped，不显示错误打扰孩子。
 4. provider 原始错误只进入脱敏后端日志，不进儿童 UI。
 ```
@@ -757,7 +757,7 @@ VoiceProfile
 3. 打开 stream。
 4. 收到 `text_delta` 后追加到同一个 agent bubble。
 5. 收到 `audio_ready` 后加入 audio queue。
-6. 收到 `route_decision` 后可更新小白狐状态和必要的内部路由摘要。
+6. 收到 `route_decision` 后可更新小白狐基础状态和必要的内部路由摘要；儿童可见状态由 Android `ChildTurnUiPhase` / `ChildInteractionPresentation` reducer 统一派生。
 7. 收到 `done` 后结束 sending 状态。
 ```
 
@@ -768,6 +768,7 @@ VoiceProfile
 2. Mute 后继续显示文本，不播放后续 segment。
 3. Auto TTS off 时仍可请求 text stream；后端可通过 include_tts=false 减少 TTS 成本。
 4. 离开页面或 ViewModel cleared 时取消 stream、停止 audio queue。
+5. 本轮 Android unified interaction state thin slice 已保证 voice-first 下 TTS pending/speaking 时可见“停一下”；静音 toggle 在儿童输入栏的常驻可见性留待下一轮收敛。
 ```
 
 儿童 UI：
@@ -785,7 +786,7 @@ VoiceProfile
 1. 如果 stream 建立前失败，自动调用旧 /conversation/message，并渲染完整回复。
 2. 如果 stream 已收到至少一个 `text_delta`，默认不自动再调用旧接口，避免出现两个不同回复；保留已有文本并显示温和提示。
 3. 如果 stream 只收到 `session_started` 但没有文本，可 fallback 旧接口。
-4. 如果 `audio_ready` 播放失败，尝试系统 TTS fallback；仍失败则保留文字。
+4. 如果 `audio_ready` 播放失败，保留文字和温和提示，不使用系统 TTS 混播。
 5. 如果 parser 遇到未知 event，忽略；遇到 malformed line，dev log 脱敏记录并继续下一行。
 ```
 
@@ -812,7 +813,7 @@ VoiceProfile
 | stream connect failure | fallback 到旧同步接口 |
 | stream interrupted before text | fallback 到旧同步接口 |
 | stream interrupted after text | 保留已有文本，停止 waiting，显示温和提示 |
-| audio segment 404/timeout | 系统 TTS fallback 或文字 fallback |
+| audio segment 404/timeout | 保留文字和温和提示，不使用系统 TTS 混播 |
 | user taps stop | 停止音频，不取消已显示文本 |
 | user sends new message | 取消上一 turn stream 和 audio queue，开始新 turn |
 

@@ -117,12 +117,14 @@ CHILD_AI_MIMO_ENABLED=true
 CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
 CHILD_AI_MIMO_ALLOW_IMAGE=true
 CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
-CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=true
 CHILD_AI_ASR_PROVIDER=local_sensevoice
 CHILD_AI_LOCAL_SENSEVOICE_ENABLED=true
 CHILD_AI_TTS_PROVIDER=mimo
 CHILD_AI_MIMO_TTS_ENABLED=true
 ```
+
+`model_debug_traces` is enabled by default in the current testing backend; no
+trace enable switch is needed.
 
 ## QA Status
 

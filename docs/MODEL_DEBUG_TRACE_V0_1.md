@@ -1,8 +1,8 @@
 # Model Debug Trace v0.1
 
-Status: DEV-TRACE-1 implemented for local dev/test only; DEV-TRACE-2 mock
-synthetic scenario runner and review report added; DEV-TRACE-3 real MiMo
-opt-in synthetic trace review added.
+Status: DEV-TRACE-1 implemented as a default local testing component;
+DEV-TRACE-2 mock synthetic scenario runner and review report added;
+DEV-TRACE-3 real MiMo synthetic trace review added.
 
 ## 1. Scope
 
@@ -22,27 +22,26 @@ prompt review can inspect what was sent to the model and what came back.
 - No true LLM streaming, CameraX, E2-B durable recall, Android QA, or
   production provider smoke automation.
 
-## 3. Enablement
+## 3. Runtime Defaults
 
-Default is off:
+Trace persistence is enabled by default in the current testing phase. Optional
+settings only control trace detail:
 
 ```text
-CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=false
 CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT=true
 CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS=20000
 ```
 
-Local opt-in:
+Run the backend normally; no trace enable switch is required:
 
 ```bash
-export CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=true
 export CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT=true
 export CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS=20000
 bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
 ```
 
-The flag only controls trace persistence. It never changes provider selection,
-fallback behavior, policy blocking, or child-facing replies.
+Trace persistence never changes provider selection, fallback behavior, policy
+blocking, or child-facing replies.
 
 ## 4. Recorded Fields
 
@@ -149,7 +148,7 @@ Run a repeatable mock-provider trace review from the repository root:
 
 The runner:
 
-- Forces mock providers and trace enablement for its own process.
+- Forces mock providers for its own process.
 - Clears `model_debug_traces` before execution.
 - Runs synthetic opening, child_chat, and parent_report scenarios.
 - Verifies child_chat model traces were actually written.

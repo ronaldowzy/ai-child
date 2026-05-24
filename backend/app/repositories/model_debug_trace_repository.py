@@ -15,7 +15,7 @@ class ModelDebugTraceRepositoryUnavailable(RuntimeError):
 
 
 class ModelDebugTraceRepository:
-    """SQLAlchemy repository for opt-in local model prompt traces."""
+    """SQLAlchemy repository for local model prompt traces."""
 
     def __init__(
         self,

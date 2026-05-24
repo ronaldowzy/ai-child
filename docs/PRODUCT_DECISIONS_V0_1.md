@@ -67,7 +67,7 @@ deprecated：已废弃，不再作为实现依据。
 | PD-038 | confirmed | 普通文字对话调用 MiMo `mimo-v2.5-pro`；带图片的 conversation attachment / vision / OCR 链路调用 MiMo `mimo-v2.5`。 | ModelRegistry、OpenAICompatibleProvider、AttachmentService vision path、vision smoke script |
 | PD-039 | confirmed | “拍给小白狐看”默认是普通图片分享；不要用图片描述里的地址、电话、学校名等关键词自动路由到 `privacy.boundary`，隐私边界只由明确隐私意图或后续安全策略触发。 | AttachmentService、OCR/vision provider、PromptManager、Android pending image context、QA |
 | PD-040 | revised | 父亲日报在父亲点开时应结合当天已落库会话消息、路由摘要和结构化 memory，由 `ModelTaskType.PARENT_REPORT` 大模型总结生成；当天有新会话素材时刷新已有日报，但仍不展示逐字聊天记录。 | ParentReportService、ModelRegistry、ConversationPersistenceRepository、parent_reports、Android ParentReportScreen |
-| PD-047 | confirmed | 当前本地测试阶段允许通过临时表 `model_debug_traces` 记录完整模型 prompt 和回复，用于 prompt/体验分析；做相关功能测试时必须显式开启并验证写入，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
+| PD-047 | confirmed | 当前本地测试阶段将 `model_debug_traces` 作为默认系统组件，记录完整模型 prompt 和回复，用于 prompt/体验分析；所有已开发模型调用功能都应默认可追踪，不保存 secrets/raw media/base64，不代表生产儿童数据策略。 | ModelRegistry、model_debug_traces、backend docs、prompt QA |
 | PD-048 | confirmed | ASR v1 真实识别第一选择改为 sherpa-onnx + SenseVoice-Small int8 本地推理；本地异常后再走原有 MiMo ASR fallback。当前测试阶段应启用 local_sensevoice 验证真实本地识别，MiMo fallback 仍需父亲授权和 ASR data policy flags。 | backend ASR provider、AsrService fallback、ASR docs、QA |
 | PD-049 | revised | 家庭 MVP 前 opening greeting 默认走 deterministic policy/template 主路径；父亲日报已由 PD-052 修订为 model-first。 | OpeningService、OpeningPolicyBuilder、QA |
 | PD-052 | confirmed | 父亲日报 v2 必须 model-first：程序只构造当天受控 evidence packet 并调用 `ModelTaskType.PARENT_REPORT`，模型结构化 JSON 才是正式日报；失败时返回明确可重试状态，不用规则日报冒充成功。 | ParentReportService、ModelRegistry、ParentReportScreen、parent_reports |
@@ -686,12 +686,12 @@ Decision ID: PD-047
 Date: 2026-05-23
 Status: confirmed
 Source: DEV-TRACE-1 local prompt analysis request
-Decision: 当前本地测试阶段允许通过 opt-in 临时表 `model_debug_traces` 记录完整模型 prompt、messages、input_text、context、metadata、模型回复和 structured output，用于 prompt/体验分析。
+Decision: 当前本地测试阶段将 `model_debug_traces` 作为默认系统组件，记录完整模型 prompt、messages、input_text、context、metadata、模型回复和 structured output，用于 prompt/体验分析。
 Rationale: 家庭测试和专家 prompt 优化需要看到实际 `ModelRegistry.generate()` 发送给模型的完整上下文，以及模型返回内容和 fallback/policy/error 状态。集中在 ModelRegistry 层记录能覆盖 child_chat、opening、parent_report、vision/OCR 等任务，避免各业务服务分散补日志。
 Affected modules: ModelRegistry、ModelDebugTraceService、ModelDebugTraceRepository、`model_debug_traces` migration、backend docs、prompt QA。
-Implementation notes: 默认 `CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=false`；本地 dev/test 显式开启后记录完整文本 prompt 和 response，但过滤 API key、Authorization/Bearer、`.env`、raw image/audio、base64 media 和 provider raw HTTP headers。trace 写入失败只 warning，不阻塞模型调用；新增清空脚本；该能力不代表生产儿童数据策略。
+Implementation notes: 不再保留 `CHILD_AI_MODEL_DEBUG_TRACE_ENABLED` 这类启停开关；后端启动后默认 best-effort 写入 trace。`CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT` 和 `CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS` 只控制记录粒度；trace 过滤 API key、Authorization/Bearer、`.env`、raw image/audio、base64 media 和 provider raw HTTP headers。trace 写入失败只 warning，不阻塞模型调用；新增清空脚本；该能力不代表生产儿童数据策略。
 Docs updated: `docs/MODEL_DEBUG_TRACE_V0_1.md`、`docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`。
-Tests or QA needed: 后端测试覆盖 disabled/enabled、opening prompt、parent report prompt、provider fallback、policy blocked、trace failure best-effort、secret/base64 sanitization、migration 可读和 clear。
+Tests or QA needed: 后端测试覆盖默认记录、opening prompt、parent report prompt、provider fallback、policy blocked、trace failure best-effort、secret/base64 sanitization、migration 可读和 clear。
 
 #### PD-048
 
@@ -728,7 +728,7 @@ Source: father / parent report v2 product revision
 Decision: 父亲日报 v2 必须 model-first。正式日报正文、学习观察、表达观察、情绪观察、安全提醒和父亲建议来自 `ModelTaskType.PARENT_REPORT` 的结构化模型输出；程序只负责构造当天受控 evidence packet、校验 schema、持久化模型日报和刷新 stale report。
 Rationale: 父亲日报需要基于当天真实对话总结孩子状态和建议，规则拼接会空泛，且会把 deterministic fallback 误当成正式成功。模型不可用时应明确失败/可重试，而不是展示一份程序拼出来的“成功日报”。
 Affected modules: ParentReportService、ModelRegistry、ParentReportRepository、ParentReportScreen、docs/tests。
-Implementation notes: `ParentReportService` 读取当天 `conversation_messages`、routing/active_scene/risk 受控信号和 parent-visible memories，构造不含 provider raw、debug trace、prompt、secret、base64 或原始媒体的 evidence packet。合法模型 JSON 才保存为 `generation_status=model_generated`；policy blocked、provider fail、空输出或 JSON 不可解析返回 `model_blocked/model_failed`，Android 父亲端显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。Opening 仍保持 deterministic default。
+Implementation notes: `ParentReportService` 读取当天 `conversation_messages`、routing/active_scene/risk 受控信号和 parent-visible memories，构造不含 provider raw、debug trace、prompt、secret、base64 或原始媒体的 evidence packet。合法模型 JSON 才保存为 `generation_status=model_generated`；policy blocked、provider fail、空输出或 JSON 不可解析返回 `model_blocked/model_failed`，Android 父亲端显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。`mimo_parent_report` 默认保留 `mimo-v2.5-pro`，但使用独立 completion budget，避免沿用 child_chat 的短回复 token 限制导致空输出。Opening 仍保持 deterministic default。
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/CODEX_PROGRESS_BOARD_V0_1.md`、`backend/README.md`、`android/README.md`。
 Tests or QA needed: 后端测试覆盖 model-first 调用、模型合法 JSON 成功、失败不冒充成功、payload 脱敏和 stale refresh；Android 需确认失败状态展示。Redmi K60 / Honor Pad 5 真机 QA 仍未完成。
 

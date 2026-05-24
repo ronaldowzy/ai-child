@@ -70,12 +70,10 @@ def _trace_repository() -> ModelDebugTraceRepository:
 def _trace_service(
     repository: object,
     *,
-    enabled: bool = True,
     max_text_chars: int = 20000,
 ) -> ModelDebugTraceService:
     return ModelDebugTraceService(
         repository=repository,  # type: ignore[arg-type]
-        enabled=enabled,
         full_text=True,
         max_text_chars=max_text_chars,
     )
@@ -140,19 +138,17 @@ def _request(task_type: ModelTaskType = ModelTaskType.CHILD_CHAT) -> ModelReques
     )
 
 
-def test_trace_disabled_does_not_write_and_generate_still_returns() -> None:
+def test_trace_records_by_default_and_generate_still_returns() -> None:
     repository = _trace_repository()
-    registry = _registry(
-        trace_service=_trace_service(repository, enabled=False),
-    )
+    registry = _registry(trace_service=_trace_service(repository))
 
     response = registry.generate(_request())
 
     assert response.response_text == "trace response for child_chat"
-    assert repository.list_recent() == []
+    assert len(repository.list_recent()) == 1
 
 
-def test_trace_enabled_saves_child_chat_request_and_response() -> None:
+def test_trace_saves_child_chat_request_and_response() -> None:
     repository = _trace_repository()
     registry = _registry(trace_service=_trace_service(repository))
 

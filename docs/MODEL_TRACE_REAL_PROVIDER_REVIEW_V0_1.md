@@ -11,7 +11,7 @@
 - Provider mode: `mimo`
 - Provider smoke status: `PASS`
 - Provider/model names: `mimo/mimo-v2.5-pro`
-- Trace source: local opt-in `model_debug_traces`.
+- Trace source: default `model_debug_traces` system component.
 - Opening default path: `deterministic_policy_template`.
 - ParentReport default path at this historical run: `deterministic_report_builder` (superseded by PD-052 model-first).
 - Provider quality evidence at this historical run: `child_chat` traces only; fresh ParentReport v2 QA must include `parent_report` traces.

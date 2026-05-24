@@ -340,7 +340,7 @@ child_chat -> mimo_child_chat / mimo-v2.5-pro
 vision/OCR -> mimo_vision / mimo-v2.5
 ASR -> local_sensevoice first, MiMo fallback
 TTS -> MiMo VoiceClone first
-model debug trace -> enabled for local prompt review
+model debug trace -> default system component for local prompt review
 ```
 
 Do not commit `.env`, real keys, uploaded images, model files, DB dumps, or
@@ -463,10 +463,10 @@ Data boundary:
   the model fails.
 - `tts_cache_records` stores hashes and cache metadata, not full sensitive TTS
   input text.
-- `model_debug_traces` is a dev/test opt-in temporary table for prompt analysis.
-  It can store full text prompts and model responses only when explicitly
-  enabled locally. It must not store API keys, Authorization headers, `.env`
-  contents, raw media, base64 image/audio payloads, or provider raw HTTP
+- `model_debug_traces` is a required local testing component for prompt
+  analysis. It stores model request/response traces by default in the current
+  test phase, while still filtering API keys, Authorization headers, `.env`
+  contents, raw media, base64 image/audio payloads, and provider raw HTTP
   headers.
 - Parent free-text notes are stored in `parent_policies.parent_message_raw` for
   local family testing. They are prompt background only and must not be exposed
@@ -476,25 +476,25 @@ Data boundary:
 
 ## Local Model Debug Traces
 
-`DEV-TRACE-1` adds a local, temporary `model_debug_traces` table for product and
-prompt analysis during family testing. It records calls made through
+`DEV-TRACE-1` adds a local `model_debug_traces` table for product and prompt
+analysis during family testing. It records calls made through
 `ModelRegistry.generate()`, including request messages, `input_text`, context,
 metadata, selected profile/provider/model, response text, structured output,
 fallback/policy flags, error type, elapsed time, request id, and child/session
 ids plus hashes.
 
-Enable it explicitly in local test runs:
+Trace recording is enabled by default whenever the backend is running. Optional
+settings only control trace detail:
 
 ```bash
-export CHILD_AI_MODEL_DEBUG_TRACE_ENABLED=true
 export CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT=true
 export CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS=20000
 bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
 ```
 
-Even when enabled, trace sanitization redacts secret-like fields and replaces
-raw image/audio data URIs or long base64 payloads with `[raw_media_omitted]`.
-Trace write failures are logged as warnings and never block model replies.
+Trace sanitization redacts secret-like fields and replaces raw image/audio data
+URIs or long base64 payloads with `[raw_media_omitted]`. Trace write failures
+are logged as warnings and never block model replies.
 
 Inspect recent traces:
 
@@ -614,6 +614,12 @@ export CHILD_AI_MIMO_MAX_TOKENS=800
 export CHILD_AI_MIMO_TIMEOUT_MS=30000
 bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
 ```
+
+ParentReport v2 is model-first and uses the same MiMo text model by default, but
+it needs a larger completion budget than short child chat. The backend defaults
+`mimo_parent_report` to `CHILD_AI_PARENT_REPORT_MAX_TOKENS=4000` and
+`CHILD_AI_PARENT_REPORT_TIMEOUT_MS=45000`; these can be overridden in local
+shell env without changing child chat routing or vision/OCR routing.
 
 `scripts/dev_backend.sh` loads the root `.env` when it exists, then starts
 uvicorn. This is only for local development; `.env` must stay ignored and must

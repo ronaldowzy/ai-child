@@ -449,6 +449,18 @@ class ModelRegistry:
                 model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
                 task_type=ModelTaskType.PARENT_REPORT,
                 temperature=0.2,
+                max_tokens=int(
+                    os.getenv(
+                        "CHILD_AI_PARENT_REPORT_MAX_TOKENS",
+                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_MAX_TOKENS", "4000"),
+                    )
+                ),
+                timeout_ms=int(
+                    os.getenv(
+                        "CHILD_AI_PARENT_REPORT_TIMEOUT_MS",
+                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "45000"),
+                    )
+                ),
                 fallback_profile_name="parent_report_mock",
             ),
             "vision_mock": self._mock_profile(
@@ -493,6 +505,8 @@ class ModelRegistry:
         task_type: ModelTaskType,
         temperature: float = 0.0,
         vision: bool = False,
+        max_tokens: int | None = None,
+        timeout_ms: int | None = None,
         fallback_profile_name: str = "child_chat_primary",
     ) -> ModelProfile:
         return ModelProfile(
@@ -520,8 +534,12 @@ class ModelRegistry:
             ),
             default_params=ModelDefaultParams(
                 temperature=temperature,
-                max_tokens=int(os.getenv("CHILD_AI_MIMO_MAX_TOKENS", "800")),
-                timeout_ms=int(os.getenv("CHILD_AI_MIMO_TIMEOUT_MS", "5000")),
+                max_tokens=max_tokens
+                if max_tokens is not None
+                else int(os.getenv("CHILD_AI_MIMO_MAX_TOKENS", "800")),
+                timeout_ms=timeout_ms
+                if timeout_ms is not None
+                else int(os.getenv("CHILD_AI_MIMO_TIMEOUT_MS", "5000")),
             ),
             enabled=self._env_bool("CHILD_AI_MIMO_ENABLED", default=False),
             fallback_profile_name=fallback_profile_name,

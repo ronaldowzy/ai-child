@@ -11,7 +11,7 @@
 - Provider mode: `mock`
 - Provider smoke status: `PASS` (mock synthetic review)
 - Provider/model names: `mock/mock-child-chat-v0, mock/mock-parent-report-v0`
-- Trace source: local opt-in `model_debug_traces`.
+- Trace source: default `model_debug_traces` system component.
 - Opening default path: `deterministic_policy_template`.
 - ParentReport default path: `model_first_parent_report`.
 - Provider quality evidence: `child_chat` and `parent_report` traces.

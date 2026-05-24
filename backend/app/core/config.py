@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+psycopg://child_ai:child_ai@localhost:5432/child_ai_dev"
     )
-    model_debug_trace_enabled: bool = False
     model_debug_trace_full_text: bool = True
     model_debug_trace_max_text_chars: int = 20000
 

@@ -160,7 +160,7 @@ Conversation API：done
 | M7-04 MemoryExtractor mock | done |  | 输出结构化记忆 |
 | M8-01 ParentReport schema | done |  | 字段完整 |
 | M8-02 ParentReportService deterministic v1 | done |  | 今日摘要可生成，不返回逐字聊天记录 |
-| M8-03 ParentReportService model-first v2 | review |  | 正式日报主路径调用 `ModelTaskType.PARENT_REPORT`；模型失败返回可重试状态，不用规则日报冒充成功 |
+| M8-03 ParentReportService model-first v2 | review |  | 正式日报主路径调用 `ModelTaskType.PARENT_REPORT`；模型失败返回可重试状态，不用规则日报冒充成功；`mimo_parent_report` 已使用独立 completion budget，避免短 token 限制导致真实模型空输出 |
 | M8-03 report API | done |  | /reports/{child_id} 和 /report/today 可用 |
 | M9-01 Attachment schema | done |  | homework_photo 和 recognized_content 可表达 |
 | M9-02 MockOCRProvider | done |  | mock 识别题目，支持低置信度 |
@@ -229,8 +229,8 @@ Conversation API：done
 | DB1-C Conversation message 持久化 | done |  | thin slice done：普通 `/api/v1/conversation/message` 和 `/api/v1/conversation/stream` 成功 turn 均已 best-effort 保存 session、child message、agent message、routing decision、audio_url/stream audio summary、emotion、agent_motion；持久化失败不阻断回复；不保存 delta 列表、debug、prompt、parent_message_raw、原始音频或照片 |
 | DB1-D MemoryService 持久化 | done |  | thin slice done：MemoryService 优先使用 PostgreSQL `memory_items`，数据库不可用时回退进程内 repository；只保存结构化 summary、tags、evidence summary、visibility/safety flags，不保存 raw media、full transcript、prompt 或 debug internals |
 | DB1-E ParentReport 持久化 | done |  | thin slice done：ParentReportService 优先从 PostgreSQL `parent_reports` 读取已生成日报；model-first v2 新增 `generation_status` / `generated_by` / `generation_error_code` / `material_fingerprint`；缺失或当天有更新会话素材时刷新模型日报；模型失败不保存为正式报告；不保存 evidence、quote_summary、raw transcript、prompt、debug 或 provider raw response |
-| DEV-TRACE-1 模型调用 trace | done |  | 新增 dev/test `model_debug_traces` 临时表；相关功能测试必须显式开启并验证写入；`ModelRegistry.generate()` 统一记录完整 request messages/input/context/metadata 和 response text/structured output/metadata、fallback/policy/error/latency；记录失败不阻断模型调用，过滤 API key/Authorization/raw media/base64；不改 Android 或现有业务表 |
-| DEV-TRACE-2 trace scenario review | done |  | 新增 `scripts/run_model_trace_scenarios.py`，强制 mock provider + trace enablement，清空并回放 15 个 synthetic opening/child_chat/parent_report 场景，确认写入 `model_debug_traces` 并生成 `MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`；报告标记 P2 mock 质量观察，明确不代表真实 MiMo、Android 真机或真实儿童 QA |
+| DEV-TRACE-1 模型调用 trace | done |  | 新增 `model_debug_traces` 本地 trace 表；当前测试阶段作为默认系统组件随后端启用，不再需要显式 trace 开关；`ModelRegistry.generate()` 统一记录完整 request messages/input/context/metadata 和 response text/structured output/metadata、fallback/policy/error/latency；记录失败不阻断模型调用，过滤 API key/Authorization/raw media/base64；不改 Android 或现有业务表 |
+| DEV-TRACE-2 trace scenario review | done |  | 新增 `scripts/run_model_trace_scenarios.py`，强制 mock provider，清空并回放 15 个 synthetic opening/child_chat/parent_report 场景，确认写入默认 `model_debug_traces` 并生成 `MODEL_TRACE_SCENARIO_REVIEW_V0_1.md`；报告标记 P2 mock 质量观察，明确不代表真实 MiMo、Android 真机或真实儿童 QA |
 | DEV-TRACE-3 real provider trace review | done |  | `run_model_trace_scenarios.py --provider mimo` 已支持显式 opt-in real MiMo synthetic 文本场景；临时 env overlay 不写 `.env`，缺 key 时输出 `REAL_PROVIDER_BLOCKED`；2026-05-23 在 MVP-CLOSEOUT-1 后复跑 `REAL_PROVIDER_SMOKE: PASS`，provider/model=`mimo/mimo-v2.5-pro`。PD-052 后 parent_report 再次纳入 model-first trace/QA 范围；报告不代表真机 QA |
 | S-Stream-0 流式架构设计 | done |  | 新增 `STREAMING_INTERACTION_DESIGN_V0_1.md`；确认 NDJSON、事件结构、pseudo streaming、fallback 和 QA 指标 |
 | S-Stream-1 后端 stream endpoint | done |  | 新增 `/api/v1/conversation/stream` NDJSON skeleton；保留旧接口；复用 ConversationService/Runtime 安全链路；按句子 pseudo streaming 和可恢复 TTS segment error |

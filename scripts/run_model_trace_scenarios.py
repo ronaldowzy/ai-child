@@ -180,7 +180,6 @@ def _configure_trace_environment(
         _load_local_env_if_present()
 
     env_defaults = {
-        "CHILD_AI_MODEL_DEBUG_TRACE_ENABLED": "true",
         "CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT": "true",
         "CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS": "20000",
         "CHILD_AI_VISION_PROVIDER": "mock",
@@ -278,7 +277,6 @@ def build_scenario_services(
     trace_repository = repository or _new_trace_repository()
     trace_service = ModelDebugTraceService(
         repository=trace_repository,
-        enabled=True,
         full_text=True,
         max_text_chars=20000,
     )
@@ -820,7 +818,7 @@ def build_report(
         f"- Provider smoke status: `{status}`"
         + (f" ({status_reason})" if status_reason else ""),
         f"- Provider/model names: `{', '.join(provider_models) or 'none'}`",
-        "- Trace source: local opt-in `model_debug_traces`.",
+        "- Trace source: default `model_debug_traces` system component.",
         "- Opening default path: `deterministic_policy_template`.",
         "- ParentReport default path: `model_first_parent_report`.",
         "- Provider quality evidence: `child_chat` and `parent_report` traces.",

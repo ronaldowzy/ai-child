@@ -42,8 +42,8 @@ _LONG_BASE64_RE = re.compile(r"\b[A-Za-z0-9+/]{120,}={0,2}\b")
 class ModelDebugTraceService:
     """Best-effort local model prompt/response trace recorder.
 
-    This is intentionally opt-in and local-dev oriented. It records full text
-    prompts when enabled, but still strips secrets and raw media payloads.
+    This is a default testing-phase system component. It records model calls
+    best-effort while stripping secrets and raw media payloads.
     """
 
     def __init__(
@@ -51,13 +51,11 @@ class ModelDebugTraceService:
         *,
         repository: ModelDebugTraceRepository | None = None,
         settings_provider: Callable[[], Settings] = get_settings,
-        enabled: bool | None = None,
         full_text: bool | None = None,
         max_text_chars: int | None = None,
     ) -> None:
         self._repository = repository or ModelDebugTraceRepository()
         self._settings_provider = settings_provider
-        self._enabled = enabled
         self._full_text = full_text
         self._max_text_chars = max_text_chars
 
@@ -74,14 +72,6 @@ class ModelDebugTraceService:
         error_detail: str | None,
     ) -> None:
         settings = self._settings_provider()
-        enabled = (
-            self._enabled
-            if self._enabled is not None
-            else settings.model_debug_trace_enabled
-        )
-        if not enabled:
-            return
-
         try:
             self._repository.save(
                 self._trace_create(

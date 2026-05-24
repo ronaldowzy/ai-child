@@ -212,6 +212,7 @@ Conversation API：done
 | R7-02 Family beta QA checklist/runbook | done |  | Task 04 新增 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md`，覆盖 14 类家庭内测场景并要求每行记录 ID、Scenario、Steps、Expected、Actual、Status、Evidence、Notes；所有真机项初始为 NOT_RUN，证据不得包含儿童原文、完整回复、原始音频、原图或父母寄语原文 |
 | R7-03 Mimo 真实 provider smoke 记录 | done |  | 临时 env 使用 `mimo-v2.5-pro` 已跑通；真实 key 不进仓库；当前测试阶段不能用未启用配置替代真实 smoke |
 | R7-04 Task 05 family beta closeout package | done |  | 2026-05-24 完成 Task 05 closeout：`pytest` 417 passed、`ruff check .` passed、`./gradlew test` passed、`./gradlew assembleDebug` passed、`build_device_debug_apk.sh --base-url http://192.168.0.118:8000/` PASS，APK `android/app/build/outputs/apk/debug/app-debug.apk` size=16471142 sha256=`a666007b69be16efc1651b7246362d9b3a8755ee2c39856ffa0c02b45ec4c074`；`smoke_db_persistence.sh` PASS；`adb devices` 无连接设备，Redmi K60 / Honor Pad 5 仍为 NOT_RUN |
+| R7-05 Task 06 post-device QA refinement | done |  | 2026-05-24 完成 Task 06 thin slice：Lane A 父亲设置改为孩子画像/年龄/可选年级/称呼偏好/兴趣/话题边界，显性作息配置降级；Lane B 后端增加 same-topic low-engagement topic shift 和静态 curated seed packs；Lane C 父亲日报增加 topic_overview、conversation_summary、avoid_followup 与 Android “今日聊了什么”；Lane D 儿童聊天页小白狐区域增加 phase chip 和轻背景，并新增 `CHILD_UI_POLISH_DESIGN_V0_1.md`。`bash scripts/test_backend.sh` 424 passed、`bash scripts/lint_backend.sh` passed、`bash scripts/android_gradle.sh test` BUILD SUCCESSFUL；Redmi K60 / Honor Pad 5 真机 QA 仍为 NOT_RUN |
 
 ### 产品决策、语音和小白狐下一阶段
 
@@ -245,6 +246,7 @@ Conversation API：done
 | S-Stream-3 interleaved TTS quick win | done |  | 后端 stream 现在按 segment 输出 text_delta/sentence_ready 后立即 tts_started/audio_ready；text_final 在所有 segment 处理后输出；新增 first_tts_start_ms、text_segment_count、tts_error_count timing |
 | EXP-E1-01 Android unified interaction state | done |  | 新增 `ChildTurnUiPhase` / `ChildInteractionPresentation` reducer，集中派生 Ready、Listening、Recognizing、Sending、Thinking、SpeakingPending、Speaking、ImageProcessing、NeedsRetry、PermissionNeeded、Resting、ServiceError 的儿童可见状态；InputBar 主按钮文案、按钮可用性、图片按钮可见性、TTS “停一下”、小白狐状态短语和 agent 状态已接入；Parallel Lane A 补齐 voice-first 下 TTS pending/speaking 的“静音/打开朗读”和新动作前 stop TTS；未改后端协议、图片具体反馈、父亲日报或 Healthy Engagement 指标；Redmi K60 / Honor Pad 5 真机 QA 仍待验 |
 | EXP-E2-01 Backend age-banded replies and question throttle | done |  | 新增 `AgeBandReplyPolicy`，从 ParentPolicy communication_preferences 的 `age_band`、`child_age` 或 `age` 派生 age_5_6 / age_7_8 / age_9_10 / unknown，默认 age_7_8；global/output/open conversation prompt 不再写死 8 岁或 150-450 字；ChildAgentRuntime 按预算裁剪普通回复，并在连续问句、换题/不聊/睡觉、孩子纠错时不新增追问钩子；未改 DB schema、后端 API 协议、Android 或父亲日报 |
+| EXP-E2-02 Topic shift curated seeds | done |  | Task 06 thin slice：`TurnGuidanceBuilder` 新增 same_topic_turn_count、child_engagement_signal、topic_shift_recommended、topic_shift_reason 和 suggested_topic_seeds；静态 seed pack 位于 `backend/app/data/topic_seed_packs_v0_1.json`；ChildAgentRuntime 会修复低能量同题下继续深挖旧话题的模型回复；不抓实时热点、不引入上瘾式机制，真机自然度 QA 待验 |
 | UI-Landscape-1 横屏双栏布局 | done |  | Android 主界面已改为 sensorLandscape 横屏：左侧约 41% 小白狐，右侧约 59% 消息和输入；Android test/assemble/lint 通过，待真机视觉 QA |
 | Fox-Coverage-1 动态小白狐覆盖矩阵 | done |  | 历史 `FOX_AGENT_STATE_COVERAGE_V0_1.md` 记录 manifest/资源基线；Task 04 已在 `FOX_AGENT_VISUAL_DESIGN_V0_1.md` 更新 phase/scene 覆盖矩阵，覆盖 Ready、Listening、Recognizing、Thinking、SpeakingPending、Speaking、ImageProcessing、NeedsRetry、PermissionNeeded、Resting、ServiceError、OpeningGreeting、PrivacyBoundary、SafetyConcern、HomeworkFocus、NetworkError，并新增 `XiaobaohuStateCoverageTest`；Resting 业务触发和全量真机动画切换仍待 QA |
 | ASR-Research-0 MiMo ASR 调研 | done |  | 新增 `ASR_INPUT_RESEARCH_V0_1.md` 和 `MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；确认 v1 目标 provider、目标模型、非流式 audio input、格式、30s 上限和数据留存缺口 |
@@ -265,6 +267,17 @@ Conversation API：done
 ---
 
 ## 3. 当天记录
+
+### 日期：2026-05-24
+
+```text
+今日目标：执行 Task 06 post-device QA product refinement，按单智能体 A -> B -> C -> D 完成父亲设置、话题切换、父亲日报和儿童 UI polish thin slice。
+完成任务：父亲设置页显性重点改为孩子画像：小名/显示名、年龄、可选年级、称呼偏好、兴趣和近期不想被追问的话题；作息时间仍兼容后端但不再作为 v0.1 家庭内测主配置。后端 turn guidance 增加 same-topic low-engagement 检测和静态 curated seed pack，ChildAgentRuntime 对继续深挖旧话题的低能量回复做换题修复。父亲日报 domain/service/Android DTO/UI 增加 topic_overview、conversation_summary、avoid_followup 和“今日聊了什么”。儿童聊天页小白狐区域增加 phase-derived 短状态 chip 和轻背景；新增 CHILD_UI_POLISH_DESIGN_V0_1.md。更新 Product Decisions、README、Freedom/Healthy/QA/Next Phase/Progress docs。
+阻塞问题：未连接 Redmi K60 / Honor Pad 5，父亲设置可读性、话题切换自然度、父亲日报层级、小白狐 phase chip 横屏布局和低配表现仍需真机 QA。
+Codex 偏差：无；本轮未做 prompt 年龄体系大重写、实时热点抓取、CameraX、后端协议变更、排行榜/积分/签到/宠物机制，也未记录儿童原文、原始音频、原图或父母寄语原文。
+需要补充到 AGENTS.md 的规则：暂无。
+明日第一任务：在 Redmi K60 / Honor Pad 5 按 QA_FAMILY_BETA_CHECKLIST_V0_1.md 复验 Task 06 设置页、话题切换、父亲日报和儿童 UI polish，并记录非敏感证据。
+```
 
 ### 日期：2026-05-21
 

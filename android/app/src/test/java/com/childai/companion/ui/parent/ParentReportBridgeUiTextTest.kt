@@ -11,6 +11,11 @@ class ParentReportBridgeUiTextTest {
     }
 
     @Test
+    fun topicSectionTitleFocusesOnConversationContent() {
+        assertEquals("今日聊了什么", PARENT_REPORT_TOPIC_SECTION_TITLE)
+    }
+
+    @Test
     fun failureMessageDoesNotExposeEngineeringWords() {
         val message = PARENT_REPORT_LOAD_FAILURE_MESSAGE
 

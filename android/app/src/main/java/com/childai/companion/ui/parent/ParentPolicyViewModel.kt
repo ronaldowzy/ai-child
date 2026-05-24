@@ -79,6 +79,26 @@ class ParentPolicyViewModel(
         updateForm { it.copy(childDisplayName = value) }
     }
 
+    fun updateChildAge(value: String) {
+        updateForm { it.copy(childAge = value) }
+    }
+
+    fun updateChildGrade(value: String) {
+        updateForm { it.copy(childGrade = value) }
+    }
+
+    fun updateChildCallPreference(value: String) {
+        updateForm { it.copy(childCallPreference = value) }
+    }
+
+    fun updateChildInterestsText(value: String) {
+        updateForm { it.copy(childInterestsText = value) }
+    }
+
+    fun updateTopicBoundariesText(value: String) {
+        updateForm { it.copy(topicBoundariesText = value) }
+    }
+
     fun updateOfferChoices(value: Boolean) {
         updateForm { it.copy(offerChoices = value) }
     }
@@ -118,6 +138,12 @@ class ParentPolicyViewModel(
     fun savePolicy() {
         val form = _uiState.value.form
         if (_uiState.value.isSaving) return
+        if (!form.hasValidAge()) {
+            _uiState.update {
+                it.copy(errorMessage = "年龄请填写 5-10 之间的数字，或先留空。")
+            }
+            return
+        }
         if (!form.hasValidTimes()) {
             _uiState.update {
                 it.copy(errorMessage = "作息时间请使用 HH:MM 格式。")
@@ -202,6 +228,11 @@ data class ParentPolicyUiState(
 data class ParentPolicyFormState(
     val childNickname: String = "",
     val childDisplayName: String = "",
+    val childAge: String = "",
+    val childGrade: String = "",
+    val childCallPreference: String = "",
+    val childInterestsText: String = "",
+    val topicBoundariesText: String = "",
     val parentMessageRaw: String = "",
     val goalsText: String = "鼓励孩子每天说一件学校小事\n学习问题先引导思路，不直接给答案",
     val offerChoices: Boolean = true,
@@ -223,13 +254,42 @@ data class ParentPolicyFormState(
     fun communicationPreferences(
         existing: Map<String, Any>,
     ): Map<String, Any> {
+        val age = childAge.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
         return existing + mapOf(
             "offer_choices_before_open_questions" to offerChoices,
             "do_not_force_expression" to doNotForceExpression,
             "ask_thinking_before_learning_answer" to askThinkingBeforeAnswer,
             "tone" to "warm_calm",
             "avoid_labels" to true,
+            "child_profile_schema" to "post_device_qa_v0_1",
+            "child_age" to (age ?: ""),
+            "child_grade" to childGrade.trim(),
+            "child_call_preference" to childCallPreference.trim(),
+            "child_interests" to childInterests(),
+            "topic_boundaries" to topicBoundaries(),
+            "visible_schedule_deprecated_v0_1" to true,
         )
+    }
+
+    fun childInterests(): List<String> {
+        return childInterestsText.lines()
+            .flatMap { it.split("，", ",", "、") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    fun topicBoundaries(): List<String> {
+        return topicBoundariesText.lines()
+            .flatMap { it.split("，", ",", "、") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    fun hasValidAge(): Boolean {
+        val value = childAge.trim()
+        if (value.isEmpty()) return true
+        val age = value.toIntOrNull() ?: return false
+        return age in 5..10
     }
 
     fun hasValidTimes(): Boolean {
@@ -249,6 +309,15 @@ private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
     return ParentPolicyFormState(
         childNickname = childNickname.orEmpty(),
         childDisplayName = childDisplayName.orEmpty(),
+        childAge = communicationPreferences.stringValue("child_age"),
+        childGrade = communicationPreferences.stringValue("child_grade"),
+        childCallPreference = communicationPreferences.stringValue("child_call_preference"),
+        childInterestsText = communicationPreferences.stringListValue(
+            "child_interests",
+        ).joinToString(separator = "\n"),
+        topicBoundariesText = communicationPreferences.stringListValue(
+            "topic_boundaries",
+        ).joinToString(separator = "\n"),
         parentMessageRaw = parentMessageRaw.orEmpty(),
         goalsText = goals.joinToString(separator = "\n"),
         offerChoices = communicationPreferences.booleanValue(
@@ -282,6 +351,25 @@ private fun scheduleWithDefaults(schedule: ParentSchedule): ParentSchedule {
                 start = defaults.entry(period)?.start ?: "18:00",
                 end = defaults.entry(period)?.end ?: "20:00",
             )
+    }
+}
+
+private fun Map<String, Any>.stringValue(key: String): String {
+    return when (val value = this[key]) {
+        is Number -> value.toInt().toString()
+        is String -> value.takeIf { it.isNotBlank() }.orEmpty()
+        else -> ""
+    }
+}
+
+private fun Map<String, Any>.stringListValue(key: String): List<String> {
+    return when (val value = this[key]) {
+        is List<*> -> value.mapNotNull { item -> item?.toString()?.trim() }
+            .filter { it.isNotEmpty() }
+        is String -> value.split("，", ",", "、", "\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        else -> emptyList()
     }
 }
 

@@ -10,7 +10,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.logging import hash_identifier
 from app.domain.memory import MemoryItem, MemorySensitivity, MemoryType
 from app.domain.model_types import ModelMessage, ModelRequest, ModelResponse, ModelTaskType
-from app.domain.parent_report import ParentReport, ParentReportGenerationStatus
+from app.domain.parent_report import (
+    ParentReport,
+    ParentReportGenerationStatus,
+    ParentReportTopicOverview,
+)
 from app.repositories.conversation_persistence_repository import (
     ConversationPersistenceRepository,
     ConversationPersistenceRepositoryUnavailable,
@@ -222,12 +226,20 @@ class ParentReportService:
                 has_emotion=bool(emotion),
                 has_safety=bool(safety_alerts),
             ),
+            topic_overview=conversation.get("topic_overview", []),
+            conversation_summary=conversation.get("conversation_summary", [None])[0]
+            if conversation.get("conversation_summary")
+            else None,
             learning_observations=learning,
             expression_observations=expression,
             emotion_observations=emotion,
             safety_alerts=safety_alerts,
             suggested_parent_actions=actions,
             tonight_parent_bridge=tonight_parent_bridge,
+            avoid_followup=conversation.get(
+                "avoid_followup",
+                ["不要追问孩子今天在小白狐里聊了什么。"],
+            ),
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -328,6 +340,10 @@ class ParentReportService:
                 child_id=child_id,
                 date=target_date,
                 summary=parsed["summary"],
+                topic_overview=parsed["topic_overview"]
+                or fallback_report.topic_overview,
+                conversation_summary=parsed["conversation_summary"]
+                or fallback_report.conversation_summary,
                 learning_observations=parsed["learning_observations"],
                 expression_observations=parsed["expression_observations"],
                 emotion_observations=parsed["emotion_observations"],
@@ -340,6 +356,8 @@ class ParentReportService:
                     has_material=bool(memories or conversation_messages),
                     has_safety=bool(parsed["safety_alerts"]),
                 ),
+                avoid_followup=parsed["avoid_followup"]
+                or fallback_report.avoid_followup,
                 created_at=self._now(),
                 generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
                 generated_by="model",
@@ -375,6 +393,8 @@ class ParentReportService:
             child_id=child_id,
             date=target_date,
             summary="日报暂时生成失败，请稍后重试。",
+            topic_overview=[],
+            conversation_summary=None,
             learning_observations=[],
             expression_observations=[],
             emotion_observations=[],
@@ -384,6 +404,7 @@ class ParentReportService:
                 "今天的小结还没准备好。今晚先轻松陪孩子做一件日常小事，"
                 "不要追问孩子在小白狐里聊了什么。"
             ),
+            avoid_followup=["不要把日报生成失败当作孩子当天表现。"],
             created_at=self._now(),
             generation_status=status,
             generated_by="model",
@@ -444,15 +465,17 @@ class ParentReportService:
     def _parent_report_system_prompt(self) -> str:
         return (
             "你是小白狐项目的父亲日报分析器。请只基于当天受控素材生成父亲可读的中文日报，"
-            "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、表达状态怎样、"
-            "有没有学习、情绪或安全线索、父亲今晚应该怎么跟进。不要输出逐字聊天记录，"
+            "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、内容主线是什么、"
+            "表达状态怎样、有没有学习、情绪或安全线索、父亲今晚应该怎么跟进。不要输出逐字聊天记录，"
             "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
             "必须输出非空、可解析的严格 JSON object；不要返回空字符串、none、null、Markdown 或解释文字。"
             "suggested_parent_actions 每条建议都应包含 starter + avoid 语义：可以怎么轻轻开口，以及避免怎么追问。"
             "tonight_parent_bridge 必须是一句现实可执行的父亲接话或动作，不要像监控报告，"
             "孩子不想说时要提醒不追问或换轻松方式。"
-            "返回严格 JSON，字段为 summary、learning_observations、expression_observations、"
-            "emotion_observations、safety_alerts、suggested_parent_actions、tonight_parent_bridge。"
+            "topic_overview 要归纳为父亲看得懂的话题卡片，不引用孩子原话；avoid_followup 写清今晚不要追问什么。"
+            "返回严格 JSON，字段为 summary、topic_overview、conversation_summary、learning_observations、"
+            "expression_observations、emotion_observations、safety_alerts、suggested_parent_actions、"
+            "tonight_parent_bridge、avoid_followup。"
         )
 
     def _parent_report_model_payload(
@@ -470,7 +493,15 @@ class ParentReportService:
                 "conversation_snippets are capped analysis snippets; do not quote them verbatim."
             ),
             "topic_hints": conversation["topics"],
+            "topic_overview_hints": [
+                item.model_dump(mode="json")
+                for item in conversation["topic_overview"]
+            ],
             "state_hints": conversation["state_summary"],
+            "conversation_summary_hint": conversation["conversation_summary"][0]
+            if conversation["conversation_summary"]
+            else "",
+            "avoid_followup_hints": conversation["avoid_followup"],
             "memory_summaries": [
                 {
                     "type": memory.memory_type.value,
@@ -487,6 +518,13 @@ class ParentReportService:
             ],
             "report_schema": {
                 "summary": "非空中文字符串，必须由当天素材归纳，不要逐字引用。",
+                "topic_overview": (
+                    "list[object]，每项字段 topic、child_intent、summary、emotion_tone、"
+                    "parent_bridge；只做归纳，不引用孩子原文。"
+                ),
+                "conversation_summary": (
+                    "非空中文字符串，说明今天聊了什么和内容主线，不输出逐字记录。"
+                ),
                 "learning_observations": "list[str]",
                 "expression_observations": "list[str]",
                 "emotion_observations": "list[str]",
@@ -496,9 +534,16 @@ class ParentReportService:
                     "非空中文字符串。父亲今晚可以自然接的一句话或一个动作；"
                     "不要逐字引用敏感内容，不要追问，孩子不想说时换轻松方式。"
                 ),
+                "avoid_followup": "list[str]，今晚避免追问、纠错、监控式盘问的点。",
             },
             "deterministic_fallback_hints": {
                 "topics": conversation["topics"],
+                "topic_overview": [
+                    item.model_dump(mode="json")
+                    for item in fallback_report.topic_overview
+                ],
+                "conversation_summary": fallback_report.conversation_summary,
+                "avoid_followup": fallback_report.avoid_followup,
                 "state_summary": conversation["state_summary"],
                 "tonight_parent_bridge": fallback_report.tonight_parent_bridge,
                 "relationship_parent_actions": [
@@ -540,6 +585,11 @@ class ParentReportService:
             return None
         return {
             "summary": summary[:500],
+            "topic_overview": self._model_topic_overview(raw),
+            "conversation_summary": self._safe_text(
+                str(raw.get("conversation_summary") or ""),
+            )[:600]
+            or None,
             "learning_observations": self._model_list(raw, "learning_observations"),
             "expression_observations": self._model_list(raw, "expression_observations"),
             "emotion_observations": self._model_list(raw, "emotion_observations"),
@@ -551,6 +601,7 @@ class ParentReportService:
             "tonight_parent_bridge": self._safe_bridge_text(
                 str(raw.get("tonight_parent_bridge") or ""),
             ),
+            "avoid_followup": self._model_list(raw, "avoid_followup"),
         }
 
     def _strip_json_fence(self, value: str) -> str:
@@ -570,6 +621,38 @@ class ParentReportService:
             [self._safe_text(str(item)) for item in value],
             limit=6,
         )
+
+    def _model_topic_overview(
+        self,
+        raw: dict[str, object],
+    ) -> list[ParentReportTopicOverview]:
+        value = raw.get("topic_overview")
+        if not isinstance(value, list):
+            return []
+        items: list[ParentReportTopicOverview] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            topic = self._safe_text(str(item.get("topic") or ""))
+            if not topic:
+                continue
+            items.append(
+                ParentReportTopicOverview(
+                    topic=topic[:120],
+                    child_intent=self._safe_text(
+                        str(item.get("child_intent") or ""),
+                    )[:180],
+                    summary=self._safe_text(str(item.get("summary") or ""))[:260],
+                    emotion_tone=self._safe_text(
+                        str(item.get("emotion_tone") or ""),
+                    )[:120],
+                    parent_bridge=self._safe_bridge_text(
+                        str(item.get("parent_bridge") or ""),
+                    )
+                    or "",
+                )
+            )
+        return items[:6]
 
     def _log_model_fallback(
         self,
@@ -617,9 +700,9 @@ class ParentReportService:
     def _save_generated_report(self, report: ParentReport) -> ParentReport:
         if self._repository_available:
             try:
-                saved = self._repository.save(report)
-                self._fallback_repository.save(saved)
-                return saved
+                self._repository.save(report)
+                self._fallback_repository.save(report)
+                return report
             except (ParentReportRepositoryUnavailable, SQLAlchemyError) as exc:
                 self._log_repository_fallback(
                     child_id=report.child_id,
@@ -714,6 +797,8 @@ class ParentReportService:
     ) -> bool:
         if report.generation_status != ParentReportGenerationStatus.MODEL_GENERATED:
             return True
+        if not report.topic_overview or not report.conversation_summary:
+            return True
         material_fingerprint = self._material_fingerprint(
             memories=memories,
             conversation_messages=conversation_messages,
@@ -756,6 +841,9 @@ class ParentReportService:
         if not child_messages:
             return {
                 "topics": [],
+                "topic_overview": [],
+                "conversation_summary": [],
+                "avoid_followup": ["不要追问孩子今天在小白狐里聊了什么。"],
                 "state_summary": [],
                 "learning_observations": [],
                 "expression_observations": [],
@@ -785,6 +873,7 @@ class ParentReportService:
             scene.startswith("learning.") for scene in scenes
         ) or any(self._is_learning_help_text(text) for text in child_texts)
         has_sports_topic = any(self._is_sports_text(text) for text in child_texts)
+        has_game_topic = any(self._is_game_text(text) for text in child_texts)
         has_topic_change = any(
             self._contains_any(
                 text,
@@ -805,6 +894,11 @@ class ParentReportService:
             topics.append("运动比赛/跑步")
             expression_observations.append(
                 "孩子今天围绕运动比赛、跑步或速度感受连续表达，说明他能把一个主动话题延展开；父亲可以轻轻问比赛项目或他最在意的一个细节。"
+            )
+        if has_game_topic:
+            topics.append("游戏/CS")
+            expression_observations.append(
+                "孩子今天围绕游戏、地图、队友或规则表达兴趣；父亲可以把它当作普通兴趣入口，不把游戏话题变成盘问或限制谈判。"
             )
         if attachment_count:
             topics.append("图片分享")
@@ -867,9 +961,34 @@ class ParentReportService:
                 "当天有孩子和小白狐的互动摘要，可作为今晚低压力沟通的参考。"
             )
 
+        deduped_topics = self._dedupe_and_limit(topics, limit=6)
+        deduped_state = self._dedupe_and_limit(state_summary, limit=3)
         return {
-            "topics": self._dedupe_and_limit(topics, limit=6),
-            "state_summary": self._dedupe_and_limit(state_summary, limit=3),
+            "topics": deduped_topics,
+            "topic_overview": self._topic_overview_for_conversation(
+                topics=deduped_topics,
+                has_learning=has_learning_topic,
+                has_sports=has_sports_topic,
+                has_game=has_game_topic,
+                has_topic_change=has_topic_change,
+                has_sports_fatigue=has_sports_fatigue,
+                attachment_count=attachment_count,
+                image_question_count=image_question_count,
+            ),
+            "conversation_summary": [
+                self._conversation_summary(
+                    topics=deduped_topics,
+                    state_summary=deduped_state,
+                    child_turn_count=child_turn_count,
+                    agent_turn_count=agent_turn_count,
+                )
+            ],
+            "avoid_followup": self._avoid_followup(
+                topics=deduped_topics,
+                has_topic_change=has_topic_change,
+                has_sports_fatigue=has_sports_fatigue,
+            ),
+            "state_summary": deduped_state,
             "learning_observations": self._dedupe_and_limit(
                 learning_observations,
                 limit=3,
@@ -884,6 +1003,142 @@ class ParentReportService:
             ),
             "safety_alerts": self._dedupe_and_limit(safety_alerts, limit=3),
         }
+
+    def _topic_overview_for_conversation(
+        self,
+        *,
+        topics: list[str],
+        has_learning: bool,
+        has_sports: bool,
+        has_game: bool,
+        has_topic_change: bool,
+        has_sports_fatigue: bool,
+        attachment_count: int,
+        image_question_count: int,
+    ) -> list[ParentReportTopicOverview]:
+        overview: list[ParentReportTopicOverview] = []
+        for topic in topics[:6]:
+            if topic == "学习求助" and has_learning:
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="想解决题目或学习卡点",
+                        summary="今天出现学习求助线索，重点是先弄清题目在问什么，而不是直接追答案。",
+                        emotion_tone="需要低压力分步支持",
+                        parent_bridge="今晚可以说：“如果有题卡住，我们先听你说题目在问什么。”",
+                    )
+                )
+            elif topic == "运动比赛/跑步" and has_sports:
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="主动分享比赛、速度或跑后感受",
+                        summary="孩子围绕运动比赛或跑步体验展开，可能也用了夸张疲惫表达。",
+                        emotion_tone="兴奋里带一点疲惫"
+                        if has_sports_fatigue
+                        else "有主动表达兴趣",
+                        parent_bridge="今晚可以轻轻问跑步里最有意思的一段，不追问距离真假。",
+                    )
+                )
+            elif topic == "游戏/CS" and has_game:
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="分享游戏里的地图、规则或队友体验",
+                        summary="今天游戏话题更像兴趣表达入口；如果孩子回复变短，后续适合给换题选择。",
+                        emotion_tone="有兴趣，但可能不想被继续盘问",
+                        parent_bridge="今晚可以轻轻接一句游戏里的创意规则，再给孩子换话题自由。",
+                    )
+                )
+            elif topic in {"图片分享", "看图交流"} and (
+                attachment_count or image_question_count
+            ):
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="把看到的东西交给小白狐一起看",
+                        summary="今天图片更像是表达入口，父亲可以先顺着孩子想看的点，而不是默认当成作业。",
+                        emotion_tone="好奇或想分享",
+                        parent_bridge="今晚可以问：“那张图你最想让我看哪里？”孩子不想说就换轻松话题。",
+                    )
+                )
+            elif topic == "安全或隐私边界":
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="对话触发了边界提醒",
+                        summary="需要父亲平静确认是否只是误触发；如果确有不舒服的事，再做具体了解。",
+                        emotion_tone="需要稳定、安全的成人支持",
+                        parent_bridge="今晚先平静确认有没有需要大人帮忙的事，不追问细节。",
+                    )
+                )
+            elif topic == "情绪表达":
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="表达累、困、不想聊或类似状态",
+                        summary="今天出现过状态线索，适合先确认孩子是不是累了或只是想重说一遍。",
+                        emotion_tone="需要被接住和放慢",
+                        parent_bridge="今晚可以先问想休息还是一起做件轻松的小事。",
+                    )
+                )
+            else:
+                overview.append(
+                    ParentReportTopicOverview(
+                        topic=topic,
+                        child_intent="日常自由聊天",
+                        summary="今天主要是轻量日常交流，适合用一个具体小细节自然连接现实生活。",
+                        emotion_tone="平稳",
+                        parent_bridge="今晚可以轻轻问一件还不错的小事；孩子不想说就不追问。",
+                    )
+                )
+        if has_topic_change and overview:
+            overview[0] = overview[0].model_copy(
+                update={
+                    "summary": overview[0].summary
+                    + " 孩子也表达过换题需求，后续要尊重转场。",
+                }
+            )
+        return overview
+
+    def _conversation_summary(
+        self,
+        *,
+        topics: list[str],
+        state_summary: list[str],
+        child_turn_count: int,
+        agent_turn_count: int,
+    ) -> str:
+        if not topics:
+            return "今天没有足够会话素材，不做额外判断。"
+        topic_text = "、".join(topics[:4])
+        base = (
+            f"今天主要聊了{topic_text}。"
+            f"可用素材包含 {child_turn_count} 个孩子回合和 {agent_turn_count} 个小白狐回合的结构化摘要。"
+        )
+        if state_summary:
+            base += f" {state_summary[0]}"
+        return base
+
+    def _avoid_followup(
+        self,
+        *,
+        topics: list[str],
+        has_topic_change: bool,
+        has_sports_fatigue: bool,
+    ) -> list[str]:
+        avoid = ["不要追问孩子今天在小白狐里逐字聊了什么。"]
+        if has_topic_change:
+            avoid.append("孩子已经表达换题时，不要把话题拉回旧问题。")
+        if has_sports_fatigue or "运动比赛/跑步" in topics:
+            avoid.append("不要连续核对跑了多远、真假或成绩。")
+        if "学习求助" in topics:
+            avoid.append("不要直接追问最终答案或替孩子完成作业。")
+        if "图片分享" in topics or "看图交流" in topics:
+            avoid.append("不要把所有图片都默认当成作业或隐私问题。")
+        if "游戏/CS" in topics:
+            avoid.append("不要把游戏话题立刻变成时长盘问、输赢评价或禁令谈判。")
+        return self._dedupe_and_limit(avoid, limit=5)
 
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         normalized = text.strip().lower().replace(" ", "")
@@ -940,6 +1195,12 @@ class ParentReportService:
         return self._is_sports_text(text) and self._contains_any(
             text,
             ("要死了", "累死了", "快不行了", "喘死了"),
+        )
+
+    def _is_game_text(self, text: str) -> bool:
+        return self._contains_any(
+            text,
+            ("游戏", "cs", "反恐", "地图", "队友", "排位", "关卡", "打游戏"),
         )
 
     def _observations_for(
@@ -1010,6 +1271,10 @@ class ParentReportService:
             actions.append(
                 "如果孩子聊到比赛或跑后“要死了”一类夸张疲惫，可以温和确认跑后是否只是累、有没有疼痛；不要否定夸张表达，也不要追问太久。"
             )
+        if conversation_topics and "游戏/CS" in conversation_topics:
+            actions.append(
+                "如果孩子聊到游戏，可以先接一个规则或创意点；避免把话题变成时长盘问、输赢评价或连续追问。"
+            )
 
         actions.extend(self._relationship_parent_actions(memories))
 
@@ -1052,6 +1317,11 @@ class ParentReportService:
             return (
                 "今晚可以轻轻问：“你今天说到跑步，最有意思的是哪一段？”"
                 "如果孩子不想说，就换成整理鞋子或喝水休息，不追问。"
+            )
+        if "游戏/CS" in topics:
+            return (
+                "今晚可以轻轻说：“你今天说到游戏里的规则，听起来有点像在设计玩法。”"
+                "如果孩子不想接，就给他换个轻松话题，不追问时长或输赢。"
             )
         if "学习求助" in topics:
             return (

@@ -120,4 +120,6 @@ Prompt 规则：
 6. 父母寄语仍不会出现在儿童端 debug 或 UI 中。
 7. child_chat prompt 和 runtime 已接入 age_band thin slice：从父亲沟通偏好里的 `age_band`、`child_age` 或 `age` 派生 age_5_6 / age_7_8 / age_9_10 / unknown，默认 age_7_8，并把 `reply_char_budget` 和 `question_policy` 作为内部提示注入。
 8. 开放对话已接入连续追问 thin slice：最近多轮都是小白狐提问、孩子说“换个话题 / 不聊了 / 睡觉了”，或孩子纠正“不是 / 你说错了 / 我还没跑”时，本轮不新增追问钩子，优先尊重边界或修正理解。
+9. Task 06 后，父亲设置中的年龄、可选年级、称呼偏好、兴趣和近期不想被追问的话题会进入 child_profile / turn guidance；显性作息配置从 v0.1 家庭内测 UI 降级，时间仍只做语气和轻量提醒。
+10. 同一普通话题持续多轮且孩子回复变短或变平时，`TurnGuidanceBuilder` 会标记 `topic_shift_recommended` 并提供静态 curated topic seeds；小白狐应给换题机会，不继续深挖旧话题。
 ```

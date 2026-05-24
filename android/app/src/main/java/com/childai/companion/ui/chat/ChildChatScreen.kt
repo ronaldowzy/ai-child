@@ -779,38 +779,93 @@ private fun AgentPanel(
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
     val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
     BoxWithConstraints(modifier = modifier) {
-        val statusReserve = if (compactLandscape) 48.dp else 68.dp
+        val statusReserve = if (compactLandscape) 64.dp else 86.dp
         val mascotMaxSize = minOf(
             maxWidth,
             (maxHeight - statusReserve).coerceAtLeast(160.dp),
             if (compactLandscape) 340.dp else 470.dp,
         )
-        Column(
+        Surface(
             modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+            shape = RoundedCornerShape(8.dp),
         ) {
-            CartoonAgentView(
-                agent = presentation.agent,
-                debugMascotState = debugMascotState,
-                modifier = Modifier.sizeIn(
-                    maxWidth = mascotMaxSize,
-                    maxHeight = mascotMaxSize,
-                ),
-            )
-            Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 16.dp))
-            AgentReplyCarouselText(
-                text = presentation.statusText,
-                compactLandscape = compactLandscape,
-            )
-            if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
-                Spacer(modifier = Modifier.height(10.dp))
-                MascotDebugSwitcher(
-                    selectedStateId = debugMascotStateId,
-                    onStateSelected = { debugMascotStateId = it },
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(if (compactLandscape) 8.dp else 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                ChildStateChip(
+                    phase = presentation.phase,
+                    compactLandscape = compactLandscape,
                 )
+                Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
+                CartoonAgentView(
+                    agent = presentation.agent,
+                    debugMascotState = debugMascotState,
+                    modifier = Modifier.sizeIn(
+                        maxWidth = mascotMaxSize,
+                        maxHeight = mascotMaxSize,
+                    ),
+                )
+                Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 14.dp))
+                AgentReplyCarouselText(
+                    text = presentation.statusText,
+                    compactLandscape = compactLandscape,
+                )
+                if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MascotDebugSwitcher(
+                        selectedStateId = debugMascotStateId,
+                        onStateSelected = { debugMascotStateId = it },
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun ChildStateChip(
+    phase: ChildTurnUiPhase,
+    compactLandscape: Boolean,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 1.dp,
+    ) {
+        Text(
+            text = childUiPolishStateLabel(phase),
+            style = if (compactLandscape) {
+                MaterialTheme.typography.labelMedium
+            } else {
+                MaterialTheme.typography.labelLarge
+            },
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+        )
+    }
+}
+
+internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
+    return when (phase) {
+        ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.Resting -> "准备好了"
+        ChildTurnUiPhase.Listening -> "正在听"
+        ChildTurnUiPhase.Recognizing -> "正在听懂"
+        ChildTurnUiPhase.Sending,
+        ChildTurnUiPhase.Thinking -> "正在想"
+        ChildTurnUiPhase.SpeakingPending,
+        ChildTurnUiPhase.Speaking -> "正在说"
+        ChildTurnUiPhase.ImageProcessing -> "正在看图"
+        ChildTurnUiPhase.NeedsRetry -> "可以重说"
+        ChildTurnUiPhase.PermissionNeeded -> "需要大人"
+        ChildTurnUiPhase.ServiceError -> "请大人检查"
     }
 }
 

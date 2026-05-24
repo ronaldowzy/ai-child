@@ -19,6 +19,11 @@ class ParentPolicyDtosTest {
                 "do_not_force_expression" to true,
                 "ask_thinking_before_learning_answer" to true,
                 "avoid_labels" to true,
+                "child_age" to 8,
+                "child_grade" to "二年级",
+                "child_call_preference" to "叫小名",
+                "child_interests" to listOf("恐龙", "画画"),
+                "topic_boundaries" to listOf("不要连续追问学校"),
             ),
             schedule = defaultParentSchedule()
                 .withEntryTimes("after_school", "15:30", "18:00")
@@ -31,6 +36,9 @@ class ParentPolicyDtosTest {
         assertTrue(json.contains("\"child_nickname\":\"豆豆\""))
         assertTrue(json.contains("\"child_display_name\":\"王小明\""))
         assertTrue(json.contains("\"parent_message_raw\":\"小名叫豆豆"))
+        assertTrue(json.contains("\"child_age\":8"))
+        assertTrue(json.contains("\"child_interests\""))
+        assertTrue(json.contains("\"topic_boundaries\""))
         assertTrue(json.contains("\"period\":\"after_school\""))
         assertTrue(json.contains("\"period\":\"bedtime\""))
         assertFalse(json.contains("\"safety_rules\""))
@@ -47,7 +55,12 @@ class ParentPolicyDtosTest {
               "parent_message_raw": "小名叫豆豆，最近喜欢恐龙。",
               "goals": ["数学题先复述题意"],
               "communication_preferences": {
-                "offer_choices_before_open_questions": true
+                "offer_choices_before_open_questions": true,
+                "child_age": 8,
+                "child_grade": "二年级",
+                "child_call_preference": "叫小名",
+                "child_interests": ["恐龙", "画画"],
+                "topic_boundaries": ["不要连续追问学校"]
               },
               "safety_rules": {
                 "homework_answer_policy": "scaffold_not_direct_answer"

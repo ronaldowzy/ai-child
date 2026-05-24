@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -32,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -53,17 +50,16 @@ fun ParentSettingsScreen(
         onSave = viewModel::savePolicy,
         onChildNicknameChange = viewModel::updateChildNickname,
         onChildDisplayNameChange = viewModel::updateChildDisplayName,
+        onChildAgeChange = viewModel::updateChildAge,
+        onChildGradeChange = viewModel::updateChildGrade,
+        onChildCallPreferenceChange = viewModel::updateChildCallPreference,
+        onChildInterestsTextChange = viewModel::updateChildInterestsText,
+        onTopicBoundariesTextChange = viewModel::updateTopicBoundariesText,
         onParentMessageChange = viewModel::updateParentMessageRaw,
         onGoalsTextChange = viewModel::updateGoalsText,
         onOfferChoicesChange = viewModel::updateOfferChoices,
         onDoNotForceExpressionChange = viewModel::updateDoNotForceExpression,
         onAskThinkingBeforeAnswerChange = viewModel::updateAskThinkingBeforeAnswer,
-        onAfterSchoolStartChange = viewModel::updateAfterSchoolStart,
-        onAfterSchoolEndChange = viewModel::updateAfterSchoolEnd,
-        onHomeworkStartChange = viewModel::updateHomeworkStart,
-        onHomeworkEndChange = viewModel::updateHomeworkEnd,
-        onBedtimeStartChange = viewModel::updateBedtimeStart,
-        onBedtimeEndChange = viewModel::updateBedtimeEnd,
         modifier = modifier,
     )
 }
@@ -76,17 +72,16 @@ private fun ParentSettingsScreenContent(
     onSave: () -> Unit,
     onChildNicknameChange: (String) -> Unit,
     onChildDisplayNameChange: (String) -> Unit,
+    onChildAgeChange: (String) -> Unit,
+    onChildGradeChange: (String) -> Unit,
+    onChildCallPreferenceChange: (String) -> Unit,
+    onChildInterestsTextChange: (String) -> Unit,
+    onTopicBoundariesTextChange: (String) -> Unit,
     onParentMessageChange: (String) -> Unit,
     onGoalsTextChange: (String) -> Unit,
     onOfferChoicesChange: (Boolean) -> Unit,
     onDoNotForceExpressionChange: (Boolean) -> Unit,
     onAskThinkingBeforeAnswerChange: (Boolean) -> Unit,
-    onAfterSchoolStartChange: (String) -> Unit,
-    onAfterSchoolEndChange: (String) -> Unit,
-    onHomeworkStartChange: (String) -> Unit,
-    onHomeworkEndChange: (String) -> Unit,
-    onBedtimeStartChange: (String) -> Unit,
-    onBedtimeEndChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -164,6 +159,82 @@ private fun ParentSettingsScreenContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            SettingsSection(title = "孩子画像") {
+                OutlinedTextField(
+                    value = uiState.form.childAge,
+                    onValueChange = onChildAgeChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "年龄")
+                    },
+                    placeholder = {
+                        Text(text = "建议填写 5-10 岁，用来控制小白狐回复长度")
+                    },
+                )
+                OutlinedTextField(
+                    value = uiState.form.childGrade,
+                    onValueChange = onChildGradeChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "年级（可选）")
+                    },
+                    placeholder = {
+                        Text(text = "例如 二年级；不确定可以留空")
+                    },
+                )
+                OutlinedTextField(
+                    value = uiState.form.childCallPreference,
+                    onValueChange = onChildCallPreferenceChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "称呼 / 代词偏好（可选）")
+                    },
+                    placeholder = {
+                        Text(text = "例如 叫小名、叫哥哥、用“孩子”")
+                    },
+                )
+                Text(
+                    text = "这些只用于尊重称呼和调整回复节奏，不用于给孩子贴性格标签。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            SettingsSection(title = "兴趣和不想聊的话题") {
+                OutlinedTextField(
+                    value = uiState.form.childInterestsText,
+                    onValueChange = onChildInterestsTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "孩子最近愿意聊的兴趣")
+                    },
+                    placeholder = {
+                        Text(text = "一行一个，例如：恐龙、画画、跑步比赛")
+                    },
+                )
+                OutlinedTextField(
+                    value = uiState.form.topicBoundariesText,
+                    onValueChange = onTopicBoundariesTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    label = {
+                        Text(text = "近期不想被追问的话题")
+                    },
+                    placeholder = {
+                        Text(text = "一行一个，例如：学校细节、比赛成绩")
+                    },
+                )
+            }
             SettingsSection(title = "父母寄语 / 小白狐了解孩子") {
                 OutlinedTextField(
                     value = uiState.form.parentMessageRaw,
@@ -204,29 +275,6 @@ private fun ParentSettingsScreenContent(
                     text = "学习问题先问思路",
                     checked = uiState.form.askThinkingBeforeAnswer,
                     onCheckedChange = onAskThinkingBeforeAnswerChange,
-                )
-            }
-            SettingsSection(title = "作息时间") {
-                TimeRangeRow(
-                    label = "放学后",
-                    start = uiState.form.afterSchoolStart,
-                    end = uiState.form.afterSchoolEnd,
-                    onStartChange = onAfterSchoolStartChange,
-                    onEndChange = onAfterSchoolEndChange,
-                )
-                TimeRangeRow(
-                    label = "作业时间",
-                    start = uiState.form.homeworkStart,
-                    end = uiState.form.homeworkEnd,
-                    onStartChange = onHomeworkStartChange,
-                    onEndChange = onHomeworkEndChange,
-                )
-                TimeRangeRow(
-                    label = "睡前",
-                    start = uiState.form.bedtimeStart,
-                    end = uiState.form.bedtimeEnd,
-                    onStartChange = onBedtimeStartChange,
-                    onEndChange = onBedtimeEndChange,
                 )
             }
             uiState.errorMessage?.let { error ->
@@ -345,51 +393,6 @@ private fun PreferenceRow(
     }
 }
 
-@Composable
-private fun TimeRangeRow(
-    label: String,
-    start: String,
-    end: String,
-    onStartChange: (String) -> Unit,
-    onEndChange: (String) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        TimeField(
-            value = start,
-            onValueChange = onStartChange,
-        )
-        Text(text = "到")
-        TimeField(
-            value = end,
-            onValueChange = onEndChange,
-        )
-    }
-}
-
-@Composable
-private fun TimeField(
-    value: String,
-    onValueChange: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.width(96.dp),
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyMedium,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-    )
-}
-
 @Preview(showBackground = true, widthDp = 900, heightDp = 700)
 @Composable
 private fun ParentSettingsScreenPreview() {
@@ -401,17 +404,16 @@ private fun ParentSettingsScreenPreview() {
             onSave = {},
             onChildNicknameChange = {},
             onChildDisplayNameChange = {},
+            onChildAgeChange = {},
+            onChildGradeChange = {},
+            onChildCallPreferenceChange = {},
+            onChildInterestsTextChange = {},
+            onTopicBoundariesTextChange = {},
             onParentMessageChange = {},
             onGoalsTextChange = {},
             onOfferChoicesChange = {},
             onDoNotForceExpressionChange = {},
             onAskThinkingBeforeAnswerChange = {},
-            onAfterSchoolStartChange = {},
-            onAfterSchoolEndChange = {},
-            onHomeworkStartChange = {},
-            onHomeworkEndChange = {},
-            onBedtimeStartChange = {},
-            onBedtimeEndChange = {},
         )
     }
 }

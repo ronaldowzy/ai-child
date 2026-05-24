@@ -116,6 +116,14 @@ class ChildAgentRuntime:
             "turn_guidance_hints",
             list(turn_guidance_context.hints),
         )
+        model_response.metadata.setdefault(
+            "topic_shift_recommended",
+            turn_guidance_context.topic_shift_recommended,
+        )
+        model_response.metadata.setdefault(
+            "topic_shift_reason",
+            turn_guidance_context.topic_shift_reason,
+        )
         raw_reply_text = model_response.response_text.strip()
         reply_text = self._normalize_model_reply(
             raw_reply_text,
@@ -241,6 +249,7 @@ class ChildAgentRuntime:
         return self._turn_guidance_builder.build(
             child_text=request.child_text,
             conversation_history=request.conversation_history,
+            parent_policy=request.parent_policy,
         )
 
     def _model_context(
@@ -298,6 +307,8 @@ class ChildAgentRuntime:
             "uses_recent_conversation_history": bool(request.conversation_history),
             "prompt_version_layers": sorted(prompt_versions.keys()),
             "turn_guidance_hints": list(turn_guidance_context.hints),
+            "topic_shift_recommended": turn_guidance_context.topic_shift_recommended,
+            "topic_shift_reason": turn_guidance_context.topic_shift_reason,
         }
 
     def _registry_fallback_reason(self, metadata: dict[str, Any]) -> str | None:
@@ -355,9 +366,13 @@ class ChildAgentRuntime:
             "boundary_respected": boundary_respected,
             "previous_topic_revived": previous_topic_revived,
             "same_topic_score": turn_guidance_context.same_topic_score,
+            "same_topic_turn_count": turn_guidance_context.same_topic_turn_count,
             "consecutive_recent_questions": (
                 turn_guidance_context.consecutive_recent_questions
             ),
+            "child_engagement_signal": turn_guidance_context.child_engagement_signal,
+            "topic_shift_recommended": turn_guidance_context.topic_shift_recommended,
+            "topic_shift_reason": turn_guidance_context.topic_shift_reason,
             "reply_normalized": reply_normalized,
             "first_text_ms": None,
             "first_audio_ms": None,
@@ -401,6 +416,12 @@ class ChildAgentRuntime:
             return ("运动", "比赛", "跑步", "跑")
         if recent_topic == "身体感受":
             return ("身体", "腿", "疼", "酸", "累", "喘")
+        if recent_topic == "游戏/CS":
+            return ("游戏", "cs", "反恐", "队友", "地图", "枪", "排位")
+        if recent_topic == "创作/画画":
+            return ("画", "画画", "手工", "积木", "故事")
+        if recent_topic == "自然/太空/恐龙":
+            return ("恐龙", "太空", "星球", "动物", "昆虫", "植物")
         return ()
 
     def _looks_like_direct_homework_answer(
@@ -443,6 +464,12 @@ class ChildAgentRuntime:
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
         if self._should_force_bedtime_close(request, text):
             return self.BEDTIME_CLOSE_REPLY
+        if self._should_replace_with_topic_shift_reply(
+            request,
+            text,
+            turn_guidance_context,
+        ):
+            return self._topic_shift_reply(turn_guidance_context)
         if request.route_decision.active_scene != SceneId.SAFETY_GUARDIAN:
             if self._should_remove_question_hook(request, turn_guidance_context):
                 text = self._remove_question_hook(text, request, turn_guidance_context)
@@ -627,6 +654,41 @@ class ChildAgentRuntime:
                 "child_correction",
             }
         )
+
+    def _should_replace_with_topic_shift_reply(
+        self,
+        request: AgentRuntimeRequest,
+        reply_text: str,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> bool:
+        if request.route_decision.active_scene != SceneId.OPEN_CONVERSATION:
+            return False
+        if not turn_guidance_context.topic_shift_recommended:
+            return False
+        normalized = reply_text.strip().lower().replace(" ", "")
+        topic_markers = self._topic_markers(turn_guidance_context.recent_topic or "")
+        revisits_topic = bool(topic_markers) and any(
+            marker in normalized for marker in topic_markers
+        )
+        return self._question_count(reply_text) > 0 or revisits_topic
+
+    def _topic_shift_reply(
+        self,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> str:
+        seeds = [
+            seed.strip()
+            for seed in turn_guidance_context.suggested_topic_seeds
+            if seed.strip()
+        ]
+        if len(seeds) >= 2:
+            return (
+                f"好，我们先换个轻松的。可以聊{seeds[0]}，"
+                f"也可以聊{seeds[1]}，或者你随便选一个。"
+            )
+        if seeds:
+            return f"好，我们先换个轻松的。可以聊{seeds[0]}，也可以你随便选一个。"
+        return "好，我们先换个轻松的。你可以随便选一个新话题，我跟着你走。"
 
     def _remove_question_hook(
         self,

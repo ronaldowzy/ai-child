@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Child, ParentReportRecord
 from app.db.session import SessionLocal
-from app.domain.parent_report import ParentReport, ParentReportGenerationStatus
+from app.domain.parent_report import (
+    ParentReport,
+    ParentReportGenerationStatus,
+    ParentReportTopicOverview,
+)
 
 
 class ParentReportRepositoryUnavailable(RuntimeError):
@@ -214,6 +218,8 @@ class ParentReportRepository:
             child_id=record.child_id,
             date=record.report_date,
             summary=record.summary,
+            topic_overview=self._topic_overview_from_legacy_record(record),
+            conversation_summary=record.summary,
             learning_observations=list(record.learning_observations or []),
             expression_observations=list(record.expression_observations or []),
             emotion_observations=list(record.emotion_observations or []),
@@ -229,6 +235,9 @@ class ParentReportRepository:
             generated_by=record.generated_by or "legacy",
             generation_error_code=record.generation_error_code,
             material_fingerprint=record.material_fingerprint,
+            avoid_followup=self._avoid_followup_from_legacy_actions(
+                list(record.suggested_parent_actions or []),
+            ),
         )
 
     def _aware_datetime(self, value: datetime) -> datetime:
@@ -254,6 +263,46 @@ class ParentReportRepository:
                     "如果孩子不想说，就先休息，不追问答案。"
                 )
         return None
+
+    def _topic_overview_from_legacy_record(
+        self,
+        record: ParentReportRecord,
+    ) -> list[ParentReportTopicOverview]:
+        actions = list(record.suggested_parent_actions or [])
+        bridge = self._bridge_from_actions(actions) or ""
+        summary = " ".join((record.summary or "").split())[:260]
+        if record.learning_observations:
+            topic = "学习求助"
+            intent = "学习或题目支持"
+        elif record.safety_alerts:
+            topic = "安全或隐私边界"
+            intent = "需要父亲平静关注"
+        elif record.expression_observations:
+            topic = "表达观察"
+            intent = "日常表达和沟通节奏"
+        elif record.emotion_observations:
+            topic = "情绪表达"
+            intent = "情绪或状态线索"
+        else:
+            topic = "日常聊天"
+            intent = "轻量日常交流"
+        return [
+            ParentReportTopicOverview(
+                topic=topic,
+                child_intent=intent,
+                summary=summary or "旧版日报记录没有单独的话题卡片。",
+                emotion_tone="",
+                parent_bridge=bridge,
+            )
+        ]
+
+    def _avoid_followup_from_legacy_actions(self, actions: list[str]) -> list[str]:
+        avoid = ["不要追问孩子今天在小白狐里逐字聊了什么。"]
+        if any("答案" in action or "作业" in action for action in actions):
+            avoid.append("不要直接追问最终答案或替孩子完成作业。")
+        if any("图片" in action for action in actions):
+            avoid.append("不要把所有图片都默认当成作业或隐私问题。")
+        return avoid
 
     def _record_id(self, child_id: str, report_date: date) -> str:
         digest = sha256(f"{child_id}:{report_date.isoformat()}".encode()).hexdigest()

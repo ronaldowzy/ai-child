@@ -840,6 +840,27 @@ OpeningService 能读取一个最近 interest_seed。
 
 ---
 
+## 17. Task 06 Post-Device QA Refinement
+
+本轮新增的 Healthy Engagement 相关 thin slice：
+
+```text
+1. `TurnGuidanceBuilder` 增加 same-topic low-engagement 检测：同一普通话题持续多轮，且孩子回复变短、变平或表达边界时，标记 `topic_shift_recommended`。
+2. 话题切换建议使用仓库内静态 curated seed packs，不抓实时热点、不制造 FOMO 或趋势压力。
+3. ChildAgentRuntime 对明显继续深挖旧话题的模型回复做保守修复，改成“先换个轻松的”并给一两个轻选项。
+4. 父亲日报增加 `avoid_followup`，提醒父亲不要追问逐字聊天、旧话题、游戏时长/输赢或作业最终答案。
+```
+
+仍需真机和真实家庭语境观察：
+
+```text
+1. 话题切换是否自然，是否过早打断孩子真正感兴趣的话题。
+2. curated seed 是否适龄、低压力、无上瘾式热点感。
+3. 父亲日报的 avoid_followup 是否帮助现实沟通，而不是让父亲过度监控。
+```
+
+---
+
 ## 16. Decision Summary For PRODUCT_DECISIONS
 
 建议同步到 `docs/PRODUCT_DECISIONS_V0_1.md`：

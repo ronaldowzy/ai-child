@@ -1,6 +1,6 @@
 # Family Beta QA Checklist v0.1
 
-Status: Task 05 release-candidate automated closeout snapshot added; real-device QA remains NOT_RUN
+Status: Task 06 post-device QA refinement automated snapshot added; real-device QA remains NOT_RUN
 Scope: Redmi K60 primary functional QA, Honor Pad 5 Android 9 / 4GB compatibility QA  
 Data policy: use only fictional child IDs, synthetic/fake audio, non-child test images, and non-private family settings. Do not record raw child text, full assistant text, raw audio, raw photos, parent_message_raw, provider keys, or private family data in this checklist or logs.
 
@@ -54,6 +54,14 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-OPEN-03 | Nickname/display-name priority | Set fictional child nickname/display name in father settings, restart chat. | Opening uses nickname first, display name second, and no forced real name when empty. |  | NOT_RUN |  | Do not use real child name. |
 | QA-OPEN-04 | Interest callback safety | With synthetic low-sensitivity interest seed, open chat. | Opening may lightly revisit one topic and allows switching away; no pressure to continue. |  | NOT_RUN |  | Backend/log evidence only; no raw memory text. |
 
+## 4A. Parent settings child profile
+
+| ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
+|---|---|---|---|---|---|---|---|
+| QA-SETTINGS-01 | Child profile fields | In father settings, enter fictional nickname, age, optional grade, call preference, interests, and topic boundaries. | Settings save successfully; child age/profile context affects later prompt metadata without exposing parent raw notes to child UI. |  | NOT_RUN |  | Do not use real child name or private family details. |
+| QA-SETTINGS-02 | Visible schedule deemphasis | Open father settings. | 放学后/作业/睡前 time ranges are not the main visible v0.1 setup burden; time remains gentle context only. |  | NOT_RUN |  | Existing backend schedule compatibility remains. |
+| QA-SETTINGS-03 | Invalid age | Enter age outside 5-10. | UI asks for 5-10 or blank; no crash. |  | NOT_RUN |  |  |
+
 ## 5. Voice-first ASR: permission, recording, auto-send, retry, cancel
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
@@ -101,6 +109,8 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-AGE-02 | Age 5-6 policy | Temporarily set fictional child age 5/6. | Reply is shorter and simpler; no babyish dependency wording. |  | NOT_RUN |  |  |
 | QA-AGE-03 | Age 9-10 policy | Temporarily set fictional child age 9/10. | Reply can be slightly richer but still voice-first and bounded. |  | NOT_RUN |  |  |
 | QA-THROTTLE-01 | Consecutive questions | Run ordinary chat where 小白狐 already asked two questions. | Next reply responds/settles instead of adding another question hook. |  | NOT_RUN |  | Check healthy_engagement log fields. |
+| QA-TOPIC-01 | Same topic low engagement | Use a synthetic game/CS or sports topic for 3+ turns, then give a short flat reply. | 小白狐 offers a gentle topic shift with curated seeds instead of deeper interview. |  | NOT_RUN |  | Evidence should be request_id/video timestamp, not raw text. |
+| QA-TOPIC-02 | Engaged same topic | Use a synthetic topic where the child gives longer engaged replies. | 小白狐 may continue naturally; topic shift should not fire too early. |  | NOT_RUN |  |  |
 
 ## 9. Image sharing
 
@@ -126,10 +136,12 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-REPORT-01 | Success | Generate report from synthetic structured memories. | Summary and “今晚可以怎么接一句” display; no raw chat transcript. |  | NOT_RUN |  |  |
+| QA-REPORT-01 | Success | Generate report from synthetic structured memories. | Summary, “今晚可以怎么接一句”, “今日聊了什么”, and avoid-follow-up display; no raw chat transcript. |  | NOT_RUN |  |  |
 | QA-REPORT-02 | model_failed/model_blocked | Force model failure or policy block. | Parent sees family-safe “小结还没准备好” style message, not provider/config details. |  | NOT_RUN |  |  |
 | QA-REPORT-03 | Empty material | Generate report with no day material. | Empty state is calm and does not invent child activity. |  | NOT_RUN |  |  |
 | QA-REPORT-04 | Tonight bridge | Inspect top bridge. | Bridge is a concrete real-life suggestion, not surveillance or a demand. |  | NOT_RUN |  |  |
+| QA-REPORT-05 | Topic/content summary | Generate a report after synthetic game/image/learning turns. | Topic cards summarize content and intent without quoting child原文. |  | NOT_RUN |  |  |
+| QA-REPORT-06 | Avoid follow-up | Inspect “今晚先不追问”. | It tells father what not to over-ask, including old topics or answer chasing when relevant. |  | NOT_RUN |  |  |
 
 ## 12. Healthy Engagement boundaries
 
@@ -173,6 +185,17 @@ Mock trace: PASS, 21 scenarios / 14 traces.
 Real-provider synthetic trace: REVIEW_NEEDED, 19 scenarios / 14 traces.
 Real-provider note: child_chat used mimo/mimo-v2.5-pro without fallback; one parent_report scenario timed out and fell back to mock; one creative-share checker returned P2.
 Real-device QA: NOT_RUN; adb listed no attached device.
+```
+
+## 16. Task 06 automated refinement snapshot
+
+```text
+Date: 2026-05-24
+Scope: parent settings child profile simplification; conversation topic shift and curated seeds; father report topic/content summary redesign; child UI polish thin slice.
+Backend tests: `bash scripts/test_backend.sh` -> 424 passed; `bash scripts/lint_backend.sh` -> passed.
+Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
+Real-device QA: NOT_RUN; earlier doctor reported no attached physical Android device.
+Device QA required: Redmi K60 / Honor Pad 5 for settings readability, topic shift naturalness, father report hierarchy, and 小白狐 phase chip/layout.
 ```
 
 ## Closeout rules

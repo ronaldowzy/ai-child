@@ -77,6 +77,52 @@ class ParentPolicyViewModelTest {
     }
 
     @Test
+    fun loadAndSavePolicyMapsSimplifiedChildProfilePreferences() {
+        var savedRequest: ParentPolicyUpdateRequest? = null
+        val viewModel = ParentPolicyViewModel(
+            policyReader = {
+                policyResponse(
+                    communicationPreferences = mapOf(
+                        "child_age" to 8,
+                        "child_grade" to "二年级",
+                        "child_call_preference" to "叫小名",
+                        "child_interests" to listOf("恐龙", "画画"),
+                        "topic_boundaries" to listOf("不要连续追问学校"),
+                    ),
+                )
+            },
+            policyWriter = { request ->
+                savedRequest = request
+                policyResponse(communicationPreferences = request.communicationPreferences)
+            },
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        val loadedForm = viewModel.uiState.value.form
+        assertEquals("8", loadedForm.childAge)
+        assertEquals("二年级", loadedForm.childGrade)
+        assertEquals("叫小名", loadedForm.childCallPreference)
+        assertEquals("恐龙\n画画", loadedForm.childInterestsText)
+        assertEquals("不要连续追问学校", loadedForm.topicBoundariesText)
+
+        viewModel.updateChildAge("9")
+        viewModel.updateChildInterestsText("跑步比赛\n积木")
+        viewModel.updateTopicBoundariesText("学校细节，比赛成绩")
+        viewModel.savePolicy()
+
+        val request = savedRequest
+        assertNotNull(request)
+        requireNotNull(request)
+        assertEquals(9, request.communicationPreferences["child_age"])
+        assertEquals(listOf("跑步比赛", "积木"), request.communicationPreferences["child_interests"])
+        assertEquals(
+            listOf("学校细节", "比赛成绩"),
+            request.communicationPreferences["topic_boundaries"],
+        )
+        assertEquals(true, request.communicationPreferences["visible_schedule_deprecated_v0_1"])
+    }
+
+    @Test
     fun savePolicySubmitsBlankChildNamesAsEmptyValues() {
         var savedRequest: ParentPolicyUpdateRequest? = null
         val viewModel = ParentPolicyViewModel(

@@ -139,6 +139,52 @@ def test_turn_guidance_detects_consecutive_question_throttle() -> None:
     assert "不再添加新的追问钩子" in guidance.guidance["too_many_recent_questions"]
 
 
+def test_turn_guidance_recommends_topic_shift_with_curated_seeds() -> None:
+    guidance = TurnGuidanceBuilder().build(
+        child_text="嗯",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_history=[
+            ModelMessage(role="user", content="我想聊 CS。"),
+            ModelMessage(role="assistant", content="你喜欢哪个地图？"),
+            ModelMessage(role="user", content="沙二。"),
+            ModelMessage(role="assistant", content="你喜欢哪把枪？"),
+            ModelMessage(role="user", content="还行。"),
+            ModelMessage(role="assistant", content="队友配合怎么样？"),
+        ],
+    )
+
+    assert guidance.recent_topic == "游戏/CS"
+    assert guidance.same_topic_turn_count >= 3
+    assert guidance.child_engagement_signal == "short_or_flat"
+    assert guidance.topic_shift_recommended is True
+    assert guidance.topic_shift_reason == "same_topic_3_plus_with_low_child_engagement"
+    assert "topic_shift_recommended" in guidance.hints
+    assert "恐龙或太空小问题" in guidance.suggested_topic_seeds
+
+
+def test_prompt_manager_includes_topic_shift_seed_context() -> None:
+    guidance = TurnGuidanceBuilder().build(
+        child_text="嗯",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_history=[
+            ModelMessage(role="user", content="我想聊 CS。"),
+            ModelMessage(role="assistant", content="你喜欢哪个地图？"),
+            ModelMessage(role="user", content="沙二。"),
+            ModelMessage(role="assistant", content="你喜欢哪把枪？"),
+            ModelMessage(role="user", content="还行。"),
+        ],
+    )
+    prompt = PromptManager().compose(
+        "conversation.open",
+        turn_guidance_context=guidance,
+    )
+
+    assert "topic_shift_recommended: true" in prompt.prompt
+    assert "same_topic_turn_count" in prompt.prompt
+    assert "child_engagement_signal: short_or_flat" in prompt.prompt
+    assert "suggested_topic_seeds" in prompt.prompt
+
+
 def test_child_agent_runtime_includes_turn_guidance_in_prompt_and_metadata() -> None:
     registry = CapturingModelRegistry()
     runtime = ChildAgentRuntime(model_registry=registry)
@@ -168,6 +214,48 @@ def test_child_agent_runtime_includes_turn_guidance_in_prompt_and_metadata() -> 
     assert "child_requests_topic_change" in registry.last_request.metadata[
         "turn_guidance_hints"
     ]
+
+
+def test_child_agent_runtime_repairs_low_energy_same_topic_reply() -> None:
+    class OldTopicQuestionRegistry(CapturingModelRegistry):
+        def generate(self, request: ModelRequest) -> ModelResponse:
+            self.last_request = request
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="你在 CS 里最喜欢哪把枪？队友配合怎么样？",
+                structured_output={},
+                provider_name="fixed",
+                model_name="fixed-child-chat",
+            )
+
+    registry = OldTopicQuestionRegistry()
+    runtime = ChildAgentRuntime(model_registry=registry)
+    request = AgentRuntimeRequest(
+        child_id="child_topic_shift_test",
+        session_id="topic_shift_session",
+        child_text="嗯",
+        route_decision=_route_decision(),
+        time_context=_time_context(),
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        memory_context=[],
+        conversation_history=[
+            ModelMessage(role="user", content="我想聊 CS。"),
+            ModelMessage(role="assistant", content="你喜欢哪个地图？"),
+            ModelMessage(role="user", content="沙二。"),
+            ModelMessage(role="assistant", content="你喜欢哪把枪？"),
+            ModelMessage(role="user", content="还行。"),
+            ModelMessage(role="assistant", content="队友配合怎么样？"),
+        ],
+        conversation_metadata={},
+    )
+
+    result = runtime.run(request)
+
+    assert "换个轻松的" in result.reply_text
+    assert "恐龙或太空小问题" in result.reply_text
+    assert "哪把枪" not in result.reply_text
+    assert "队友" not in result.reply_text
+    assert result.model_metadata["topic_shift_recommended"] is True
 
 
 def test_running_exaggerated_fatigue_is_watch_lite_not_self_harm() -> None:

@@ -245,6 +245,19 @@ class PromptManager:
         raw_message = str(data.get("parent_message_raw") or "").strip()
         nickname = str(data.get("child_nickname") or "").strip()
         display_name = str(data.get("child_display_name") or "").strip()
+        communication_preferences = data.get("communication_preferences")
+        preferences = (
+            dict(communication_preferences)
+            if isinstance(communication_preferences, Mapping)
+            else {}
+        )
+        child_age = self._compact_profile_scalar(preferences.get("child_age"))
+        child_grade = self._compact_profile_scalar(preferences.get("child_grade"))
+        call_preference = self._compact_profile_scalar(
+            preferences.get("child_call_preference")
+        )
+        child_interests = self._profile_string_list(preferences.get("child_interests"))
+        topic_boundaries = self._profile_string_list(preferences.get("topic_boundaries"))
         age_policy = derive_age_band_reply_policy(parent_policy)
         age_lines = [
             "年龄与回复节奏是内部提示，不要直接说给孩子：",
@@ -252,7 +265,32 @@ class PromptManager:
             f"- reply_char_budget: {age_policy.reply_char_budget}",
             f"- question_policy: {age_policy.question_policy}",
         ]
-        if not raw_message and not nickname and not display_name:
+        profile_lines: list[str] = []
+        if nickname:
+            profile_lines.append(f"- child_nickname: {nickname}")
+        if display_name:
+            profile_lines.append(f"- child_display_name: {display_name}")
+        if child_age:
+            profile_lines.append(f"- child_age: {child_age}")
+        if child_grade:
+            profile_lines.append(f"- child_grade: {child_grade}")
+        if call_preference:
+            profile_lines.append(
+                "- child_call_preference: "
+                f"{call_preference}。只用于尊重称呼和措辞，不推断性格、能力或兴趣。"
+            )
+        if child_interests:
+            profile_lines.append(
+                "- child_interests: "
+                f"{'，'.join(child_interests[:8])}。这是可尝试的轻话题，不要变成任务。"
+            )
+        if topic_boundaries:
+            profile_lines.append(
+                "- topic_boundaries: "
+                f"{'，'.join(topic_boundaries[:8])}。孩子不想聊时优先尊重，不拉回旧话题。"
+            )
+
+        if not raw_message and not profile_lines:
             return "\n".join(
                 [
                     "当前没有单独的孩子画像。不要编造孩子的小名、性格或家庭信息。",
@@ -262,10 +300,7 @@ class PromptManager:
         lines = [
             "孩子画像来自结构化父亲设置和父母寄语的背景信息。可以用它理解孩子的兴趣、近期状态和沟通节奏；不要把它当成固定标签，也不要编造寄语中没有的事实。"
         ]
-        if nickname:
-            lines.append(f"- child_nickname: {nickname}")
-        if display_name:
-            lines.append(f"- child_display_name: {display_name}")
+        lines.extend(profile_lines)
         lines.extend(age_lines)
         return "\n".join(lines)
 
@@ -367,6 +402,11 @@ class PromptManager:
         guidance = data.get("guidance")
         recent_topic = str(data.get("recent_topic") or "").strip()
         same_topic_score = data.get("same_topic_score")
+        same_topic_turn_count = data.get("same_topic_turn_count")
+        engagement = str(data.get("child_engagement_signal") or "").strip()
+        topic_shift_recommended = data.get("topic_shift_recommended") is True
+        topic_shift_reason = str(data.get("topic_shift_reason") or "").strip()
+        suggested_topic_seeds = data.get("suggested_topic_seeds")
 
         if not isinstance(hints, Sequence) or isinstance(hints, str) or not hints:
             return "本轮没有额外动态提示。继续遵守场景提示、儿童安全底线和输出契约。"
@@ -376,6 +416,26 @@ class PromptManager:
             lines.append(f"- recent_topic: 最近可能围绕“{recent_topic}”展开。")
         if isinstance(same_topic_score, int) and same_topic_score > 0:
             lines.append(f"- same_topic_score: {same_topic_score}")
+        if isinstance(same_topic_turn_count, int) and same_topic_turn_count > 0:
+            lines.append(f"- same_topic_turn_count: {same_topic_turn_count}")
+        if engagement:
+            lines.append(f"- child_engagement_signal: {engagement}")
+        if topic_shift_recommended:
+            lines.append("- topic_shift_recommended: true")
+        if topic_shift_reason:
+            lines.append(f"- topic_shift_reason: {topic_shift_reason}")
+        if (
+            isinstance(suggested_topic_seeds, Sequence)
+            and not isinstance(suggested_topic_seeds, str)
+            and suggested_topic_seeds
+        ):
+            seeds = [
+                str(seed).strip()
+                for seed in suggested_topic_seeds
+                if str(seed).strip()
+            ]
+            if seeds:
+                lines.append(f"- suggested_topic_seeds: {'，'.join(seeds[:4])}")
 
         guidance_map = guidance if isinstance(guidance, Mapping) else {}
         for hint in hints:
@@ -431,6 +491,29 @@ class PromptManager:
         if isinstance(value, Sequence):
             return "，".join(self._compact_value(item) for item in value)
         return str(value)
+
+    def _compact_profile_scalar(self, value: Any) -> str:
+        if value is None or isinstance(value, bool):
+            return ""
+        text = str(value).strip()
+        if not text:
+            return ""
+        return text[:80]
+
+    def _profile_string_list(self, value: Any) -> list[str]:
+        if isinstance(value, str):
+            source = value.replace("，", "\n").replace("、", "\n").replace(",", "\n")
+            items = source.splitlines()
+        elif isinstance(value, Sequence):
+            items = [str(item) for item in value if item is not None]
+        else:
+            return []
+        cleaned = []
+        for item in items:
+            text = " ".join(item.strip().split())
+            if text:
+                cleaned.append(text[:60])
+        return cleaned
 
     def _format_section(self, section: PromptSection) -> str:
         return f"## {section.layer.value}\n{section.content}"

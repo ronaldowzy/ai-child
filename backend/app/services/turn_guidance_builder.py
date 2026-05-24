@@ -1,8 +1,10 @@
 from collections.abc import Sequence
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from app.domain.model_types import ModelMessage
+from app.services.topic_seed_service import TopicSeedService
 
 
 class TurnGuidanceContext(BaseModel):
@@ -10,12 +12,20 @@ class TurnGuidanceContext(BaseModel):
     guidance: dict[str, str] = Field(default_factory=dict)
     recent_topic: str | None = None
     same_topic_score: int = 0
+    same_topic_turn_count: int = 0
     consecutive_recent_questions: int = 0
     boundary_signal: str | None = None
+    child_engagement_signal: str = "neutral"
+    topic_shift_recommended: bool = False
+    topic_shift_reason: str | None = None
+    suggested_topic_seeds: list[str] = Field(default_factory=list)
 
 
 class TurnGuidanceBuilder:
     """Builds lightweight prompt guidance for one child speech turn."""
+
+    def __init__(self, *, topic_seed_service: TopicSeedService | None = None) -> None:
+        self._topic_seed_service = topic_seed_service or TopicSeedService()
 
     _OPERATION_ASIDE_MARKERS = (
         "按一下",
@@ -45,6 +55,34 @@ class TurnGuidanceBuilder:
         "练完",
         "训练",
         "跑",
+    )
+    _GAME_CONTEXT_MARKERS = (
+        "游戏",
+        "打游戏",
+        "cs",
+        "反恐",
+        "队友",
+        "地图",
+        "枪",
+        "排位",
+        "关卡",
+    )
+    _CREATION_CONTEXT_MARKERS = (
+        "画",
+        "画画",
+        "手工",
+        "积木",
+        "故事",
+        "编一个",
+        "编个",
+    )
+    _ANIMAL_SPACE_CONTEXT_MARKERS = (
+        "恐龙",
+        "太空",
+        "星球",
+        "动物",
+        "昆虫",
+        "植物",
     )
     _DISCOMFORT_MARKERS = ("要死了", "累死了", "快不行了", "喘死了")
     _TOPIC_CHANGE_MARKERS = (
@@ -78,6 +116,7 @@ class TurnGuidanceBuilder:
         *,
         child_text: str,
         conversation_history: Sequence[ModelMessage] | None = None,
+        parent_policy: Any | None = None,
     ) -> TurnGuidanceContext:
         normalized = self._normalize(child_text)
         hints: list[str] = []
@@ -138,6 +177,7 @@ class TurnGuidanceBuilder:
             child_text=child_text,
             conversation_history=conversation_history or [],
         )
+        child_engagement_signal = self._child_engagement_signal(normalized, hints)
         consecutive_recent_questions = self._recent_assistant_question_count(
             conversation_history or []
         )
@@ -155,14 +195,45 @@ class TurnGuidanceBuilder:
                 hint="same_topic_too_long",
                 instruction="最近多轮可能持续围绕同一普通话题且孩子回答变短，提供换轨机会，不继续追问旧话题。",
             )
+        topic_shift_recommended = (
+            same_topic_score >= 3
+            and child_engagement_signal in {"short_or_flat", "boundary"}
+            and recent_topic is not None
+        )
+        topic_shift_reason = None
+        suggested_topic_seeds: list[str] = []
+        if topic_shift_recommended:
+            topic_shift_reason = (
+                "same_topic_3_plus_with_low_child_engagement"
+            )
+            suggested_topic_seeds = self._topic_seed_service.seeds_for_parent_policy(
+                parent_policy,
+                limit=3,
+            )
+            seed_text = "、".join(suggested_topic_seeds)
+            self._set_hint(
+                hints=hints,
+                guidance=guidance,
+                hint="topic_shift_recommended",
+                instruction=(
+                    "同一普通话题已经持续多轮且孩子回复变短或变平，"
+                    "本轮给换题机会，不继续追问旧话题；可以给孩子两个轻松方向"
+                    f"{f'，例如：{seed_text}' if seed_text else ''}。"
+                ),
+            )
 
         return TurnGuidanceContext(
             hints=hints,
             guidance=guidance,
             recent_topic=recent_topic,
             same_topic_score=same_topic_score,
+            same_topic_turn_count=same_topic_score,
             consecutive_recent_questions=consecutive_recent_questions,
             boundary_signal=self._boundary_signal(normalized, hints),
+            child_engagement_signal=child_engagement_signal,
+            topic_shift_recommended=topic_shift_recommended,
+            topic_shift_reason=topic_shift_reason,
+            suggested_topic_seeds=suggested_topic_seeds,
         )
 
     def _recent_topic(
@@ -171,13 +242,13 @@ class TurnGuidanceBuilder:
         child_text: str,
         conversation_history: Sequence[ModelMessage],
     ) -> tuple[str | None, int]:
-        user_texts = [
-            message.content
-            for message in conversation_history[-8:]
-            if message.role == "user" and isinstance(message.content, str)
+        recent_messages = [
+            message
+            for message in conversation_history[-10:]
+            if isinstance(message.content, str)
         ]
-        user_texts.append(child_text)
-        normalized_texts = [self._normalize(text) for text in user_texts]
+        normalized_texts = [self._normalize(message.content) for message in recent_messages]
+        normalized_texts.append(self._normalize(child_text))
 
         sports_score = sum(
             1
@@ -193,6 +264,27 @@ class TurnGuidanceBuilder:
             return "运动比赛/跑步", sports_score
         if body_score >= 3:
             return "身体感受", body_score
+        game_score = sum(
+            1
+            for text in normalized_texts
+            if self._contains_any(text, self._GAME_CONTEXT_MARKERS)
+        )
+        creation_score = sum(
+            1
+            for text in normalized_texts
+            if self._contains_any(text, self._CREATION_CONTEXT_MARKERS)
+        )
+        animal_space_score = sum(
+            1
+            for text in normalized_texts
+            if self._contains_any(text, self._ANIMAL_SPACE_CONTEXT_MARKERS)
+        )
+        if game_score >= max(creation_score, animal_space_score, 3):
+            return "游戏/CS", game_score
+        if creation_score >= max(game_score, animal_space_score, 3):
+            return "创作/画画", creation_score
+        if animal_space_score >= max(game_score, creation_score, 3):
+            return "自然/太空/恐龙", animal_space_score
         return None, max(sports_score, body_score)
 
     def _recent_assistant_question_count(
@@ -245,6 +337,29 @@ class TurnGuidanceBuilder:
         if len(normalized) <= 8:
             return True
         return self._contains_any(normalized, self._TOPIC_CHANGE_MARKERS)
+
+    def _child_engagement_signal(self, normalized: str, hints: list[str]) -> str:
+        if "child_requests_topic_change" in hints:
+            return "boundary"
+        flat_replies = (
+            "嗯",
+            "哦",
+            "好吧",
+            "不知道",
+            "还行",
+            "随便",
+            "没有",
+            "没了",
+            "算了",
+            "都行",
+        )
+        if normalized in flat_replies or len(normalized) <= 4:
+            return "short_or_flat"
+        if len(normalized) <= 8 and not self._contains_any(normalized, ("？", "?")):
+            return "short_or_flat"
+        if len(normalized) >= 18:
+            return "engaged"
+        return "neutral"
 
     def _boundary_signal(self, normalized: str, hints: list[str]) -> str | None:
         if "bedtime_close_requested" in hints:

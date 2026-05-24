@@ -21,4 +21,13 @@ class AgentReplyCarouselTest {
     fun blankReplyReturnsNoSegments() {
         assertEquals(emptyList<String>(), agentReplyCarouselSegments("   "))
     }
+
+    @Test
+    fun stateChipLabelsStayShortAndChildFacing() {
+        assertEquals("准备好了", childUiPolishStateLabel(ChildTurnUiPhase.Ready))
+        assertEquals("正在听", childUiPolishStateLabel(ChildTurnUiPhase.Listening))
+        assertEquals("正在说", childUiPolishStateLabel(ChildTurnUiPhase.Speaking))
+        assertEquals("正在看图", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
+        assertEquals("请大人检查", childUiPolishStateLabel(ChildTurnUiPhase.ServiceError))
+    }
 }

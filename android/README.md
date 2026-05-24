@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，并补上图片本地确认卡和父亲入口降噪 thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
+当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，并补上图片本地确认卡、父亲入口降噪和 Task 06 post-device QA UI polish thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
 
 Task 04 家庭内测 QA runbook 已新增：
 
@@ -27,8 +27,8 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 - “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo。CameraX 自定义相机不是当前目标。
 - 拍照/相册发送后，儿童消息区显示本地临时图片确认卡：优先展示压缩缩略图，并显示图片类型、大小和上传状态；本地路径不进入模型 prompt，上传文件名会去掉本地目录。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
-- 父亲设置页可读取和保存孩子小名 / 显示名、父母寄语、目标、沟通偏好、放学后/作业/睡前时间段。小白狐 opening greeting 优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
-- 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”；失败态不默认暴露后端/model/provider/config 文案。
+- 父亲设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、父母寄语、目标和沟通偏好；v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
+- 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”，增加“今日聊了什么”话题/内容摘要和“今晚先不追问”；失败态不默认暴露后端/model/provider/config 文案。
 - 儿童聊天页中的父亲入口降噪为一个小“大人”入口：点击只提示，长按后选择父亲日报或父亲设置，再输入开发 PIN 才进入。该入口不是生产级账号/auth。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
 - 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、父母寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
@@ -44,6 +44,8 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
 5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
 6. “拍给小白狐看”是默认图片入口；旧 mock attachment 不作为儿童端默认路径。
+7. Task 06 后父亲设置显性重点从作息时间转向孩子画像、兴趣和话题边界；作息仍可作为后端时间上下文，不把场景硬锁给孩子。
+8. 儿童聊天页小白狐区域新增 phase-derived 短状态 chip 和轻背景；这是 thin slice polish，不代表最终视觉体验完成。
 ```
 
 待 Redmi K60 手动 QA：

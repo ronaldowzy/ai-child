@@ -20,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.data.parent.ParentReport
+import com.childai.companion.data.parent.ParentReportTopicOverview
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 
 @Composable
@@ -145,6 +147,28 @@ private fun ReportBody(report: ParentReport) {
             style = MaterialTheme.typography.bodyLarge,
         )
     }
+    ReportSection(title = PARENT_REPORT_TOPIC_SECTION_TITLE) {
+        report.conversationSummary?.let { summary ->
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (report.topicOverview.isEmpty()) {
+            Text(
+                text = "今天还没有足够的结构化话题摘要。",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                report.topicOverview.forEach { topic ->
+                    TopicOverviewCard(topic = topic)
+                }
+            }
+        }
+    }
     ReportSection(title = "今日整体摘要") {
         Text(
             text = report.summary,
@@ -168,10 +192,49 @@ private fun ReportBody(report: ParentReport) {
         items = report.suggestedParentActions,
     )
     ReportSection(
+        title = "今晚先不追问",
+        items = report.avoidFollowup,
+        emptyText = "避免连续追问，先轻松陪孩子做一件现实里的小事。",
+    )
+    ReportSection(
         title = "需要关注事项",
         items = report.safetyAlerts,
         emptyText = "暂无需要关注事项。",
     )
+}
+
+@Composable
+private fun TopicOverviewCard(topic: ParentReportTopicOverview) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = topic.topic,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (topic.summary.isNotBlank()) {
+                Text(
+                    text = topic.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (topic.parentBridge.isNotBlank()) {
+                Text(
+                    text = topic.parentBridge,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -241,7 +304,18 @@ private fun ParentReportScreenPreview() {
                     suggestedParentActions = listOf(
                         "今晚用一个具体问题轻轻收尾，不要追问过多。",
                     ),
+                    topicOverview = listOf(
+                        ParentReportTopicOverview(
+                            topic = "图片分享",
+                            childIntent = "想分享给小白狐看",
+                            summary = "孩子今天把图片作为表达入口，适合先问最想看哪里。",
+                            emotionTone = "好奇",
+                            parentBridge = "今晚可以轻轻问那张图最想让我看哪里。",
+                        ),
+                    ),
+                    conversationSummary = "今天主要聊了图片分享，没有输出逐字聊天记录。",
                     tonightParentBridge = "今晚可以轻轻问：“今天有没有一件还不错的小事？”如果孩子不想说，就换轻松方式。",
+                    avoidFollowup = listOf("不要追问孩子在小白狐里逐字聊了什么。"),
                     generationStatus = "model_generated",
                     generatedBy = "model",
                 ),
@@ -254,3 +328,4 @@ private fun ParentReportScreenPreview() {
 }
 
 internal const val PARENT_REPORT_BRIDGE_SECTION_TITLE = "今晚可以怎么接一句"
+internal const val PARENT_REPORT_TOPIC_SECTION_TITLE = "今日聊了什么"

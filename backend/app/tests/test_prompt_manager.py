@@ -84,6 +84,31 @@ def test_prompt_manager_injects_age_band_reply_policy() -> None:
     assert "reply_char_budget: 30-80 个汉字" in explicit_prompt.prompt
 
 
+def test_prompt_manager_injects_simplified_child_profile_without_stereotypes() -> None:
+    prompt = PromptManager().compose(
+        "conversation.open",
+        parent_policy={
+            "version": 4,
+            "child_nickname": "豆豆",
+            "communication_preferences": {
+                "child_age": 8,
+                "child_grade": "二年级",
+                "child_call_preference": "叫小名",
+                "child_interests": ["恐龙", "画画"],
+                "topic_boundaries": ["不要连续追问学校"],
+            },
+        },
+    )
+
+    assert "child_age: 8" in prompt.prompt
+    assert "child_grade: 二年级" in prompt.prompt
+    assert "child_call_preference: 叫小名" in prompt.prompt
+    assert "child_interests: 恐龙，画画" in prompt.prompt
+    assert "topic_boundaries: 不要连续追问学校" in prompt.prompt
+    assert "不推断性格、能力或兴趣" in prompt.prompt
+    assert "不要变成任务" in prompt.prompt
+
+
 def test_prompt_manager_injects_turn_guidance_section() -> None:
     prompt = PromptManager().compose(
         "conversation.open",

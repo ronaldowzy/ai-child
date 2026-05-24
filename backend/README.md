@@ -67,6 +67,17 @@ The current backend is local-first and test-stage real-path focused:
 - Parent policy supports `child_nickname` and `child_display_name`; Android
   father settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.
+- Task 06 refines parent policy for family beta: Android father settings now
+  emphasize child age, optional grade, call preference, interests, and topic
+  boundaries through `communication_preferences`. Visible schedule editing is
+  de-emphasized for v0.1; time periods remain gentle context, not hard scene
+  locks.
+- Open conversation turn guidance now detects low-engagement same-topic loops
+  and can recommend a topic shift with curated static seed packs; this stays in
+  backend prompt/runtime metadata and does not call live trend services.
+- Parent report v2 now includes topic overview, conversation summary, tonight
+  bridge, and avoid-follow-up fields while keeping model-first generation and
+  no raw transcript output.
 - 小白狐 voice output now has a backend TTS path: `POST /api/v1/tts/xiaobaohu`
   can generate or return a cached wav URL. For QA, enable the intended real TTS
   provider or mark the missing external condition as BLOCKED/FAIL. Android now

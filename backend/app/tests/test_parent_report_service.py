@@ -330,12 +330,63 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     report_json = report.model_dump_json()
     assert "会话消息" in report.summary
     assert "图片分享" in report.summary
+    assert report.conversation_summary is not None
+    assert "图片分享" in report.conversation_summary
+    assert any(topic.topic == "图片分享" for topic in report.topic_overview)
+    assert any("逐字" in item for item in report.avoid_followup)
     assert any("复述题意" in item for item in report.learning_observations)
     assert any("图片" in item for item in report.expression_observations)
     assert "我发了一张家里的照片" not in report_json
     assert "数学题不会做" not in report_json
     assert report.tonight_parent_bridge is not None
     assert "不追问" in report.tonight_parent_bridge
+
+
+def test_parent_report_redesign_summarizes_game_topic_without_raw_transcript() -> None:
+    report_service = ParentReportService(
+        memory_service=MemoryService(
+            repository=InMemoryMemoryRepository(),
+            now_provider=_fixed_now,
+        ),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_game_1",
+                    text="我今天一直在聊 CS 的地图和队友配合。",
+                ),
+                _conversation_message(
+                    message_id="msg_agent_game_1",
+                    actor="agent",
+                    text="你喜欢哪张地图？",
+                ),
+                _conversation_message(
+                    message_id="msg_child_game_2",
+                    text="嗯，随便。",
+                ),
+            ]
+        ),
+        model_registry=SuccessfulParentReportModelRegistry(),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service.generate_daily_report(
+        "child_parent_report_service_test",
+        report_date=date(2026, 5, 18),
+    )
+
+    report_json = report.model_dump_json()
+    assert report.conversation_summary is not None
+    assert "游戏/CS" in report.conversation_summary
+    assert report.topic_overview
+    assert any(item.topic == "游戏/CS" for item in report.topic_overview)
+    assert report.tonight_parent_bridge is not None
+    assert "不追问时长或输赢" in report.tonight_parent_bridge
+    assert any(
+        "不要追问孩子今天在小白狐里逐字聊了什么" in item
+        for item in report.avoid_followup
+    )
+    assert "我今天一直在聊 CS" not in report_json
+    assert "嗯，随便" not in report_json
 
 
 def test_parent_report_model_parse_accepts_optional_bridge_text() -> None:

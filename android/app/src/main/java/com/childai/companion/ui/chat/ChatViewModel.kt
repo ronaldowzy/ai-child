@@ -470,9 +470,10 @@ class ChatViewModel(
         if (_uiState.value.isSending || payload.bytes.isEmpty()) return
         stopCurrentTts(restoreBaseAgent = true)
         childInteractionStarted = true
+        val childPhotoMessageId = nextMessageId("child-photo")
         appendMessage(
             ChatMessage(
-                id = nextMessageId("child-photo"),
+                id = childPhotoMessageId,
                 author = MessageAuthor.Child,
                 text = "我拍了一张图片给小白狐看。",
             ),
@@ -482,6 +483,12 @@ class ChatViewModel(
                 isSending = true,
                 childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
                 quickActions = emptyList(),
+                imagePreviewCards = it.imagePreviewCards + (
+                    childPhotoMessageId to LocalImagePreviewCardUiState.fromPayload(
+                        messageId = childPhotoMessageId,
+                        payload = payload,
+                    )
+                    ),
                 mockPhoto = null,
                 agent = childInteractionPresentation(
                     phaseHint = ChildTurnUiPhase.ImageProcessing,
@@ -501,12 +508,16 @@ class ChatViewModel(
                     sessionId = sessionId,
                     imageBytes = payload.bytes,
                     mimeType = payload.mimeType,
-                    fileName = payload.fileName,
+                    fileName = childSafeUploadFileName(payload.fileName),
                     imagePurpose = imagePurpose,
                     childCaption = "我拍了一张图片给小白狐看。",
                 )
             }.onSuccess { attachmentResponse ->
                 handleAttachmentResponse(attachmentResponse)
+                updateImagePreviewStatus(
+                    messageId = childPhotoMessageId,
+                    status = LocalImagePreviewStatus.Sent,
+                )
             }.onFailure {
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
                 _uiState.update {
@@ -514,6 +525,15 @@ class ChatViewModel(
                         isSending = false,
                         childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         quickActions = emptyList(),
+                        imagePreviewCards = it.imagePreviewCards + (
+                            childPhotoMessageId to (
+                                it.imagePreviewCards[childPhotoMessageId]
+                                    ?: LocalImagePreviewCardUiState.fromPayload(
+                                        messageId = childPhotoMessageId,
+                                        payload = payload,
+                                    )
+                                ).copy(status = LocalImagePreviewStatus.Failed)
+                            ),
                         mockPhoto = null,
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
@@ -524,6 +544,28 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    private fun updateImagePreviewStatus(
+        messageId: String,
+        status: LocalImagePreviewStatus,
+    ) {
+        _uiState.update { state ->
+            val card = state.imagePreviewCards[messageId] ?: return@update state
+            state.copy(
+                imagePreviewCards = state.imagePreviewCards + (
+                    messageId to card.copy(status = status)
+                    ),
+            )
+        }
+    }
+
+    private fun childSafeUploadFileName(fileName: String): String {
+        return fileName
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .ifBlank { "xiaobaohu_photo.jpg" }
+            .take(96)
     }
 
     fun onPhotoCaptureFailed(message: String) {
@@ -1350,6 +1392,7 @@ data class ChatUiState(
     val childTurnPhaseHint: ChildTurnUiPhase? = null,
     val mockPhoto: MockPhotoUiState? = null,
     val pendingImageContext: PendingImageContextUiState? = null,
+    val imagePreviewCards: Map<String, LocalImagePreviewCardUiState> = emptyMap(),
 ) {
     val interactionPresentation: ChildInteractionPresentation
         get() = childInteractionPresentation(
@@ -1379,6 +1422,49 @@ data class PendingImageContextUiState(
     val imagePurpose: String?,
     val recognizedType: String,
 )
+
+enum class LocalImagePreviewStatus {
+    Uploading,
+    Sent,
+    Failed,
+}
+
+data class LocalImagePreviewCardUiState(
+    val messageId: String,
+    val mimeType: String,
+    val sizeBytes: Int,
+    val previewBytes: ByteArray?,
+    val status: LocalImagePreviewStatus = LocalImagePreviewStatus.Uploading,
+) {
+    val displayMimeType: String
+        get() = when (mimeType.lowercase()) {
+            "image/jpeg" -> "JPEG"
+            "image/png" -> "PNG"
+            "image/webp" -> "WebP"
+            else -> "图片"
+        }
+
+    val displaySize: String
+        get() = if (sizeBytes >= 1024 * 1024) {
+            "${sizeBytes / (1024 * 1024)} MB"
+        } else {
+            "${(sizeBytes / 1024).coerceAtLeast(1)} KB"
+        }
+
+    companion object {
+        fun fromPayload(
+            messageId: String,
+            payload: PhotoUploadPayload,
+        ): LocalImagePreviewCardUiState {
+            return LocalImagePreviewCardUiState(
+                messageId = messageId,
+                mimeType = payload.mimeType,
+                sizeBytes = payload.bytes.size,
+                previewBytes = payload.previewBytes,
+            )
+        }
+    }
+}
 
 const val IMAGE_PURPOSE_SHARE = "share"
 const val IMAGE_PURPOSE_HOMEWORK = "learning_homework"

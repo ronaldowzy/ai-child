@@ -83,6 +83,7 @@ unsafe_unknown
 4. 作业题走 learning.homework_help。
 5. 隐私敏感图片描述走 privacy.boundary。
 6. 普通分享成功后暂存 pendingImageContext，后续快捷动作带上 attachment_id 和图片摘要。
+7. 系统相机/相册图片发送后，儿童消息区显示本地临时图片确认卡；优先显示压缩缩略图，缺缩略图时显示图片类型/大小和发送状态。
 ```
 
 ---
@@ -123,4 +124,16 @@ unsafe_unknown
 4. Prompt 中会说明孩子刚刚分享了一张图片、图片描述和孩子说明；如果不是作业题，不把它当成作业。
 5. 隐私图片的后续追问仍进入 privacy.boundary。
 6. 不保存原始照片；只使用 mock 识别摘要和孩子说明。
+```
+
+## 8. Task 03 thin slice：具体看见 + 本地确认卡
+
+已落实规则：
+
+```text
+1. 普通非作业图片在 recognized_content.type=image_observation、置信度足够且文字安全具体时，首句会带一个短具体细节，例如“一个积木城堡 / 窗边的灯”。
+2. 低置信度、缺文字、unsafe_unknown 或过于笼统时，不假装看见，改为请孩子告诉小白狐想看哪里。
+3. privacy_sensitive 和 learning_homework 路径保持原安全/学习分支；学习题仍先问题意或卡点，不直接给答案。
+4. Android 只把本地预览作为儿童端临时 UI 确认，不把本地路径放进模型 prompt；上传文件名会去掉本地目录。
+5. 本轮未接 CameraX，仍使用系统相机/相册；Redmi K60 / Honor Pad 5 真实拍照、相册、缩略图和失败态 QA 仍待验。
 ```

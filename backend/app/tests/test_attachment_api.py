@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import conversation_attachment as attachment_api
 from app.core.config import Settings
+from app.domain.attachment import ImagePurpose, RecognizedContent
 from app.domain.model_types import ModelRequest, ModelResponse
 from app.main import app
 from app.repositories.attachment_repository import (
@@ -9,6 +10,7 @@ from app.repositories.attachment_repository import (
     get_attachment_repository,
 )
 from app.services.attachment_service import AttachmentService
+from app.services.modality_manager import ModalityManager
 
 
 client = TestClient(app)
@@ -249,10 +251,34 @@ def test_conversation_attachment_accepts_generic_image_share() -> None:
     assert body["recognized_content"]["type"] == "image_observation"
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
-    assert body["reply"]["text"] == "我看到这张图啦。你想让我陪你聊聊它，还是说说你想问哪里？"
+    assert "积木城堡" in body["reply"]["text"]
+    assert "哪里最有意思" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "encourage"
-    assert "积木城堡" not in body["reply"]["text"]
     assert "这道题" not in body["reply"]["text"]
+
+
+def test_generic_image_low_confidence_does_not_pretend_to_see_detail() -> None:
+    response = client.post(
+        "/api/v1/conversation/attachment",
+        json={
+            "child_id": "child_attachment_api_test",
+            "session_id": "attachment_api_low_image_session",
+            "attachment_type": "image",
+            "image_purpose": "share",
+            "file_id": "mock_unclear_toy_photo",
+            "mock_vision_text": "一个积木城堡",
+            "child_caption": "你看我搭的这个",
+            "mock_confidence": 0.41,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["recognized_content"]["type"] == "image_observation"
+    assert body["session_state"]["active_scene"] == "conversation.open"
+    assert "看得还不太清楚" in body["reply"]["text"]
+    assert "积木城堡" not in body["reply"]["text"]
 
 
 def test_generic_photo_with_homework_like_text_stays_image_context() -> None:
@@ -277,7 +303,7 @@ def test_generic_photo_with_homework_like_text_stays_image_context() -> None:
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
     assert body["session_state"].get("needs_input") is None
-    assert body["reply"]["text"] == "我看到这张图啦。你想让我陪你聊聊它，还是说说你想问哪里？"
+    assert "看得还不太清楚" in body["reply"]["text"]
     assert "这道题是在问什么" not in body["reply"]["text"]
 
 
@@ -304,9 +330,34 @@ def test_generic_image_attachment_reply_does_not_echo_long_vision_text() -> None
     body = response.json()
 
     assert body["recognized_content"]["text"].startswith("这是一段很长的图片识别内容")
-    assert body["reply"]["text"] == "我看到这张图啦。你想让我陪你聊聊它，还是说说你想问哪里？"
+    assert "图片识别内容" in body["reply"]["text"]
     assert "分类判断" not in body["reply"]["text"]
-    assert len(body["reply"]["text"]) <= 40
+    assert len(body["reply"]["text"]) <= 70
+
+
+def test_image_detail_helper_strips_labels_and_blocks_private_details() -> None:
+    manager = ModalityManager()
+    safe_detail = manager._child_visible_image_detail(
+        RecognizedContent(
+            type="image_observation",
+            text="child_summary: 图里有一个窗边的灯。context_summary: 后面还有很多细节。",
+            confidence=0.92,
+            provider_name="mock_ocr",
+            image_purpose=ImagePurpose.SHARE,
+        )
+    )
+    private_detail = manager._child_visible_image_detail(
+        RecognizedContent(
+            type="image_observation",
+            text="图片描述：纸上写着电话 138 0000 0000 和学校名字。",
+            confidence=0.92,
+            provider_name="mock_ocr",
+            image_purpose=ImagePurpose.SHARE,
+        )
+    )
+
+    assert safe_detail == "一个窗边的灯"
+    assert private_detail is None
 
 
 def test_generic_image_context_can_continue_in_conversation() -> None:

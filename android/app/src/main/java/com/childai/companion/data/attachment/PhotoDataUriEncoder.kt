@@ -12,11 +12,14 @@ data class PhotoUploadPayload(
     val bytes: ByteArray,
     val mimeType: String = "image/jpeg",
     val fileName: String = "xiaobaohu_photo.jpg",
+    val previewBytes: ByteArray? = null,
 )
 
 object PhotoUploadPreparer {
     private const val MAX_DIMENSION = 1280
+    private const val PREVIEW_MAX_DIMENSION = 360
     private const val DEFAULT_JPEG_QUALITY = 82
+    private const val PREVIEW_JPEG_QUALITY = 68
     private const val MAX_IMAGE_BYTES = 4_800_000
     private const val MAX_SOURCE_BYTES = 16_000_000
 
@@ -31,6 +34,7 @@ object PhotoUploadPreparer {
             bytes = jpegBytes,
             mimeType = "image/jpeg",
             fileName = fileName,
+            previewBytes = createPreviewJpeg(bitmap),
         )
     }
 
@@ -52,6 +56,7 @@ object PhotoUploadPreparer {
             bytes = jpegBytes,
             mimeType = "image/jpeg",
             fileName = fileName,
+            previewBytes = createPreviewJpeg(bitmap),
         )
     }
 
@@ -105,5 +110,27 @@ object PhotoUploadPreparer {
             error("photo is too large after compression")
         }
         return bytes
+    }
+
+    private fun createPreviewJpeg(bitmap: Bitmap): ByteArray {
+        val previewBitmap = if (max(bitmap.width, bitmap.height) <= PREVIEW_MAX_DIMENSION) {
+            bitmap
+        } else {
+            val scale = PREVIEW_MAX_DIMENSION.toFloat() /
+                max(bitmap.width, bitmap.height).toFloat()
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt().coerceAtLeast(1),
+                (bitmap.height * scale).toInt().coerceAtLeast(1),
+                true,
+            )
+        }
+        return ByteArrayOutputStream().use { output ->
+            previewBitmap.compress(Bitmap.CompressFormat.JPEG, PREVIEW_JPEG_QUALITY, output)
+            if (previewBitmap !== bitmap) {
+                previewBitmap.recycle()
+            }
+            output.toByteArray()
+        }
     }
 }

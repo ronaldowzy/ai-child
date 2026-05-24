@@ -1,15 +1,20 @@
 package com.childai.companion.ui.chat
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,7 +29,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -45,6 +54,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -349,8 +361,9 @@ private fun ChatConversationPanel(
         action.id == "take_photo" || action.id == "share_photo"
     }
     Column(modifier = modifier) {
-        MessageList(
+        ChatMessageListWithPreviews(
             messages = uiState.messages,
+            imagePreviewCards = uiState.imagePreviewCards,
             modifier = Modifier.weight(1f),
         )
         if (visibleQuickActions.isNotEmpty()) {
@@ -365,6 +378,152 @@ private fun ChatConversationPanel(
             Spacer(modifier = Modifier.height(10.dp))
             SessionStateStrip(sessionState = sessionState)
         }
+    }
+}
+
+@Composable
+private fun ChatMessageListWithPreviews(
+    messages: List<ChatMessage>,
+    imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+    val lastPreviewStatus = messages.lastOrNull()
+        ?.id
+        ?.let { imagePreviewCards[it]?.status }
+    LaunchedEffect(messages.lastOrNull()?.id, messages.lastOrNull()?.text, lastPreviewStatus) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 8.dp),
+    ) {
+        items(
+            items = messages,
+            key = { message -> message.id },
+        ) { message ->
+            ChatMessageBubbleWithPreview(
+                message = message,
+                imagePreview = imagePreviewCards[message.id],
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatMessageBubbleWithPreview(
+    message: ChatMessage,
+    imagePreview: LocalImagePreviewCardUiState?,
+) {
+    val isChild = message.author == MessageAuthor.Child
+    val bubbleColor = if (isChild) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val textColor = if (isChild) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val alignment = if (isChild) Alignment.CenterEnd else Alignment.CenterStart
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = alignment,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(bubbleColor)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(
+                text = if (isChild) "我" else "小白狐",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor.copy(alpha = 0.78f),
+            )
+            imagePreview?.let { preview ->
+                LocalImagePreviewCard(
+                    preview = preview,
+                    childBubble = isChild,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Text(
+                text = message.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = textColor,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalImagePreviewCard(
+    preview: LocalImagePreviewCardUiState,
+    childBubble: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val previewBitmap = remember(preview.previewBytes) {
+        preview.previewBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    val contentColor = if (childBubble) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val statusText = when (preview.status) {
+        LocalImagePreviewStatus.Uploading -> "图片正在给小白狐看"
+        LocalImagePreviewStatus.Sent -> "图片已发送给小白狐"
+        LocalImagePreviewStatus.Failed -> "图片没有传好"
+    }
+    val cardColor = if (childBubble) {
+        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(cardColor)
+            .border(
+                width = 1.dp,
+                color = contentColor.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(8.dp),
+            )
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (previewBitmap != null) {
+            Image(
+                bitmap = previewBitmap,
+                contentDescription = "刚才发送的图片",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(112.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            )
+        }
+        Text(
+            text = "$statusText · ${preview.displayMimeType} · ${preview.displaySize}",
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

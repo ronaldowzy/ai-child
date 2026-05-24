@@ -1,9 +1,9 @@
 package com.childai.companion.data.attachment
 
-class AttachmentRepository(
+open class AttachmentRepository(
     private val apiClient: AttachmentApiClient = AttachmentApiClient(),
 ) {
-    suspend fun createCapturedImage(
+    open suspend fun createCapturedImage(
         childId: String,
         sessionId: String,
         imageBytes: ByteArray,
@@ -23,7 +23,7 @@ class AttachmentRepository(
         )
     }
 
-    suspend fun createMockHomeworkPhoto(
+    open suspend fun createMockHomeworkPhoto(
         childId: String,
         sessionId: String,
         mockOcrText: String,
@@ -41,7 +41,7 @@ class AttachmentRepository(
         )
     }
 
-    suspend fun createMockImageShare(
+    open suspend fun createMockImageShare(
         childId: String,
         sessionId: String,
         mockVisionText: String,

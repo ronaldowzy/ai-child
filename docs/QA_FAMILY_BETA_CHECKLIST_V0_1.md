@@ -18,14 +18,41 @@ APK sha256=...
 
 Do not paste screenshots containing real child photos, real names, raw transcripts, or provider keys.
 
+## Task 08 evidence collection protocol
+
+Task 08 round 2 status: no new Redmi K60 / Honor Pad 5 video, backend `request_id`, or Android `XiaobaohuTtsTiming` logcat evidence was available in this Codex run. Lane B/C/D fixes remain skipped until a concrete device symptom is linked to evidence.
+
+For the next real-device round, collect only non-sensitive evidence:
+
+```text
+1. Install the Task 08 APK from `android/app/build/outputs/apk/debug/app-debug.apk`.
+2. Start the backend on the Mac LAN URL used at build time: `http://192.168.0.118:8000/`.
+3. For one slow synthetic turn, record the backend `request_id` from response headers or backend logs.
+4. Around the same turn, capture Android timing lines with:
+   `adb logcat -v time | grep XiaobaohuTtsTiming`
+5. Preserve backend timing log names and request_id only:
+   `conversation_turn_latency`, `conversation_stream_finished`, `request_id`, `model_ms`, `tts_ms`, `first_text_ms`, `tts_started_ms`, `first_audio_ms`, `turn_total_ms`.
+6. Record video timestamps such as `Redmi K60 video 00:01:23`, without uploading raw child audio, raw child photos, private names, full child transcript, full assistant reply, parent_message_raw, provider keys, DB dumps, or full signed media URLs.
+```
+
+Slow-turn classification rules:
+
+```text
+model_ms high -> model/provider generation delay.
+tts_ms or first_audio_ms high -> backend TTS generation or audio_ready delay.
+remote_audio_url_received to remote_audio_playback_started high -> Android download/prepare/playback delay.
+remote_audio_error -> network/media playback failure.
+No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
+```
+
 ## 1. Build and environment
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. | 2026-05-24 doctor OK for conda/JDK/Android SDK/adb; adb reported no connected physical device. | PASS | local terminal | Automated smoke only; not device QA. |
-| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. | `cd backend && conda run -n child-ai pytest`: 417 passed. Bare `pytest` was not on shell PATH, so standard conda env was used. | PASS | local terminal | No real provider key in output. |
-| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test`. | JVM tests pass. | `cd android && ./gradlew test`: BUILD SUCCESSFUL. | PASS | local terminal | Does not replace device QA. |
-| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. | 2026-05-24 PASS with base URL `http://192.168.0.118:8000/`; size 16471142; sha256 `a666007b69be16efc1651b7246362d9b3a8755ee2c39856ffa0c02b45ec4c074`. | PASS | local terminal | Rebuild after backend URL changes; no install attempted because no device connected. |
+| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. | 2026-05-24 Task 08 doctor OK for conda/JDK/Android SDK/adb; LAN IP `192.168.0.118`; adb reported no connected physical Android device. | PASS | local terminal | Automated smoke only; not device QA. |
+| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. | 2026-05-24 Task 08: `cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m pytest` -> 428 passed. | PASS | local terminal | No real provider key in output. |
+| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test` or the standard wrapper. | JVM tests pass. | 2026-05-24 Task 08: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL. | PASS | local terminal | Does not replace device QA. |
+| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. | 2026-05-24 Task 08 Lane A PASS with base URL `http://192.168.0.118:8000/`; path `android/app/build/outputs/apk/debug/app-debug.apk`; size 16471142; sha256 `811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86`; source code commit before Lane A docs closeout `a0255d79647eaecd86013ed90a7063f259e10dcf`. | PASS | local terminal | No install attempted because no device connected. Rebuild after backend URL changes or app code changes. |
 
 ## 2. Backend health and PostgreSQL
 
@@ -211,6 +238,30 @@ Backend tests: `bash scripts/test_backend.sh` -> 428 passed; `bash scripts/lint_
 Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL; `bash scripts/android_gradle.sh assembleDebug` -> BUILD SUCCESSFUL.
 Real-device QA: NOT_RUN; doctor reported no attached physical Android device.
 Device QA required: Redmi K60 / Honor Pad 5 for hidden schedule save/load, shift chip layout, TTS log collection, slow-turn diagnosis, and father report CS/game readability.
+```
+
+## 18. Task 08 real-device QA round 2 package snapshot
+
+```text
+Date: 2026-05-24
+Scope: Lane A only. No new Redmi K60 / Honor Pad 5 video, backend request_id, or Android XiaobaohuTtsTiming logcat evidence was available, so Lane B/C/D code fixes were skipped.
+Source code commit before Lane A docs closeout: a0255d79647eaecd86013ed90a7063f259e10dcf
+Backend tests: `cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m pytest` -> 428 passed.
+Backend lint: `cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m ruff check .` -> All checks passed.
+Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
+Android build: `bash scripts/android_gradle.sh assembleDebug` -> BUILD SUCCESSFUL.
+Device APK build: `bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/` -> PASS.
+APK path: android/app/build/outputs/apk/debug/app-debug.apk
+APK base URL: http://192.168.0.118:8000/
+APK size: 16471142 bytes
+APK sha256: 811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86
+Device connection: adb available; no connected physical Android device.
+Slow-turn latency classification: NOT_RUN because no matching request_id + XiaobaohuTtsTiming logcat + video/timestamp evidence exists.
+P0 issues: none observed in this run.
+P1 issues: none observed in this run.
+P2 issues: none observed in this run; device layout/audio/report naturalness still unvalidated.
+P3 issues: git reported loose-object gc housekeeping warnings; not product/runtime blocking.
+Remaining NOT_RUN QA: all Redmi K60 / Honor Pad 5 device rows in sections 3-14, especially QA-TTS-06, QA-TOPIC-03, QA-SETTINGS-04, QA-REPORT-07, QA-DEVICE-RK60-01/02, and QA-DEVICE-HP5-01/02.
 ```
 
 ## Closeout rules

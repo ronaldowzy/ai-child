@@ -88,12 +88,51 @@ The current backend is local-first and test-stage real-path focused:
   signals, age band, scene, latency, request_id, and hashed IDs only; they must
   not contain full child text, full assistant text, raw audio, raw images,
   parent_message_raw, provider keys, or full provider bodies.
+- Task 08 Lane A prepared the next real-device QA package only. No new Redmi
+  K60 / Honor Pad 5 video, backend request_id, or Android
+  `XiaobaohuTtsTiming` logcat evidence was available in that run, so no
+  evidence-based Lane B/C/D fixes were made.
 
 If Android replies look like fixed templates such as “听起来可以聊”, the backend
 is probably not running the intended real chat provider for the current QA
 target. Restart with the temporary environment variables in the Mimo section
 below when needed; do not put the real API key into git, Android, docs, tests,
 or screenshots.
+
+## Task 08 Device QA Evidence
+
+Latest Task 08 Lane A APK package:
+
+```text
+path=android/app/build/outputs/apk/debug/app-debug.apk
+base_url=http://192.168.0.118:8000/
+size_bytes=16471142
+sha256=811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86
+source_code_commit_before_docs_closeout=a0255d79647eaecd86013ed90a7063f259e10dcf
+```
+
+For one slow synthetic TTS turn, collect backend timing and Android playback
+timing for the same request:
+
+```bash
+bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+adb logcat -v time | grep XiaobaohuTtsTiming
+```
+
+Use the backend `request_id` to align these logs:
+
+- `conversation_turn_latency`: non-stream `model_ms`, `tts_ms`,
+  `audio_url_present`, `turn_total_ms`.
+- `conversation_stream_finished`: stream `first_text_ms`, `tts_started_ms`,
+  `first_audio_ms`, `turn_total_ms`.
+- Android `XiaobaohuTtsTiming`: `remote_audio_url_received`,
+  `remote_audio_playback_started`, `remote_audio_playback_done`, or
+  `remote_audio_error`, with request/turn id and elapsed milliseconds.
+
+Evidence must stay non-sensitive: request_id, timing fields, log paths, and
+video timestamps are acceptable. Do not paste child text, full assistant text,
+raw audio, raw photos, parent_message_raw, provider keys, DB dumps, or full
+signed media URLs.
 
 ## Current Voice And Presentation Contract
 

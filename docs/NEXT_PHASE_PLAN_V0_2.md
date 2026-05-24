@@ -52,6 +52,7 @@ Task 05 known issues / next actions:
 8. Task 06 topic shift naturalness NOT_VALIDATED；负责人：后端/prompt + 父亲；下一步：用 synthetic game/sports/art 话题和真机视频观察是否过早换题。
 9. Task 06 father settings/report UI NOT_DEVICE_QA；负责人：Android/父亲；下一步：在 Redmi K60 / Honor Pad 5 检查设置页输入、日报信息层级和小白狐 phase chip 横屏布局。
 10. Task 07 closeout NOT_DEVICE_QA；负责人：Android/后端/父亲；下一步：在真机上验证隐藏 schedule 不影响保存、换题 chips 不挤压 voice-first 控件、TTS backend/logcat timing 能定位慢在 model/TTS/audio playback 哪一段、CS/game 父亲日报摘要自然且不展示 raw transcript。
+11. Task 08 round 2 Lane A package ready；负责人：父亲/设备测试；下一步：安装 sha256 `811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86` 的 debug APK，按 QA checklist 采集同一慢 turn 的 backend `request_id`、backend timing、`adb logcat -v time | grep XiaobaohuTtsTiming` 和视频时间点。没有这些真机证据前，Lane B/C/D 保持跳过，不做猜测式修复。
 ```
 
 ---

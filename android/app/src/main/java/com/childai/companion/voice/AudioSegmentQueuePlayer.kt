@@ -4,6 +4,8 @@ data class AudioSegment(
     val audioUrl: String?,
     val text: String,
     val index: Int,
+    val requestId: String? = null,
+    val turnId: String? = null,
 )
 
 data class AudioSegmentQueueCallbacks(
@@ -65,6 +67,9 @@ class AudioSegmentQueuePlayer(
                 audioUrl = next.audioUrl,
                 backendBaseUrl = backendBaseUrl,
                 voiceProfile = VoiceProfile.default(),
+                requestId = next.requestId,
+                turnId = next.turnId,
+                segmentIndex = next.index,
             ),
             callbacks = TtsCallbacks(
                 onDiagnostics = callbacks.onDiagnostics,

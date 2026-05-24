@@ -214,6 +214,7 @@ ChildChatScreen 首次可见
 14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败时保留文字和温和错误提示，不再 fallback 到系统 TextToSpeech。
 15. 真实设备听感、远程音频播放、停止/静音按钮可发现性、延迟和 Honor Pad 5 低配表现仍需 QA；不应把本轮写成语音体验全部完成。
 16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式和 TTS 分句/分段播放设计。
+17. Task 07 已增加 TTS latency observability：非 stream `/conversation/message` 日志记录 `conversation_turn_latency`，包含 `request_id`、`request_start`、`model_ms`、`tts_ms`、`audio_url_present`、`turn_total_ms`；stream 日志记录 `conversation_stream_finished`，包含 `request_start`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`turn_total_ms`。Android logcat 使用 `XiaobaohuTtsTiming` 记录 remote audio URL received / playback started / done / error，包含 request_id、turn_id、segment_index、elapsed_ms，不显示给儿童。
 ```
 
 ### 5.3 Streaming Voice Direction
@@ -584,6 +585,7 @@ TTS 自然度主观评价
 | VQA-18 | TTS 数据策略 | MiMo VoiceClone 未显式开启 allow child text 和 retention checked 时不能调用外部 provider |
 | VQA-19 | Opening greeting | App 打开后小白狐请求一次 opening；有小名喊小名，有 display name 用 display name，都没有不强行称呼 |
 | VQA-20 | Opening 不打断孩子 | 如果孩子先点击语音或发送文本，迟到的 opening 不插入、不覆盖孩子消息 |
+| VQA-21 | TTS perceived latency breakdown | 记录一次慢 turn 的后端 `request_id`，同时抓 `app.conversation` / `app.stream_timing` / `app.tts_timing` 和 Android `XiaobaohuTtsTiming` logcat；用 `model_ms`、`tts_ms`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`elapsed_ms` 区分模型、TTS 生成、stream audio_ready 和 Android 播放启动延迟 |
 
 语音体验 QA 记录必须包含：
 
@@ -594,4 +596,5 @@ TTS 自然度主观评价
 4. 儿童声音识别效果。
 5. 后端 VoiceClone 的自然度；系统 TTS 不作为儿童端自动朗读 fallback 评分项。
 6. 孩子接受度。
+7. 如果觉得小白狐开口慢，记录 request_id、turn_id、backend timing 日志和 Android logcat；证据只保留 ID、耗时和状态，不记录儿童原文、完整回复、原始音频或完整 audio URL。
 ```

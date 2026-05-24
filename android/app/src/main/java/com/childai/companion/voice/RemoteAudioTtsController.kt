@@ -1,13 +1,22 @@
 package com.childai.companion.voice
 
+import android.util.Log
+
 class RemoteAudioTtsController(
     private val audioUrlPlayer: AudioUrlPlayer,
     private val fallbackController: TtsController,
     private val backendBaseUrl: String,
 ) : TtsController {
     override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
+        val requestedAtMs = System.currentTimeMillis()
         val audioUrl = request.audioUrl?.trim().orEmpty()
         if (audioUrl.isBlank()) {
+            logTiming(
+                event = "remote_audio_url_missing",
+                request = request,
+                requestedAtMs = requestedAtMs,
+                result = "missing",
+            )
             callbacks.onDiagnostics(
                 VoiceDiagnostics(
                     isAvailable = false,
@@ -28,6 +37,12 @@ class RemoteAudioTtsController(
             audioUrl = audioUrl,
             backendBaseUrl = request.backendBaseUrl ?: backendBaseUrl,
         )
+        logTiming(
+            event = "remote_audio_url_received",
+            request = request,
+            requestedAtMs = requestedAtMs,
+            result = "pending",
+        )
         callbacks.onDiagnostics(
             VoiceDiagnostics(
                 isAvailable = true,
@@ -41,6 +56,12 @@ class RemoteAudioTtsController(
         )
 
         fun reportRemoteAudioError(reason: String): Boolean {
+            logTiming(
+                event = "remote_audio_error",
+                request = request,
+                requestedAtMs = requestedAtMs,
+                result = reason,
+            )
             callbacks.onDiagnostics(
                 VoiceDiagnostics(
                     isAvailable = false,
@@ -61,6 +82,12 @@ class RemoteAudioTtsController(
             url = resolvedUrl,
             callbacks = AudioUrlPlayerCallbacks(
                 onStart = {
+                    logTiming(
+                        event = "remote_audio_playback_started",
+                        request = request,
+                        requestedAtMs = requestedAtMs,
+                        result = "playing",
+                    )
                     callbacks.onDiagnostics(
                         VoiceDiagnostics(
                             isAvailable = true,
@@ -74,7 +101,15 @@ class RemoteAudioTtsController(
                     )
                     callbacks.onStart()
                 },
-                onDone = callbacks.onDone,
+                onDone = {
+                    logTiming(
+                        event = "remote_audio_playback_done",
+                        request = request,
+                        requestedAtMs = requestedAtMs,
+                        result = "done",
+                    )
+                    callbacks.onDone()
+                },
                 onError = { reason ->
                     reportRemoteAudioError(reason)
                 },
@@ -96,6 +131,28 @@ class RemoteAudioTtsController(
     }
 
     companion object {
+        private const val TAG = "XiaobaohuTtsTiming"
+
+        private fun logTiming(
+            event: String,
+            request: TtsRequest,
+            requestedAtMs: Long,
+            result: String,
+        ) {
+            runCatching {
+                Log.i(
+                    TAG,
+                    "event=$event" +
+                        " request_id=${request.requestId.orEmpty()}" +
+                        " turn_id=${request.turnId.orEmpty()}" +
+                        " segment_index=${request.segmentIndex ?: -1}" +
+                        " elapsed_ms=${System.currentTimeMillis() - requestedAtMs}" +
+                        " audio_url_present=${!request.audioUrl.isNullOrBlank()}" +
+                        " result=$result",
+                )
+            }
+        }
+
         fun resolveAudioUrl(audioUrl: String, backendBaseUrl: String): String {
             val trimmedAudioUrl = audioUrl.trim()
             if (

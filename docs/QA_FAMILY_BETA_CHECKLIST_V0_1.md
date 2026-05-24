@@ -61,6 +61,7 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-SETTINGS-01 | Child profile fields | In father settings, enter fictional nickname, age, optional grade, call preference, interests, and topic boundaries. | Settings save successfully; child age/profile context affects later prompt metadata without exposing parent raw notes to child UI. |  | NOT_RUN |  | Do not use real child name or private family details. |
 | QA-SETTINGS-02 | Visible schedule deemphasis | Open father settings. | 放学后/作业/睡前 time ranges are not the main visible v0.1 setup burden; time remains gentle context only. |  | NOT_RUN |  | Existing backend schedule compatibility remains. |
 | QA-SETTINGS-03 | Invalid age | Enter age outside 5-10. | UI asks for 5-10 or blank; no crash. |  | NOT_RUN |  |  |
+| QA-SETTINGS-04 | Hidden schedule closeout | Save settings after backend already has a synthetic custom schedule. | Save succeeds even if hidden schedule UI defaults are not visible; existing schedule is preserved and hidden default times are not re-saved as a side effect. |  | NOT_RUN |  | Automated ViewModel test covers this; device still needs save/load QA. |
 
 ## 5. Voice-first ASR: permission, recording, auto-send, retry, cancel
 
@@ -82,6 +83,7 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-TTS-03 | Stop speaking | During SpeakingPending/Speaking tap “停一下”. | Current playback and segment queue stop; 小白狐 returns to base/Ready state. |  | NOT_RUN |  |  |
 | QA-TTS-04 | Mute/unmute | Toggle “静音/打开朗读”. | Muted state prevents subsequent auto playback; unmuted resumes future turns only. |  | NOT_RUN |  |  |
 | QA-TTS-05 | Remote failure | Break media URL or disable TTS provider. | Child sees gentle text/failure state; no Android system TTS fallback or mixed system voice. |  | NOT_RUN |  |  |
+| QA-TTS-06 | Perceived latency breakdown | For one slow synthetic turn, record backend request_id and Android logcat around the turn. | Backend has model/TTS/stream timing; Android has `XiaobaohuTtsTiming` URL received/start/done/error lines with request_id or turn_id; evidence contains IDs and timings only. |  | NOT_RUN |  | Do not paste child text, full reply, raw audio, parent_message_raw, provider key, or complete signed audio URL. |
 
 ## 7. Xiaobaihu state coverage
 
@@ -111,6 +113,7 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-THROTTLE-01 | Consecutive questions | Run ordinary chat where 小白狐 already asked two questions. | Next reply responds/settles instead of adding another question hook. |  | NOT_RUN |  | Check healthy_engagement log fields. |
 | QA-TOPIC-01 | Same topic low engagement | Use a synthetic game/CS or sports topic for 3+ turns, then give a short flat reply. | 小白狐 offers a gentle topic shift with curated seeds instead of deeper interview. |  | NOT_RUN |  | Evidence should be request_id/video timestamp, not raw text. |
 | QA-TOPIC-02 | Engaged same topic | Use a synthetic topic where the child gives longer engaged replies. | 小白狐 may continue naturally; topic shift should not fire too early. |  | NOT_RUN |  |  |
+| QA-TOPIC-03 | Idle shift chips | After a completed turn with no backend quick actions, inspect Ready/Resting child chat. | Small chips may show “换个轻松话题”、safe seed labels, and “拍给小白狐看”; they do not cover voice/TTS controls or look like tasks/rewards. |  | NOT_RUN |  | Local fallback chips only; no live web/trend fetch. |
 
 ## 9. Image sharing
 
@@ -142,6 +145,7 @@ Do not paste screenshots containing real child photos, real names, raw transcrip
 | QA-REPORT-04 | Tonight bridge | Inspect top bridge. | Bridge is a concrete real-life suggestion, not surveillance or a demand. |  | NOT_RUN |  |  |
 | QA-REPORT-05 | Topic/content summary | Generate a report after synthetic game/image/learning turns. | Topic cards summarize content and intent without quoting child原文. |  | NOT_RUN |  |  |
 | QA-REPORT-06 | Avoid follow-up | Inspect “今晚先不追问”. | It tells father what not to over-ask, including old topics or answer chasing when relevant. |  | NOT_RUN |  |  |
+| QA-REPORT-07 | CS/game summary | Generate a report from a synthetic CS/game conversation with friends/team/map/loss/short replies. | Report summarizes topic/content at a high level, gives a concrete tonight bridge, includes avoid_followup, and does not show raw transcript/provider/debug/scoring wording. |  | NOT_RUN |  | Automated synthetic test covers backend summary; parent UI device reading still pending. |
 
 ## 12. Healthy Engagement boundaries
 
@@ -196,6 +200,17 @@ Backend tests: `bash scripts/test_backend.sh` -> 424 passed; `bash scripts/lint_
 Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
 Real-device QA: NOT_RUN; earlier doctor reported no attached physical Android device.
 Device QA required: Redmi K60 / Honor Pad 5 for settings readability, topic shift naturalness, father report hierarchy, and 小白狐 phase chip/layout.
+```
+
+## 17. Task 07 automated closeout snapshot
+
+```text
+Date: 2026-05-24
+Scope: parent schedule closeout; reviewed age-aware topic seed pack; child-facing idle shift chips; TTS latency observability; CS/game parent report summary hardening.
+Backend tests: `bash scripts/test_backend.sh` -> 428 passed; `bash scripts/lint_backend.sh` -> All checks passed.
+Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL; `bash scripts/android_gradle.sh assembleDebug` -> BUILD SUCCESSFUL.
+Real-device QA: NOT_RUN; doctor reported no attached physical Android device.
+Device QA required: Redmi K60 / Honor Pad 5 for hidden schedule save/load, shift chip layout, TTS log collection, slow-turn diagnosis, and father report CS/game readability.
 ```
 
 ## Closeout rules

@@ -144,30 +144,9 @@ class ParentPolicyViewModel(
             }
             return
         }
-        if (!form.hasValidTimes()) {
-            _uiState.update {
-                it.copy(errorMessage = "作息时间请使用 HH:MM 格式。")
-            }
-            return
-        }
 
         val basePolicy = loadedPolicy
-        val schedule = (basePolicy?.schedule ?: defaultParentSchedule())
-            .withEntryTimes(
-                period = "after_school",
-                start = form.afterSchoolStart,
-                end = form.afterSchoolEnd,
-            )
-            .withEntryTimes(
-                period = "homework_time",
-                start = form.homeworkStart,
-                end = form.homeworkEnd,
-            )
-            .withEntryTimes(
-                period = "bedtime",
-                start = form.bedtimeStart,
-                end = form.bedtimeEnd,
-            )
+        val schedule = basePolicy?.schedule ?: defaultParentSchedule()
         val request = ParentPolicyUpdateRequest(
             childId = DevSettings.CHILD_ID,
             childNickname = form.childNickname.trim(),
@@ -292,16 +271,6 @@ data class ParentPolicyFormState(
         return age in 5..10
     }
 
-    fun hasValidTimes(): Boolean {
-        return listOf(
-            afterSchoolStart,
-            afterSchoolEnd,
-            homeworkStart,
-            homeworkEnd,
-            bedtimeStart,
-            bedtimeEnd,
-        ).all { TIME_PATTERN.matches(it) }
-    }
 }
 
 private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
@@ -380,5 +349,3 @@ private fun Map<String, Any>.booleanValue(key: String, fallback: Boolean): Boole
         else -> fallback
     }
 }
-
-private val TIME_PATTERN = Regex("^\\d{2}:\\d{2}$")

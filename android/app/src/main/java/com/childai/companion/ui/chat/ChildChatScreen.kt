@@ -379,6 +379,16 @@ private fun ChatConversationPanel(
                 enabled = !uiState.isSending,
                 onQuickAction = onQuickAction,
             )
+        } else {
+            val topicShiftActions = topicShiftChipActions(uiState)
+            if (topicShiftActions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                QuickActionsRow(
+                    actions = topicShiftActions,
+                    enabled = !uiState.isSending,
+                    onQuickAction = onQuickAction,
+                )
+            }
         }
         if (DevSettings.SHOW_SESSION_STATE_DEBUG) uiState.sessionState?.let { sessionState ->
             Spacer(modifier = Modifier.height(10.dp))
@@ -604,6 +614,28 @@ internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMP
 
 internal fun parentEntryLongPressTargets(): List<ParentEntryTarget> =
     listOf(ParentEntryTarget.Report, ParentEntryTarget.Settings)
+
+internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
+    val phase = uiState.interactionPresentation.phase
+    val canSuggest = phase == ChildTurnUiPhase.Ready ||
+        phase == ChildTurnUiPhase.Resting ||
+        phase == ChildTurnUiPhase.NeedsRetry
+    if (
+        !canSuggest ||
+        uiState.isSending ||
+        uiState.quickActions.isNotEmpty() ||
+        uiState.pendingImageContext != null ||
+        uiState.messages.size <= initialChatMessages().size
+    ) {
+        return emptyList()
+    }
+    return listOf(
+        QuickActionUi(id = "topic_shift", label = "换个轻松话题"),
+        QuickActionUi(id = "topic_seed_drawing", label = "画画或手工"),
+        QuickActionUi(id = "topic_seed_dinosaur_space", label = "恐龙或太空"),
+        QuickActionUi(id = "share_photo", label = "拍给小白狐看"),
+    )
+}
 
 @Composable
 private fun QuickActionsRow(

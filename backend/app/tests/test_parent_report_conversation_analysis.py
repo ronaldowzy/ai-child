@@ -110,13 +110,17 @@ def test_parent_report_extracts_game_topic_content_bridge() -> None:
     service = ParentReportService()
     analysis = service._conversation_analysis(
         [
-            _message(0, "我想聊 CS 的地图。"),
-            _message(1, "队友配合还行。"),
+            _message(0, "我和朋友玩 CS 的地图。"),
+            _message(1, "队友配合还行，最后我们输了。"),
             _message(2, "嗯，随便。"),
         ]
     )
 
     assert "游戏/CS" in analysis["topics"]
-    assert any(item.topic == "游戏/CS" for item in analysis["topic_overview"])
+    game_topic = next(item for item in analysis["topic_overview"] if item.topic == "游戏/CS")
+    assert "地图" in game_topic.summary
+    assert "队友或朋友配合" in game_topic.summary
+    assert "输赢感受" in game_topic.summary
     assert "游戏/CS" in analysis["conversation_summary"][0]
+    assert "输赢感受" in analysis["conversation_summary"][0]
     assert any("时长盘问" in item for item in analysis["avoid_followup"])

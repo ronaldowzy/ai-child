@@ -41,7 +41,7 @@ class MediaPlayerAudioUrlPlayer : AudioUrlPlayer {
                 player.releaseSafely()
             }
             val reason = "remote_audio_prepare_failed ${throwable.javaClass.simpleName}"
-            Log.w(TAG, "Remote audio prepare failed: $url", throwable)
+            Log.w(TAG, "Remote audio prepare failed; url_present=${url.isNotBlank()}", throwable)
             callbacks.onError(reason)
             false
         }

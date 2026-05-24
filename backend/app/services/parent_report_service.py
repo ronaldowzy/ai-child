@@ -874,6 +874,7 @@ class ParentReportService:
         ) or any(self._is_learning_help_text(text) for text in child_texts)
         has_sports_topic = any(self._is_sports_text(text) for text in child_texts)
         has_game_topic = any(self._is_game_text(text) for text in child_texts)
+        game_detail_summary = self._game_detail_summary(child_texts)
         has_topic_change = any(
             self._contains_any(
                 text,
@@ -900,6 +901,8 @@ class ParentReportService:
             expression_observations.append(
                 "孩子今天围绕游戏、地图、队友或规则表达兴趣；父亲可以把它当作普通兴趣入口，不把游戏话题变成盘问或限制谈判。"
             )
+            if game_detail_summary:
+                state_summary.append(game_detail_summary)
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
@@ -970,6 +973,7 @@ class ParentReportService:
                 has_learning=has_learning_topic,
                 has_sports=has_sports_topic,
                 has_game=has_game_topic,
+                game_detail_summary=game_detail_summary,
                 has_topic_change=has_topic_change,
                 has_sports_fatigue=has_sports_fatigue,
                 attachment_count=attachment_count,
@@ -1011,6 +1015,7 @@ class ParentReportService:
         has_learning: bool,
         has_sports: bool,
         has_game: bool,
+        game_detail_summary: str | None,
         has_topic_change: bool,
         has_sports_fatigue: bool,
         attachment_count: int,
@@ -1045,7 +1050,8 @@ class ParentReportService:
                     ParentReportTopicOverview(
                         topic=topic,
                         child_intent="分享游戏里的地图、规则或队友体验",
-                        summary="今天游戏话题更像兴趣表达入口；如果孩子回复变短，后续适合给换题选择。",
+                        summary=game_detail_summary
+                        or "今天游戏话题更像兴趣表达入口；如果孩子回复变短，后续适合给换题选择。",
                         emotion_tone="有兴趣，但可能不想被继续盘问",
                         parent_bridge="今晚可以轻轻接一句游戏里的创意规则，再给孩子换话题自由。",
                     )
@@ -1201,6 +1207,30 @@ class ParentReportService:
         return self._contains_any(
             text,
             ("游戏", "cs", "反恐", "地图", "队友", "排位", "关卡", "打游戏"),
+        )
+
+    def _game_detail_summary(self, child_texts: list[str]) -> str | None:
+        if not any(self._is_game_text(text) for text in child_texts):
+            return None
+        details: list[str] = []
+        if any(self._contains_any(text, ("地图", "沙二", "dust")) for text in child_texts):
+            details.append("地图")
+        if any(
+            self._contains_any(text, ("队友", "朋友", "同学", "组队", "配合"))
+            for text in child_texts
+        ):
+            details.append("队友或朋友配合")
+        if any(
+            self._contains_any(text, ("输了", "输掉", "没赢", "最后输了", "赢了"))
+            for text in child_texts
+        ):
+            details.append("输赢感受")
+        if not details:
+            details.append("规则或玩法")
+        detail_text = "、".join(self._dedupe_and_limit(details, limit=3))
+        return (
+            f"孩子围绕游戏/CS聊到{detail_text}，更像是在分享兴趣和规则理解；"
+            "如果后面回复变短，今晚不适合继续追问时长、输赢或细节。"
         )
 
     def _observations_for(

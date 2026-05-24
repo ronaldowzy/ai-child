@@ -85,6 +85,32 @@ class AudioSegmentQueuePlayerTest {
         assertEquals(1, errors)
         assertEquals(0, player.queuedCount)
     }
+
+    @Test
+    fun segmentPlaybackPropagatesLatencyTraceIds() {
+        val controller = RecordingTtsController(autoComplete = true)
+        val player = AudioSegmentQueuePlayer(
+            ttsController = controller,
+            backendBaseUrl = "http://127.0.0.1:8000/",
+            isMuted = { false },
+            callbacks = AudioSegmentQueueCallbacks(),
+        )
+
+        player.enqueue(
+            AudioSegment(
+                audioUrl = "/media/tts/one.wav",
+                text = "一",
+                index = 3,
+                requestId = "req_trace_001",
+                turnId = "turn_trace_001",
+            ),
+        )
+
+        val request = controller.requests.single()
+        assertEquals("req_trace_001", request.requestId)
+        assertEquals("turn_trace_001", request.turnId)
+        assertEquals(3, request.segmentIndex)
+    }
 }
 
 private class RecordingTtsController(

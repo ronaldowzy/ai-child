@@ -50,7 +50,7 @@ Coordinator 已在 `backend/app/main.py` 注册 stream router；`/api/v1/convers
 
 Ops P0 timing 复用：
 1. 每个 stream 请求仍由 request_id middleware 写入 `X-Request-ID`。
-2. `app.stream_timing` 记录 `conversation_stream_finished`，字段包含 request_id、session_id_hash、active_scene、first_text_ms、first_tts_start_ms、first_audio_ms、stream_total_ms、text_segment_count、tts_segment_count、audio_segment_count、tts_error_count 和 error_type。
+2. `app.stream_timing` 记录 `conversation_stream_finished`，字段包含 request_id、request_start、session_id_hash、active_scene、first_text_ms、first_tts_start_ms、tts_started_ms、first_audio_ms、stream_total_ms、turn_total_ms、text_segment_count、tts_segment_count、audio_segment_count、tts_error_count 和 error_type。`tts_started_ms` 是 `first_tts_start_ms` 的 QA 友好别名，用来和 Android logcat 对齐。
 3. 日志不得记录完整 child text、parent_message_raw、prompt、reply text、TTS segment text、API key 或带签名 query 的 audioUrl。
 ```
 

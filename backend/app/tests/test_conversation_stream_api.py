@@ -737,11 +737,14 @@ def test_stream_timing_log_contains_request_id_and_latency(
     assert record.request_id == "stream-log-request-001"
     assert record.active_scene == "conversation.open"
     assert record.session_id_hash
+    assert record.request_start is not None
     assert record.first_text_ms is not None
     assert record.first_tts_start_ms is not None
+    assert record.tts_started_ms == record.first_tts_start_ms
     assert record.first_audio_ms is not None
     assert record.text_segment_count >= 1
     assert record.stream_total_ms >= record.first_text_ms
+    assert record.turn_total_ms == record.stream_total_ms
     assert record.tts_segment_count >= 1
     assert record.audio_segment_count >= 1
     assert record.tts_error_count == 0

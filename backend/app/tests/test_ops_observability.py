@@ -6,8 +6,14 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.domain.model_types import ModelRequest, ModelTaskType
+from app.domain.schemas.conversation import (
+    ClientContext,
+    ConversationInput,
+    ConversationMessageRequest,
+)
 from app.domain.schemas.tts import XiaobaihuTtsRequest
 from app.main import app
+from app.services.conversation_service import ConversationService
 from app.services.model_registry import ModelRegistry
 from app.services.tts_data_policy_guard import TtsDataPolicyBlockedError
 from app.services.tts_service import TtsService
@@ -111,6 +117,50 @@ def test_model_call_finished_log_does_not_include_prompt_text(
     assert records[-1].model == "mock-child-chat-v0"
     assert records[-1].child_id_hash
     assert records[-1].session_id_hash
+
+
+def test_conversation_latency_log_splits_model_and_tts_without_text(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FixedTtsService:
+        def generate_for_conversation(self, *, text: str, emotion: str) -> str:
+            return "/media/tts/xiaobaohu_v01/fixed.wav"
+
+    child_text = "这句儿童输入不应该进入延迟日志。"
+    caplog.set_level(logging.INFO, logger="app.conversation")
+    service = ConversationService(
+        tts_service=FixedTtsService(),
+        debug_enabled=False,
+        persistence_enabled=False,
+    )
+
+    response = service.handle_message(
+        ConversationMessageRequest(
+            child_id="fictional_latency_child",
+            session_id="fictional_latency_session",
+            input=ConversationInput(text=child_text),
+            client_context=ClientContext(
+                deviceTime="2026-05-24T16:30:00+08:00",
+                timezone="Asia/Shanghai",
+            ),
+        )
+    )
+
+    assert response.reply.audio_url == "/media/tts/xiaobaohu_v01/fixed.wav"
+    assert child_text not in caplog.text
+    records = [
+        record for record in caplog.records
+        if getattr(record, "event", None) == "conversation_turn_latency"
+    ]
+    assert records
+    record = records[-1]
+    assert record.request_start is not None
+    assert record.model_ms >= 0
+    assert record.tts_ms >= 0
+    assert record.turn_total_ms >= record.model_ms
+    assert record.audio_url_present is True
+    assert record.child_id_hash
+    assert record.session_id_hash
 
 
 def test_tts_call_finished_log_does_not_include_api_key_or_full_text(

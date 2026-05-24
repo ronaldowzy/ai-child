@@ -1048,6 +1048,8 @@ class ChatViewModel(
                 audioUrl = audioUrl,
                 text = event.audioText,
                 index = event.payload.optInt("index", 0),
+                requestId = event.requestId,
+                turnId = event.requestId,
             ),
         )
     }
@@ -1192,6 +1194,7 @@ class ChatViewModel(
                 voiceProfile = VoiceProfile.default(),
                 audioUrl = reply.audioUrl,
                 backendBaseUrl = DevSettings.conversationApiBaseUrl,
+                turnId = "local_tts_$token",
             ),
             callbacks = TtsCallbacks(
                 onDiagnostics = { diagnostics ->

@@ -91,6 +91,7 @@ class ConversationStreamService:
         request: ConversationStreamRequest,
     ) -> Iterator[ConversationStreamEvent]:
         started_at = time.perf_counter()
+        request_start = time.time()
         first_text_ms: float | None = None
         first_tts_start_ms: float | None = None
         first_audio_ms: float | None = None
@@ -152,6 +153,7 @@ class ConversationStreamService:
                 tts_error_count=tts_error_count,
                 error_type=error_type,
                 healthy_engagement=healthy_engagement,
+                request_start=request_start,
             )
             return
 
@@ -267,6 +269,7 @@ class ConversationStreamService:
             tts_error_count=tts_error_count,
             error_type="tts_segment_failed" if tts_error_count else error_type,
             healthy_engagement=healthy_engagement,
+            request_start=request_start,
         )
 
     def _record_stream_turn_best_effort(
@@ -461,6 +464,7 @@ class ConversationStreamService:
         tts_error_count: int,
         error_type: str | None,
         healthy_engagement: dict[str, object] | None,
+        request_start: float,
     ) -> None:
         stream_total_ms = self._elapsed_ms(started_at)
         logging.getLogger("app.stream_timing").info(
@@ -468,12 +472,15 @@ class ConversationStreamService:
             extra={
                 "event": "conversation_stream_finished",
                 "request_id": get_request_id(),
+                "request_start": request_start,
                 "session_id_hash": hash_identifier(request.session_id),
                 "active_scene": active_scene,
                 "first_text_ms": first_text_ms,
                 "first_tts_start_ms": first_tts_start_ms,
+                "tts_started_ms": first_tts_start_ms,
                 "first_audio_ms": first_audio_ms,
                 "stream_total_ms": stream_total_ms,
+                "turn_total_ms": stream_total_ms,
                 "text_segment_count": text_segment_count,
                 "tts_segment_count": tts_segment_count,
                 "audio_segment_count": audio_segment_count,
@@ -488,9 +495,11 @@ class ConversationStreamService:
             {
                 "event": "healthy_engagement_stream",
                 "request_id": get_request_id(),
+                "request_start": request_start,
                 "session_id_hash": hash_identifier(request.session_id),
                 "active_scene": active_scene,
                 "first_text_ms": first_text_ms,
+                "tts_started_ms": first_tts_start_ms,
                 "first_audio_ms": first_audio_ms,
                 "turn_total_ms": stream_total_ms,
                 "stream_error_type": error_type,

@@ -122,4 +122,5 @@ Prompt 规则：
 8. 开放对话已接入连续追问 thin slice：最近多轮都是小白狐提问、孩子说“换个话题 / 不聊了 / 睡觉了”，或孩子纠正“不是 / 你说错了 / 我还没跑”时，本轮不新增追问钩子，优先尊重边界或修正理解。
 9. Task 06 后，父亲设置中的年龄、可选年级、称呼偏好、兴趣和近期不想被追问的话题会进入 child_profile / turn guidance；显性作息配置从 v0.1 家庭内测 UI 降级，时间仍只做语气和轻量提醒。
 10. 同一普通话题持续多轮且孩子回复变短或变平时，`TurnGuidanceBuilder` 会标记 `topic_shift_recommended` 并提供静态 curated topic seeds；小白狐应给换题机会，不继续深挖旧话题。
+11. Task 07 后，topic seeds 升级为 reviewed / age-aware / expiring seed objects，每条包含 `id`、`label`、`age_bands`、`prompt_hint`、`safety_notes`、`expires_at` 和 `source`。Android 只在 Ready/Resting 等空闲状态展示轻量“换个轻松话题”chips，且不抓实时热点、不做任务菜单、不鼓励继续游戏。
 ```

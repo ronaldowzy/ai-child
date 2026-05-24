@@ -51,6 +51,7 @@ Task 05 known issues / next actions:
 7. Healthy Engagement `boundary_respected` 已增强到明显旧话题复活检测，但仍是 v0.1 heuristic；负责人：后端；下一步：用真机 QA 和 synthetic trace 继续观察误报/漏报。
 8. Task 06 topic shift naturalness NOT_VALIDATED；负责人：后端/prompt + 父亲；下一步：用 synthetic game/sports/art 话题和真机视频观察是否过早换题。
 9. Task 06 father settings/report UI NOT_DEVICE_QA；负责人：Android/父亲；下一步：在 Redmi K60 / Honor Pad 5 检查设置页输入、日报信息层级和小白狐 phase chip 横屏布局。
+10. Task 07 closeout NOT_DEVICE_QA；负责人：Android/后端/父亲；下一步：在真机上验证隐藏 schedule 不影响保存、换题 chips 不挤压 voice-first 控件、TTS backend/logcat timing 能定位慢在 model/TTS/audio playback 哪一段、CS/game 父亲日报摘要自然且不展示 raw transcript。
 ```
 
 ---

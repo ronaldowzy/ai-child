@@ -7,6 +7,7 @@ import com.childai.companion.data.parent.defaultParentSchedule
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ParentPolicyViewModelTest {
@@ -120,6 +121,80 @@ class ParentPolicyViewModelTest {
             request.communicationPreferences["topic_boundaries"],
         )
         assertEquals(true, request.communicationPreferences["visible_schedule_deprecated_v0_1"])
+    }
+
+    @Test
+    fun savePolicyAllowsBlankAge() {
+        var savedRequest: ParentPolicyUpdateRequest? = null
+        val viewModel = ParentPolicyViewModel(
+            policyReader = { policyResponse() },
+            policyWriter = { request ->
+                savedRequest = request
+                policyResponse(communicationPreferences = request.communicationPreferences)
+            },
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.updateChildAge("   ")
+        viewModel.savePolicy()
+
+        val request = savedRequest
+        assertNotNull(request)
+        requireNotNull(request)
+        assertEquals("", request.communicationPreferences["child_age"])
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun savePolicyRejectsInvalidAgeWithoutCallingWriter() {
+        var saveAttempts = 0
+        val viewModel = ParentPolicyViewModel(
+            policyReader = { policyResponse() },
+            policyWriter = { request ->
+                saveAttempts += 1
+                policyResponse(communicationPreferences = request.communicationPreferences)
+            },
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.updateChildAge("11")
+        viewModel.savePolicy()
+
+        assertEquals(0, saveAttempts)
+        assertEquals("年龄请填写 5-10 之间的数字，或先留空。", viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun savePolicyPreservesLoadedScheduleAndDoesNotValidateHiddenTimes() {
+        val existingSchedule = defaultParentSchedule()
+            .withEntryTimes("after_school", "16:05", "17:15")
+            .withEntryTimes("homework_time", "18:35", "19:10")
+            .withEntryTimes("bedtime", "21:00", "21:20")
+        var savedRequest: ParentPolicyUpdateRequest? = null
+        val viewModel = ParentPolicyViewModel(
+            policyReader = { policyResponse(schedule = existingSchedule) },
+            policyWriter = { request ->
+                savedRequest = request
+                policyResponse(schedule = request.schedule)
+            },
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.updateAfterSchoolStart("not-a-time")
+        viewModel.updateHomeworkEnd("also-bad")
+        viewModel.updateChildAge("8")
+        viewModel.savePolicy()
+
+        val request = savedRequest
+        assertNotNull(request)
+        requireNotNull(request)
+        assertEquals("16:05", request.schedule.entry("after_school")?.start)
+        assertEquals("17:15", request.schedule.entry("after_school")?.end)
+        assertEquals("18:35", request.schedule.entry("homework_time")?.start)
+        assertEquals("19:10", request.schedule.entry("homework_time")?.end)
+        assertEquals("21:00", request.schedule.entry("bedtime")?.start)
+        assertEquals("21:20", request.schedule.entry("bedtime")?.end)
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 
     @Test

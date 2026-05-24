@@ -5,6 +5,9 @@ data class TtsRequest(
     val voiceProfile: VoiceProfile = VoiceProfile.default(),
     val audioUrl: String? = null,
     val backendBaseUrl: String? = null,
+    val requestId: String? = null,
+    val turnId: String? = null,
+    val segmentIndex: Int? = null,
 )
 
 data class VoiceDiagnostics(

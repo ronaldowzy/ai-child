@@ -859,6 +859,17 @@ OpeningService 能读取一个最近 interest_seed。
 3. 父亲日报的 avoid_followup 是否帮助现实沟通，而不是让父亲过度监控。
 ```
 
+## 18. Task 07 Closeout Hardening
+
+本轮继续收紧 Task 06 的健康使用边界：
+
+```text
+1. Topic seed pack 升级为 reviewed / age-aware / expiring objects，包含 safety_notes；过期、缺字段或带抽卡、排行、购买、热搜八卦等 marker 的 seed 不进入提示。
+2. 儿童端只在空闲状态展示小型换题 chips，作为“可以换个轻松话题”的出口，不做任务列表、奖励、签到或明日钩子。
+3. 父亲日报的 CS/game synthetic case 会归纳地图、队友/朋友配合和输赢感受，但仍只显示 summary、bridge 和 avoid_followup，不展示逐字聊天记录、provider/debug 词或行为评分。
+4. TTS latency observability 只记录 request_id、hash、阶段耗时和播放状态，帮助判断慢在 model、TTS 生成、stream audio_ready 还是 Android playback start；不得记录儿童原文、完整回复、原始音频、完整 audio URL 或父母寄语原文。
+```
+
 ---
 
 ## 16. Decision Summary For PRODUCT_DECISIONS

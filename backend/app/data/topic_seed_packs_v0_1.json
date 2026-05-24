@@ -1,26 +1,79 @@
 {
-  "age_5_6": [
-    "小动物的一件小事",
-    "今天看到的颜色",
-    "积木或玩具小故事",
-    "画一个奇怪的东西"
-  ],
-  "age_7_8": [
-    "恐龙或太空小问题",
-    "画画、手工或积木",
-    "运动里一个好玩的瞬间",
-    "给今天编一个小故事"
-  ],
-  "age_9_10": [
-    "游戏里的一个创意规则",
-    "一本书或一个角色",
-    "运动、音乐或手工里的小挑战",
-    "把今天见到的东西改编成故事"
-  ],
-  "unknown": [
-    "画画或手工",
-    "运动里的一个小瞬间",
-    "恐龙、太空或动物",
-    "编一个短故事"
+  "schema": "topic_seed_pack.v0.1",
+  "generated_at": "2026-05-24",
+  "source": "curated_v0_1",
+  "seeds": [
+    {
+      "id": "tiny_animals_story",
+      "label": "小动物的一件小事",
+      "age_bands": ["age_5_6", "unknown"],
+      "prompt_hint": "可以让孩子选一个小动物，讲一件很短的小事。",
+      "safety_notes": "avoid purchase pressure; avoid ranking/collection mechanics; keep it short and non-scary",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "colors_seen_today",
+      "label": "今天看到的颜色",
+      "age_bands": ["age_5_6", "unknown"],
+      "prompt_hint": "可以请孩子说今天看到的一个颜色，或把颜色编进一句故事。",
+      "safety_notes": "avoid achievement comparison; avoid turning it into a quiz",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "drawing_handcraft_blocks",
+      "label": "画画、手工或积木",
+      "age_bands": ["age_5_6", "age_7_8", "age_9_10", "unknown"],
+      "prompt_hint": "可以问孩子最近有没有画过、搭过或做过什么东西，也可以让孩子拍给小白狐看。",
+      "safety_notes": "avoid purchase pressure; avoid ranking/collection mechanics; do not push screen time",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "dinosaurs_space_question",
+      "label": "恐龙或太空小问题",
+      "age_bands": ["age_7_8", "age_9_10", "unknown"],
+      "prompt_hint": "可以给一个轻松选择：恐龙、星球或太空里的一个小问题。",
+      "safety_notes": "avoid scary disaster framing; avoid long fact drilling",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "sports_funny_moment",
+      "label": "运动里一个好玩的瞬间",
+      "age_bands": ["age_7_8", "age_9_10", "unknown"],
+      "prompt_hint": "可以接一个现实运动或跑跳里的好玩瞬间，不追问成绩。",
+      "safety_notes": "avoid body shaming; avoid score comparison; avoid pressure to train more",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "short_story_from_today",
+      "label": "给今天编一个小故事",
+      "age_bands": ["age_5_6", "age_7_8", "age_9_10", "unknown"],
+      "prompt_hint": "可以把今天看到的一个东西改编成两三句小故事。",
+      "safety_notes": "avoid tomorrow hooks or FOMO; keep it easy to stop",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "book_or_character",
+      "label": "一本书或一个角色",
+      "age_bands": ["age_9_10"],
+      "prompt_hint": "可以请孩子说一个角色做了什么选择，或把角色换到现实小场景里。",
+      "safety_notes": "avoid celebrity gossip; avoid fandom ranking; avoid purchase pressure",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    },
+    {
+      "id": "game_creative_rule",
+      "label": "游戏里的一个创意规则",
+      "age_bands": ["age_9_10"],
+      "prompt_hint": "只把游戏当成规则设计或表达入口，不鼓励继续玩游戏。",
+      "safety_notes": "do not encourage more gameplay; avoid rankings, loot, skins, streaks, or time-spend goals",
+      "expires_at": "2026-12-31",
+      "source": "curated_v0_1"
+    }
   ]
 }

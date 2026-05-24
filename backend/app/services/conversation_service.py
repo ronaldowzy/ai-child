@@ -119,6 +119,7 @@ class ConversationService:
         self, request: ConversationMessageRequest
     ) -> ConversationMessageResponse:
         started_at = time.perf_counter()
+        request_start = time.time()
         parent_policy = self._parent_policy_service.get_policy(request.child_id)
         time_context = self._time_context_service.build_context(
             device_time=request.client_context.device_time,
@@ -213,6 +214,7 @@ class ConversationService:
             if homework_context is not None
             else None
         )
+        model_started_at = time.perf_counter()
         runtime_result = self._child_agent_runtime.run(
             AgentRuntimeRequest(
                 child_id=request.child_id,
@@ -233,12 +235,13 @@ class ConversationService:
                 },
             )
         )
+        model_ms = self._elapsed_ms(model_started_at)
         response = self._response_from_route_decision(
             route_decision,
             runtime_result,
             child_text=request.input.text,
         )
-        self._attach_audio_url_if_enabled(response)
+        tts_ms = self._attach_audio_url_if_enabled(response)
         self._persist_turn_if_enabled(
             request=request,
             response=response,
@@ -261,6 +264,15 @@ class ConversationService:
             request=request,
             runtime_result=runtime_result,
             healthy_engagement=healthy_engagement_debug,
+        )
+        self._log_conversation_latency(
+            request=request,
+            route_decision=route_decision,
+            response=response,
+            request_start=request_start,
+            model_ms=model_ms,
+            tts_ms=tts_ms,
+            turn_total_ms=self._elapsed_ms(started_at),
         )
 
         if self._debug_enabled:
@@ -475,18 +487,47 @@ class ConversationService:
     def _attach_audio_url_if_enabled(
         self,
         response: ConversationMessageResponse,
-    ) -> None:
+    ) -> float | None:
         if not response.reply.voice_enabled:
-            return
+            return None
+        started_at = time.perf_counter()
         try:
             audio_url = self._tts_service.generate_for_conversation(
                 text=response.reply.text,
                 emotion=response.reply.emotion,
             )
         except Exception:
-            return
+            return self._elapsed_ms(started_at)
         if audio_url:
             response.reply.audio_url = audio_url
+        return self._elapsed_ms(started_at)
+
+    def _log_conversation_latency(
+        self,
+        *,
+        request: ConversationMessageRequest,
+        route_decision: SceneRouteDecision,
+        response: ConversationMessageResponse,
+        request_start: float,
+        model_ms: float,
+        tts_ms: float | None,
+        turn_total_ms: float,
+    ) -> None:
+        logger.info(
+            "conversation_turn_latency",
+            extra={
+                "event": "conversation_turn_latency",
+                "request_id": get_request_id(),
+                "request_start": request_start,
+                "child_id_hash": hash_identifier(request.child_id),
+                "session_id_hash": hash_identifier(request.session_id),
+                "active_scene": route_decision.active_scene.value,
+                "model_ms": model_ms,
+                "tts_ms": tts_ms,
+                "audio_url_present": response.reply.audio_url is not None,
+                "turn_total_ms": turn_total_ms,
+            },
+        )
 
     def _agent_motion_for(self, decision: SceneRouteDecision) -> str:
         active_scene = decision.active_scene.value

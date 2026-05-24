@@ -30,4 +30,41 @@ class AgentReplyCarouselTest {
         assertEquals("正在看图", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
         assertEquals("请大人检查", childUiPolishStateLabel(ChildTurnUiPhase.ServiceError))
     }
+
+    @Test
+    fun topicShiftChipsAreSmallIdleFallbackOnly() {
+        val state = ChatUiState(
+            messages = initialChatMessages() + ChatMessage(
+                id = "agent-after-turn",
+                author = MessageAuthor.Agent,
+                text = "我们可以换个轻松点的话题。",
+            ),
+        )
+
+        val actions = topicShiftChipActions(state)
+
+        assertEquals(
+            listOf("换个轻松话题", "画画或手工", "恐龙或太空", "拍给小白狐看"),
+            actions.map { it.label },
+        )
+    }
+
+    @Test
+    fun topicShiftChipsDoNotHideBackendActionsOrActiveTurns() {
+        val withBackendActions = ChatUiState(
+            messages = initialChatMessages() + ChatMessage(
+                id = "agent-after-turn",
+                author = MessageAuthor.Agent,
+                text = "可以拍给我看。",
+            ),
+            quickActions = listOf(QuickActionUi(id = "take_photo", label = "拍给小白狐看")),
+        )
+        val activeTurn = withBackendActions.copy(
+            quickActions = emptyList(),
+            isSending = true,
+        )
+
+        assertTrue(topicShiftChipActions(withBackendActions).isEmpty())
+        assertTrue(topicShiftChipActions(activeTurn).isEmpty())
+    }
 }

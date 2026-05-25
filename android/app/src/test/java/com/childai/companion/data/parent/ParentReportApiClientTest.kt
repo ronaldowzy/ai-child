@@ -6,6 +6,6 @@ import org.junit.Test
 class ParentReportApiClientTest {
     @Test
     fun parentReportReadTimeoutCoversModelGeneration() {
-        assertTrue(PARENT_REPORT_READ_TIMEOUT_MS >= 60_000)
+        assertTrue(PARENT_REPORT_READ_TIMEOUT_MS >= 95_000)
     }
 }

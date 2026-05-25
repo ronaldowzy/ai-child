@@ -484,13 +484,13 @@ class ModelRegistry:
                 max_tokens=int(
                     os.getenv(
                         "CHILD_AI_PARENT_REPORT_MAX_TOKENS",
-                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_MAX_TOKENS", "4000"),
+                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_MAX_TOKENS", "6000"),
                     )
                 ),
                 timeout_ms=int(
                     os.getenv(
                         "CHILD_AI_PARENT_REPORT_TIMEOUT_MS",
-                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "15000"),
+                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "90000"),
                     )
                 ),
             ),

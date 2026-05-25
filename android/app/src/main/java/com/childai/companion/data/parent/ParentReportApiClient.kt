@@ -53,7 +53,7 @@ class ParentReportApiClient(
     }
 }
 
-internal const val PARENT_REPORT_READ_TIMEOUT_MS = 70_000
+internal const val PARENT_REPORT_READ_TIMEOUT_MS = 100_000
 
 class ParentReportApiException(
     message: String,

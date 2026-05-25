@@ -525,4 +525,4 @@ bash scripts/e2e_local_api_check.sh
 GET /api/v1/parent/reports/{child_id}?date=YYYY-MM-DD
 ```
 
-Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议家长动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；2026-05-25 真机复盘后，后端 parent report provider 默认 timeout 从 45s 调整为 15s，避免家长前台长时间等待。若返回 `model_failed` / `model_blocked`，家长端只显示“今天的小结还没准备好，请稍后再试”，不展示 deterministic fallback 正文。
+Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议家长动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；2026-05-25 运行反馈后，后端 parent report provider 默认 timeout 调整为 90s、completion budget 调整为 6000，并压缩日报 prompt；Android 家长日报 read timeout 调整为 100s。若返回 `model_failed` / `model_blocked`，家长端只显示“今天的小结还没准备好，请稍后再试”，不展示 deterministic fallback 正文。

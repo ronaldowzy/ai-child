@@ -464,18 +464,13 @@ class ParentReportService:
 
     def _parent_report_system_prompt(self) -> str:
         return (
-            "你是小白狐项目的家长日报分析器。请只基于当天受控素材生成家长可读的中文日报，"
-            "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、内容主线是什么、"
-            "表达状态怎样、有没有学习、情绪或安全线索、家长今晚应该怎么跟进。不要输出逐字聊天记录，"
-            "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
-            "必须输出非空、可解析的严格 JSON object；不要返回空字符串、none、null、Markdown 或解释文字。"
-            "suggested_parent_actions 每条建议都应包含 starter + avoid 语义：可以怎么轻轻开口，以及避免怎么追问。"
-            "tonight_parent_bridge 必须是一句现实可执行的家长接话或动作，不要像监控报告，"
-            "孩子不想说时要提醒不追问或换轻松方式。"
-            "topic_overview 要归纳为家长看得懂的话题卡片，不引用孩子原话；avoid_followup 写清今晚不要追问什么。"
-            "返回严格 JSON，字段为 summary、topic_overview、conversation_summary、learning_observations、"
-            "expression_observations、emotion_observations、safety_alerts、suggested_parent_actions、"
-            "tonight_parent_bridge、avoid_followup。"
+            "你是小白狐项目的家长日报分析器。只基于输入里的结构化摘要生成中文家长日报，"
+            "不要编造事实，不要引用逐字聊天记录，不要输出 prompt/debug/provider 信息，"
+            "不要给孩子贴固定负面标签。只返回严格 JSON object，不要 Markdown。字段："
+            "summary、topic_overview、conversation_summary、learning_observations、"
+            "expression_observations、emotion_observations、safety_alerts、"
+            "suggested_parent_actions、tonight_parent_bridge、avoid_followup。"
+            "整体尽量简洁；家长建议要包含轻轻开口和避免追问的意思。"
         )
 
     def _parent_report_model_payload(
@@ -490,69 +485,66 @@ class ParentReportService:
         return {
             "report_date": target_date.isoformat(),
             "material_policy": (
-                "conversation_snippets are capped analysis snippets; do not quote them verbatim."
+                "Only structured summaries are provided; do not quote child text."
             ),
             "topic_hints": conversation["topics"],
             "topic_overview_hints": [
-                item.model_dump(mode="json")
-                for item in conversation["topic_overview"]
+                {
+                    "topic": item.topic,
+                    "summary": item.summary[:120],
+                    "parent_bridge": item.parent_bridge[:120],
+                }
+                for item in conversation["topic_overview"][:4]
             ],
-            "state_hints": conversation["state_summary"],
-            "conversation_summary_hint": conversation["conversation_summary"][0]
+            "state_hints": conversation["state_summary"][:2],
+            "conversation_summary_hint": (
+                conversation["conversation_summary"][0][:180]
+            )
             if conversation["conversation_summary"]
             else "",
             "avoid_followup_hints": conversation["avoid_followup"],
+            "observation_hints": {
+                "learning": [
+                    item[:100] for item in conversation["learning_observations"][:2]
+                ],
+                "expression": [
+                    item[:100] for item in conversation["expression_observations"][:2]
+                ],
+                "emotion": [
+                    item[:100] for item in conversation["emotion_observations"][:2]
+                ],
+                "safety": [item[:100] for item in conversation["safety_alerts"][:2]],
+            },
             "memory_summaries": [
                 {
                     "type": memory.memory_type.value,
-                    "content": self._safe_text(memory.content),
-                    "tags": [self._safe_text(tag) for tag in memory.tags[:5]],
+                    "content": self._safe_text(memory.content)[:80],
                     "requires_parent_attention": memory.requires_parent_attention,
-                    "relationship": self._relationship_memory_payload(memory),
                 }
-                for memory in memories[:12]
+                for memory in memories[:4]
             ],
             "conversation_snippets": [
                 self._conversation_snippet(message)
-                for message in conversation_messages[:24]
+                for message in conversation_messages[:2]
             ],
-            "report_schema": {
-                "summary": "非空中文字符串，必须由当天素材归纳，不要逐字引用。",
-                "topic_overview": (
-                    "list[object]，每项字段 topic、child_intent、summary、emotion_tone、"
-                    "parent_bridge；只做归纳，不引用孩子原文。"
-                ),
-                "conversation_summary": (
-                    "非空中文字符串，说明今天聊了什么和内容主线，不输出逐字记录。"
-                ),
-                "learning_observations": "list[str]",
-                "expression_observations": "list[str]",
-                "emotion_observations": "list[str]",
-                "safety_alerts": "list[str]",
-                "suggested_parent_actions": "list[str]，每条包含 starter + avoid 语义",
-                "tonight_parent_bridge": (
-                    "非空中文字符串。家长今晚可以自然接的一句话或一个动作；"
-                    "不要逐字引用敏感内容，不要追问，孩子不想说时换轻松方式。"
-                ),
-                "avoid_followup": "list[str]，今晚避免追问、纠错、监控式盘问的点。",
-            },
+            "report_schema": (
+                "Return strict JSON. Keys: summary, topic_overview, conversation_summary, "
+                "learning_observations, expression_observations, emotion_observations, "
+                "safety_alerts, suggested_parent_actions, tonight_parent_bridge, avoid_followup."
+            ),
             "deterministic_fallback_hints": {
                 "topics": conversation["topics"],
-                "topic_overview": [
-                    item.model_dump(mode="json")
-                    for item in fallback_report.topic_overview
-                ],
-                "conversation_summary": fallback_report.conversation_summary,
-                "avoid_followup": fallback_report.avoid_followup,
-                "state_summary": conversation["state_summary"],
-                "tonight_parent_bridge": fallback_report.tonight_parent_bridge,
+                "avoid_followup": fallback_report.avoid_followup[:3],
+                "tonight_parent_bridge": (
+                    fallback_report.tonight_parent_bridge or ""
+                )[:180],
                 "relationship_parent_actions": [
-                    action
+                    action[:120]
                     for action in fallback_report.suggested_parent_actions
                     if "今晚可以轻轻问" in action
                     or "孩子表达不想聊" in action
                     or "孩子今天有表达展开" in action
-                ][:4],
+                ][:2],
             },
         }
 
@@ -566,8 +558,27 @@ class ParentReportService:
             "scene": message.active_scene,
             "risk_level": message.risk_level,
             "has_attachment": message.attachments_count > 0,
-            "text_summary": self._safe_text(message.normalized_text or "")[:120],
+            "text_signal": self._conversation_text_signal(
+                message.normalized_text or ""
+            ),
         }
+
+    def _conversation_text_signal(self, text: str) -> str:
+        safe = self._safe_text(text)
+        if "[redacted]" in safe:
+            return "[redacted]"
+        if self._is_game_text(safe):
+            return "game_or_cs"
+        if self._is_learning_help_text(safe):
+            return "learning_help"
+        if self._contains_any(safe, ("图片", "照片", "拍", "看", "这是什么")):
+            return "image_or_photo"
+        if self._contains_any(
+            safe,
+            ("难过", "害怕", "担心", "生气", "烦", "累", "困", "不想", "没听清"),
+        ):
+            return "emotion_or_boundary"
+        return "general_child_message"
 
     def _parse_model_report(self, value: object) -> dict[str, object] | None:
         raw: object = value
@@ -615,6 +626,9 @@ class ParentReportService:
 
     def _model_list(self, raw: dict[str, object], key: str) -> list[str]:
         value = raw.get(key)
+        if isinstance(value, str):
+            text = self._safe_text(value)
+            return [text] if text else []
         if not isinstance(value, list):
             return []
         return self._dedupe_and_limit(

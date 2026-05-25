@@ -806,8 +806,8 @@ bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 
 ParentReport v2 is model-first and uses the same MiMo text model by default, but
 it needs a larger completion budget than short child chat. The backend defaults
-`mimo_parent_report` to `CHILD_AI_PARENT_REPORT_MAX_TOKENS=4000` and
-`CHILD_AI_PARENT_REPORT_TIMEOUT_MS=15000`; these can be overridden in local
+`mimo_parent_report` to `CHILD_AI_PARENT_REPORT_MAX_TOKENS=6000` and
+`CHILD_AI_PARENT_REPORT_TIMEOUT_MS=90000`; these can be overridden in local
 shell env without changing child chat routing or vision/OCR routing. If the
 provider misses this window, the API returns a retryable model-failed report
 instead of showing deterministic text as a successful diary.

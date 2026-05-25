@@ -21,19 +21,20 @@ enum class ParentEntryTarget(val label: String) {
     Settings("家长设置"),
 }
 
-object ParentPinGate {
-    const val GENTLE_ERROR_MESSAGE = "这次没有打开，请让家长再试一次。"
+object ParentCredentialGate {
+    const val GENTLE_ERROR_MESSAGE = "密码没有通过，请家长再试一次。"
 
-    fun isPinAccepted(input: String, expectedPin: String): Boolean =
-        expectedPin.isNotBlank() && input.trim() == expectedPin
+    fun isLocalCredentialAccepted(input: String, expectedCredential: String): Boolean =
+        expectedCredential.isNotBlank() && input.trim() == expectedCredential
 }
 
 @Composable
-fun ParentEntryPinDialog(
+fun ParentEntryCredentialDialog(
     target: ParentEntryTarget,
-    pinInput: String,
+    credentialInput: String,
     errorMessage: String?,
-    onPinInputChange: (String) -> Unit,
+    isSubmitting: Boolean,
+    onCredentialInputChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -45,20 +46,20 @@ fun ParentEntryPinDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "请大人输入 PIN 后继续。",
+                    text = "请家长输入当前账号密码后继续。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
-                    value = pinInput,
-                    onValueChange = onPinInputChange,
+                    value = credentialInput,
+                    onValueChange = onCredentialInputChange,
                     singleLine = true,
                     label = {
-                        Text(text = "PIN")
+                        Text(text = "账号密码")
                     },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.NumberPassword,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
                     ),
                     keyboardActions = KeyboardActions(
@@ -77,8 +78,11 @@ fun ParentEntryPinDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
-                Text(text = "进入")
+            Button(
+                onClick = onConfirm,
+                enabled = !isSubmitting && credentialInput.isNotBlank(),
+            ) {
+                Text(text = if (isSubmitting) "验证中" else "进入")
             }
         },
         dismissButton = {

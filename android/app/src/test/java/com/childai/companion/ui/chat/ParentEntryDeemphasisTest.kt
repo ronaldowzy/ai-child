@@ -24,11 +24,11 @@ class ParentEntryDeemphasisTest {
     }
 
     @Test
-    fun defaultHintExplainsLongPressAndPin() {
+    fun defaultHintExplainsLongPressAndAccountPassword() {
         val hint = parentEntryDefaultHint()
 
         assertTrue(hint.contains("长按"))
-        assertTrue(hint.contains("PIN"))
+        assertTrue(hint.contains("账号密码"))
     }
 
     @Test

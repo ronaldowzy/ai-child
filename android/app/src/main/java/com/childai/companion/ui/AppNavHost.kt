@@ -24,6 +24,7 @@ import com.childai.companion.ui.chat.ChatViewModel
 import com.childai.companion.ui.chat.ConversationRepositoryMessageSender
 import com.childai.companion.ui.parent.ParentReportScreen
 import com.childai.companion.ui.parent.ParentReportViewModel
+import com.childai.companion.ui.parent.ParentCredentialVerifier
 import com.childai.companion.ui.parent.ParentPolicyViewModel
 import com.childai.companion.ui.parent.ParentSettingsScreen
 
@@ -63,6 +64,9 @@ fun AppNavHost(
             ParentReportApiClient(authTokenProvider = authTokenProvider),
         )
     }
+    val parentCredentialVerifier = remember(authRepository, session.username) {
+        ParentCredentialVerifier(authRepository)
+    }
     var destination by rememberSaveable { mutableStateOf(AppDestination.Chat) }
 
     when (destination) {
@@ -80,7 +84,8 @@ fun AppNavHost(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
                 viewModel = chatViewModel,
-                requireParentPin = true,
+                requireParentCredential = true,
+                verifyParentCredential = parentCredentialVerifier::verify,
             )
         }
         AppDestination.ParentSettings -> {

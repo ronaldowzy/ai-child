@@ -49,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,14 +67,15 @@ import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.mascot.MascotState
-import com.childai.companion.ui.parent.ParentEntryPinDialog
+import com.childai.companion.ui.parent.ParentEntryCredentialDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
-import com.childai.companion.ui.parent.ParentPinGate
+import com.childai.companion.ui.parent.ParentCredentialGate
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import com.childai.companion.voice.MediaPlayerAudioUrlPlayer
 import com.childai.companion.voice.NoOpTtsController
 import com.childai.companion.voice.RemoteAudioTtsController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChildChatScreen(
@@ -81,7 +83,8 @@ fun ChildChatScreen(
     onOpenParentSettings: () -> Unit = {},
     onOpenParentReport: () -> Unit = {},
     viewModel: ChatViewModel = viewModel(),
-    requireParentPin: Boolean = false,
+    requireParentCredential: Boolean = false,
+    verifyParentCredential: suspend (String) -> Boolean = { false },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -129,7 +132,8 @@ fun ChildChatScreen(
         onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
-        requireParentPin = requireParentPin,
+        requireParentCredential = requireParentCredential,
+        verifyParentCredential = verifyParentCredential,
         modifier = modifier,
     )
 }
@@ -147,25 +151,29 @@ private fun ChildChatScreenContent(
     onPhotoCaptureFailed: (String) -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
-    requireParentPin: Boolean,
+    requireParentCredential: Boolean,
+    verifyParentCredential: suspend (String) -> Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var pendingParentEntry by rememberSaveable { mutableStateOf<ParentEntryTarget?>(null) }
-    var parentPinInput by rememberSaveable { mutableStateOf("") }
-    var parentPinError by rememberSaveable { mutableStateOf<String?>(null) }
+    var parentCredentialInput by rememberSaveable { mutableStateOf("") }
+    var parentCredentialError by rememberSaveable { mutableStateOf<String?>(null) }
+    var parentCredentialSubmitting by rememberSaveable { mutableStateOf(false) }
     var parentEntryHint by rememberSaveable { mutableStateOf<String?>(null) }
     var showParentEntryChoices by rememberSaveable { mutableStateOf(false) }
 
     fun resetParentGate() {
         pendingParentEntry = null
-        parentPinInput = ""
-        parentPinError = null
+        parentCredentialInput = ""
+        parentCredentialError = null
+        parentCredentialSubmitting = false
     }
 
     fun openParentGate(target: ParentEntryTarget) {
         parentEntryHint = null
         showParentEntryChoices = false
-        if (!requireParentPin) {
+        if (!requireParentCredential) {
             when (target) {
                 ParentEntryTarget.Report -> onOpenParentReport()
                 ParentEntryTarget.Settings -> onOpenParentSettings()
@@ -173,33 +181,45 @@ private fun ChildChatScreenContent(
             return
         }
         pendingParentEntry = target
-        parentPinInput = ""
-        parentPinError = null
+        parentCredentialInput = ""
+        parentCredentialError = null
+        parentCredentialSubmitting = false
     }
 
-    fun submitParentPin() {
+    fun submitParentCredential() {
         val target = pendingParentEntry ?: return
-        if (ParentPinGate.isPinAccepted(parentPinInput, DevSettings.DEV_PARENT_PIN)) {
-            resetParentGate()
-            when (target) {
-                ParentEntryTarget.Report -> onOpenParentReport()
-                ParentEntryTarget.Settings -> onOpenParentSettings()
+        if (parentCredentialSubmitting) return
+        parentCredentialSubmitting = true
+        parentCredentialError = null
+        val credential = parentCredentialInput
+        coroutineScope.launch {
+            val accepted = runCatching {
+                verifyParentCredential(credential)
+            }.getOrDefault(false)
+            parentCredentialSubmitting = false
+            if (accepted) {
+                resetParentGate()
+                when (target) {
+                    ParentEntryTarget.Report -> onOpenParentReport()
+                    ParentEntryTarget.Settings -> onOpenParentSettings()
+                }
+            } else {
+                parentCredentialError = ParentCredentialGate.GENTLE_ERROR_MESSAGE
             }
-        } else {
-            parentPinError = ParentPinGate.GENTLE_ERROR_MESSAGE
         }
     }
 
     pendingParentEntry?.let { target ->
-        ParentEntryPinDialog(
+        ParentEntryCredentialDialog(
             target = target,
-            pinInput = parentPinInput,
-            errorMessage = parentPinError,
-            onPinInputChange = {
-                parentPinInput = it
-                parentPinError = null
+            credentialInput = parentCredentialInput,
+            errorMessage = parentCredentialError,
+            isSubmitting = parentCredentialSubmitting,
+            onCredentialInputChange = {
+                parentCredentialInput = it
+                parentCredentialError = null
             },
-            onConfirm = ::submitParentPin,
+            onConfirm = ::submitParentCredential,
             onDismiss = ::resetParentGate,
         )
     }
@@ -522,7 +542,7 @@ internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
 
 internal fun parentEntryTapHint(): String = "这是给家长看的，请让家长长按进入。"
 
-internal fun parentEntryDefaultHint(): String = "长按“大人”并输入 PIN，才能进入家长页面。"
+internal fun parentEntryDefaultHint(): String = "长按“大人”并输入家长账号密码，才能进入家长页面。"
 
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 
@@ -936,7 +956,8 @@ private fun ChildChatScreenPreview() {
             onPhotoCaptureFailed = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
-            requireParentPin = false,
+            requireParentCredential = false,
+            verifyParentCredential = { false },
         )
     }
 }

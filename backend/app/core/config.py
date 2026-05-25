@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     mimo_tts_base_url: str = "https://token-plan-cn.xiaomimimo.com/v1"
     mimo_tts_model: str = "mimo-v2.5-tts-voiceclone"
     mimo_tts_timeout_ms: int = 30000
-    conversation_stream_tts_soft_timeout_ms: int = 8000
+    conversation_stream_tts_soft_timeout_ms: int = 15000
     mimo_tts_allow_child_text: bool = False
     mimo_tts_retention_policy_checked: bool = False
     xiaobaihu_voice_sample_path: str = (
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     model_debug_trace_max_text_chars: int = 20000
     allow_mock_runtime: bool = False
     allow_auth_memory_fallback: bool = False
-    opening_tts_soft_timeout_ms: int = 8000
+    opening_tts_soft_timeout_ms: int = 15000
 
     model_config = SettingsConfigDict(env_prefix="CHILD_AI_", extra="ignore")
 

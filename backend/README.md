@@ -66,9 +66,12 @@ The current backend is local-first and test-stage real-path focused:
   profile, parent guidance, topic boundaries, recent low-sensitivity memory,
   and a model-generated short greeting when safe/available, with deterministic
   fallback on provider failure. Task 10 adds non-sensitive `app.opening_timing`
-  logs and a short TTS soft timeout so slow/failed opening audio does not block
-  the text opening. Android should treat opening/TTS as non-blocking and keep
-  the first screen Ready.
+  logs and a bounded TTS soft timeout so slow/failed opening audio does not block
+  indefinitely. Current family-beta defaults use 15s for opening and stream TTS
+  because real MiMo VoiceClone cache-miss calls have been observed around
+  9-12s; this prevents avoidable no-audio turns but is not the final latency
+  solution. Android should treat opening/TTS as non-blocking and keep the first
+  screen Ready.
 - Parent policy supports `child_nickname` and `child_display_name`; Android
   parent settings can edit them, and opening greeting uses nickname first,
   display name second, then no forced call name.
@@ -906,6 +909,8 @@ export CHILD_AI_MIMO_TTS_ENABLED=true
 export CHILD_AI_MIMO_TTS_API_KEY=""
 export CHILD_AI_MIMO_TTS_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
 export CHILD_AI_MIMO_TTS_MODEL=mimo-v2.5-tts-voiceclone
+export CHILD_AI_OPENING_TTS_SOFT_TIMEOUT_MS=15000
+export CHILD_AI_CONVERSATION_STREAM_TTS_SOFT_TIMEOUT_MS=15000
 export CHILD_AI_MIMO_TTS_ALLOW_CHILD_TEXT=true
 export CHILD_AI_MIMO_TTS_RETENTION_POLICY_CHECKED=true
 ```

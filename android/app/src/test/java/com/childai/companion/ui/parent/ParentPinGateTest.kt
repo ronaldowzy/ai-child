@@ -1,25 +1,24 @@
 package com.childai.companion.ui.parent
 
-import com.childai.companion.config.DevSettings
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ParentPinGateTest {
+class ParentCredentialGateTest {
     @Test
-    fun acceptsDefaultDevPin() {
-        assertTrue(ParentPinGate.isPinAccepted("0000", DevSettings.DEV_PARENT_PIN))
+    fun acceptsInjectedCredential() {
+        assertTrue(ParentCredentialGate.isLocalCredentialAccepted("safe-password", "safe-password"))
     }
 
     @Test
-    fun trimsAccidentalWhitespaceAroundPin() {
-        assertTrue(ParentPinGate.isPinAccepted(" 0000 ", DevSettings.DEV_PARENT_PIN))
+    fun trimsAccidentalWhitespaceAroundCredential() {
+        assertTrue(ParentCredentialGate.isLocalCredentialAccepted(" safe-password ", "safe-password"))
     }
 
     @Test
-    fun rejectsWrongOrBlankPin() {
-        assertFalse(ParentPinGate.isPinAccepted("1234", DevSettings.DEV_PARENT_PIN))
-        assertFalse(ParentPinGate.isPinAccepted("", DevSettings.DEV_PARENT_PIN))
-        assertFalse(ParentPinGate.isPinAccepted("0000", ""))
+    fun rejectsWrongOrBlankCredential() {
+        assertFalse(ParentCredentialGate.isLocalCredentialAccepted("wrong-password", "safe-password"))
+        assertFalse(ParentCredentialGate.isLocalCredentialAccepted("", "safe-password"))
+        assertFalse(ParentCredentialGate.isLocalCredentialAccepted("safe-password", ""))
     }
 }

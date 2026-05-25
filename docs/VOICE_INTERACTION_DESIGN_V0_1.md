@@ -176,7 +176,7 @@ ChildChatScreen 首次可见
 5. 如果孩子在 opening 返回前已经开始说话，Android 丢弃 opening，孩子主动输入优先。
 6. opening TTS 失败不影响文本展示，也不阻塞语音按钮。
 7. Task 10 后，后端 opening 记录非敏感 `app.opening_timing`，包含 `model_ms`、`tts_ms`、`total_ms`、`audio_url_present`、`fallback_used` 和 hashed child/session id；不记录 opening 全文、儿童原文或家长寄语原文。
-8. opening 音频生成有短 soft timeout；TTS 慢/失败时返回 text opening，`voice_enabled=false`，Android 不使用系统 TTS 顶替。
+8. opening 音频生成有 bounded soft timeout；TTS 慢/失败时返回 text opening，`voice_enabled=false`，Android 不使用系统 TTS 顶替。2026-05-25 家庭内测服务日志显示 MiMo VoiceClone cache miss 在 8.7-11.9 秒区间，正式运行默认 soft timeout 调整为 15 秒，避免 8 秒窗口刚超时就丢掉随后完成的正式音频。
 ```
 
 ---
@@ -215,8 +215,9 @@ ChildChatScreen 首次可见
 13. 真实 MiMo VoiceClone smoke 已通过：`/api/v1/tts/xiaobaohu` 返回 `/media/tts/...wav`，conversation 在 `CHILD_AI_CONVERSATION_TTS_ENABLED=true` 时可自动返回 `reply.audio_url`。
 14. Android 已实现 remote audioUrl 优先播放：`reply.audio_url` 非空时先播放后端 WAV，失败时保留文字和温和错误提示，不再 fallback 到系统 TextToSpeech。
 15. 真实设备听感、远程音频播放、停止/静音按钮可发现性、延迟和 Honor Pad 5 低配表现仍需 QA；不应把本轮写成语音体验全部完成。
-16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式和 TTS 分句/分段播放设计。
+16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式、TTS 分句/分段播放、预生成缓存或更快正式音色链路设计。
 17. Task 07 已增加 TTS latency observability：非 stream `/conversation/message` 日志记录 `conversation_turn_latency`，包含 `request_id`、`request_start`、`model_ms`、`tts_ms`、`audio_url_present`、`turn_total_ms`；stream 日志记录 `conversation_stream_finished`，包含 `request_start`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`turn_total_ms`。Android logcat 使用 `XiaobaohuTtsTiming` 记录 remote audio URL received / playback started / done / error，包含 request_id、turn_id、segment_index、elapsed_ms，不显示给儿童。
+18. 2026-05-25 backend-only 日志复盘：`conversation_stream_finished` 出现 `tts_segment_failed`，但随后 `tts_call_finished` 在 0.7-3.9 秒后成功，说明旧 8 秒 soft timeout 会制造无声 turn。本次只把 formal VoiceClone 等待窗口校准到 15 秒；Android 播放启动和真机听感仍需 Redmi K60 / Honor Pad 5 logcat + 视频复验。
 ```
 
 ### 5.3 Streaming Voice Direction

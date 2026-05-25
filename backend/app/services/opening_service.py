@@ -37,7 +37,7 @@ from app.middleware.request_id import get_request_id
 
 
 logger = logging.getLogger("app.opening_timing")
-DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS = 8000
+DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS = 15000
 
 
 @dataclass(frozen=True)

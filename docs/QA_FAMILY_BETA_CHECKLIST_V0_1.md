@@ -1,6 +1,6 @@
 # Family Beta QA Checklist v0.1
 
-Status: Task 09 account/personalization automated snapshot added; real-device QA remains NOT_RUN
+Status: Task 10 account/opening/control closeout automated snapshot added; real-device QA remains NOT_RUN
 Scope: Redmi K60 primary functional QA, Honor Pad 5 Android 9 / 4GB compatibility QA  
 Data policy: use only fictional child IDs, synthetic/fake audio, non-child test images, and non-private family settings. Do not record raw child text, full assistant text, raw audio, raw photos, parent_message_raw, provider keys, or private family data in this checklist or logs.
 
@@ -18,9 +18,9 @@ APK sha256=...
 
 Do not paste screenshots containing real child photos, real names, raw transcripts, auth tokens, or provider keys.
 
-## Task 09 QA focus
+## Task 10 QA focus
 
-Task 09 adds account and personalization foundations. The next device round must explicitly cover:
+Task 10 closes out Task 09 account and personalization foundations. The next device round must explicitly cover:
 
 ```text
 1. 家长创建一个孩子账号、登录、重启保持登录、手动退出。
@@ -28,6 +28,7 @@ Task 09 adds account and personalization foundations. The next device round must
 3. Opening v2 个性化但不阻塞首屏 Ready；孩子先开口时迟到 opening 不插入。
 4. CS/game/sports 短答时 conversation_control soft_shift 自然给换题机会，高参与时不强制换题。
 5. Topic choices 来自后端 quick actions；Android 不展示独立硬编码恐龙/太空 fallback chips。
+6. Slow opening evidence must align backend request_id, `app.opening_timing`, Android video timestamp, and no raw child text.
 ```
 
 Evidence stays non-sensitive: account username can be synthetic, but do not record passwords, bearer tokens, real child names, raw transcript, raw audio, raw image, or provider key.
@@ -63,10 +64,10 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. | 2026-05-24 Task 08 doctor OK for conda/JDK/Android SDK/adb; LAN IP `192.168.0.118`; adb reported no connected physical Android device. | PASS | local terminal | Automated smoke only; not device QA. |
-| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. | 2026-05-24 Task 08: `cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m pytest` -> 428 passed. | PASS | local terminal | No real provider key in output. |
-| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test` or the standard wrapper. | JVM tests pass. | 2026-05-24 Task 08: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL. | PASS | local terminal | Does not replace device QA. |
-| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. | 2026-05-24 Task 08 Lane A PASS with base URL `http://192.168.0.118:8000/`; path `android/app/build/outputs/apk/debug/app-debug.apk`; size 16471142; sha256 `811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86`; source code commit before Lane A docs closeout `a0255d79647eaecd86013ed90a7063f259e10dcf`. | PASS | local terminal | No install attempted because no device connected. Rebuild after backend URL changes or app code changes. |
+| QA-ENV-01 | Local environment doctor | Run `bash scripts/doctor_local_env.sh` from repo root. | Conda `child-ai`, JDK 17, Android SDK, adb, and network info are reported; missing physical device is recorded, not treated as pass. | 2026-05-25 Task 10: conda/JDK/Android SDK/adb OK; LAN IP `192.168.0.118`; adb warned no connected physical Android device. | PASS | local terminal | Automated smoke only; not device QA. |
+| QA-ENV-02 | Backend tests before device build | Run `cd backend && pytest` or standard root script. | Backend tests pass or failures are recorded before APK handoff. | 2026-05-25 Task 10: `bash scripts/test_backend.sh` -> 453 passed. | PASS | local terminal | No real provider key in output. |
+| QA-ENV-03 | Android unit tests before device build | Run `cd android && ./gradlew test` or the standard wrapper. | JVM tests pass. | 2026-05-25 Task 10: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL. | PASS | local terminal | Does not replace device QA. |
+| QA-ENV-04 | Device APK build | Run `bash scripts/build_device_debug_apk.sh --base-url http://<mac-lan-ip>:8000/` and `shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk`. | APK base URL points to current Mac LAN backend; sha256 recorded. | 2026-05-25 Task 10 PASS with base URL `http://192.168.0.118:8000/`; path `android/app/build/outputs/apk/debug/app-debug.apk`; size 16471142; sha256 `28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa`; BuildConfig base URL verified. | PASS | local terminal | No install attempted because no device connected. Rebuild after backend URL changes or app code changes. |
 
 ## 2. Backend health and PostgreSQL
 
@@ -95,6 +96,7 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-AUTH-03 | Persistent session | Close/relaunch the app after login. | App remains logged in and opens the child experience without retyping password. |  | NOT_RUN |  |  |
 | QA-AUTH-04 | Manual logout | From家长设置 tap logout. | Token clears and app returns to parent-operated login/register screen. |  | NOT_RUN |  |  |
 | QA-AUTH-05 | Invalid credentials | Try an incorrect password for a synthetic account. | App shows a parent-facing failure message; child UI does not expose token/server internals. |  | NOT_RUN |  |  |
+| QA-AUTH-06 | Invalid or expired token | Use a synthetic saved session after backend logout/expiry or force `/auth/me` 401 on app launch. | Saved token clears and app returns to parent-operated login/register screen; no token/debug credential is shown. |  | NOT_RUN |  | Backend and ViewModel unit tests cover this; device relaunch still required. |
 
 ## 4. Opening greeting
 
@@ -104,6 +106,7 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-OPEN-02 | Child speaks before late opening | Immediately start voice/text turn after entering chat. | Late opening does not insert above the child’s active turn. |  | NOT_RUN |  |  |
 | QA-OPEN-03 | Nickname/display-name priority | Set fictional child nickname/display name in家长设置, restart chat. | Opening uses nickname first, display name second, and no forced real name when empty. |  | NOT_RUN |  | Do not use real child name. |
 | QA-OPEN-04 | Interest callback safety | With synthetic low-sensitivity interest seed, open chat. | Opening may lightly revisit one topic and allows switching away; no pressure to continue. |  | NOT_RUN |  | Backend/log evidence only; no raw memory text. |
+| QA-OPEN-05 | Slow opening trace | Trigger a slow synthetic opening/TTS path. | Evidence has backend `request_id`, `app.opening_timing` fields `model_ms`, `tts_ms`, `total_ms`, `audio_url_present`, `fallback_used`, plus Android video timestamp; no raw opening text or parent_message_raw. |  | NOT_RUN |  | Task 10 backend unit tests cover non-sensitive log shape and TTS timeout fallback. |
 
 ## 4A. Parent settings child profile
 
@@ -298,6 +301,27 @@ Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
 Real-device QA: NOT_RUN; no Redmi K60 / Honor Pad 5 device evidence was available in this implementation run.
 Device QA required: Redmi K60 / Honor Pad 5 for register/login/persistent session/logout, 家长设置/日报 default logged-in entry, opening v2 non-blocking behavior, CS/game conversation_control naturalness, backend topic choices layout, and auth screens on low-end landscape.
 Data boundary: do not record passwords, bearer tokens, real child names, raw transcript, raw audio, raw image, provider key, parent_message_raw, or DB dumps.
+```
+
+## 20. Task 10 Task09 closeout and QA package snapshot
+
+```text
+Date: 2026-05-25
+Scope: Auth/account closeout; opening v2 latency closeout; model control/topic choice trace hardening; QA package and docs closeout.
+Backend tests: `bash scripts/test_backend.sh` -> 453 passed.
+Backend lint: `bash scripts/lint_backend.sh` -> All checks passed.
+Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
+Android build: `bash scripts/android_gradle.sh assembleDebug` -> BUILD SUCCESSFUL.
+Model trace runner: `conda run -n child-ai python scripts/run_model_trace_scenarios.py --output /tmp/task10_model_trace_review.md` -> MODEL_TRACE_SCENARIOS: PASS, scenarios=26, traces=26.
+Device APK build: `bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/` -> PASS.
+APK path: android/app/build/outputs/apk/debug/app-debug.apk
+APK base URL: http://192.168.0.118:8000/
+APK size: 16471142 bytes
+APK sha256: 28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
+Device connection: adb available; no connected physical Android device.
+Real-device QA: NOT_RUN; no Redmi K60 / Honor Pad 5 install, video, request_id, opening timing, or XiaobaohuTtsTiming evidence was collected in this run.
+Remaining NOT_RUN QA: all Redmi K60 / Honor Pad 5 device rows in sections 3-14, especially QA-AUTH-01..06, QA-OPEN-01..05, QA-TOPIC-01..03, QA-TTS-06, QA-ANDROID-03, QA-DEVICE-RK60-01/02, and QA-DEVICE-HP5-01/02.
+Data boundary: SharedPreferences token is a family-beta thin slice only, not production security hardening; do not record passwords, bearer tokens, real child names, raw transcript, raw audio, raw image, provider key, parent_message_raw, or DB dumps.
 ```
 
 ## Closeout rules

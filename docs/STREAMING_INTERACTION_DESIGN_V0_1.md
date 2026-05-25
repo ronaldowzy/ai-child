@@ -929,6 +929,8 @@ Task 09 补充约束：
 2. `conversation_control` 是 child_chat 同一次模型调用的结构化结果，不新增第二次模型调用。
 3. stream UI 只展示后端返回的 safe quick actions / topic choices；Android 不再在无后端上下文时写死恐龙、太空等固定话题 chips。
 4. opening v2 不阻塞首屏 Ready；如果孩子先开始 stream turn，迟到 opening 不插入活跃会话。
+5. Task 10 已补 stream auth override 回归测试；登录态 stream 默认使用账号 child_id，显式 child_id 只保留为 local/dev 兼容。
+6. Task 10 trace runner 覆盖 CS/game 短答 soft_shift、高细节 continue、no-chat guardrail、兴趣化 topic choices 和 boundary filtering；trace 只记录 control/action 摘要，不记录儿童原文。
 ```
 
 暂不做：

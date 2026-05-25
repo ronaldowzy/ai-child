@@ -84,6 +84,42 @@ def test_topic_seed_pack_rejects_missing_or_unsafe_fields(tmp_path: Path) -> Non
         TopicSeedService(seed_pack_path=unsafe_path)._load_seed_objects()
 
 
+def test_topic_choice_labels_prefer_profile_interests() -> None:
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 8,
+                "child_interests": ["恐龙", "画画", "跑步"],
+            }
+        },
+        limit=3,
+    )
+
+    assert labels == ["聊恐龙", "聊画画", "聊跑步"]
+
+
+def test_topic_choice_labels_filter_boundaries_and_recent_topic_synonyms() -> None:
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 8,
+                "child_interests": ["恐龙", "画画", "跑步", "CS"],
+                "topic_boundaries": ["跑步", "游戏"],
+            }
+        },
+        recent_topic="游戏/CS",
+        limit=4,
+    )
+
+    assert labels[:2] == ["聊恐龙", "聊画画"]
+    assert all("跑步" not in label for label in labels)
+    assert all("CS" not in label and "游戏" not in label for label in labels)
+
+
 def _seed(
     *,
     seed_id: str,

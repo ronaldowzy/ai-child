@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成儿童统一聊天、家长代创建/登录一个孩子账号、系统相机/相册真实图片上传、家长设置/日报和家长入口降噪。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 家长调试模式。Task 09 已接入本地家庭内测账号、家长术语、opening v2 和后端生成 topic choices；仍待 Redmi K60 / Honor Pad 5 真机 QA。
+当前 Android MVP 已完成儿童统一聊天、家长代创建/登录一个孩子账号、系统相机/相册真实图片上传、家长设置/日报和家长入口降噪。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 家长调试模式。Task 10 已收口本地家庭内测账号、opening v2 latency 和后端生成 topic choices 的自动化 QA；仍待 Redmi K60 / Honor Pad 5 真机 QA。
 
 Task 04 家庭内测 QA runbook 已新增：
 
@@ -15,7 +15,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 ## 当前范围
 
 - 单一儿童聊天入口。
-- Task 09 家庭内测账号薄片：无本地 token 时显示“家长登录 / 创建孩子账号”，注册和登录都由家长操作；登录后 token 持久保存到 SharedPreferences，除非家长手动退出或后端 token 失效。孩子不管理密码，Android 不展示 token/debug 信息。
+- Task 09/10 家庭内测账号薄片：无本地 token 时显示“家长登录 / 创建孩子账号”，注册和登录都由家长操作；登录后 token 持久保存到 SharedPreferences，除非家长手动退出或后端 token 失效。SharedPreferences token 只是 family-beta thin slice，不是生产安全加固；孩子不管理密码，Android 不展示 token/debug 信息。
 - 小白狐智能体形象占位，会根据后端 `reply.emotion` 和
   `reply.agent_motion` 做轻量状态变化。
 - 儿童默认 voice-first 输入：主按钮用于开始说话 / 说完了 / 正在听懂；文字输入框和发送按钮默认隐藏，可通过 DevSettings 打开。
@@ -74,7 +74,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 - 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 或非儿童测试音频做 ASR smoke，不用真实儿童录音。
 - 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
 - App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示；后端 opening 默认尝试生成小白狐 `audio_url`，Android 只播放该远程音频，不用系统 TTS 顶替。孩子先开口时，迟到的 opening 不插入。
-- opening greeting 的称呼来自家长设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。Task 09 后 opening v2 可结合账号画像、兴趣和低敏历史生成短开场，Android Ready 首屏不等待 opening/TTS。
+- opening greeting 的称呼来自家长设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。Task 10 后 opening v2 继续结合账号画像、兴趣和低敏历史生成短开场，Android Ready 首屏不等待 opening/TTS；后端记录非敏感 `app.opening_timing`，并在 TTS 慢/失败时返回文字而不阻塞到音频生成完成。
 - TTS 朗读只播放后端返回的 `reply.audio_url` 对应音频；远程播放失败或缺失 `audio_url` 时保留文字和温和错误提示，不用系统 TextToSpeech 混播。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。本轮保证 voice-first 下 TTS pending/speaking 时儿童可见“停一下”和“静音/打开朗读”；停止会清空当前播放和 segment queue，静音会阻止后续自动朗读。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
@@ -190,27 +190,27 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 base URL：http://192.168.0.118:8000/
 大小：16471142 bytes
-SHA256：811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86
+SHA256：28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
+构建时间 UTC：2026-05-25T04:10:50Z
 ```
 
-Task 08 Lane A QA 包构建结果（2026-05-24）：
+Task 10 QA 包构建结果（2026-05-25）：
 
 ```text
-cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m pytest：428 passed
-cd backend && /opt/homebrew/bin/conda run --no-capture-output -n child-ai python -m ruff check .：All checks passed
+bash scripts/test_backend.sh：453 passed
+bash scripts/lint_backend.sh：All checks passed
 bash scripts/android_gradle.sh test：BUILD SUCCESSFUL
 bash scripts/android_gradle.sh assembleDebug：BUILD SUCCESSFUL
-bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/：PASS
-adb devices：未连接物理设备
+conda run -n child-ai python scripts/run_model_trace_scenarios.py --output /tmp/task10_model_trace_review.md：MODEL_TRACE_SCENARIOS: PASS，26 scenarios / 26 traces
+bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/：PASS，sha256=28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
+bash scripts/doctor_local_env.sh：adb 可用但未连接物理设备
 ```
 
 上述结果只说明本机 JVM 测试和 debug APK 构建可用；Redmi K60 /
 Honor Pad 5 安装、音频、录音、横屏布局、图片缩略图、stream/TTS stop/mute
 和低配动画表现仍必须按 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md` 真机记录。
 
-Task 08 没有收到新一轮 Redmi K60 / Honor Pad 5 视频、同一慢 turn 的 backend
-`request_id` 或 Android `XiaobaohuTtsTiming` logcat，因此没有做 Lane B/C/D
-猜测式代码修复。下一轮慢 TTS turn 需要同时记录 backend timing 和：
+Task 10 没有执行 Redmi K60 / Honor Pad 5 真机安装、录屏或 logcat 采集。下一轮慢 opening/TTS turn 需要同时记录 backend timing 和：
 
 ```bash
 adb logcat -v time | grep XiaobaohuTtsTiming
@@ -323,7 +323,7 @@ base URL：http://192.168.0.118:8000/
 | 设备 | 定位 | 重点 |
 |---|---|---|
 | Device A：Redmi K60，Android 14 | 功能主验证 | 先跑通后端 ASR 录音上传确认、自动朗读、小白狐状态切换、图片资源、轻量动画、真实模型/Mock 模型对话体验和核心安全流程 |
-| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9、4GB 内存、平板横屏/大屏 UI、后端 ASR 上传确认、TTS fallback、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
+| Device B：Honor Pad 5，Android 9，RAM 4GB | 低配兼容性目标设备 | 验证 Android 9、4GB 内存、平板横屏/大屏 UI、后端 ASR 上传确认、远程 TTS 失败不混播系统音色、小白狐资源大小、动画流畅度、发热、卡顿和降级策略 |
 
 开发原则：
 
@@ -410,7 +410,7 @@ bash scripts/smoke_voice_stack.sh
 2. APK 使用真机 LAN base URL 构建。
 3. MiMo key 只放后端环境变量，不放 Android、docs、tests 或截图。
 4. ASR 真实 provider smoke 只用非儿童测试音频和 opt-in policy env；真机儿童语音 QA 不等于 provider smoke。
-5. 详细 Redmi K60 / Honor Pad 5 手动步骤见 `docs/QA_DEVICE_CHECKLIST_V0_1.md`。
+5. 详细 Redmi K60 / Honor Pad 5 手动步骤见 `docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md`。
 6. Redmi K60 先测主功能链路，Honor Pad 5 后测低配性能和 fallback。
 7. QA 结果记录模板见 `docs/QA_RESULT_TEMPLATE_V0_1.md`。
 ```
@@ -419,14 +419,14 @@ bash scripts/smoke_voice_stack.sh
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-构建时间 UTC：2026-05-22T12:06:31Z
-大小：16190741 bytes / 15M
-SHA256：798a87a6256c9b2523b519aeb337385eec2fe7b9cecc43e25f1feb79bf51f850
+构建时间 UTC：2026-05-25T04:10:50Z
+大小：16471142 bytes
+SHA256：28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
 base URL：http://192.168.0.118:8000/
 BuildConfig.CONVERSATION_API_BASE_URL：http://192.168.0.118:8000/
 ```
 
-这个 APK 可用于 Redmi K60 / Honor Pad 5 真机 QA，但尚未真机通过。Mac LAN IP 改变后必须重新构建。
+这个 Task 10 APK 可用于 Redmi K60 / Honor Pad 5 真机 QA，但尚未真机通过。Mac LAN IP 改变后必须重新构建。
 
 ## 本地运行
 

@@ -1,3 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from contextvars import copy_context
+from dataclasses import dataclass
+import logging
+import time
+
+from app.core.logging import hash_identifier
 from app.domain.schemas.conversation import (
     ConversationMessageResponse,
     ConversationOpeningRequest,
@@ -25,6 +32,32 @@ from app.services.time_context_service import (
     get_time_context_service,
 )
 from app.services.tts_service import TtsService, get_tts_service
+from app.middleware.request_id import get_request_id
+
+
+logger = logging.getLogger("app.opening_timing")
+DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS = 1500
+
+
+@dataclass(frozen=True)
+class _ModelOpeningResult:
+    text: str
+    model_ms: float
+    fallback_used: bool
+    error_type: str | None = None
+
+
+@dataclass(frozen=True)
+class _OpeningTtsResult:
+    tts_ms: float
+    audio_url_present: bool
+    error_type: str | None = None
+
+
+@dataclass(frozen=True)
+class _OpeningCacheInfo:
+    fallback_used: bool
+    audio_url_present: bool
 
 
 class OpeningService:
@@ -39,6 +72,7 @@ class OpeningService:
         model_registry: ModelRegistry | None = None,
         memory_service: MemoryService | None = None,
         opening_policy_builder: OpeningPolicyBuilder | None = None,
+        tts_soft_timeout_ms: int = DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -51,15 +85,36 @@ class OpeningService:
             opening_policy_builder
             or OpeningPolicyBuilder(memory_service=self._memory_service)
         )
+        self._tts_soft_timeout_ms = tts_soft_timeout_ms
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
+        self._session_cache_info: dict[tuple[str, str], _OpeningCacheInfo] = {}
 
     def create_opening(
         self,
         request: ConversationOpeningRequest,
     ) -> ConversationMessageResponse:
         cache_key = (request.child_id, request.session_id)
+        started_at = time.perf_counter()
         cached = self._session_cache.get(cache_key)
         if cached is not None:
+            cache_info = self._session_cache_info.get(cache_key)
+            self._log_opening_finished(
+                request=request,
+                started_at=started_at,
+                model_result=_ModelOpeningResult(
+                    text="",
+                    model_ms=0.0,
+                    fallback_used=cache_info.fallback_used if cache_info else False,
+                ),
+                tts_result=_OpeningTtsResult(
+                    tts_ms=0.0,
+                    audio_url_present=cache_info.audio_url_present
+                    if cache_info
+                    else bool(cached.reply.audio_url),
+                ),
+                opening_policy_mode=None,
+                cache_hit=True,
+            )
             return cached
 
         parent_policy = self._parent_policy_service.get_policy(request.child_id)
@@ -77,19 +132,21 @@ class OpeningService:
             parent_policy=parent_policy,
             opening_policy=opening_policy,
         )
-        text = self._generate_model_opening(
+        model_result = self._generate_model_opening(
             parent_policy=parent_policy,
             time_context=time_context,
             opening_policy=opening_policy,
             fallback_text=fallback_text,
         )
         reply = Reply(
-            text=text,
+            text=model_result.text,
             voice_enabled=True,
             emotion=self._emotion_for(time_context),
             agent_motion=self._motion_for(time_context),
         )
-        self._attach_audio_url(reply)
+        tts_result = self._attach_audio_url(reply)
+        if not reply.audio_url:
+            reply.voice_enabled = False
         response = ConversationMessageResponse(
             reply=reply,
             ui_actions=[
@@ -107,6 +164,18 @@ class OpeningService:
             policy=opening_policy,
         )
         self._session_cache[cache_key] = response
+        self._session_cache_info[cache_key] = _OpeningCacheInfo(
+            fallback_used=model_result.fallback_used,
+            audio_url_present=tts_result.audio_url_present,
+        )
+        self._log_opening_finished(
+            request=request,
+            started_at=started_at,
+            model_result=model_result,
+            tts_result=tts_result,
+            opening_policy_mode=opening_policy.mode.value,
+            cache_hit=False,
+        )
         return response
 
     def _generate_model_opening(
@@ -116,7 +185,8 @@ class OpeningService:
         time_context: TimeContext,
         opening_policy: OpeningPolicy,
         fallback_text: str,
-    ) -> str:
+    ) -> _ModelOpeningResult:
+        started_at = time.perf_counter()
         try:
             response = self._request_model_opening(
                 parent_policy=parent_policy,
@@ -125,16 +195,29 @@ class OpeningService:
                 user_content="请生成开场白。",
                 retry=False,
             )
-        except Exception:
-            return fallback_text
+        except Exception as exc:
+            return _ModelOpeningResult(
+                text=fallback_text,
+                model_ms=self._elapsed_ms(started_at),
+                fallback_used=True,
+                error_type=exc.__class__.__name__,
+            )
         if response.metadata.get("mock"):
-            return fallback_text
+            return _ModelOpeningResult(
+                text=fallback_text,
+                model_ms=self._elapsed_ms(started_at),
+                fallback_used=True,
+            )
         text = self._sanitize_opening_text(
             response.response_text,
             opening_policy=opening_policy,
         )
         if text:
-            return text
+            return _ModelOpeningResult(
+                text=text,
+                model_ms=self._elapsed_ms(started_at),
+                fallback_used=False,
+            )
         try:
             retry_response = self._request_model_opening(
                 parent_policy=parent_policy,
@@ -143,14 +226,21 @@ class OpeningService:
                 user_content="请只输出一句中文开场白，不要解释，不要 JSON。",
                 retry=True,
             )
-        except Exception:
-            return fallback_text
-        return (
-            self._sanitize_opening_text(
-                retry_response.response_text,
-                opening_policy=opening_policy,
+        except Exception as exc:
+            return _ModelOpeningResult(
+                text=fallback_text,
+                model_ms=self._elapsed_ms(started_at),
+                fallback_used=True,
+                error_type=exc.__class__.__name__,
             )
-            or fallback_text
+        retry_text = self._sanitize_opening_text(
+            retry_response.response_text,
+            opening_policy=opening_policy,
+        )
+        return _ModelOpeningResult(
+            text=retry_text or fallback_text,
+            model_ms=self._elapsed_ms(started_at),
+            fallback_used=not bool(retry_text),
         )
 
     def _request_model_opening(
@@ -296,18 +386,56 @@ class OpeningService:
             or (parent_policy.child_display_name or "").strip()
         )
 
-    def _attach_audio_url(self, reply: Reply) -> None:
+    def _attach_audio_url(self, reply: Reply) -> _OpeningTtsResult:
+        started_at = time.perf_counter()
         if not reply.voice_enabled:
-            return
+            return _OpeningTtsResult(
+                tts_ms=self._elapsed_ms(started_at),
+                audio_url_present=False,
+            )
         try:
-            audio_url = self._tts_service.generate_for_conversation(
+            audio_url = self._generate_tts_with_soft_timeout(
                 text=reply.text,
                 emotion=reply.emotion,
             )
-        except Exception:
-            return
+        except FutureTimeoutError as exc:
+            return _OpeningTtsResult(
+                tts_ms=self._elapsed_ms(started_at),
+                audio_url_present=False,
+                error_type=exc.__class__.__name__,
+            )
+        except Exception as exc:
+            return _OpeningTtsResult(
+                tts_ms=self._elapsed_ms(started_at),
+                audio_url_present=False,
+                error_type=exc.__class__.__name__,
+            )
         if audio_url:
             reply.audio_url = audio_url
+        return _OpeningTtsResult(
+            tts_ms=self._elapsed_ms(started_at),
+            audio_url_present=bool(audio_url),
+        )
+
+    def _generate_tts_with_soft_timeout(self, *, text: str, emotion: str) -> str | None:
+        if self._tts_soft_timeout_ms <= 0:
+            return self._tts_service.generate_for_conversation(
+                text=text,
+                emotion=emotion,
+            )
+
+        context = copy_context()
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="opening-tts")
+        future = executor.submit(
+            context.run,
+            self._tts_service.generate_for_conversation,
+            text=text,
+            emotion=emotion,
+        )
+        try:
+            return future.result(timeout=self._tts_soft_timeout_ms / 1000)
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def _emotion_for(self, time_context: TimeContext) -> str:
         if time_context.time_period == TimePeriod.BEDTIME:
@@ -353,6 +481,41 @@ class OpeningService:
         if any("不提固定场所" in rule for rule in opening_policy.prompt_rules):
             return text.replace("学校", "日间场所")
         return text
+
+    def _log_opening_finished(
+        self,
+        *,
+        request: ConversationOpeningRequest,
+        started_at: float,
+        model_result: _ModelOpeningResult,
+        tts_result: _OpeningTtsResult,
+        opening_policy_mode: str | None,
+        cache_hit: bool,
+    ) -> None:
+        logger.info(
+            "conversation_opening_finished",
+            extra={
+                "event": "conversation_opening_finished",
+                "request_id": get_request_id(),
+                "child_id_hash": hash_identifier(request.child_id),
+                "session_id_hash": hash_identifier(request.session_id),
+                "opening_policy_mode": opening_policy_mode,
+                "cache_hit": cache_hit,
+                "model_ms": model_result.model_ms,
+                "tts_ms": tts_result.tts_ms,
+                "total_ms": self._elapsed_ms(started_at),
+                "audio_url_present": tts_result.audio_url_present,
+                "fallback_used": model_result.fallback_used,
+                "model_error_type": model_result.error_type,
+                "tts_error_type": tts_result.error_type,
+                "opening_text_chars": len(model_result.text)
+                if model_result.text
+                else None,
+            },
+        )
+
+    def _elapsed_ms(self, started_at: float) -> float:
+        return round((time.perf_counter() - started_at) * 1000, 1)
 
 
 _opening_service = OpeningService()

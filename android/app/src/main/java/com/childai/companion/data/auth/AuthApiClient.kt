@@ -8,18 +8,35 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+interface AuthSessionRepository {
+    fun savedSession(): SavedAuthSession
+    fun authToken(): String?
+    fun childIdOrNull(): String?
+    suspend fun register(request: AuthRegisterRequest): SavedAuthSession
+    suspend fun login(request: AuthLoginRequest): SavedAuthSession
+    suspend fun refreshAccount(): SavedAuthSession
+    suspend fun logout()
+}
+
+interface AuthRemoteDataSource {
+    suspend fun register(request: AuthRegisterRequest): AuthSession
+    suspend fun login(request: AuthLoginRequest): AuthSession
+    suspend fun logout(token: String)
+    suspend fun me(token: String): AuthAccount
+}
+
 class AuthApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = 12_000,
-) {
-    suspend fun register(request: AuthRegisterRequest): AuthSession =
+) : AuthRemoteDataSource {
+    override suspend fun register(request: AuthRegisterRequest): AuthSession =
         postJson("auth/register", request.toJsonString())
 
-    suspend fun login(request: AuthLoginRequest): AuthSession =
+    override suspend fun login(request: AuthLoginRequest): AuthSession =
         postJson("auth/login", request.toJsonString())
 
-    suspend fun logout(token: String) = withContext(Dispatchers.IO) {
+    override suspend fun logout(token: String) = withContext(Dispatchers.IO) {
         val connection = openConnection(authEndpoint("auth/logout"), "POST").apply {
             setBearerToken(token)
             doOutput = true
@@ -38,7 +55,7 @@ class AuthApiClient(
         }
     }
 
-    suspend fun me(token: String): AuthAccount = withContext(Dispatchers.IO) {
+    override suspend fun me(token: String): AuthAccount = withContext(Dispatchers.IO) {
         val connection = openConnection(authEndpoint("auth/me"), "GET").apply {
             setBearerToken(token)
         }

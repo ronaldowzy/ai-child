@@ -41,6 +41,8 @@ class QuickActionService:
         conversation_control: dict[str, object] | None,
     ) -> list[SceneAction]:
         control_actions = self._control_actions(conversation_control)
+        if self._is_stop_control(conversation_control):
+            return control_actions
         if self._should_offer_topic_choices(conversation_control, reply_text):
             topic_actions = self._topic_choice_actions(
                 parent_policy=parent_policy,
@@ -91,12 +93,23 @@ class QuickActionService:
             conversation_control=conversation_control,
         ) or self._actions("继续说", "讲个小故事", "今天不聊了")
 
+    def _is_stop_control(
+        self,
+        conversation_control: dict[str, object] | None,
+    ) -> bool:
+        return bool(
+            conversation_control
+            and conversation_control.get("topic_continuity") == "stop"
+        )
+
     def _should_offer_topic_choices(
         self,
         conversation_control: dict[str, object] | None,
         reply_text: str,
     ) -> bool:
         if not conversation_control:
+            return False
+        if conversation_control.get("topic_continuity") == "stop":
             return False
         if conversation_control.get("topic_continuity") == "soft_shift":
             return True

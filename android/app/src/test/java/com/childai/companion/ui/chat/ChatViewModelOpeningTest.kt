@@ -7,6 +7,10 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,6 +48,59 @@ class ChatViewModelOpeningTest {
 
         assertEquals(1, tts.requests.size)
         assertEquals("/media/tts/opening.wav", tts.requests.first().audioUrl)
+    }
+
+    @Test
+    fun openingTextWithoutAudioDoesNotUseLocalTtsFallback() {
+        val sender = OpeningSender(
+            openingResponse = response(
+                text = "豆豆，我准备好啦。",
+                audioUrl = null,
+                voiceEnabled = false,
+            ),
+        )
+        val tts = RecordingTtsController()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            ttsController = tts,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.requestOpeningGreeting()
+
+        assertEquals("豆豆，我准备好啦。", viewModel.uiState.value.messages.first().text)
+        assertEquals(0, tts.requests.size)
+    }
+
+    @Test
+    fun lateOpeningAfterChildInputIsSuppressedAndDoesNotPlayAudio() {
+        val sender = BlockingOpeningSender(
+            openingResponse = response(
+                text = "豆豆，迟到的开场。",
+                audioUrl = "/media/tts/late-opening.wav",
+            ),
+        )
+        val tts = RecordingTtsController()
+        val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        try {
+            val viewModel = ChatViewModel(
+                conversationSender = sender,
+                ttsController = tts,
+                sendDispatcher = dispatcher,
+            )
+
+            viewModel.requestOpeningGreeting()
+            assertTrue(sender.openingStarted.await(1, TimeUnit.SECONDS))
+            viewModel.sendText("我先说")
+            sender.releaseOpening()
+            assertTrue(sender.sendStarted.await(1, TimeUnit.SECONDS))
+
+            assertEquals(listOf("我先说"), sender.sentTexts)
+            assertTrue(viewModel.uiState.value.messages.none { it.text == "豆豆，迟到的开场。" })
+            assertEquals(0, tts.requests.size)
+        } finally {
+            dispatcher.close()
+        }
     }
 
     @Test
@@ -130,6 +187,51 @@ private class OpeningSender(
     ) = Unit
 }
 
+private class BlockingOpeningSender(
+    private val openingResponse: ConversationMessageResponse,
+) : ConversationMessageSender {
+    val openingStarted = CountDownLatch(1)
+    val sendStarted = CountDownLatch(1)
+    private val releaseOpening = CountDownLatch(1)
+    val sentTexts = mutableListOf<String>()
+
+    fun releaseOpening() {
+        releaseOpening.countDown()
+    }
+
+    override suspend fun requestOpening(
+        childId: String,
+        sessionId: String,
+        timezone: String,
+    ): ConversationMessageResponse {
+        openingStarted.countDown()
+        assertTrue(releaseOpening.await(1, TimeUnit.SECONDS))
+        return openingResponse
+    }
+
+    override suspend fun sendTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+    ): ConversationMessageResponse {
+        sentTexts += text
+        sendStarted.countDown()
+        return response("收到。", audioUrl = null)
+    }
+
+    override suspend fun streamTextMessage(
+        childId: String,
+        sessionId: String,
+        text: String,
+        attachments: List<String>,
+        timezone: String,
+        includeTts: Boolean,
+        onEvent: (ConversationStreamEvent) -> Unit,
+    ) = Unit
+}
+
 private class RecordingTtsController : TtsController {
     val requests = mutableListOf<TtsRequest>()
 
@@ -148,12 +250,13 @@ private class RecordingTtsController : TtsController {
 private fun response(
     text: String,
     audioUrl: String? = null,
+    voiceEnabled: Boolean = audioUrl != null,
 ): ConversationMessageResponse {
     return ConversationMessageResponse(
         reply = ConversationReply(
             type = "agent_message",
             text = text,
-            voiceEnabled = audioUrl != null,
+            voiceEnabled = voiceEnabled,
             audioUrl = audioUrl,
             emotion = "warm",
             agentMotion = "gentle_idle",

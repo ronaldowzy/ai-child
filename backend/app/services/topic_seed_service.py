@@ -32,6 +32,12 @@ UNSAFE_LABEL_MARKERS = (
     "八卦",
     "明天有惊喜",
 )
+CHOICE_FILTER_MARKER_GROUPS = (
+    ("游戏", "cs", "反恐", "game"),
+    ("跑步", "运动", "比赛"),
+    ("画画", "画", "手工", "积木"),
+    ("恐龙", "太空", "星球", "动物", "昆虫", "植物"),
+)
 
 
 @dataclass(frozen=True)
@@ -239,11 +245,23 @@ class TopicSeedService:
     ) -> bool:
         if not label or self._contains_unsafe_label(label):
             return False
-        normalized = label.lower().replace(" ", "")
-        if recent_topic and recent_topic.lower().replace(" ", "") in normalized:
+        label_markers = self._choice_marker_set(label)
+        if recent_topic and (
+            label_markers & self._choice_marker_set(recent_topic)
+        ):
             return False
         for boundary in boundaries:
-            compact_boundary = boundary.lower().replace(" ", "")
-            if compact_boundary and compact_boundary in normalized:
+            boundary_markers = self._choice_marker_set(boundary)
+            if boundary_markers and label_markers & boundary_markers:
                 return False
         return True
+
+    def _choice_marker_set(self, text: str) -> set[str]:
+        compact = text.lower().replace(" ", "")
+        if not compact:
+            return set()
+        markers = {compact}
+        for group in CHOICE_FILTER_MARKER_GROUPS:
+            if any(marker in compact for marker in group):
+                markers.update(group)
+        return markers

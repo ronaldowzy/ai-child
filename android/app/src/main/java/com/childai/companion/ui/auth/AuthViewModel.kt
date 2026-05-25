@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.childai.companion.data.auth.AuthLoginRequest
 import com.childai.companion.data.auth.AuthRegisterRequest
-import com.childai.companion.data.auth.AuthRepository
+import com.childai.companion.data.auth.AuthSessionRepository
 import com.childai.companion.data.auth.SavedAuthSession
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AuthViewModel(
-    private val repository: AuthRepository,
+    private val repository: AuthSessionRepository,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(

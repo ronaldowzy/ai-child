@@ -1,3 +1,6 @@
+import json
+import logging
+import time
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
@@ -315,6 +318,35 @@ def test_opening_tts_failure_still_returns_text() -> None:
 
     assert response.reply.text
     assert response.reply.audio_url is None
+    assert response.reply.voice_enabled is False
+
+
+def test_opening_tts_timeout_still_returns_text(caplog) -> None:
+    class SlowTts:
+        calls = 0
+
+        def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
+            self.calls += 1
+            time.sleep(0.2)
+            return "/media/tts/late-opening.wav"
+
+    caplog.set_level(logging.INFO, logger="app.opening_timing")
+    tts = SlowTts()
+    service = OpeningService(tts_service=tts, tts_soft_timeout_ms=1)
+    request = _request_model(
+        child_id="opening_tts_timeout_child",
+        session_id="opening-tts-timeout",
+    )
+
+    response = service.create_opening(request)
+
+    assert response.reply.text
+    assert response.reply.audio_url is None
+    assert response.reply.voice_enabled is False
+    assert tts.calls == 1
+    record = _last_opening_timing_record(caplog)
+    assert record.tts_error_type == "TimeoutError"
+    assert record.audio_url_present is False
 
 
 def test_opening_generates_xiaobaihu_audio_url_and_uses_session_cache() -> None:
@@ -339,6 +371,70 @@ def test_opening_generates_xiaobaihu_audio_url_and_uses_session_cache() -> None:
     assert first.reply.audio_url == "/media/tts/opening.wav"
     assert second.reply.audio_url == "/media/tts/opening.wav"
     assert tts.calls == 1
+
+
+def test_opening_timing_log_is_structured_and_non_sensitive(caplog) -> None:
+    opening_text = "豆豆，今天可以从恐龙或画画里选一个轻松说。"
+    parent_secret = "parent_message_raw_secret_do_not_log"
+
+    class FixedOpeningModelRegistry:
+        def generate(self, _request):
+            from app.domain.model_types import ModelResponse, ModelTaskType
+
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text=opening_text,
+                structured_output={},
+                provider_name="fixed",
+                model_name="fixed-opening",
+                metadata={},
+            )
+
+    class UrlTts:
+        def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
+            return "/media/tts/opening.wav"
+
+    child_id = "opening_timing_log_child"
+    _update_policy(
+        child_id,
+        child_nickname="豆豆",
+        parent_message_raw=parent_secret,
+        communication_preferences={"child_interests": ["恐龙", "画画"]},
+    )
+    caplog.set_level(logging.INFO, logger="app.opening_timing")
+    service = OpeningService(
+        model_registry=FixedOpeningModelRegistry(),
+        tts_service=UrlTts(),
+    )
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-timing-log-session",
+        )
+    )
+
+    assert response.reply.text == opening_text
+    assert response.reply.audio_url == "/media/tts/opening.wav"
+    record = _last_opening_timing_record(caplog)
+    assert record.model_ms is not None
+    assert record.tts_ms is not None
+    assert record.total_ms >= record.model_ms
+    assert record.audio_url_present is True
+    assert record.fallback_used is False
+    assert record.child_id_hash
+    assert record.session_id_hash
+    payload = _opening_record_payload(record)
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "model_ms" in payload
+    assert "tts_ms" in payload
+    assert "total_ms" in payload
+    assert "audio_url_present" in payload
+    assert "fallback_used" in payload
+    assert parent_secret not in serialized
+    assert opening_text not in serialized
+    assert parent_secret not in caplog.text
+    assert opening_text not in caplog.text
 
 
 def test_opening_lightly_revisits_recent_interest_seed() -> None:
@@ -596,3 +692,32 @@ def _request_model(
             app_mode="child",
         ),
     )
+
+
+def _last_opening_timing_record(caplog):
+    records = [
+        record for record in caplog.records
+        if getattr(record, "event", None) == "conversation_opening_finished"
+    ]
+    assert records
+    return records[-1]
+
+
+def _opening_record_payload(record) -> dict[str, object]:
+    keys = [
+        "event",
+        "request_id",
+        "child_id_hash",
+        "session_id_hash",
+        "opening_policy_mode",
+        "cache_hit",
+        "model_ms",
+        "tts_ms",
+        "total_ms",
+        "audio_url_present",
+        "fallback_used",
+        "model_error_type",
+        "tts_error_type",
+        "opening_text_chars",
+    ]
+    return {key: getattr(record, key, None) for key in keys}

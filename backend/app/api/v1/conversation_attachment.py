@@ -1,5 +1,6 @@
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 
+from app.api.v1.auth import optional_auth_account
 from app.domain.attachment import (
     AttachmentCreateRequest,
     AttachmentCreateResponse,
@@ -25,7 +26,11 @@ attachment_service = AttachmentService()
 )
 def create_attachment(
     request: AttachmentCreateRequest,
+    authorization: str | None = Header(default=None),
 ) -> AttachmentCreateResponse:
+    account = optional_auth_account(authorization)
+    if account is not None:
+        request = request.model_copy(update={"child_id": account.child_id})
     return attachment_service.create_attachment(request)
 
 
@@ -40,8 +45,12 @@ async def upload_image_attachment(
     image_purpose: ImagePurpose = Form(ImagePurpose.SHARE),
     child_caption: str | None = Form(default=None),
     file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
 ) -> AttachmentCreateResponse:
     try:
+        account = optional_auth_account(authorization)
+        if account is not None:
+            child_id = account.child_id
         image_bytes = await file.read(REAL_IMAGE_MAX_BYTES + 1)
         return attachment_service.create_real_image_upload(
             RealImageUpload(

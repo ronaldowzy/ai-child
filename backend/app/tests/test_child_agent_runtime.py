@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from app.domain.agent_runtime import (
@@ -32,8 +33,10 @@ class CapturingModelRegistry:
         self.response = response or _model_response("我们先看看题目在问什么。")
         self.exc = exc
         self.last_request: ModelRequest | None = None
+        self.call_count = 0
 
     def generate(self, request: ModelRequest) -> ModelResponse:
+        self.call_count += 1
         self.last_request = request
         if self.exc is not None:
             raise self.exc
@@ -364,6 +367,13 @@ def test_child_agent_runtime_bedtime_closeout_removes_open_question() -> None:
     assert result.source == AgentRuntimeSource.MODEL
     assert result.reply_text == ChildAgentRuntime.BEDTIME_CLOSE_REPLY
     assert "？" not in result.reply_text
+    assert result.model_metadata["final_conversation_control"]["source"] == (
+        "program_guardrail"
+    )
+    assert (
+        result.model_metadata["final_conversation_control"]["topic_continuity"]
+        == "stop"
+    )
 
 
 def test_child_agent_runtime_bedtime_closeout_removes_tomorrow_hook() -> None:
@@ -563,6 +573,14 @@ def test_child_agent_runtime_uses_model_control_soft_shift_for_cs_short_answer()
     assert result.model_metadata["healthy_engagement"]["final_conversation_control"][
         "topic_continuity"
     ] == "soft_shift"
+    assert result.model_metadata["conversation_control_trace"]["recent_topic"] == "游戏/CS"
+    control_trace_json = json.dumps(
+        result.model_metadata["conversation_control_trace"],
+        ensure_ascii=False,
+    )
+    assert "我想聊 CS" not in control_trace_json
+    assert "CS 沙二" not in control_trace_json
+    assert registry.call_count == 1
 
 
 def test_child_agent_runtime_allows_high_engagement_to_continue_topic() -> None:

@@ -880,6 +880,7 @@ Task 09 后的 Healthy Engagement 相关边界：
 3. metrics 记录 `model_conversation_control` 与 `final_conversation_control` 的结构化字段，不记录儿童原文、完整回复、原始音频、原图、家长寄语原文或 provider body。
 4. topic choices 使用家长配置的兴趣、topic boundaries、历史低敏摘要和静态 curated seeds；不抓实时热点，不做签到/任务/奖励/排行榜/宠物机制。
 5. 账号薄片只用于把设置、对话、opening、日报和 topic choices 归属到当前孩子账号；不宣称生产级账号合规完成。
+6. Task 10 增加 `conversation_control_trace` 和 trace runner coverage，用于验证 model_control、fallback_control、final_control、boundary_signal、same_topic_score 和 topic choices；这些 trace 只能保存非内容摘要，不能保存 raw child text、full reply、parent_message_raw、原始音频或原图。
 ```
 
 ---

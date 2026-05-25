@@ -175,6 +175,8 @@ ChildChatScreen 首次可见
 4. 同一个 ChatViewModel session 只请求一次。
 5. 如果孩子在 opening 返回前已经开始说话，Android 丢弃 opening，孩子主动输入优先。
 6. opening TTS 失败不影响文本展示，也不阻塞语音按钮。
+7. Task 10 后，后端 opening 记录非敏感 `app.opening_timing`，包含 `model_ms`、`tts_ms`、`total_ms`、`audio_url_present`、`fallback_used` 和 hashed child/session id；不记录 opening 全文、儿童原文或家长寄语原文。
+8. opening 音频生成有短 soft timeout；TTS 慢/失败时返回 text opening，`voice_enabled=false`，Android 不使用系统 TTS 顶替。
 ```
 
 ---

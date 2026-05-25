@@ -147,6 +147,14 @@ class ChildAgentRuntime:
         model_response.metadata["final_conversation_control"] = (
             final_control.model_dump(mode="json")
         )
+        model_response.metadata["conversation_control_trace"] = (
+            self._conversation_control_trace(
+                model_control=model_control,
+                fallback_control=fallback_control,
+                final_control=final_control,
+                turn_guidance_context=turn_guidance_context,
+            )
+        )
         reply_text = self._normalize_model_reply(
             raw_reply_text,
             request,
@@ -259,6 +267,15 @@ class ChildAgentRuntime:
         metadata.setdefault(
             "final_conversation_control",
             fallback_control.model_dump(mode="json"),
+        )
+        metadata.setdefault(
+            "conversation_control_trace",
+            self._conversation_control_trace(
+                model_control=None,
+                fallback_control=fallback_control,
+                final_control=fallback_control,
+                turn_guidance_context=fallback_guidance,
+            ),
         )
         self._attach_healthy_engagement_metrics(
             metadata,
@@ -481,6 +498,35 @@ class ChildAgentRuntime:
         if model_control.topic_continuity in {"soft_shift", "stop", "continue"}:
             return model_control
         return fallback_control
+
+    def _conversation_control_trace(
+        self,
+        *,
+        model_control: ConversationControl | None,
+        fallback_control: ConversationControl,
+        final_control: ConversationControl,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> dict[str, Any]:
+        """Non-content summary for traces/debug; intentionally excludes child text."""
+
+        return {
+            "model_present": model_control is not None,
+            "model": (
+                model_control.model_dump(mode="json") if model_control else None
+            ),
+            "fallback": fallback_control.model_dump(mode="json"),
+            "final": final_control.model_dump(mode="json"),
+            "recent_topic": turn_guidance_context.recent_topic,
+            "same_topic_score": turn_guidance_context.same_topic_score,
+            "boundary_signal": turn_guidance_context.boundary_signal,
+            "child_engagement_signal": (
+                turn_guidance_context.child_engagement_signal
+            ),
+            "topic_shift_recommended": (
+                turn_guidance_context.topic_shift_recommended
+            ),
+            "topic_shift_reason": turn_guidance_context.topic_shift_reason,
+        }
 
     def _topic_seed_moves(
         self,

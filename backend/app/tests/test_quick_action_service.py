@@ -170,6 +170,84 @@ def test_open_conversation_topic_choices_filter_boundaries() -> None:
     assert all("跑步" not in label for label in labels)
 
 
+def test_model_soft_shift_profile_choices_override_old_keyword_fallbacks() -> None:
+    service = QuickActionService()
+    decision = SceneRouteDecision(
+        session_id="quick_action_soft_shift_keyword_session",
+        primary_intent=IntentType.CASUAL_CHAT,
+        base_scene=SceneId.OPEN_CONVERSATION,
+        active_scene=SceneId.OPEN_CONVERSATION,
+        transition=SceneTransitionType.MERGE,
+        scene_stack=[SceneId.OPEN_CONVERSATION],
+        risk_level=RiskLevel.NONE,
+        confidence=0.8,
+        reason="open_conversation",
+        needs_input=None,
+        reply_text="我们可以换个轻松话题。",
+        quick_actions=[],
+    )
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="CS 游戏为什么又输了",
+        reply_text="我们可以换个轻松话题。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+            }
+        },
+        conversation_control={
+            "topic_continuity": "soft_shift",
+            "topic_shift_intent": "likely",
+            "suggested_next_moves": [
+                {"id": "continue_game", "label": "继续聊游戏"}
+            ],
+        },
+    )
+
+    assert [action.label for action in actions] == [
+        "聊恐龙",
+        "聊画画",
+        "聊跑步",
+    ]
+
+
+def test_stop_control_does_not_offer_topic_choice_fallbacks() -> None:
+    service = QuickActionService()
+    decision = SceneRouteDecision(
+        session_id="quick_action_stop_control_session",
+        primary_intent=IntentType.CASUAL_CHAT,
+        base_scene=SceneId.OPEN_CONVERSATION,
+        active_scene=SceneId.OPEN_CONVERSATION,
+        transition=SceneTransitionType.MERGE,
+        scene_stack=[SceneId.OPEN_CONVERSATION],
+        risk_level=RiskLevel.NONE,
+        confidence=0.8,
+        reason="open_conversation",
+        needs_input=None,
+        reply_text="好，我们先停一下。想休息也可以。",
+        quick_actions=[],
+    )
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="不聊了。",
+        reply_text="好，我们先停一下。想休息也可以。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+            }
+        },
+        conversation_control={
+            "topic_continuity": "stop",
+            "topic_shift_intent": "explicit",
+            "suggested_next_moves": [],
+        },
+    )
+
+    assert actions == []
+
+
 def test_open_conversation_topic_choices_use_curated_seeds_without_interests() -> None:
     service = QuickActionService()
     decision = SceneRouteDecision(

@@ -125,5 +125,6 @@ Prompt 规则：
 11. Task 07 后，topic seeds 升级为 reviewed / age-aware / expiring seed objects，每条包含 `id`、`label`、`age_bands`、`prompt_hint`、`safety_notes`、`expires_at` 和 `source`。Android 只在 Ready/Resting 等空闲状态展示轻量“换个轻松话题”chips，且不抓实时热点、不做任务菜单、不鼓励继续游戏。
 12. Task 09 后，普通话题 continuation/shift 以模型 `conversation_control` 语义判断为主，程序规则保留 safety、privacy、bedtime、explicit boundary、fallback 和 metrics；高参与孩子可以继续当前话题，短答/低能量时可自然 soft_shift。
 13. Task 09 后，topic choices 由后端基于账号画像、兴趣、topic boundaries、curated seeds 和 `conversation_control` 生成；Android 不再独立硬编码固定话题 chips。
-14. 产品术语默认使用“家长”；历史 `Parent*` 代码命名暂保留，UI、QA 和面向家庭的文案避免继续写“家长设置/家长日报”。
+14. 产品术语默认使用“家长”；历史 `Parent*` 代码命名暂保留，UI、QA 和面向家庭的文案避免继续写“父亲设置/父亲日报”。
+15. Task 10 后，旧 keyword fallback quick actions 只作为 profile/model choices 不足时的后备；`final_control=stop` 时不展示换题 chips，soft_shift 时优先展示账号兴趣和安全 curated choices。
 ```

@@ -38,6 +38,7 @@
 31. Task 05 已完成 release-candidate 自动 closeout：backend pytest/ruff、Android JVM test、debug APK build、PostgreSQL persistence smoke、mock synthetic trace 均通过；real-provider synthetic trace 返回 `REVIEW_NEEDED`，因为 child_chat 链路通过但一个 parent_report 场景超时 fallback，且 creative-share checker 仍需人工 review。
 32. Task 06 已完成 post-device QA product refinement thin slice：家长设置显性重点改为孩子画像/兴趣/话题边界，普通对话同题低能量时提供静态 curated 换题 seeds，家长日报增加话题/内容摘要和 avoid_followup，儿童聊天页小白狐区域增加 phase chip 和轻背景；全部仍需 Redmi K60 / Honor Pad 5 真机 QA。
 33. Task 09 已完成 child account and model-driven personalization thin slice：一个孩子一个账号、家长代创建/登录/退出；密码 hash、服务端 token hash、Android 持久登录态；家长设置/日报和 conversation 使用登录 child_id；父亲文案改为家长；child_chat 增加 model-driven `conversation_control`，program guardrails 仍覆盖安全/边界；opening v2 可模型生成且不阻塞首屏；topic choices 由后端基于兴趣、历史和 curated seeds 生成，Android 不再硬编码话题 chips。
+34. Task 10 已完成 Task 09 closeout：auth/session 高影响路由覆盖到 conversation、stream、opening、家长策略、家长日报和 attachment upload；Android 保存会话刷新、失效清空和退出有单测；opening v2 增加非敏感 timing、TTS soft timeout 和无系统 TTS fallback 测试；conversation_control/topic choices 增加 trace hardening；已构建 Task 10 QA APK，但 Redmi K60 / Honor Pad 5 仍为 NOT_RUN。
 ```
 
 Task 05 known issues / next actions:
@@ -54,7 +55,7 @@ Task 05 known issues / next actions:
 9. Task 06 家长 settings/report UI NOT_DEVICE_QA；负责人：Android/家长；下一步：在 Redmi K60 / Honor Pad 5 检查设置页输入、日报信息层级和小白狐 phase chip 横屏布局。
 10. Task 07 closeout NOT_DEVICE_QA；负责人：Android/后端/父亲；下一步：在真机上验证隐藏 schedule 不影响保存、换题 chips 不挤压 voice-first 控件、TTS backend/logcat timing 能定位慢在 model/TTS/audio playback 哪一段、CS/game 家长日报摘要自然且不展示 raw transcript。
 11. Task 08 round 2 Lane A package ready；负责人：家长/设备测试；下一步：安装 sha256 `811a87abd220e1c102619e827beedb505f0771658b533871e44af02a134d0c86` 的 debug APK，按 QA checklist 采集同一慢 turn 的 backend `request_id`、backend timing、`adb logcat -v time | grep XiaobaohuTtsTiming` 和视频时间点。没有这些真机证据前，Lane B/C/D 保持跳过，不做猜测式修复。
-12. Task 09 device QA NOT_RUN；负责人：Android/后端/家长；下一步：重新构建真机 APK 后，在 Redmi K60 / Honor Pad 5 验证注册/登录/保持登录/退出、家长设置/日报默认无 PIN 路径、opening v2 首屏不阻塞且迟到 opening 不插入、model-driven conversation_control 对 CS/game 短答换题自然、后端生成 topic choices 可读且不挤压 voice-first/TTS 控件。
+12. Task 09/10 device QA NOT_RUN；负责人：Android/后端/家长；下一步：安装 sha256 `28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa` 的 Task 10 QA APK，在 Redmi K60 / Honor Pad 5 验证注册/登录/保持登录/退出、失效 token 回登录、家长设置/日报默认无 PIN 路径、opening v2 首屏不阻塞且迟到 opening 不插入、opening timing 采集、model-driven conversation_control 对 CS/game 短答换题自然、后端生成 topic choices 可读且不挤压 voice-first/TTS 控件。
 ```
 
 ---

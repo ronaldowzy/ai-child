@@ -429,7 +429,7 @@ def test_model_registry_can_route_parent_report_to_mimo_without_changing_child_c
     assert parent_report_profile.profile_name == "mimo_parent_report"
     assert parent_report_profile.model_name == "mimo-v2.5-pro"
     assert parent_report_profile.default_params.max_tokens == 4000
-    assert parent_report_profile.default_params.timeout_ms == 45000
+    assert parent_report_profile.default_params.timeout_ms == 15000
     assert vision_profile.profile_name == "vision_mock"
 
 

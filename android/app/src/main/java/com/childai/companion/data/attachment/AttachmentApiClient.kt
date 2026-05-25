@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 class AttachmentApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
-    private val readTimeoutMs: Int = 12_000,
+    private val readTimeoutMs: Int = IMAGE_UPLOAD_READ_TIMEOUT_MS,
     private val authTokenProvider: () -> String? = { null },
 ) {
     suspend fun uploadImage(
@@ -73,6 +73,8 @@ class AttachmentApiClient(
         return "${baseUrl.trimEnd('/')}/api/v1/attachments/images"
     }
 }
+
+internal const val IMAGE_UPLOAD_READ_TIMEOUT_MS = 30_000
 
 class AttachmentApiException(
     message: String,

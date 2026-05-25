@@ -27,8 +27,9 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo，也不保留儿童端模拟图片弹窗。CameraX 自定义相机不是当前目标。
 - 拍照/相册发送后，儿童消息区显示本地临时图片确认卡：优先展示压缩缩略图，并显示图片类型、大小和上传状态；本地路径不进入模型 prompt，上传文件名会去掉本地目录。
+- 2026-05-25 真机复盘显示 MiMo vision 可略超过旧 Android 12s 图片上传 read timeout，造成后端已收到图片但 Android 误报“没有传到后端”；当前图片上传 read timeout 调整为 30s，失败文案改为“图片暂时没有处理好”，避免误导儿童和家长。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
-- 家长设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、家长寄语、目标和沟通偏好；v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
+- 注册页可填写孩子常用称呼、年龄、年级和兴趣；家长设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、家长寄语、目标和沟通偏好，并在顶部显示当前账号资料摘要。v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
 - 家长日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”，增加“今日聊了什么”话题/内容摘要和“今晚先不追问”；失败态不默认暴露后端/model/provider/config 文案。
 - 儿童聊天页中的家长入口降噪为一个小“大人”入口：默认显示“长按“大人”并输入家长账号密码，才能进入家长页面。”普通点击只提示给家长看，长按后选择家长日报/家长设置并输入当前登录账号密码才进入；不再使用隐藏开发 PIN。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
@@ -42,7 +43,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 1. 家长寄语可在家长设置页编辑；后端会在 PostgreSQL 可用时持久化，数据库不可用时 dev fallback 到内存。
 2. 孩子小名 / 显示名可在家长设置页编辑；不要强制填写真实全名。
 3. 家长寄语不会出现在儿童聊天 UI 或 session_state debug 中。
-4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
+4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”；失败态说“没有处理好”，不再断言图片没有传到后端。
 5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
 6. “拍给小白狐看”是默认图片入口；儿童端只走系统相机/相册真实图片 multipart 上传。
 7. Task 06 后家长设置显性重点从作息时间转向孩子画像、兴趣和话题边界；作息仍可作为后端时间上下文，不把场景硬锁给孩子。
@@ -524,4 +525,4 @@ bash scripts/e2e_local_api_check.sh
 GET /api/v1/parent/reports/{child_id}?date=YYYY-MM-DD
 ```
 
-Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议家长动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；首次生成可能需要几十秒，Android 家长日报 client read timeout 为 70s，避免前端先超时而后端稍后生成成功。如果返回 `model_failed` / `model_blocked`，家长端只显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。
+Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议家长动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；2026-05-25 真机复盘后，后端 parent report provider 默认 timeout 从 45s 调整为 15s，避免家长前台长时间等待。若返回 `model_failed` / `model_blocked`，家长端只显示“今天的小结还没准备好，请稍后再试”，不展示 deterministic fallback 正文。

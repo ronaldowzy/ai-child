@@ -177,6 +177,7 @@ ChildChatScreen 首次可见
 6. opening TTS 失败不影响文本展示，也不阻塞语音按钮。
 7. Task 10 后，后端 opening 记录非敏感 `app.opening_timing`，包含 `model_ms`、`tts_ms`、`total_ms`、`audio_url_present`、`fallback_used` 和 hashed child/session id；不记录 opening 全文、儿童原文或家长寄语原文。
 8. opening 音频生成有 bounded soft timeout；TTS 慢/失败时返回 text opening，`voice_enabled=false`，Android 不使用系统 TTS 顶替。2026-05-25 家庭内测服务日志显示 MiMo VoiceClone cache miss 在 8.7-11.9 秒区间，正式运行默认 soft timeout 调整为 15 秒，避免 8 秒窗口刚超时就丢掉随后完成的正式音频。
+9. 2026-05-25 真机复盘显示 opening 个性化模型可慢到 34-35 秒，导致声音很晚才出现；正式运行新增 3 秒 opening model soft timeout，超时后先使用确定性安全开场白并继续生成小白狐音频。个性化 opening 仍可用，但不得拖住首次出声。
 ```
 
 ---

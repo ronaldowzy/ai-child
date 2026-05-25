@@ -57,6 +57,32 @@ class AuthViewModelTest {
         assertEquals(1, repository.logoutCalls)
     }
 
+    @Test
+    fun registerSubmitsChildGradeWithProfile() {
+        val registered = savedSession(childId = "child_registered")
+        val repository = FakeAuthSessionRepository(
+            initialSession = SavedAuthSession.Empty,
+            refreshedSession = registered,
+        )
+        val viewModel = AuthViewModel(repository, dispatcher = Dispatchers.Unconfined)
+
+        viewModel.updateMode(AuthMode.Register)
+        viewModel.updateUsername("parent-one")
+        viewModel.updatePassword("password123")
+        viewModel.updateChildNickname("航航")
+        viewModel.updateChildAge("8")
+        viewModel.updateChildGrade("二年级")
+        viewModel.updateChildInterests("越野赛\n变形金刚")
+        viewModel.submit()
+
+        val request = repository.lastRegisterRequest
+        requireNotNull(request)
+        assertEquals("二年级", request.childGrade)
+        assertEquals(8, request.childAge)
+        assertEquals(listOf("越野赛", "变形金刚"), request.childInterests)
+        assertEquals(registered, viewModel.uiState.value.session)
+    }
+
     private fun savedSession(childId: String): SavedAuthSession {
         return SavedAuthSession(
             token = "token_$childId",
@@ -77,6 +103,8 @@ private class FakeAuthSessionRepository(
         private set
     var logoutCalls = 0
         private set
+    var lastRegisterRequest: AuthRegisterRequest? = null
+        private set
 
     override fun savedSession(): SavedAuthSession = currentSession
 
@@ -85,6 +113,7 @@ private class FakeAuthSessionRepository(
     override fun childIdOrNull(): String? = currentSession.childId.takeIf { it.isNotBlank() }
 
     override suspend fun register(request: AuthRegisterRequest): SavedAuthSession {
+        lastRegisterRequest = request
         currentSession = refreshedSession
         return currentSession
     }

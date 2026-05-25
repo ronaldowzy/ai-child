@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     model_debug_trace_max_text_chars: int = 20000
     allow_mock_runtime: bool = False
     allow_auth_memory_fallback: bool = False
+    opening_model_soft_timeout_ms: int = 3000
     opening_tts_soft_timeout_ms: int = 15000
 
     model_config = SettingsConfigDict(env_prefix="CHILD_AI_", extra="ignore")

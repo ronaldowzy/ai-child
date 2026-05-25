@@ -73,6 +73,7 @@ class OpeningService:
         model_registry: ModelRegistry | None = None,
         memory_service: MemoryService | None = None,
         opening_policy_builder: OpeningPolicyBuilder | None = None,
+        model_soft_timeout_ms: int | None = None,
         tts_soft_timeout_ms: int | None = None,
     ) -> None:
         self._parent_policy_service = (
@@ -85,6 +86,11 @@ class OpeningService:
         self._opening_policy_builder = (
             opening_policy_builder
             or OpeningPolicyBuilder(memory_service=self._memory_service)
+        )
+        self._model_soft_timeout_ms = (
+            model_soft_timeout_ms
+            if model_soft_timeout_ms is not None
+            else get_settings().opening_model_soft_timeout_ms
         )
         self._tts_soft_timeout_ms = (
             tts_soft_timeout_ms
@@ -193,7 +199,7 @@ class OpeningService:
     ) -> _ModelOpeningResult:
         started_at = time.perf_counter()
         try:
-            response = self._request_model_opening(
+            response = self._request_model_opening_with_soft_timeout(
                 parent_policy=parent_policy,
                 time_context=time_context,
                 opening_policy=opening_policy,
@@ -224,7 +230,7 @@ class OpeningService:
                 fallback_used=False,
             )
         try:
-            retry_response = self._request_model_opening(
+            retry_response = self._request_model_opening_with_soft_timeout(
                 parent_policy=parent_policy,
                 time_context=time_context,
                 opening_policy=opening_policy,
@@ -247,6 +253,40 @@ class OpeningService:
             model_ms=self._elapsed_ms(started_at),
             fallback_used=not bool(retry_text),
         )
+
+    def _request_model_opening_with_soft_timeout(
+        self,
+        *,
+        parent_policy: ParentPolicy,
+        time_context: TimeContext,
+        opening_policy: OpeningPolicy,
+        user_content: str,
+        retry: bool,
+    ):
+        if self._model_soft_timeout_ms <= 0:
+            return self._request_model_opening(
+                parent_policy=parent_policy,
+                time_context=time_context,
+                opening_policy=opening_policy,
+                user_content=user_content,
+                retry=retry,
+            )
+
+        context = copy_context()
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="opening-model")
+        future = executor.submit(
+            context.run,
+            self._request_model_opening,
+            parent_policy=parent_policy,
+            time_context=time_context,
+            opening_policy=opening_policy,
+            user_content=user_content,
+            retry=retry,
+        )
+        try:
+            return future.result(timeout=self._model_soft_timeout_ms / 1000)
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def _request_model_opening(
         self,

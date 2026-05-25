@@ -48,6 +48,10 @@ class AuthViewModel(
         _uiState.update { it.copy(childAge = value, errorMessage = null) }
     }
 
+    fun updateChildGrade(value: String) {
+        _uiState.update { it.copy(childGrade = value, errorMessage = null) }
+    }
+
     fun updateChildInterests(value: String) {
         _uiState.update { it.copy(childInterestsText = value, errorMessage = null) }
     }
@@ -71,6 +75,7 @@ class AuthViewModel(
                             password = state.password,
                             childNickname = state.childNickname.trim(),
                             childAge = state.childAge.trim().toIntOrNull(),
+                            childGrade = state.childGrade.trim(),
                             childInterests = state.childInterestList(),
                         ),
                     )
@@ -142,6 +147,7 @@ data class AuthUiState(
     val password: String = "",
     val childNickname: String = "",
     val childAge: String = "",
+    val childGrade: String = "",
     val childInterestsText: String = "",
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,

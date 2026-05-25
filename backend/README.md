@@ -65,9 +65,10 @@ The current backend is local-first and test-stage real-path focused:
   Task 09 upgrades it to personalized opening v2: it uses time context, account
   profile, parent guidance, topic boundaries, recent low-sensitivity memory,
   and a model-generated short greeting when safe/available, with deterministic
-  fallback on provider failure. Task 10 adds non-sensitive `app.opening_timing`
-  logs and a bounded TTS soft timeout so slow/failed opening audio does not block
-  indefinitely. Current family-beta defaults use 15s for opening and stream TTS
+  fallback on provider failure or slow model generation. Task 10 adds
+  non-sensitive `app.opening_timing` logs and bounded model/TTS soft timeouts so
+  slow/failed opening audio does not block indefinitely. Current family-beta
+  defaults use 3s for opening model generation and 15s for opening/stream TTS
   because real MiMo VoiceClone cache-miss calls have been observed around
   9-12s; this prevents avoidable no-audio turns but is not the final latency
   solution. Android should treat opening/TTS as non-blocking and keep the first
@@ -806,8 +807,10 @@ bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 ParentReport v2 is model-first and uses the same MiMo text model by default, but
 it needs a larger completion budget than short child chat. The backend defaults
 `mimo_parent_report` to `CHILD_AI_PARENT_REPORT_MAX_TOKENS=4000` and
-`CHILD_AI_PARENT_REPORT_TIMEOUT_MS=45000`; these can be overridden in local
-shell env without changing child chat routing or vision/OCR routing.
+`CHILD_AI_PARENT_REPORT_TIMEOUT_MS=15000`; these can be overridden in local
+shell env without changing child chat routing or vision/OCR routing. If the
+provider misses this window, the API returns a retryable model-failed report
+instead of showing deterministic text as a successful diary.
 
 `scripts/start_backend_services.sh` loads the root `.env` when it exists, then
 starts the managed FastAPI service and records pid/port/log metadata under the

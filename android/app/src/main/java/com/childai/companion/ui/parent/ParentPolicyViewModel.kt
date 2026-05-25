@@ -272,6 +272,26 @@ data class ParentPolicyFormState(
         return age in 5..10
     }
 
+    fun profileSummaryLines(): List<String> {
+        val callName = childNickname.trim()
+            .ifEmpty { childDisplayName.trim() }
+            .ifEmpty { "未填写" }
+        val ageText = childAge.trim().ifEmpty { "未填写" }
+        val gradeText = childGrade.trim().ifEmpty { "未填写" }
+        val interests = childInterests()
+        val interestsText = if (interests.isEmpty()) {
+            "未填写"
+        } else {
+            interests.joinToString("、")
+        }
+        return listOf(
+            "称呼：$callName",
+            "年龄：$ageText",
+            "年级：$gradeText",
+            "兴趣：$interestsText",
+        )
+    }
+
 }
 
 private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {

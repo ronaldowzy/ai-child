@@ -955,9 +955,9 @@ class ChatViewModel(
 
     private fun uploadFailureMessage(imagePurpose: String): String {
         return if (imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
-            "这道题目暂时没有传到后端。我们先停一下，请大人检查网络后再试。"
+            "这道题目暂时没有处理好。我们先停一下，请大人稍后再试。"
         } else {
-            "这张图片暂时没有传到后端。我们先停一下，请大人检查网络后再试。"
+            "这张图片暂时没有处理好。我们先停一下，请大人稍后再试。"
         }
     }
 

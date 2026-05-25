@@ -490,7 +490,7 @@ class ModelRegistry:
                 timeout_ms=int(
                     os.getenv(
                         "CHILD_AI_PARENT_REPORT_TIMEOUT_MS",
-                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "45000"),
+                        os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "15000"),
                     )
                 ),
             ),

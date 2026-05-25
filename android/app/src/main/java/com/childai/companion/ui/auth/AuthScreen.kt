@@ -43,6 +43,7 @@ fun AuthScreen(
         onPasswordChange = viewModel::updatePassword,
         onChildNicknameChange = viewModel::updateChildNickname,
         onChildAgeChange = viewModel::updateChildAge,
+        onChildGradeChange = viewModel::updateChildGrade,
         onChildInterestsChange = viewModel::updateChildInterests,
         onSubmit = viewModel::submit,
         modifier = modifier,
@@ -57,6 +58,7 @@ private fun AuthScreenContent(
     onPasswordChange: (String) -> Unit,
     onChildNicknameChange: (String) -> Unit,
     onChildAgeChange: (String) -> Unit,
+    onChildGradeChange: (String) -> Unit,
     onChildInterestsChange: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -123,6 +125,14 @@ private fun AuthScreenContent(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text("年龄（可选，5-10）") },
+                        enabled = !uiState.isSubmitting,
+                    )
+                    OutlinedTextField(
+                        value = uiState.childGrade,
+                        onValueChange = onChildGradeChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("年级（可选）") },
                         enabled = !uiState.isSubmitting,
                     )
                     OutlinedTextField(
@@ -198,6 +208,7 @@ private fun AuthScreenPreview() {
             onPasswordChange = {},
             onChildNicknameChange = {},
             onChildAgeChange = {},
+            onChildGradeChange = {},
             onChildInterestsChange = {},
             onSubmit = {},
         )
@@ -215,6 +226,7 @@ private fun AuthScreenLandscapePreview() {
             onPasswordChange = {},
             onChildNicknameChange = {},
             onChildAgeChange = {},
+            onChildGradeChange = {},
             onChildInterestsChange = {},
             onSubmit = {},
         )

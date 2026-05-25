@@ -330,6 +330,7 @@ def build_scenario_services(
         tts_service=tts_service,
         model_registry=registry,
         memory_service=memory_service,
+        model_soft_timeout_ms=0,
     )
     child_agent_runtime = ChildAgentRuntime(model_registry=registry)
     memory_hooks = ConversationMemoryHooks(memory_service=memory_service)

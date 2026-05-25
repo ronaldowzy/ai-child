@@ -137,6 +137,20 @@ private fun ParentSettingsScreenContent(
                     Text(text = "正在读取设置")
                 }
             }
+            SettingsSection(title = "当前账号资料") {
+                uiState.form.profileSummaryLines().forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Text(
+                    text = "这些资料来自当前登录账号对应的家长设置，修改后需要点保存设置。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             SettingsSection(title = "孩子称呼") {
                 OutlinedTextField(
                     value = uiState.form.childNickname,

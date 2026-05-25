@@ -59,7 +59,7 @@ class ChatViewModelImageAttachmentTest {
 
         val state = viewModel.uiState.value
         val childMessage = state.messages.first { it.author == MessageAuthor.Child }
-        assertTrue(state.messages.any { it.text.contains("这张图片暂时没有传到后端") })
+        assertTrue(state.messages.any { it.text.contains("这张图片暂时没有处理好") })
         assertEquals(
             LocalImagePreviewStatus.Failed,
             state.imagePreviewCards.getValue(childMessage.id).status,

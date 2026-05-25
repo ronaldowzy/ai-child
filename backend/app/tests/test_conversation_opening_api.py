@@ -153,6 +153,47 @@ def test_opening_falls_back_when_model_opening_unavailable() -> None:
     assert model_registry.requests == 1
 
 
+def test_opening_model_soft_timeout_returns_fallback_quickly(caplog) -> None:
+    class SlowOpeningModelRegistry:
+        requests = 0
+
+        def generate(self, _request):
+            self.requests += 1
+            time.sleep(0.2)
+            raise RuntimeError("opening model should not block opening")
+
+    class FastTts:
+        def generate_for_conversation(self, *, text: str, emotion: str) -> str | None:
+            return "/media/tts/opening-fast.wav"
+
+    child_id = "opening_model_timeout_child"
+    _update_policy(child_id, child_nickname="豆豆")
+    model_registry = SlowOpeningModelRegistry()
+    service = OpeningService(
+        model_registry=model_registry,
+        tts_service=FastTts(),
+        model_soft_timeout_ms=10,
+        tts_soft_timeout_ms=0,
+    )
+    request = _request_model(
+        child_id=child_id,
+        session_id="opening-model-timeout-session",
+        device_time="2026-05-21T20:40:00+08:00",
+    )
+    caplog.set_level(logging.INFO, logger="app.opening_timing")
+
+    response = service.create_opening(request)
+
+    assert response.reply.text.startswith("豆豆，")
+    assert response.reply.audio_url == "/media/tts/opening-fast.wav"
+    assert response.reply.voice_enabled is True
+    assert model_registry.requests == 1
+    record = _last_opening_timing_record(caplog)
+    assert record.fallback_used is True
+    assert record.model_error_type == "TimeoutError"
+    assert record.model_ms < 100
+
+
 def test_opening_can_use_non_mock_model_text_when_safe() -> None:
     class FixedOpeningModelRegistry:
         def generate(self, _request):

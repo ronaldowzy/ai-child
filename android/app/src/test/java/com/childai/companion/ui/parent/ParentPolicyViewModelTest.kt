@@ -105,6 +105,10 @@ class ParentPolicyViewModelTest {
         assertEquals("叫小名", loadedForm.childCallPreference)
         assertEquals("恐龙\n画画", loadedForm.childInterestsText)
         assertEquals("不要连续追问学校", loadedForm.topicBoundariesText)
+        assertEquals(
+            listOf("称呼：未填写", "年龄：8", "年级：二年级", "兴趣：恐龙、画画"),
+            loadedForm.profileSummaryLines(),
+        )
 
         viewModel.updateChildAge("9")
         viewModel.updateChildInterestsText("跑步比赛\n积木")

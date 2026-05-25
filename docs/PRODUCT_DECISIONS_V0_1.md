@@ -817,7 +817,7 @@ Source: parent / product owner runtime feedback
 Decision: 家庭内测运行时不得把 mock provider、mock 图片流程、mock ASR/TTS 或 mock model fallback 当作产品能力。已进入测试范围的聊天、图片理解、TTS、ASR 和家长日报必须显式配置正式 provider；配置缺失时应 fail fast、返回明确 BLOCKED/FAIL 或提示检查服务，不能报告 mock PASS。自动化测试可以使用隔离 test double，但只能作为测试替身，不能进入儿童端默认 UI、真机 QA 包、runtime fallback 成功路径或文档完成口径。
 Rationale: 真机问题已经证明未加载 `.env` 时后端会回到默认 mock，导致开场白无正式语音、ASR 一直“未听清”等假通过体验。家庭内测阶段必须优先暴露真实配置问题，避免把非正式路径提交为产品功能。
 Affected modules: backend Settings、RuntimeProviderGuard、ModelRegistry fallback、health/detail、Android image input、voice/TTS/ASR QA、README、progress board。
-Implementation notes: 后端 `Settings` 默认 provider 已改为正式方向（MiMo model/vision/TTS、本地 SenseVoice ASR、MiMo ASR fallback），启动时 `CHILD_AI_ALLOW_MOCK_RUNTIME=false` 会拒绝 mock provider，并进一步校验 MiMo API key、外发 policy flag、本地 ASR 模型/tokens 和小白狐音色样本；测试环境通过 `backend/app/tests/conftest.py` 显式允许 test double。Android 儿童端只保留真实系统相机/相册 multipart 上传，不再保留 mock 图片弹窗入口。模型 provider 失败或 policy blocked 时不再自动 fallback 到 mock profile，除非自动化测试显式开启。
+Implementation notes: 后端 `Settings` 默认 provider 已改为正式方向（MiMo model/vision/TTS、本地 SenseVoice ASR、MiMo ASR fallback），启动时 `CHILD_AI_ALLOW_MOCK_RUNTIME=false` 会拒绝 mock provider，并进一步校验 MiMo API key、外发 policy flag、本地 ASR 模型/tokens 和小白狐音色样本；`CHILD_AI_ALLOW_AUTH_MEMORY_FALLBACK=false` 是家庭内测默认值，账号注册/登录必须落 PostgreSQL，DB/auth 表不可用时明确失败，不再返回重启即丢失的内存账号成功。测试环境通过 `backend/app/tests/conftest.py` 显式允许 test double。Android 儿童端只保留真实系统相机/相册 multipart 上传，不再保留 mock 图片弹窗入口。模型 provider 失败或 policy blocked 时不再自动 fallback 到 mock profile，除非自动化测试显式开启。
 Tests or QA needed: 后端 runtime guard 单测、health/detail 正式 provider 状态核对、opening 返回/播放正式 audio_url、ASR response provider 为 `local_sensevoice` 或授权 MiMo fallback、Redmi K60 / Honor Pad 5 真机录音/朗读/图片上传复验。
 
 ---

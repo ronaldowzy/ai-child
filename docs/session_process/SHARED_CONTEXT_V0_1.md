@@ -60,6 +60,7 @@ bash scripts/stop_backend_services.sh --agent main
 4. `status_backend_services.sh` 是判断端口/PID/health 的唯一标准入口；不要只凭 `lsof` 或旧终端输出判断当前服务状态。
 5. `stop_backend_services.sh --agent <name>` 默认只停止该 agent 管理的 FastAPI，不停止共享 PostgreSQL；只有确认没有其他 agent 依赖时才使用 `--stop-postgres`。
 6. 临时 smoke 脚本可以在高位端口启动自清理测试服务，但不得作为父亲/真机 QA 的共享后台服务。
+7. 账号注册/登录必须确认当前服务已跑 migration 并连接 PostgreSQL；正式运行不允许 auth 内存 fallback。若数据库里 `child_accounts` 为空，上一轮“注册成功”很可能发生在旧内存 fallback 进程中，重启后不会保留，需要重新注册。
 ```
 
 ### 1.3 并行会话文件所有权矩阵

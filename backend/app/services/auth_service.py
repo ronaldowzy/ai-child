@@ -5,6 +5,7 @@ import hmac
 import secrets
 from uuid import uuid4
 
+from app.core.config import get_settings
 from app.domain.schemas.auth import (
     AuthAccountProfile,
     AuthAccountRecordData,
@@ -47,6 +48,10 @@ class AuthAccountExists(AuthServiceError):
     pass
 
 
+class AuthStorageUnavailable(AuthServiceError):
+    pass
+
+
 class AuthService:
     PASSWORD_HASH_ALGORITHM = "pbkdf2_sha256"
     PASSWORD_HASH_ITERATIONS = 210_000
@@ -58,12 +63,16 @@ class AuthService:
         repository: AuthRepository | InMemoryAuthRepository | None = None,
         fallback_repository: InMemoryAuthRepository | None = None,
         parent_policy_service: ParentPolicyService | None = None,
-        fallback_to_memory: bool = True,
+        fallback_to_memory: bool | None = None,
     ) -> None:
         self._repository = repository or AuthRepository()
         self._fallback_repository = fallback_repository or InMemoryAuthRepository()
         self._using_fallback = isinstance(self._repository, InMemoryAuthRepository)
-        self._fallback_to_memory = fallback_to_memory
+        self._fallback_to_memory = (
+            get_settings().allow_auth_memory_fallback
+            if fallback_to_memory is None
+            else fallback_to_memory
+        )
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
         )
@@ -89,7 +98,7 @@ class AuthService:
             raise AuthAccountExists("username already exists") from exc
         except AuthRepositoryUnavailable:
             if not self._fallback_to_memory:
-                raise
+                raise AuthStorageUnavailable("auth storage unavailable")
             self._using_fallback = True
             try:
                 saved = self._repo().create_account(
@@ -130,7 +139,7 @@ class AuthService:
             return self._repo().revoke_session(token_hash, revoked_at=self._now())
         except AuthRepositoryUnavailable:
             if not self._fallback_to_memory:
-                raise
+                raise AuthStorageUnavailable("auth storage unavailable")
             self._using_fallback = True
             return self._repo().revoke_session(token_hash, revoked_at=self._now())
 
@@ -195,7 +204,7 @@ class AuthService:
             self._repo().create_session(session_data)
         except AuthRepositoryUnavailable:
             if not self._fallback_to_memory:
-                raise
+                raise AuthStorageUnavailable("auth storage unavailable")
             self._using_fallback = True
             self._repo().create_session(session_data)
         refreshed = self._repo().get_account_by_id(account.id) or account
@@ -211,7 +220,7 @@ class AuthService:
             session = self._repo().get_session_by_token_hash(token_hash)
         except AuthRepositoryUnavailable:
             if not self._fallback_to_memory:
-                raise
+                raise AuthStorageUnavailable("auth storage unavailable")
             self._using_fallback = True
             session = self._repo().get_session_by_token_hash(token_hash)
         if session is None:
@@ -226,7 +235,7 @@ class AuthService:
             return self._repo().get_account_by_username(username)
         except AuthRepositoryUnavailable:
             if not self._fallback_to_memory:
-                raise
+                raise AuthStorageUnavailable("auth storage unavailable")
             self._using_fallback = True
             return self._repo().get_account_by_username(username)
 

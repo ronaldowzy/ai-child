@@ -13,6 +13,7 @@ from app.services.auth_service import (
     AuthInvalidCredentials,
     AuthService,
     AuthServiceError,
+    AuthStorageUnavailable,
     AuthTokenInvalid,
     get_auth_service,
 )
@@ -35,6 +36,11 @@ def register_child_account(request: AuthRegisterRequest) -> AuthSessionResponse:
             status_code=status.HTTP_409_CONFLICT,
             detail="username already exists",
         ) from exc
+    except AuthStorageUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="auth storage unavailable",
+        ) from exc
 
 
 @router.post(
@@ -49,6 +55,11 @@ def login_child_account(request: AuthLoginRequest) -> AuthSessionResponse:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid username or password",
+        ) from exc
+    except AuthStorageUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="auth storage unavailable",
         ) from exc
 
 

@@ -106,6 +106,13 @@ starting. With `CHILD_AI_ALLOW_MOCK_RUNTIME=false`, startup validates:
 Automated tests set `CHILD_AI_ALLOW_MOCK_RUNTIME=true` inside
 `app/tests/conftest.py`; this is not a product or QA setting.
 
+Auth persistence follows the same rule. Family-beta runtime uses PostgreSQL for
+child accounts and bearer sessions; `CHILD_AI_ALLOW_AUTH_MEMORY_FALLBACK=false`
+is the default. If the auth tables or database are unavailable, register/login
+must fail clearly instead of returning a temporary in-memory account that would
+disappear after service restart. Automated tests may enable the memory fallback
+through `app/tests/conftest.py`.
+
 ## Managed Backend Services
 
 All Codex agents must use the same service scripts for local backend services:

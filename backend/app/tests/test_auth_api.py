@@ -21,8 +21,16 @@ from app.domain.schemas.conversation import (
     Reply,
     SessionState,
 )
-from app.repositories.auth_repository import InMemoryAuthRepository
-from app.services.auth_service import AuthService, AuthTokenExpired, AuthTokenInvalid
+from app.repositories.auth_repository import (
+    AuthRepositoryUnavailable,
+    InMemoryAuthRepository,
+)
+from app.services.auth_service import (
+    AuthService,
+    AuthStorageUnavailable,
+    AuthTokenExpired,
+    AuthTokenInvalid,
+)
 
 from app.main import app
 
@@ -191,6 +199,32 @@ def test_auth_service_rejects_expired_and_revoked_sessions() -> None:
         pass
     else:
         raise AssertionError("revoked token should be rejected")
+
+
+def test_auth_service_does_not_memory_fallback_when_disabled() -> None:
+    class UnavailableRepository:
+        def create_account(self, *, account, child_nickname):
+            raise AuthRepositoryUnavailable("db unavailable")
+
+        def get_account_by_username(self, username):
+            raise AuthRepositoryUnavailable("db unavailable")
+
+    service = AuthService(
+        repository=UnavailableRepository(),
+        fallback_to_memory=False,
+    )
+
+    try:
+        service.register(
+            request=AuthRegisterRequest(
+                username=f"task10_no_memory_{uuid4().hex[:8]}",
+                password="safe-password-09",
+            )
+        )
+    except AuthStorageUnavailable:
+        pass
+    else:
+        raise AssertionError("formal auth runtime must not fall back to memory")
 
 
 def test_authenticated_parent_policy_defaults_to_account_child_id() -> None:

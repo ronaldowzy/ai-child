@@ -18,6 +18,9 @@ class HealthService:
             "postgres": self._postgres_health(),
             "tts_cache": self._tts_cache_health(),
             "xiaobaohu_voice_sample": self._voice_sample_health(),
+            "model_config": self._model_config_health(),
+            "vision_config": self._vision_config_health(),
+            "asr_config": self._asr_config_health(),
             "mimo_tts_config": self._mimo_tts_config_health(),
         }
         status = "ok"
@@ -29,7 +32,78 @@ class HealthService:
         return {
             "status": status,
             "environment": self._settings.environment,
+            "mockRuntimeAllowed": self._settings.allow_mock_runtime,
             "components": components,
+        }
+
+    def _model_config_health(self) -> dict[str, object]:
+        return self._mimo_model_config_health(
+            provider=self._settings.model_provider,
+            requires_image=False,
+        )
+
+    def _vision_config_health(self) -> dict[str, object]:
+        return self._mimo_model_config_health(
+            provider=self._settings.vision_provider,
+            requires_image=True,
+        )
+
+    def _mimo_model_config_health(
+        self,
+        *,
+        provider: str,
+        requires_image: bool,
+    ) -> dict[str, object]:
+        provider = provider.strip().lower()
+        enabled = self._settings.mimo_enabled or provider == "mimo"
+        api_key_present = bool(self._settings.mimo_api_key)
+        base_url_present = bool(self._settings.mimo_base_url)
+        child_data_allowed = self._settings.mimo_allow_child_data
+        image_allowed = self._settings.mimo_allow_image
+        retention_policy_checked = self._settings.mimo_retention_policy_checked
+        status = "configured"
+        if provider != "mimo" or not enabled or not (api_key_present and base_url_present):
+            status = "missing_config"
+        elif not (child_data_allowed and retention_policy_checked):
+            status = "missing_policy"
+        elif requires_image and not image_allowed:
+            status = "missing_policy"
+        return {
+            "status": status,
+            "provider": provider,
+            "enabled": enabled,
+            "apiKeyPresent": api_key_present,
+            "baseUrlPresent": base_url_present,
+            "childDataAllowed": child_data_allowed,
+            "imageAllowed": image_allowed,
+            "retentionPolicyChecked": retention_policy_checked,
+        }
+
+    def _asr_config_health(self) -> dict[str, object]:
+        provider = self._settings.asr_provider
+        fallback_provider = self._settings.asr_fallback_provider
+        local_model = self._settings.resolve_repo_path(
+            self._settings.local_sensevoice_model_path
+        )
+        local_tokens = self._settings.resolve_repo_path(
+            self._settings.local_sensevoice_tokens_path
+        )
+        status = "configured"
+        if provider == "mock" or fallback_provider == "mock":
+            status = "missing_config"
+        elif provider == "local_sensevoice" and not (
+            self._settings.local_sensevoice_enabled
+            and local_model.exists()
+            and local_tokens.exists()
+        ):
+            status = "missing_config"
+        return {
+            "status": status,
+            "provider": provider,
+            "fallbackProvider": fallback_provider,
+            "localSenseVoiceEnabled": self._settings.local_sensevoice_enabled,
+            "localModelPresent": local_model.exists(),
+            "localTokensPresent": local_tokens.exists(),
         }
 
     def _postgres_health(self) -> dict[str, object]:

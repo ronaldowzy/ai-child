@@ -20,9 +20,11 @@ from app.api.tts_media import router as tts_media_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.middleware.request_id import RequestIdMiddleware, get_request_id
+from app.services.runtime_provider_guard import RuntimeProviderGuard
 
 configure_logging()
 settings = get_settings()
+RuntimeProviderGuard(settings).validate()
 tts_cache_dir = settings.resolve_repo_path(settings.tts_cache_dir)
 tts_cache_dir.mkdir(parents=True, exist_ok=True)
 

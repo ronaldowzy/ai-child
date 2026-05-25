@@ -145,10 +145,11 @@ scripts/
 后端命令，具体以 backend/README.md 为准：
 
 ```bash
-cd backend
-pytest
-ruff check .
-uvicorn app.main:app --reload
+bash scripts/test_backend.sh
+bash scripts/lint_backend.sh
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
 ```
 
 项目脚本，具体以 scripts/ 为准：
@@ -156,9 +157,13 @@ uvicorn app.main:app --reload
 ```bash
 bash scripts/doctor_local_env.sh
 bash scripts/test_backend.sh
-bash scripts/dev_backend.sh
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
 bash scripts/demo_backend_scenarios.sh
 ```
+
+多 agent 协作时，任何 agent 不得手写 `uvicorn`、`nohup`、`launchctl` 或直接 kill 共享服务。后台服务启停必须统一使用 `start_backend_services.sh` / `status_backend_services.sh` / `stop_backend_services.sh`，并通过 `--agent <name>` 和不同 `--port` 隔离各 Lane；默认只停止自己的 FastAPI 进程，不停止共享 PostgreSQL。
 
 Android 命令，具体以 android/README.md 为准：
 

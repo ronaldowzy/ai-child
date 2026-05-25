@@ -5,8 +5,9 @@ FastAPI backend for the v0.1 child AI growth agent MVP.
 The current backend is local-first and test-stage real-path focused:
 
 - Current QA must run the actual provider path for any feature that has entered
-  the active test scope; mock/fake providers are only automatic-test doubles or
-  exception fallbacks.
+  the active test scope. Child-facing runtime rejects non-formal provider
+  configuration at startup; automated test doubles are isolated to tests and
+  must not be counted as product success.
 - Does not put provider keys or direct model/OCR/vision calls in Android.
 - Keeps all child-facing AI decisions behind backend services such as `SafetyEngine`, `IntentClassifier`, `SceneOrchestrator`, `PromptManager`, and `ModelRegistry`.
 - Routes child-facing replies through `ChildAgentRuntime`: `SceneOrchestrator`
@@ -42,8 +43,8 @@ The current backend is local-first and test-stage real-path focused:
   Android uploads a real system-camera or system-picker image to
   `POST /api/v1/attachments/images`, the backend runs MiMo vision for the image
   summary, and conversation receives only controlled `image_context` through
-  `attachment_id`. The older JSON/mock attachment path remains for automated
-  tests and explicit fallback diagnostics, not the child-facing default.
+  `attachment_id`. The older JSON attachment contract is test-only and is not
+  part of the child-facing Android path.
 - Uses `ConversationHistoryService` for short-term, in-memory recent turns so
   ordinary chat can keep context within one running backend process. This is not
   a durable chat database; service restart clears it, and full chat transcripts
@@ -88,6 +89,48 @@ The current backend is local-first and test-stage real-path focused:
   fallbacks and filters boundary synonyms such as CS/game or running/sports.
   Android should render backend actions and not provide hard-coded independent
   topic chips.
+
+## Formal Runtime Provider Gate
+
+Family beta runtime must load `.env` or equivalent deployment settings before
+starting. With `CHILD_AI_ALLOW_MOCK_RUNTIME=false`, startup validates:
+
+- `CHILD_AI_MODEL_PROVIDER=mimo` with MiMo enabled, API key present, child-data
+  authorization enabled, and retention policy checked.
+- `CHILD_AI_VISION_PROVIDER=mimo` with image authorization enabled.
+- `CHILD_AI_TTS_PROVIDER=mimo` with MiMo TTS enabled, child-text authorization
+  enabled, retention policy checked, and the Xiaobaihu voice sample present.
+- `CHILD_AI_ASR_PROVIDER=local_sensevoice` with local model/tokens present, and
+  MiMo ASR fallback only when its audio policy flags are enabled.
+
+Automated tests set `CHILD_AI_ALLOW_MOCK_RUNTIME=true` inside
+`app/tests/conftest.py`; this is not a product or QA setting.
+
+## Managed Backend Services
+
+All Codex agents must use the same service scripts for local backend services:
+
+```bash
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
+```
+
+For parallel work, give each Lane a stable agent name and port:
+
+```bash
+bash scripts/start_backend_services.sh --agent lane-a --port 18081
+bash scripts/start_backend_services.sh --agent lane-b --port 18082 --skip-postgres
+```
+
+The scripts write PID, port, and log metadata under
+`${TMPDIR:-/tmp}/ai-child-services/<agent>/` by default; set
+`CHILD_AI_SERVICE_ROOT` only if an agent explicitly needs a different local
+runtime directory. `stop_backend_services.sh` stops only the named agent's
+FastAPI process by default; shared PostgreSQL is kept running unless
+`--stop-postgres` is explicitly passed after confirming no other agent needs it.
+Agents should not use ad hoc `uvicorn`, `nohup`, `launchctl`, or manual `kill`
+commands for shared backend services.
 - Parent report v2 now includes topic overview, conversation summary, tonight
   bridge, and avoid-follow-up fields while keeping model-first generation and
   no raw transcript output.
@@ -148,16 +191,17 @@ Latest Task 10 QA APK package:
 path=android/app/build/outputs/apk/debug/app-debug.apk
 base_url=http://192.168.0.118:8000/
 size_bytes=16471142
-sha256=28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
-build_time_utc=2026-05-25T04:10:50Z
+sha256=e5ae9d587adbffc491bba720e61ef932670cdc28e1a12ef7896e0ffca042dea9
+build_time_utc=2026-05-25T11:51:00Z
 real_device_qa=NOT_RUN
 ```
 
-For one slow synthetic opening or TTS turn, collect backend timing and Android
-playback timing for the same request:
+For one slow synthetic opening or TTS turn, start the managed backend service
+and collect backend timing plus Android playback timing for the same request:
 
 ```bash
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
+bash scripts/status_backend_services.sh --agent main
 adb logcat -v time | grep XiaobaohuTtsTiming
 ```
 
@@ -249,19 +293,20 @@ bash scripts/doctor_local_env.sh
 From the repository root:
 
 ```bash
-bash scripts/dev_backend.sh
-```
-
-Or from `backend/` after activating the environment:
-
-```bash
-python -m uvicorn app.main:app --reload
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh --agent main
 ```
 
 For Android device or tablet LAN testing, listen on all interfaces:
 
 ```bash
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
+```
+
+To stop only this agent's FastAPI process:
+
+```bash
+bash scripts/stop_backend_services.sh --agent main
 ```
 
 Then use the Mac mini LAN address from the Android build, for example:
@@ -602,7 +647,7 @@ settings only control trace detail:
 ```bash
 export CHILD_AI_MODEL_DEBUG_TRACE_FULL_TEXT=true
 export CHILD_AI_MODEL_DEBUG_TRACE_MAX_TEXT_CHARS=20000
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 ```
 
 Trace sanitization redacts secret-like fields and replaces raw image/audio data
@@ -745,7 +790,7 @@ export CHILD_AI_MIMO_ALLOW_CHILD_DATA=true
 export CHILD_AI_MIMO_RETENTION_POLICY_CHECKED=true
 export CHILD_AI_MIMO_MAX_TOKENS=800
 export CHILD_AI_MIMO_TIMEOUT_MS=30000
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 ```
 
 ParentReport v2 is model-first and uses the same MiMo text model by default, but
@@ -754,9 +799,9 @@ it needs a larger completion budget than short child chat. The backend defaults
 `CHILD_AI_PARENT_REPORT_TIMEOUT_MS=45000`; these can be overridden in local
 shell env without changing child chat routing or vision/OCR routing.
 
-`scripts/dev_backend.sh` loads the root `.env` when it exists, then starts
-uvicorn. This is only for local development; `.env` must stay ignored and must
-not be shared.
+`scripts/start_backend_services.sh` loads the root `.env` when it exists, then
+starts the managed FastAPI service and records pid/port/log metadata under the
+local service root. `.env` must stay ignored and must not be shared.
 
 Only use fictional child IDs and test text in this mode. Keep
 `CHILD_AI_MIMO_ALLOW_IMAGE=false` and `CHILD_AI_MIMO_ALLOW_AUDIO=false` unless a

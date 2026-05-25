@@ -29,7 +29,9 @@
 | 环境诊断 | `bash scripts/doctor_local_env.sh` |
 | 后端测试 | `bash scripts/test_backend.sh` |
 | 后端 lint | `bash scripts/lint_backend.sh` |
-| 后端本地服务 | `bash scripts/dev_backend.sh` |
+| 后端本地服务启动 | `bash scripts/start_backend_services.sh --agent main --port 8000` |
+| 后端本地服务状态 | `bash scripts/status_backend_services.sh` |
+| 后端本地服务停止 | `bash scripts/stop_backend_services.sh --agent main` |
 | 后端演示 | `bash scripts/demo_backend_scenarios.sh` |
 | 本地 API 合约 | `bash scripts/e2e_local_api_check.sh` |
 | Android 单测 | `bash scripts/android_gradle.sh test` |
@@ -37,9 +39,30 @@
 | Android lint | `bash scripts/android_gradle.sh lintDebug` |
 | 安装 debug 包 | `bash scripts/install_android_debug.sh` |
 
-当前结论：JDK 17、Android SDK、adb 和 `child-ai` conda 环境已配置。当前阶段不再维护非真机路径作为默认测试入口；给父亲测试必须使用 Redmi K60 / Honor Pad 5 真机 LAN APK。裸 `python3`、`conda`、`./gradlew` 或 `adb` 失败，只能说明当前 shell 可能没加载环境；必须先使用上表标准入口复跑。
+当前结论：JDK 17、Android SDK、adb 和 `child-ai` conda 环境已配置。当前阶段不再维护非真机路径作为默认测试入口；给父亲测试必须使用 Redmi K60 / Honor Pad 5 真机 LAN APK。裸 `python3`、`conda`、`./gradlew`、`uvicorn`、`nohup`、`launchctl` 或 `adb` 失败，只能说明当前 shell 可能没加载环境；必须先使用上表标准入口复跑。
 
-### 1.2 并行会话文件所有权矩阵
+### 1.2 统一后台服务启停规则
+
+多 agent / 多 Lane 协作时，所有 agent 必须使用同一套脚本管理本地后台服务：
+
+```bash
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
+```
+
+规则：
+
+```text
+1. 不得手写 `uvicorn app.main:app`、`nohup`、`launchctl submit` 或直接 kill 共享服务作为常规启停方式。
+2. 每个 agent 必须显式传 `--agent <name>`；并行 Lane 使用不同 `--port`，例如 lane-a=18081、lane-b=18082、lane-c=18083。
+3. `start_backend_services.sh` 会统一加载 `.env`、检查/启动 PostgreSQL、运行迁移、记录 pid/log/port 到默认 `${TMPDIR:-/tmp}/ai-child-services/<agent>/`，并等待 `/api/v1/health/detail`。
+4. `status_backend_services.sh` 是判断端口/PID/health 的唯一标准入口；不要只凭 `lsof` 或旧终端输出判断当前服务状态。
+5. `stop_backend_services.sh --agent <name>` 默认只停止该 agent 管理的 FastAPI，不停止共享 PostgreSQL；只有确认没有其他 agent 依赖时才使用 `--stop-postgres`。
+6. 临时 smoke 脚本可以在高位端口启动自清理测试服务，但不得作为父亲/真机 QA 的共享后台服务。
+```
+
+### 1.3 并行会话文件所有权矩阵
 
 并行会话以主控会话最新提示词为准。默认写入权如下：
 
@@ -55,7 +78,7 @@
 
 如果必须修改不属于自己的文件，子会话必须在计划中说明原因，并在交接中标记冲突风险。发现其他会话的并行改动时，先读取 diff 并适配，不要回退。
 
-### 1.3 Merge gate
+### 1.4 Merge gate
 
 子会话交接前必须自查：
 
@@ -159,7 +182,7 @@ bash scripts/install_android_debug.sh
 真机访问本机后端时，后端必须监听 `0.0.0.0:8000`，APK 必须使用 Mac LAN base URL：
 
 ```bash
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
 ```
 
@@ -223,7 +246,7 @@ Mimo 相关协作规则：
 
 ### 下一阶段 QA 清单
 
-家庭内测前，后续 QA 子会话至少覆盖以下设备侧场景。全部使用虚构 child_id、虚构输入和 mock 题目，不使用真实儿童身份、照片或音频：
+家庭内测前，后续 QA 子会话至少覆盖以下设备侧场景。全部使用虚构 child_id、虚构输入、非儿童测试图片和非儿童测试音频，不使用真实儿童身份、照片或音频：
 
 | 场景 | 核心期望 |
 |---|---|
@@ -233,9 +256,9 @@ Mimo 相关协作规则：
 | 高风险 | 进入 `safety.guardian`，鼓励告诉父母/老师/可信成人，并触发父亲提醒 |
 | 隐私边界 | 不索要或保存地址、电话、学校、照片等隐私；提醒不要告诉 AI 或陌生人 |
 | 父亲入口保护 | 点击不直接进入父亲页；长按后输 dev PIN；错误 PIN 温和提示；正确 PIN 才进入 |
-| Mock 拍题 | 点击拍题走 mock attachment + conversation 连续调用；不接真实 CameraX；不保存真实照片 |
+| 图片/作业图 | 点击“拍给小白狐看”走系统相机/相册真实 multipart 上传；图片像题目时先引导读题/拆题，不直接给最终答案；不保存真实儿童照片 |
 | Android 后端断开提示 | 停止后端后，Android 显示温和错误和稍后再试，不诱导孩子反复刷请求或自责 |
-| 语音预留 | `speak_problem` 只是占位或 mock，不接真实录音作为必需流程，不保存原始音频 |
+| 语音输入 | 点击后录短音频并上传后端 ASR；ASR 成功自动发送，失败温和提示重说；不保存原始音频 |
 | 小白狐动画预留 | 第一版只保留轻量视觉或占位，不做复杂动画或上瘾式反馈 |
 
 ---

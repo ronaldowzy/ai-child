@@ -24,6 +24,14 @@ class ParentEntryDeemphasisTest {
     }
 
     @Test
+    fun defaultHintExplainsLongPressAndPin() {
+        val hint = parentEntryDefaultHint()
+
+        assertTrue(hint.contains("长按"))
+        assertTrue(hint.contains("PIN"))
+    }
+
+    @Test
     fun longPressStillOffersReportAndSettingsTargets() {
         assertEquals(
             listOf(ParentEntryTarget.Report, ParentEntryTarget.Settings),

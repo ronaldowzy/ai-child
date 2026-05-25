@@ -42,6 +42,7 @@ captures/
 # IDEs
 .idea/
 .vscode/
+.claude/
 *.iml
 
 # OS files
@@ -53,6 +54,7 @@ Thumbs.db
 logs/
 qa_logs/
 tmp/
+.codex/services/
 backend/storage/tts_cache/*
 !backend/storage/tts_cache/.gitkeep
 backend/storage/attachments/*

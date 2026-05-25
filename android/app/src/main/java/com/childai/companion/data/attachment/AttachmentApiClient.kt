@@ -15,31 +15,6 @@ class AttachmentApiClient(
     private val readTimeoutMs: Int = 12_000,
     private val authTokenProvider: () -> String? = { null },
 ) {
-    suspend fun createAttachment(
-        request: AttachmentCreateRequest,
-    ): AttachmentCreateResponse = withContext(Dispatchers.IO) {
-        val connection = openConnection()
-        try {
-            val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
-            connection.outputStream.use { output ->
-                output.write(requestBody)
-            }
-
-            val statusCode = connection.responseCode
-            val responseBody = connection.readBody(statusCode)
-            if (statusCode !in 200..299) {
-                throw AttachmentApiException(
-                    "Attachment API returned HTTP $statusCode: $responseBody",
-                )
-            }
-            AttachmentCreateResponse.fromJsonString(responseBody)
-        } catch (exception: IOException) {
-            throw AttachmentApiException("Attachment API request failed", exception)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
     suspend fun uploadImage(
         childId: String,
         sessionId: String,
@@ -82,18 +57,6 @@ class AttachmentApiClient(
         }
     }
 
-    private fun openConnection(): HttpURLConnection {
-        return (URL(attachmentEndpoint()).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = connectTimeoutMs
-            readTimeout = readTimeoutMs
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Accept", "application/json")
-            setBearerToken(authTokenProvider())
-        }
-    }
-
     private fun openMultipartConnection(boundary: String): HttpURLConnection {
         return (URL(imageUploadEndpoint()).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -104,10 +67,6 @@ class AttachmentApiClient(
             setRequestProperty("Accept", "application/json")
             setBearerToken(authTokenProvider())
         }
-    }
-
-    private fun attachmentEndpoint(): String {
-        return "${baseUrl.trimEnd('/')}/api/v1/conversation/attachment"
     }
 
     private fun imageUploadEndpoint(): String {

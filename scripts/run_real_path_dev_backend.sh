@@ -33,4 +33,9 @@ cd "${BACKEND_DIR}"
 echo "REAL_PATH_BACKEND: starting"
 echo "child_chat_model=${CHILD_AI_MIMO_MODEL}"
 echo "vision_model=${CHILD_AI_MIMO_VISION_MODEL}"
-python -m uvicorn app.main:app --host 0.0.0.0 --port "${CHILD_AI_BACKEND_PORT:-8000}"
+cd "${ROOT_DIR}"
+exec bash "${ROOT_DIR}/scripts/start_backend_services.sh" \
+  --foreground \
+  --agent "${CODEX_AGENT_NAME:-real-path}" \
+  --host "${CHILD_AI_BACKEND_HOST:-0.0.0.0}" \
+  --port "${CHILD_AI_BACKEND_PORT:-8000}"

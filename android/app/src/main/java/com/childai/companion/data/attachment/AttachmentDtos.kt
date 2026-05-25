@@ -6,47 +6,6 @@ import com.childai.companion.data.conversation.ConversationUiAction
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class AttachmentCreateRequest(
-    val childId: String,
-    val sessionId: String,
-    val attachmentType: String = "image",
-    val imagePurpose: String = "share",
-    val fileId: String? = null,
-    val imageDataUri: String? = null,
-    val mockOcrText: String? = null,
-    val mockVisionText: String? = null,
-    val childCaption: String? = null,
-    val mockConfidence: Double = 0.94,
-) {
-    fun toJsonString(): String {
-        return JSONObject()
-            .put("child_id", childId)
-            .put("session_id", sessionId)
-            .put("attachment_type", attachmentType)
-            .put("image_purpose", imagePurpose)
-            .put("file_id", fileId)
-            .put("image_data_uri", imageDataUri)
-            .put("mock_ocr_text", mockOcrText)
-            .put("mock_vision_text", mockVisionText)
-            .put("child_caption", childCaption)
-            .put("mock_confidence", mockConfidence)
-            .put(
-                "metadata",
-                JSONObject()
-                    .put(
-                        "source",
-                        if (imageDataUri == null) {
-                            "android_text_photo_flow"
-                        } else {
-                            "android_camera_capture"
-                        },
-                    )
-                    .put("stores_original_image", false),
-            )
-            .toString()
-    }
-}
-
 data class AttachmentCreateResponse(
     val attachmentId: String,
     val recognizedContent: RecognizedContent,

@@ -23,15 +23,15 @@ import org.junit.Test
 
 class ChatViewModelStreamTest {
     @Test
-    fun photoQuickActionsDoNotOpenMockAttachmentFlow() {
+    fun photoQuickActionsPromptRealPhotoUpload() {
         val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
 
         viewModel.onQuickAction(QuickActionUi(id = "share_photo", label = "拍给小白狐看"))
 
         val state = viewModel.uiState.value
-        assertEquals(null, state.mockPhoto)
         assertEquals(MessageAuthor.Agent, state.messages.last().author)
         assertTrue(state.messages.last().text.contains("拍给小白狐看"))
+        assertTrue(state.messages.last().text.contains("拍照或从相册选一张"))
     }
 
     @Test

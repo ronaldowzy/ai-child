@@ -7,22 +7,6 @@ import org.junit.Test
 
 class AttachmentDtosTest {
     @Test
-    fun requestUsesGenericImageWithoutOriginalImageStorage() {
-        val json = AttachmentCreateRequest(
-            childId = "child_demo_001",
-            sessionId = "session_001",
-            imagePurpose = "share",
-            mockVisionText = "我搭了一个积木城堡",
-        ).toJsonString()
-
-        assertTrue(json.contains("\"attachment_type\":\"image\""))
-        assertTrue(json.contains("\"image_purpose\":\"share\""))
-        assertTrue(json.contains("\"mock_vision_text\""))
-        assertTrue(json.contains("\"stores_original_image\":false"))
-        assertFalse(json.contains("CameraX"))
-    }
-
-    @Test
     fun responseMarksHighConfidenceHomeworkTextReady() {
         val response = AttachmentCreateResponse.fromJsonString(
             """
@@ -32,7 +16,7 @@ class AttachmentDtosTest {
                 "type": "homework_problem",
                 "text": "小明有24个苹果，平均分给6个同学，每人几个？",
                 "confidence": 0.94,
-                "provider_name": "mock_ocr",
+                "provider_name": "mimo",
                 "image_purpose": "learning_homework"
               },
               "reply": {
@@ -102,7 +86,7 @@ class AttachmentDtosTest {
                 "type": "image_observation",
                 "text": "孩子搭了一个积木城堡",
                 "confidence": 0.9,
-                "provider_name": "mock_ocr",
+                "provider_name": "mimo",
                 "image_purpose": "share"
               },
               "reply": {
@@ -166,7 +150,7 @@ class AttachmentDtosTest {
                 "type": "image_observation",
                 "text": "孩子搭了一个积木城堡",
                 "confidence": 0.9,
-                "provider_name": "mock_ocr",
+                "provider_name": "mimo",
                 "image_purpose": "share",
                 "child_caption": "你看我搭的这个"
               },

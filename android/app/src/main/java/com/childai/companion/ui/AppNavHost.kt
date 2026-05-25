@@ -80,7 +80,7 @@ fun AppNavHost(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
                 viewModel = chatViewModel,
-                requireParentPin = false,
+                requireParentPin = true,
             )
         }
         AppDestination.ParentSettings -> {

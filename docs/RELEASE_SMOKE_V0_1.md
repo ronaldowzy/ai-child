@@ -60,7 +60,7 @@ bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
 2. Mac LAN IP 变化后必须重新构建，不能继续使用旧 APK。
 3. 真机 QA 仍未完成；APK 构建成功不等于 Redmi K60 / Honor Pad 5 通过。
 4. 安装前先启动后端：
-   bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+   bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 5. 设备和 Mac 必须在同一网络，并在设备侧能访问：
    http://192.168.0.118:8000/api/v1/health
 ```
@@ -239,7 +239,7 @@ Still not implemented:
 交付真机 QA 前：
 
 ```bash
-bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 curl --noproxy '*' http://192.168.0.118:8000/api/v1/health
 ```
 

@@ -2,56 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="${ROOT_DIR}/backend"
-CONDA_ENV_NAME="${CONDA_ENV_NAME:-child-ai}"
-CONDA_CMD=""
 
-if [[ ! -d "${BACKEND_DIR}" ]]; then
-  echo "backend/ has not been initialized yet. Run S01 backend skeleton before starting the dev server." >&2
-  exit 1
-fi
-
-resolve_python_cmd() {
-  if [[ -n "${PYTHON_BIN:-}" ]]; then
-    read -r -a PYTHON_CMD <<< "${PYTHON_BIN}"
-    return
-  fi
-
-  if command -v conda >/dev/null 2>&1; then
-    CONDA_CMD="$(command -v conda)"
-  elif [[ -x "/opt/homebrew/bin/conda" ]]; then
-    CONDA_CMD="/opt/homebrew/bin/conda"
-  fi
-
-  if [[ -n "${CONDA_CMD}" ]] && "${CONDA_CMD}" env list | awk '{print $1}' | grep -qx "${CONDA_ENV_NAME}"; then
-    PYTHON_CMD=("${CONDA_CMD}" run --no-capture-output -n "${CONDA_ENV_NAME}" python)
-    return
-  fi
-
-  if command -v python >/dev/null 2>&1; then
-    PYTHON_CMD=(python)
-    return
-  fi
-
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_CMD=(python3)
-    return
-  fi
-
-  echo "No Python interpreter found. Set PYTHON_BIN or install/activate the ${CONDA_ENV_NAME} environment." >&2
-  exit 1
-}
-
-resolve_python_cmd
-
-if [[ -f "${ROOT_DIR}/.env" ]]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "${ROOT_DIR}/.env"
-  set +a
-  echo "Loaded local .env for backend dev server."
-fi
-
-cd "${BACKEND_DIR}"
-echo "Starting backend dev server with: ${PYTHON_CMD[*]}"
-"${PYTHON_CMD[@]}" -m uvicorn app.main:app --reload "$@"
+echo "dev_backend.sh is a compatibility wrapper."
+echo "Agent-managed backend services must use start/status/stop_backend_services.sh."
+exec bash "${ROOT_DIR}/scripts/start_backend_services.sh" --foreground "$@"

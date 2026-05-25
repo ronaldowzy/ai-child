@@ -20,7 +20,7 @@ debug APK 构建：已完成，当前真机 QA APK 使用 Mac LAN base URL。
 ## 2. 安装前检查
 
 ```text
-[ ] 后端用 LAN 可访问地址启动：bash scripts/dev_backend.sh --host 0.0.0.0 --port 8000
+[ ] 后端用统一服务脚本在 LAN 可访问地址启动：bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
 [ ] Mac 和设备在同一网络。
 [ ] curl --noproxy '*' http://<mac-lan-ip>:8000/api/v1/health 返回 ok。
 [ ] 使用真机 base URL 重新构建 APK，或使用本轮已构建的 LAN APK：

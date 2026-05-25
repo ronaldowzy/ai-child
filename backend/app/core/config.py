@@ -8,10 +8,16 @@ class Settings(BaseSettings):
     app_name: str = "Child AI Growth Agent Backend"
     api_v1_prefix: str = "/api/v1"
     environment: str = "dev"
-    model_provider: str = "mock"
-    vision_provider: str = "mock"
+    model_provider: str = "mimo"
+    vision_provider: str = "mimo"
+    mimo_enabled: bool = False
     mimo_api_key: str = ""
-    tts_provider: str = "mock"
+    mimo_base_url: str = "https://token-plan-cn.xiaomimimo.com/v1"
+    mimo_model: str = "mimo-v2.5-pro"
+    mimo_allow_child_data: bool = False
+    mimo_allow_image: bool = False
+    mimo_retention_policy_checked: bool = False
+    tts_provider: str = "mimo"
     conversation_tts_enabled: bool = False
     mimo_tts_enabled: bool = False
     mimo_tts_api_key: str = ""
@@ -27,7 +33,7 @@ class Settings(BaseSettings):
     tts_cache_dir: str = "backend/storage/tts_cache"
     tts_public_base_url: str = "/media/tts"
     tts_max_text_chars: int = 600
-    asr_provider: str = "mock"
+    asr_provider: str = "local_sensevoice"
     asr_fallback_provider: str = "mimo"
     local_sensevoice_enabled: bool = False
     local_sensevoice_model_path: str = (
@@ -50,6 +56,8 @@ class Settings(BaseSettings):
     )
     model_debug_trace_full_text: bool = True
     model_debug_trace_max_text_chars: int = 20000
+    allow_mock_runtime: bool = False
+    opening_tts_soft_timeout_ms: int = 8000
 
     model_config = SettingsConfigDict(env_prefix="CHILD_AI_", extra="ignore")
 

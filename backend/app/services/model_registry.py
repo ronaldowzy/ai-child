@@ -318,25 +318,35 @@ class ModelRegistry:
     ) -> ModelProfile | None:
         if profile.fallback_profile_name:
             fallback = self._profiles.get(profile.fallback_profile_name)
-            if fallback is not None and fallback.enabled:
+            if (
+                fallback is not None
+                and fallback.enabled
+                and self._profile_allowed_for_runtime(fallback)
+            ):
                 return fallback
 
-        mock_profile_name = self._default_task_profile_map().get(task_type)
+        mock_profile_name = self._default_mock_task_profile_map().get(task_type)
         if mock_profile_name and mock_profile_name != profile.profile_name:
             fallback = self._profiles.get(mock_profile_name)
-            if fallback is not None and fallback.enabled:
+            if (
+                fallback is not None
+                and fallback.enabled
+                and self._profile_allowed_for_runtime(fallback)
+            ):
                 return fallback
         return None
 
     def _mock_fallback_profile_for(
         self, profile: ModelProfile, task_type: ModelTaskType
     ) -> ModelProfile | None:
+        if not self._allow_mock_runtime():
+            return None
         if profile.fallback_profile_name:
             fallback = self._enabled_mock_profile(profile.fallback_profile_name)
             if fallback is not None:
                 return fallback
 
-        mock_profile_name = self._default_task_profile_map().get(task_type)
+        mock_profile_name = self._default_mock_task_profile_map().get(task_type)
         if mock_profile_name and mock_profile_name != profile.profile_name:
             return self._enabled_mock_profile(mock_profile_name)
         return None
@@ -354,6 +364,14 @@ class ModelRegistry:
         if provider is None or not provider.enabled:
             return None
         return profile
+
+    def _profile_allowed_for_runtime(self, profile: ModelProfile) -> bool:
+        if profile.provider_type != ModelProviderType.MOCK:
+            return True
+        return self._allow_mock_runtime()
+
+    def _allow_mock_runtime(self) -> bool:
+        return self._env_bool("CHILD_AI_ALLOW_MOCK_RUNTIME", default=False)
 
     def _normalize_task_profile_map(
         self, task_profile_map: Mapping[ModelTaskType | str, str]
@@ -379,7 +397,10 @@ class ModelRegistry:
 
     def _default_task_profile_map(self) -> dict[ModelTaskType, str]:
         child_chat_profile = os.getenv("CHILD_AI_CHILD_CHAT_PROFILE")
-        if not child_chat_profile and os.getenv("CHILD_AI_MODEL_PROVIDER") == "mimo":
+        if (
+            not child_chat_profile
+            and os.getenv("CHILD_AI_MODEL_PROVIDER", "mimo") == "mimo"
+        ):
             child_chat_profile = "mimo_child_chat"
 
         parent_report_profile = os.getenv("CHILD_AI_PARENT_REPORT_PROFILE")
@@ -408,6 +429,17 @@ class ModelRegistry:
             ModelTaskType.PARENT_REPORT: parent_report_profile or "parent_report_mock",
             ModelTaskType.VISION: vision_profile or "vision_mock",
             ModelTaskType.OCR: ocr_profile or "ocr_mock",
+        }
+
+    def _default_mock_task_profile_map(self) -> dict[ModelTaskType, str]:
+        return {
+            ModelTaskType.CHILD_CHAT: "child_chat_primary",
+            ModelTaskType.INTENT_CLASSIFICATION: "intent_classifier_mock",
+            ModelTaskType.SAFETY_CLASSIFICATION: "safety_classifier_mock",
+            ModelTaskType.MEMORY_EXTRACTION: "memory_extractor_mock",
+            ModelTaskType.PARENT_REPORT: "parent_report_mock",
+            ModelTaskType.VISION: "vision_mock",
+            ModelTaskType.OCR: "ocr_mock",
         }
 
     def _default_profiles(self) -> dict[str, ModelProfile]:
@@ -461,7 +493,6 @@ class ModelRegistry:
                         os.getenv("CHILD_AI_MIMO_PARENT_REPORT_TIMEOUT_MS", "45000"),
                     )
                 ),
-                fallback_profile_name="parent_report_mock",
             ),
             "vision_mock": self._mock_profile(
                 profile_name="vision_mock",
@@ -483,7 +514,6 @@ class ModelRegistry:
                 ),
                 task_type=ModelTaskType.VISION,
                 vision=True,
-                fallback_profile_name="vision_mock",
             ),
             "mimo_ocr": self._mimo_profile(
                 profile_name="mimo_ocr",
@@ -493,7 +523,6 @@ class ModelRegistry:
                 ),
                 task_type=ModelTaskType.OCR,
                 vision=True,
-                fallback_profile_name="ocr_mock",
             ),
         }
 
@@ -507,7 +536,7 @@ class ModelRegistry:
         vision: bool = False,
         max_tokens: int | None = None,
         timeout_ms: int | None = None,
-        fallback_profile_name: str = "child_chat_primary",
+        fallback_profile_name: str | None = None,
     ) -> ModelProfile:
         return ModelProfile(
             id=profile_name,
@@ -583,7 +612,11 @@ class ModelRegistry:
         return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
     def _env_provider_requested(self, *env_names: str) -> bool:
-        return any(os.getenv(env_name, "").strip().lower() == "mimo" for env_name in env_names)
+        for env_name in env_names:
+            raw_value = os.getenv(env_name)
+            if raw_value is not None and raw_value.strip():
+                return raw_value.strip().lower() == "mimo"
+        return True
 
 
 _model_registry = ModelRegistry()

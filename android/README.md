@@ -25,12 +25,12 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 - 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；Task 09 后儿童端不再独立硬编码恐龙/太空等 fallback topic chips，话题选择来自后端 quick actions / conversation_control。`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
-- “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo。CameraX 自定义相机不是当前目标。
+- “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo，也不保留儿童端模拟图片弹窗。CameraX 自定义相机不是当前目标。
 - 拍照/相册发送后，儿童消息区显示本地临时图片确认卡：优先展示压缩缩略图，并显示图片类型、大小和上传状态；本地路径不进入模型 prompt，上传文件名会去掉本地目录。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
 - 家长设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、家长寄语、目标和沟通偏好；v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
 - 家长日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”，增加“今日聊了什么”话题/内容摘要和“今晚先不追问”；失败态不默认暴露后端/model/provider/config 文案。
-- 儿童聊天页中的家长入口降噪为一个小“大人”入口：登录态默认可直接进入家长设置/日报，不再要求开发 PIN；开发/旧路径可保留 PIN 误触保护，但它不是生产级账号/auth。
+- 儿童聊天页中的家长入口降噪为一个小“大人”入口：默认显示“长按“大人”并输入 PIN，才能进入家长页面。”普通点击只提示给家长看，长按后选择家长日报/家长设置并输入 PIN 才进入。当前 PIN 是家庭内测轻量门禁，不是生产级账号安全。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
 - 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、家长寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
 
@@ -44,7 +44,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 3. 家长寄语不会出现在儿童聊天 UI 或 session_state debug 中。
 4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
 5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
-6. “拍给小白狐看”是默认图片入口；旧 mock attachment 不作为儿童端默认路径。
+6. “拍给小白狐看”是默认图片入口；儿童端只走系统相机/相册真实图片 multipart 上传。
 7. Task 06 后家长设置显性重点从作息时间转向孩子画像、兴趣和话题边界；作息仍可作为后端时间上下文，不把场景硬锁给孩子。
 8. 儿童聊天页小白狐区域新增 phase-derived 短状态 chip 和轻背景；这是 thin slice polish，不代表最终视觉体验完成。
 ```
@@ -58,7 +58,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 4. 后端缺 key、`allow_image` 未开或 provider 失败时，儿童端显示失败，不假装看到了。
 5. 断开后端时，普通图片和作业图片分别显示正确失败文案。
 6. 拍照/相册发送后，消息区缩略图/图片确认卡在上传中、成功、失败状态下不挤占横屏消息区。
-7. 家长入口默认只显示小“大人”入口；登录后可进入家长日报和设置，旧开发 PIN 路径只作为 fallback。
+7. 家长入口默认只显示小“大人”入口；普通点击只提示，长按 + PIN 后才能进入家长日报和设置。
 8. 家长日报顶部“今晚可以怎么接一句”和失败态家庭化文案在真机可读。
 ```
 
@@ -190,8 +190,8 @@ DevSettings.SHOW_MASCOT_DEBUG_SWITCHER = false
 路径：android/app/build/outputs/apk/debug/app-debug.apk
 base URL：http://192.168.0.118:8000/
 大小：16471142 bytes
-SHA256：28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
-构建时间 UTC：2026-05-25T04:10:50Z
+SHA256：e5ae9d587adbffc491bba720e61ef932670cdc28e1a12ef7896e0ffca042dea9
+构建时间 UTC：2026-05-25T11:51:00Z
 ```
 
 Task 10 QA 包构建结果（2026-05-25）：
@@ -202,7 +202,7 @@ bash scripts/lint_backend.sh：All checks passed
 bash scripts/android_gradle.sh test：BUILD SUCCESSFUL
 bash scripts/android_gradle.sh assembleDebug：BUILD SUCCESSFUL
 conda run -n child-ai python scripts/run_model_trace_scenarios.py --output /tmp/task10_model_trace_review.md：MODEL_TRACE_SCENARIOS: PASS，26 scenarios / 26 traces
-bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/：PASS，sha256=28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
+bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/：PASS，sha256=e5ae9d587adbffc491bba720e61ef932670cdc28e1a12ef7896e0ffca042dea9
 bash scripts/doctor_local_env.sh：adb 可用但未连接物理设备
 ```
 
@@ -419,9 +419,9 @@ bash scripts/smoke_voice_stack.sh
 
 ```text
 路径：android/app/build/outputs/apk/debug/app-debug.apk
-构建时间 UTC：2026-05-25T04:10:50Z
+构建时间 UTC：2026-05-25T11:51:00Z
 大小：16471142 bytes
-SHA256：28fdd63f6cd6e9ef71c27d0dde2c8ce274d7980ea06d0a9e50e2d2248fa0ddaa
+SHA256：e5ae9d587adbffc491bba720e61ef932670cdc28e1a12ef7896e0ffca042dea9
 base URL：http://192.168.0.118:8000/
 BuildConfig.CONVERSATION_API_BASE_URL：http://192.168.0.118:8000/
 ```
@@ -473,7 +473,8 @@ bash scripts/doctor_local_env.sh
 先从仓库根目录启动后端：
 
 ```bash
-bash scripts/dev_backend.sh
+bash scripts/start_backend_services.sh --agent main --host 0.0.0.0 --port 8000
+bash scripts/status_backend_services.sh --agent main
 ```
 
 再安装运行 Android debug 包。验证路径：

@@ -38,7 +38,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,10 +125,6 @@ fun ChildChatScreen(
         onInstallTtsData = {
             openIntentWithFallback(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
         },
-        onMockProblemTextChange = viewModel::updateMockProblemText,
-        onMockImagePurposeChange = viewModel::updateMockImagePurpose,
-        onDismissMockPhoto = viewModel::dismissMockPhotoCapture,
-        onSubmitMockPhoto = viewModel::submitMockPhotoCapture,
         onPhotoCaptured = viewModel::submitCapturedPhoto,
         onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
         onOpenParentSettings = onOpenParentSettings,
@@ -148,10 +143,6 @@ private fun ChildChatScreenContent(
     onToggleTtsMuted: () -> Unit,
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
-    onMockProblemTextChange: (String) -> Unit,
-    onMockImagePurposeChange: (String) -> Unit,
-    onDismissMockPhoto: () -> Unit,
-    onSubmitMockPhoto: () -> Unit,
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
     onOpenParentSettings: () -> Unit,
@@ -199,15 +190,6 @@ private fun ChildChatScreenContent(
         }
     }
 
-    uiState.mockPhoto?.let { mockPhoto ->
-        MockPhotoDialog(
-            mockPhoto = mockPhoto,
-            onProblemTextChange = onMockProblemTextChange,
-            onImagePurposeChange = onMockImagePurposeChange,
-            onDismiss = onDismissMockPhoto,
-            onSubmit = onSubmitMockPhoto,
-        )
-    }
     pendingParentEntry?.let { target ->
         ParentEntryPinDialog(
             target = target,
@@ -285,86 +267,6 @@ private fun ChildChatScreenContent(
             }
         }
     }
-}
-
-@Composable
-private fun MockPhotoDialog(
-    mockPhoto: MockPhotoUiState,
-    onProblemTextChange: (String) -> Unit,
-    onImagePurposeChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onSubmit: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(text = "拍给小白狐看")
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(
-                        onClick = { onImagePurposeChange(IMAGE_PURPOSE_SHARE) },
-                        label = {
-                            Text(
-                                if (mockPhoto.imagePurpose == IMAGE_PURPOSE_SHARE) {
-                                    "分享给小白狐*"
-                                } else {
-                                    "分享给小白狐"
-                                },
-                            )
-                        },
-                    )
-                    AssistChip(
-                        onClick = { onImagePurposeChange(IMAGE_PURPOSE_HOMEWORK) },
-                        label = {
-                            Text(
-                                if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
-                                    "这是作业题*"
-                                } else {
-                                    "这是作业题"
-                                },
-                            )
-                        },
-                    )
-                }
-                OutlinedTextField(
-                    value = mockPhoto.problemText,
-                    onValueChange = onProblemTextChange,
-                    enabled = !mockPhoto.isSubmitting,
-                    label = {
-                        Text(text = "我拍的是什么 / 我想问什么")
-                    },
-                    minLines = 3,
-                    maxLines = 5,
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                )
-                mockPhoto.errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onSubmit,
-                enabled = !mockPhoto.isSubmitting,
-            ) {
-                Text(text = if (mockPhoto.isSubmitting) "发送中" else "发送给小白狐")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !mockPhoto.isSubmitting,
-            ) {
-                Text(text = "取消")
-            }
-        },
-    )
 }
 
 @Composable
@@ -620,6 +522,8 @@ internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
 
 internal fun parentEntryTapHint(): String = "这是给家长看的，请让家长长按进入。"
 
+internal fun parentEntryDefaultHint(): String = "长按“大人”并输入 PIN，才能进入家长页面。"
+
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 
 internal fun parentEntryLongPressTargets(): List<ParentEntryTarget> =
@@ -716,18 +620,16 @@ private fun AgentTopBar(
                     onLongPress = onParentEntryLongPress,
                 )
             }
-            parentEntryHint?.let { hint ->
-                Text(
-                    text = hint,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(
-                        start = horizontalPadding,
-                        end = horizontalPadding,
-                        bottom = if (compactLandscape) 8.dp else 10.dp,
-                    ),
-                )
-            }
+            Text(
+                text = parentEntryHint ?: parentEntryDefaultHint(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    start = horizontalPadding,
+                    end = horizontalPadding,
+                    bottom = if (compactLandscape) 8.dp else 10.dp,
+                ),
+            )
         }
     }
 }
@@ -1032,10 +934,6 @@ private fun ChildChatScreenPreview() {
             onInstallTtsData = {},
             onPhotoCaptured = { _, _ -> },
             onPhotoCaptureFailed = {},
-            onMockProblemTextChange = {},
-            onMockImagePurposeChange = {},
-            onDismissMockPhoto = {},
-            onSubmitMockPhoto = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
             requireParentPin = false,

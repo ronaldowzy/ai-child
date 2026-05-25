@@ -71,7 +71,7 @@ data class AsrTranscriptionResponse(
                 status = root.getString("status"),
                 transcript = root.optNullableString("transcript"),
                 requiresConfirmation = root.optBoolean("requiresConfirmation", true),
-                provider = root.optString("provider", "mock"),
+                provider = root.optString("provider", "unknown"),
                 model = root.optString("model", ""),
                 language = root.optString("language", "zh-CN"),
                 durationMs = root.optNullableInt("durationMs"),

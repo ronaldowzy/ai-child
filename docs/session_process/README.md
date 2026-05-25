@@ -24,7 +24,7 @@ bash scripts/doctor_local_env.sh
 
 ```text
 1. 不要只根据裸命令失败就判断本机缺少依赖。
-2. 后端验证优先使用 scripts/test_backend.sh、scripts/lint_backend.sh、scripts/dev_backend.sh。
+2. 后端验证优先使用 scripts/test_backend.sh、scripts/lint_backend.sh；后台服务启停必须使用 scripts/start_backend_services.sh、scripts/status_backend_services.sh、scripts/stop_backend_services.sh。
 3. Android 验证优先使用 scripts/android_gradle.sh，而不是直接运行裸 ./gradlew。
 4. 遇到 JDK、Conda、Android SDK、设备、局域网 IP、base URL 等问题，先查 SHARED_CONTEXT_V0_1.md。
 5. 新发现的共性坑必须在交接摘要里提出，由主控会话确认后写入共享上下文。
@@ -182,6 +182,16 @@ docs/session_process/         主控会话拥有
 bash scripts/test_backend.sh
 bash scripts/lint_backend.sh
 ```
+
+后台服务统一使用：
+
+```bash
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
+```
+
+多 agent 并行时必须给每个 Lane 分配独立 `--agent` 和 `--port`；不要手写 `uvicorn`、`nohup`、`launchctl` 或直接 kill 其他 agent 的服务。
 
 如果必须手动使用 Conda：
 

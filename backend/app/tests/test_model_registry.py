@@ -230,7 +230,7 @@ def test_model_registry_can_register_enabled_mimo_profile(
 
     assert profile.profile_name == "mimo_child_chat"
     assert profile.model_name == "mimo-v2.5-pro"
-    assert profile.fallback_profile_name == "child_chat_primary"
+    assert profile.fallback_profile_name is None
     assert response.provider_name == "mock"
     assert response.metadata["fallback_used"] is True
     assert response.metadata["failure_type"] == "ModelProviderConfigurationError"

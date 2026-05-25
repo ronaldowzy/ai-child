@@ -5,6 +5,7 @@ import logging
 import time
 
 from app.core.logging import hash_identifier
+from app.core.config import get_settings
 from app.domain.schemas.conversation import (
     ConversationMessageResponse,
     ConversationOpeningRequest,
@@ -36,7 +37,7 @@ from app.middleware.request_id import get_request_id
 
 
 logger = logging.getLogger("app.opening_timing")
-DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS = 1500
+DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS = 8000
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,7 @@ class OpeningService:
         model_registry: ModelRegistry | None = None,
         memory_service: MemoryService | None = None,
         opening_policy_builder: OpeningPolicyBuilder | None = None,
-        tts_soft_timeout_ms: int = DEFAULT_OPENING_TTS_SOFT_TIMEOUT_MS,
+        tts_soft_timeout_ms: int | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -85,7 +86,11 @@ class OpeningService:
             opening_policy_builder
             or OpeningPolicyBuilder(memory_service=self._memory_service)
         )
-        self._tts_soft_timeout_ms = tts_soft_timeout_ms
+        self._tts_soft_timeout_ms = (
+            tts_soft_timeout_ms
+            if tts_soft_timeout_ms is not None
+            else get_settings().opening_tts_soft_timeout_ms
+        )
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
         self._session_cache_info: dict[tuple[str, str], _OpeningCacheInfo] = {}
 

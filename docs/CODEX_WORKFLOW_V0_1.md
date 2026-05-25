@@ -149,6 +149,26 @@ Codex 不应该擅自：
 
 如果任一项不满足，Codex 必须停止交付该测试目标，先修配置、重打包或改口径。不得把半配置、mock 产物交给父亲做真实能力 QA。
 
+### 1.5 Backend service management gate
+
+多 agent / 多 Lane 协作时，后台服务启停必须统一使用仓库脚本：
+
+```bash
+bash scripts/start_backend_services.sh --agent main --port 8000
+bash scripts/status_backend_services.sh
+bash scripts/stop_backend_services.sh --agent main
+```
+
+规则：
+
+```text
+1. 不允许各 agent 手写 uvicorn/nohup/launchctl 作为共享后端服务启动方式。
+2. 每个 agent 必须使用稳定的 --agent 名称；并行 Lane 必须使用不同 --port。
+3. status_backend_services.sh 是判断服务归属、PID、端口、health 和日志路径的事实入口。
+4. stop_backend_services.sh 默认只停止指定 agent 的 FastAPI，不停止共享 PostgreSQL；只有确认没有其他 agent 依赖时才加 --stop-postgres。
+5. 临时 smoke 脚本可以自启自停高位端口服务，但不能替代父亲/真机 QA 的后台服务入口。
+```
+
 例外：
 
 ```text

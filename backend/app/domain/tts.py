@@ -18,6 +18,7 @@ class TtsEmotion(StrEnum):
 class TtsProviderName(StrEnum):
     MOCK = "mock"
     MIMO = "mimo"
+    SHERPA_ONNX = "sherpa_onnx"
 
 
 class TtsVoiceVersion(StrEnum):

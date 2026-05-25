@@ -44,12 +44,13 @@ PD-037：儿童聊天页打开后，小白狐请求 opening greeting；称呼优
 ```text
 1. 语音输入 v1：Android 点击录音后上传短音频到后端 ASR，后端优先调用本地 sherpa-onnx + SenseVoice-Small int8；本地异常时再走配置的原有识别方式。
 2. 儿童默认不展示可编辑识别文本，ASR ok 且 transcript 非空后自动发送 conversation stream；确认面板只作为 DevSettings / 父亲调试模式。
-3. TTS 朗读 v1：后端使用小白狐 VoiceClone 生成 `audio_url`，Android 优先播放 `audio_url`。
+3. TTS 朗读 v1：后端主路径使用 MiMo VoiceClone 生成 `audio_url`；MiMo 异常时自动 fallback 到本地 sherpa-onnx ZipVoice 生成；Android 优先播放 `audio_url`。
 4. `audio_url` 不可用或播放失败时，Android 保留文字和温和提示，不用系统 TextToSpeech 顶替儿童端自动朗读；系统 TTS 不再作为正式小白狐音色方案。
 5. 后端 ASR endpoint 可以接收一次性短音频做转写，但原始音频不入长期库、不进日志、不进入 memory；语音输入正式进入对话的仍是自动发送后的文本。
 6. Hands-free conversational mode 是 future，不进入 v1。
 7. 本地 ASR 方案见 `docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md`；MiMo ASR / audio input 仍作为 fallback 和对照测试路径，结论见 `docs/ASR_INPUT_RESEARCH_V0_1.md` 和 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；真实儿童音频外发必须由父亲授权和 ASR policy flags 控制。
 8. 语音输出下一步转向文本流式和 TTS 分句/分段播放，不能继续依赖增加同步 read timeout。
+9. 本地 TTS fallback 方案使用 sherpa-onnx ZipVoice zero-shot 声音克隆，无需 API key 和网络，MiMo 异常时自动切换；详见本文档 5.1 节。
 ```
 
 ---
@@ -219,7 +220,90 @@ ChildChatScreen 首次可见
 16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式、TTS 分句/分段播放、预生成缓存或更快正式音色链路设计。
 17. Task 07 已增加 TTS latency observability：非 stream `/conversation/message` 日志记录 `conversation_turn_latency`，包含 `request_id`、`request_start`、`model_ms`、`tts_ms`、`audio_url_present`、`turn_total_ms`；stream 日志记录 `conversation_stream_finished`，包含 `request_start`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`turn_total_ms`。Android logcat 使用 `XiaobaohuTtsTiming` 记录 remote audio URL received / playback started / done / error，包含 request_id、turn_id、segment_index、elapsed_ms，不显示给儿童。
 18. 2026-05-25 backend-only 日志复盘：`conversation_stream_finished` 出现 `tts_segment_failed`，但随后 `tts_call_finished` 在 0.7-3.9 秒后成功，说明旧 8 秒 soft timeout 会制造无声 turn。本次只把 formal VoiceClone 等待窗口校准到 15 秒；Android 播放启动和真机听感仍需 Redmi K60 / Honor Pad 5 logcat + 视频复验。
+19. 2026-05-25 新增 sherpa-onnx ZipVoice 本地 TTS 作为 MiMo VoiceClone 的 fallback。本地 TTS 使用同一份小白狐 voice sample 做 zero-shot 声音克隆，无需 API key，无需网络，无需 data policy flags。MiMo 主路径异常（网络超时、provider 错误、data policy 拦截）时自动切换到本地生成；配置错误（模型文件缺失、provider 未启用）不触发 fallback，直接报错。本地 TTS 不支持 emotion 控制，生成音色与 MiMo VoiceClone 接近但语调更平。
 ```
+
+### 5.1 Local TTS Fallback Strategy
+
+```text
+主路径：MiMo VoiceClone（云端，支持 emotion）
+  ↓ 异常时
+Fallback：sherpa-onnx ZipVoice（本地，不支持 emotion）
+```
+
+选择逻辑：
+
+```text
+1. CHILD_AI_TTS_PROVIDER=mimo 且 CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true：
+   MiMo 为主，异常时 fallback 到 sherpa-onnx。
+2. CHILD_AI_TTS_PROVIDER=sherpa_onnx：
+   直接使用本地 TTS，不尝试 MiMo。
+3. CHILD_AI_TTS_PROVIDER=mock：
+   测试用，生成静音 WAV。
+```
+
+触发 fallback 的异常类型：
+
+```text
+1. TtsProviderError：MiMo 网络超时、API 错误、返回空音频。
+2. TtsDataPolicyBlockedError：MiMo data policy 未满足。
+```
+
+不触发 fallback 的异常：
+
+```text
+1. TtsProviderConfigurationError：模型文件缺失、provider 未启用、voice sample 缺失。
+   这类错误说明本地配置有问题，fallback 到同样依赖本地文件的 sherpa-onnx 也会失败。
+```
+
+本地 TTS 资源占用（Apple M2 / 8GB）：
+
+```text
+模型加载：~2-3 秒（首次调用时懒加载，线程安全，后续调用复用）
+短文本生成：~1.5-2 秒（5-15 个汉字）
+内存占用：~200-300MB 常驻
+CPU：推理时占满配置线程数（默认 2 线程），空闲时几乎不占
+```
+
+与 ASR 对比：
+
+```text
+| 项目 | ASR（SenseVoice） | TTS（ZipVoice） |
+|------|------------------|-----------------|
+| 模型大小 | ~85MB | ~176MB |
+| 加载时间 | ~0.7s | ~2-3s |
+| 推理速度 | 5.6s 音频 → 83ms | 10 字 → 1.5-2s |
+| 内存占用 | ~471MB | ~200-300MB |
+| 线程数 | 4 | 2 |
+```
+
+### 5.2 sherpa-onnx TTS Model Files
+
+模型文件不进入 git，目录已忽略。需手动下载：
+
+```text
+backend/models/tts/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/
+  tokens.txt
+  encoder.int8.onnx (5.5MB)
+  decoder.int8.onnx (119MB)
+  lexicon.txt
+  espeak-ng-data/
+backend/models/tts/vocos_24khz.onnx (52MB)
+```
+
+voice sample（已在 git 中）：
+
+```text
+backend/assets/voices/xiaobaohu_voice_v01.wav
+```
+
+voice reference text（配置在 .env 中）：
+
+```text
+CHILD_AI_SHERPA_ONNX_TTS_VOICE_REFERENCE_TEXT=太棒啦，你刚刚这一步做的很认真。没关系，我们换个角度再想一想，我发现一个小线索，你要不要试试看，别着急，小白狐会陪你一步一步完成，答错也没关系，错误就是新的线索呀。
+```
+
+该文本是 voice sample 的实际语音内容转写，用于 zero-shot 声音克隆的参考文本。
 
 ### 5.3 Streaming Voice Direction
 

@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     conversation_stream_tts_soft_timeout_ms: int = 15000
     mimo_tts_allow_child_text: bool = False
     mimo_tts_retention_policy_checked: bool = False
+    sherpa_onnx_tts_enabled: bool = False
+    sherpa_onnx_tts_model_dir: str = (
+        "backend/models/tts/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia"
+    )
+    sherpa_onnx_tts_vocoder_path: str = (
+        "backend/models/tts/vocos_24khz.onnx"
+    )
+    sherpa_onnx_tts_num_threads: int = 2
+    sherpa_onnx_tts_num_steps: int = 4
+    sherpa_onnx_tts_voice_reference_text: str = ""
     xiaobaihu_voice_sample_path: str = (
         "backend/assets/voices/xiaobaohu_voice_v01.wav"
     )

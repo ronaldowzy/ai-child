@@ -104,6 +104,8 @@ starting. With `CHILD_AI_ALLOW_MOCK_RUNTIME=false`, startup validates:
 - `CHILD_AI_VISION_PROVIDER=mimo` with image authorization enabled.
 - `CHILD_AI_TTS_PROVIDER=mimo` with MiMo TTS enabled, child-text authorization
   enabled, retention policy checked, and the Xiaobaihu voice sample present.
+  When `CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true`, sherpa-onnx ZipVoice is
+  available as a local fallback; it does not require external data policy flags.
 - `CHILD_AI_ASR_PROVIDER=local_sensevoice` with local model/tokens present, and
   MiMo ASR fallback only when its audio policy flags are enabled.
 
@@ -860,10 +862,78 @@ The Android app never stores model API keys. All model configuration belongs on 
 - `POST /api/v1/tts/xiaobaohu`
 - `GET /media/tts/{voice_version}/{cache_key}.wav`
 
-## XiaoBaiHu TTS Endpoint
+## TTS v1: MiMo VoiceClone + sherpa-onnx Local Fallback
 
 The backend now owns the official 小白狐 voice path. Android should not call
 MiMo directly and must not store any TTS API key.
+
+Current TTS strategy:
+
+```text
+1. Primary: MiMo VoiceClone (cloud) — full emotion support via style_prompt.
+2. Fallback: sherpa-onnx ZipVoice (local) — zero-shot voice cloning, no emotion,
+   runs on CPU, no API key needed.
+3. Configuration errors (missing model files, disabled provider) propagate without fallback.
+4. Transient errors (network, provider timeout, data policy block) trigger fallback to sherpa-onnx.
+```
+
+sherpa-onnx TTS uses the same voice sample as MiMo VoiceClone for consistent
+voice identity. The model is `zipvoice-distill-int8-zh-en-emilia` with
+`vocos_24khz` vocoder. It is a zero-shot voice cloning model that takes a
+reference audio sample and generates speech in a similar voice.
+
+Local TTS model files (not in git):
+
+```text
+backend/models/tts/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/
+  tokens.txt
+  encoder.int8.onnx (5.5MB)
+  decoder.int8.onnx (119MB)
+  lexicon.txt
+  espeak-ng-data/
+backend/models/tts/vocos_24khz.onnx (52MB)
+```
+
+Configuration:
+
+```bash
+CHILD_AI_TTS_PROVIDER=mimo              # or sherpa_onnx for local-only
+CHILD_AI_SHERPA_ONNX_TTS_ENABLED=false  # set true to enable fallback
+CHILD_AI_SHERPA_ONNX_TTS_MODEL_DIR=backend/models/tts/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia
+CHILD_AI_SHERPA_ONNX_TTS_VOCODER_PATH=backend/models/tts/vocos_24khz.onnx
+CHILD_AI_SHERPA_ONNX_TTS_NUM_THREADS=2
+CHILD_AI_SHERPA_ONNX_TTS_NUM_STEPS=4
+CHILD_AI_SHERPA_ONNX_TTS_VOICE_REFERENCE_TEXT=<transcribed content of voice sample>
+```
+
+The `voice_reference_text` must match what the voice sample actually says. This
+text is used by the zero-shot model as context for voice cloning.
+
+sherpa-onnx TTS runs locally and does not transmit any child text externally.
+The `TtsDataPolicyGuard` treats it the same as mock — no external data policy
+flags are required.
+
+Performance (Apple M2 / 8GB, 2026-05-25):
+
+```text
+Model load: ~2-3s (one-time, lazy, thread-safe)
+Short text generation: ~1.5-2s (5-15 chars)
+Memory: ~200-300MB resident
+```
+
+Trade-offs vs MiMo VoiceClone:
+
+```text
+| Aspect            | MiMo VoiceClone          | sherpa-onnx ZipVoice        |
+|-------------------|--------------------------|------------------------------|
+| Emotion/style     | Full emotion via prompt   | No emotion control           |
+| Voice similarity  | High (trained clone)      | Good (zero-shot)             |
+| Latency (cache)   | ~0ms                      | ~0ms                         |
+| Latency (gen)     | 5-12s (cloud)             | 1.5-2s (local)               |
+| Requires network  | Yes                       | No                           |
+| API key           | Yes                       | No                           |
+| Data policy       | Full child-text flags     | Local-only, no flags needed  |
+```
 
 For real QA, use the configured 小白狐 TTS provider. The endpoint shape is:
 

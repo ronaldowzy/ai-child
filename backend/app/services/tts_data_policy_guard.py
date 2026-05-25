@@ -14,7 +14,7 @@ class TtsDataPolicyGuard:
         settings: Settings,
         contains_child_text: bool = True,
     ) -> None:
-        if provider == TtsProviderName.MOCK:
+        if provider in (TtsProviderName.MOCK, TtsProviderName.SHERPA_ONNX):
             return
 
         reasons: list[str] = []

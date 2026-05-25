@@ -17,6 +17,7 @@ from app.middleware.request_id import get_request_id
 from app.providers.tts.base import TtsProviderError
 from app.providers.tts.mimo_voiceclone_provider import MimoVoiceCloneProvider
 from app.providers.tts.mock_tts_provider import MockTtsProvider
+from app.providers.tts.sherpa_onnx_provider import SherpaOnnxTtsProvider
 from app.services.tts_cache_service import TtsCacheService
 from app.services.tts_data_policy_guard import (
     TtsDataPolicyBlockedError,
@@ -52,6 +53,7 @@ class TtsService:
             cache_dir=self._cache_dir
         )
         self._data_policy_guard = data_policy_guard or TtsDataPolicyGuard()
+        self._sherpa_provider: SherpaOnnxTtsProvider | None = None
 
     def generate_xiaobaihu(
         self,
@@ -131,13 +133,9 @@ class TtsService:
                 )
                 return response
 
-            self._data_policy_guard.validate(
+            provider_result = self._generate_with_fallback(
                 provider=provider,
-                settings=self._settings,
-                contains_child_text=True,
-            )
-            provider_result = self._provider(provider).generate(
-                TtsProviderRequest(
+                request=TtsProviderRequest(
                     text=normalized_text,
                     emotion=emotion,
                     voice_version=voice_version,
@@ -145,8 +143,64 @@ class TtsService:
                     voice_sample_sha256=voice_sample_sha256,
                     style_prompt=xiaobaihu_style_prompt(emotion),
                     prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
-                )
+                ),
             )
+            if provider_result.provider != provider:
+                fallback_provider = provider_result.provider
+                provider = fallback_provider
+                model = self._model_name(fallback_provider)
+                cache_key = self._cache_service.cache_key(
+                    normalized_text=normalized_text,
+                    emotion=emotion.value,
+                    voice_version=voice_version,
+                    provider=fallback_provider,
+                    model=model,
+                    voice_sample_sha256=voice_sample_sha256,
+                    prompt_version=XIAOBAIHU_TTS_PROMPT_VERSION,
+                )
+                if not request.force_refresh and self._cache_service.has(
+                    voice_version=voice_version,
+                    cache_key=cache_key,
+                ):
+                    cache_hit = True
+                    metadata = self._cache_service.load_metadata(
+                        voice_version=voice_version,
+                        cache_key=cache_key,
+                    )
+                    audio_path = self._cache_service.audio_path(
+                        voice_version=voice_version,
+                        cache_key=cache_key,
+                    )
+                    audio_bytes = self._file_size(audio_path)
+                    duration = metadata.get("duration")
+                    response = self._response(
+                        audio_url=self._public_audio_url(
+                            voice_version=voice_version,
+                            cache_key=cache_key,
+                        ),
+                        duration=duration if isinstance(duration, (int, float)) else (
+                            self._cache_service.duration_seconds(audio_path)
+                        ),
+                        text=normalized_text,
+                        emotion=emotion,
+                        voice_version=voice_version,
+                        provider=fallback_provider,
+                        model=str(metadata.get("model") or model),
+                        cache_hit=True,
+                    )
+                    self._log_tts_call_finished(
+                        started_at=started_at,
+                        provider=fallback_provider,
+                        model=response.model,
+                        voice_version=voice_version,
+                        emotion=emotion,
+                        cache_hit=cache_hit,
+                        audio_bytes=audio_bytes,
+                        text_chars=text_chars,
+                        cache_key=cache_key,
+                        error_type=None,
+                    )
+                    return response
             audio_bytes = len(provider_result.audio_bytes)
             text_hash = hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
             duration = provider_result.duration
@@ -284,9 +338,47 @@ class TtsService:
     def _model_name(self, provider: TtsProviderName) -> str:
         if provider == TtsProviderName.MIMO:
             return self._settings.mimo_tts_model
+        if provider == TtsProviderName.SHERPA_ONNX:
+            return "zipvoice-distill-int8-zh-en-emilia"
         return "mock-tts-v0"
 
-    def _provider(self, provider: TtsProviderName) -> MockTtsProvider | MimoVoiceCloneProvider:
+    def _generate_with_fallback(
+        self,
+        *,
+        provider: TtsProviderName,
+        request: TtsProviderRequest,
+    ):
+        from app.providers.tts.base import TtsProviderConfigurationError
+
+        sherpa_available = (
+            self._settings.sherpa_onnx_tts_enabled
+            and provider != TtsProviderName.SHERPA_ONNX
+        )
+        try:
+            self._data_policy_guard.validate(
+                provider=provider,
+                settings=self._settings,
+                contains_child_text=True,
+            )
+            return self._provider(provider).generate(request)
+        except TtsProviderConfigurationError:
+            raise
+        except (TtsProviderError, TtsDataPolicyBlockedError) as exc:
+            if not sherpa_available:
+                raise
+            logging.getLogger("app.tts_timing").warning(
+                "tts_primary_failed_fallback",
+                extra={
+                    "event": "tts_primary_failed_fallback",
+                    "primary_provider": provider.value,
+                    "fallback_provider": TtsProviderName.SHERPA_ONNX.value,
+                    "error_type": exc.__class__.__name__,
+                    "error_detail": str(exc)[:200],
+                },
+            )
+            return self._provider(TtsProviderName.SHERPA_ONNX).generate(request)
+
+    def _provider(self, provider: TtsProviderName) -> MockTtsProvider | MimoVoiceCloneProvider | SherpaOnnxTtsProvider:
         if provider == TtsProviderName.MIMO:
             return MimoVoiceCloneProvider(
                 base_url=self._settings.mimo_tts_base_url,
@@ -295,6 +387,24 @@ class TtsService:
                 timeout_ms=self._settings.mimo_tts_timeout_ms,
                 enabled=self._settings.mimo_tts_enabled,
             )
+        if provider == TtsProviderName.SHERPA_ONNX:
+            if self._sherpa_provider is None:
+                self._sherpa_provider = SherpaOnnxTtsProvider(
+                    model_dir=self._settings.resolve_repo_path(
+                        self._settings.sherpa_onnx_tts_model_dir
+                    ),
+                    vocoder_path=self._settings.resolve_repo_path(
+                        self._settings.sherpa_onnx_tts_vocoder_path
+                    ),
+                    voice_sample_path=self._settings.resolve_repo_path(
+                        self._settings.xiaobaihu_voice_sample_path
+                    ),
+                    voice_reference_text=self._settings.sherpa_onnx_tts_voice_reference_text,
+                    num_threads=self._settings.sherpa_onnx_tts_num_threads,
+                    num_steps=self._settings.sherpa_onnx_tts_num_steps,
+                    enabled=self._settings.sherpa_onnx_tts_enabled,
+                )
+            return self._sherpa_provider
         return MockTtsProvider()
 
     def _public_audio_url(

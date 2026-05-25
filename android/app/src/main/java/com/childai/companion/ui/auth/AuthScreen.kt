@@ -1,7 +1,10 @@
 package com.childai.companion.ui.auth
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -67,8 +70,10 @@ private fun AuthScreenContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp, vertical = 26.dp),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
         ) {
             Text(
                 text = if (uiState.mode == AuthMode.Register) {
@@ -185,6 +190,23 @@ private fun AuthScreenContent(
 @Preview(showBackground = true, widthDp = 420, heightDp = 720)
 @Composable
 private fun AuthScreenPreview() {
+    ChildAiCompanionTheme {
+        AuthScreenContent(
+            uiState = AuthUiState(mode = AuthMode.Register),
+            onModeChange = {},
+            onUsernameChange = {},
+            onPasswordChange = {},
+            onChildNicknameChange = {},
+            onChildAgeChange = {},
+            onChildInterestsChange = {},
+            onSubmit = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 900, heightDp = 360)
+@Composable
+private fun AuthScreenLandscapePreview() {
     ChildAiCompanionTheme {
         AuthScreenContent(
             uiState = AuthUiState(mode = AuthMode.Register),

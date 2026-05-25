@@ -1,0 +1,341 @@
+# Product and Experience Roadmap After Task 09 v0.1
+
+Project: `ai-child`  
+Stage: after family-beta experience foundation and before broader pilot  
+Purpose: keep future planning anchored in the full product vision, not only the latest QA issues.
+
+---
+
+## 0. Current philosophy
+
+`ai-child` is not a gamified retention product. The core product is a child-safe AI growth companion centered on:
+
+```text
+1. voice-first free expression;
+2. Xiaobaihu as a warm but non-dependent companion;
+3. parent/guardian bridge to real family conversation;
+4. child expression, curiosity, emotional regulation, and gentle learning support;
+5. healthy engagement and the right to stop;
+6. privacy-minimized and parent-operated data governance.
+```
+
+Every future feature must pass this test:
+
+```text
+Does it help the child express, reflect, learn, or connect with real family life without increasing dependency, pressure, or surveillance?
+```
+
+---
+
+## 1. What Tasks 01-08 have established
+
+The project now has a real family-beta foundation:
+
+```text
+1. Android voice-first child chat.
+2. Local SenseVoice-first ASR and MiMo fallback guardrails.
+3. MiMo VoiceClone audio_url and Android remote playback without system TTS mixing.
+4. Unified child-facing interaction phase.
+5. Freedom-first conversation with age-banded replies and question throttle.
+6. Universal image sharing with specific safe first response and local preview card.
+7. Parent entry deemphasis and parent report bridge.
+8. Healthy Engagement non-content observability.
+9. QA checklist and real-device evidence workflow.
+10. Topic shift seeds and child UI polish thin slice.
+```
+
+Task 09 should establish the identity and personalization foundation:
+
+```text
+1. one parent-operated child account;
+2. product copy using 家长 rather than 父亲;
+3. model-driven conversation control;
+4. personalized non-blocking opening v2;
+5. interest-aware topic suggestions.
+```
+
+---
+
+## 2. Roadmap levels
+
+## Level 1 — Finish family-beta MVP foundation
+
+### Goal
+
+Make the current product stable enough for a small number of parent-supervised family testers.
+
+### Key work
+
+```text
+1. Task 09: child account + model-driven personalization.
+2. Device QA round after Task 09 on Redmi K60 and Honor Pad 5.
+3. Fix only P0/P1/P2 issues from actual device evidence.
+4. Improve TTS latency only after logs identify bottleneck.
+5. Keep parent report summary understandable but not transcript-based.
+```
+
+### Exit criteria
+
+```text
+1. Parent can create/login one child account and remain logged in.
+2. Child conversation, settings, report, opening, and memory all attach to that account.
+3. Opening is short, personalized, and non-blocking.
+4. Topic shift feels semantic, not purely menu-like.
+5. Parent report says what was discussed in a summary form.
+6. No obvious P0/P1 device blockers.
+```
+
+---
+
+## Level 2 — Relationship memory and expression growth loop
+
+### Goal
+
+Turn conversations into a gentle growth arc rather than isolated chats.
+
+### Key systems
+
+```text
+1. Relationship memory v2:
+   - interests;
+   - expression style;
+   - proud moments;
+   - topic boundaries;
+   - recent unfinished threads;
+   - do-not-overuse signals.
+
+2. Conversation arc v2:
+   - opening;
+   - child-led topic;
+   - deepen briefly;
+   - detect stop/shift;
+   - bridge to parent;
+   - close gently.
+
+3. Parent report v3:
+   - topic summary;
+   - expression growth observation;
+   - one realistic parent bridge;
+   - what not to ask;
+   - safety/learning notes.
+```
+
+### What not to do
+
+```text
+1. Do not create a diary that becomes surveillance.
+2. Do not store unnecessary raw child content.
+3. Do not create emotional dependence language.
+```
+
+---
+
+## Level 3 — Multimodal sharing and creation loop
+
+### Goal
+
+Make “拍给小白狐看” a natural expression and creation tool.
+
+### Key systems
+
+```text
+1. Image sharing v2:
+   - drawings;
+   - toys;
+   - school projects;
+   - nature observations;
+   - homework when explicitly requested.
+
+2. Show-and-tell mode:
+   - child shares object/image;
+   - Xiaobaihu notices one safe detail;
+   - child can tell a story or ask a question;
+   - parent report gets summary, not raw image.
+
+3. Creative scaffolds:
+   - story from a picture;
+   - explain my drawing;
+   - make up a short scene;
+   - ask a gentle question about what child made.
+```
+
+### Deferred
+
+```text
+1. CameraX custom camera.
+2. Long-term gallery or作品墙.
+3. Sharing outside the family.
+```
+
+---
+
+## Level 4 — Learning help without answer-giving
+
+### Goal
+
+Support school-related questions while preserving agency and avoiding direct answer outsourcing.
+
+### Key systems
+
+```text
+1. Homework intent detection v2:
+   - explicit child asks for homework help;
+   - image/text recognized as homework;
+   - parent setting allows learning support.
+
+2. Learning scaffold:
+   - understand the question;
+   - ask child what they already know;
+   - give a hint;
+   - check reasoning;
+   - avoid final answer unless safety/clarity requires.
+
+3. Parent report learning summary:
+   - what type of difficulty appeared;
+   - how parent can support;
+   - what not to do.
+```
+
+### What not to do
+
+```text
+1. Do not become an answer machine.
+2. Do not shame the child for not knowing.
+3. Do not turn learning into daily task pressure.
+```
+
+---
+
+## Level 5 — Voice and latency maturity
+
+### Goal
+
+Make voice feel immediate enough for children.
+
+### Key systems
+
+```text
+1. Measure before optimizing:
+   - ASR latency;
+   - model_ms;
+   - first_text_ms;
+   - tts_started_ms;
+   - first_audio_ms;
+   - Android playback start.
+
+2. Possible optimizations after evidence:
+   - shorter first sentence;
+   - text-first, audio-follow strategy;
+   - TTS cache for greetings and common short phrases;
+   - opening audio pre-generation;
+   - provider/model latency comparison.
+```
+
+### What not to do
+
+```text
+1. Do not reintroduce Android system TTS as Xiaobaihu voice.
+2. Do not hide latency by adding addictive waiting animations.
+3. Do not change provider without measured cause.
+```
+
+---
+
+## Level 6 — Parent/guardian governance and compliance foundation
+
+### Goal
+
+Prepare for real-world usage beyond family beta while staying honest about compliance gaps.
+
+### Key systems
+
+```text
+1. Account and login hardening.
+2. Parent-operated child data controls.
+3. Data retention and deletion UI.
+4. Export policy design for summaries and, later, raw records if legally/product-wise required.
+5. Consent and privacy notices.
+6. Production auth, rate limiting, monitoring, backup, and abuse prevention.
+```
+
+### Current stance
+
+Task 09 account work is only a family-beta thin slice. It is not production compliance completion.
+
+---
+
+## 3. Feature priority after Task 09
+
+### Highest priority
+
+```text
+1. Device QA after account/opening/topic-control changes.
+2. Fix P0/P1 issues only from evidence.
+3. Parent report readability and trust.
+4. TTS latency diagnosis.
+5. Relationship memory v2 design.
+```
+
+### Medium priority
+
+```text
+1. Image sharing v2.
+2. Learning scaffold v2.
+3. UI polish v2.
+4. More robust local persistence and migration tooling.
+```
+
+### Low priority / later
+
+```text
+1. CameraX.
+2. Multi-child / multi-guardian family org.
+3. Raw transcript export.
+4. Production compliance flows.
+5. Large visual redesign.
+```
+
+### Do not build
+
+```text
+1. points;
+2. streaks;
+3. leaderboards;
+4. gacha/cards;
+5. pet hunger;
+6. daily task pressure;
+7. “Xiaobaihu misses you” emotional hooks;
+8. child-managed social sharing.
+```
+
+---
+
+## 4. Planning rule for future master sessions
+
+Future work should always be planned against three inputs:
+
+```text
+1. Long-term product vision in this roadmap and prior design docs.
+2. Current GitHub main code reality.
+3. Latest real-device QA evidence.
+```
+
+Do not overfit to the latest test video. Also do not ignore it.
+
+The correct loop is:
+
+```text
+roadmap -> scoped Codex task -> implementation -> master review -> device QA -> evidence-based fix -> next roadmap step
+```
+
+---
+
+## 5. Next expected sequence
+
+```text
+1. Execute Task 09.
+2. Master review Task 09 implementation.
+3. Build APK and run Redmi K60 QA focused on login/opening/topic-control/topic choices.
+4. Run Honor Pad 5 layout and performance QA.
+5. Create Task 10 only from evidence plus roadmap priority.
+```

@@ -340,7 +340,7 @@ def test_high_risk_guardian_creates_parent_attention_safety_memory() -> None:
         _message(
             child_id=child_id,
             session_id="session_auto_memory_high_risk",
-            text="有个陌生人让我不要告诉爸爸妈妈",
+            text="有个陌生人让我不要告诉家长",
         )
     )
 
@@ -351,7 +351,7 @@ def test_high_risk_guardian_creates_parent_attention_safety_memory() -> None:
     assert response.session_state.active_scene == "safety.guardian"
     assert safety_memory.requires_parent_attention is True
     assert safety_memory.visible_to_parent is True
-    assert "有个陌生人让我不要告诉爸爸妈妈" not in safety_memory.content
+    assert "有个陌生人让我不要告诉家长" not in safety_memory.content
     assert memory_service.retrieve(child_id, include_safety=False) == []
     assert memory_service.retrieve(child_id, include_safety=True)[0].id == safety_memory.id
     _assert_summary_evidence(memories)
@@ -447,7 +447,7 @@ def test_conversation_passes_retrieved_non_safety_memory_context_to_runtime() ->
         _manual_memory_request(
             child_id=child_id,
             memory_type=MemoryType.SAFETY,
-            content="本次会话出现需要父亲关注的安全信号。",
+            content="本次会话出现需要家长关注的安全信号。",
             tags=["安全提醒"],
             sensitivity=MemorySensitivity.HIGH,
             requires_parent_attention=True,

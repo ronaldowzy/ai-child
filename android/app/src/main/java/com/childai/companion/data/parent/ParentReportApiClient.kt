@@ -1,6 +1,7 @@
 package com.childai.companion.data.parent
 
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -12,6 +13,7 @@ class ParentReportApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = PARENT_REPORT_READ_TIMEOUT_MS,
+    private val authTokenProvider: () -> String? = { null },
 ) {
     suspend fun getReport(childId: String, date: String): ParentReport =
         withContext(Dispatchers.IO) {
@@ -41,6 +43,7 @@ class ParentReportApiClient(
             connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
             setRequestProperty("Accept", "application/json")
+            setBearerToken(authTokenProvider())
         }
     }
 

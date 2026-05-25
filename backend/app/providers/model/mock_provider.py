@@ -72,16 +72,22 @@ class MockModelProvider(BaseModelProvider):
             needs_input=scene_route.get("needs_input"),
             parent_policy=request.context.get("parent_policy"),
             image_context=request.context.get("conversation", {}).get("image_context"),
+            turn_guidance=request.context.get("turn_guidance"),
             fallback_reply_text=(
                 fallback_reply_text
                 if isinstance(fallback_reply_text, str)
                 else None
             ),
         )
+        conversation_control = self._mock_conversation_control(
+            request.context.get("turn_guidance"),
+            text,
+        )
         return (
             text,
             {
                 "reply": text,
+                "conversation_control": conversation_control,
                 "scene_hint": active_scene or "daily.after_school_checkin",
                 "requires_parent_attention": bool(
                     scene_route.get("requires_parent_attention", False)
@@ -99,6 +105,7 @@ class MockModelProvider(BaseModelProvider):
         needs_input: object,
         parent_policy: object,
         image_context: object,
+        turn_guidance: object,
         fallback_reply_text: str | None,
     ) -> tuple[str, str]:
         """Return a deterministic but less scripted child-chat reply.
@@ -115,7 +122,7 @@ class MockModelProvider(BaseModelProvider):
             return fallback_reply_text, "privacy_scene_fallback"
         if active_scene == "safety.gentle_checkin":
             return (
-                "听起来这件事让你不舒服。你可以告诉爸爸妈妈或老师。现在你想先说一句，还是先安静一下？",
+                "听起来这件事让你不舒服。你可以告诉家长或老师。现在你想先说一句，还是先安静一下？",
                 "watch_gentle_checkin",
             )
         if active_scene == "learning.homework_help":
@@ -164,6 +171,11 @@ class MockModelProvider(BaseModelProvider):
                 f"{topic}听起来可以聊。你想先说它有趣的地方，还是说你为什么想到它？",
                 "free_dialogue_topic_echo",
             )
+        if self._mock_control_topic_continuity(turn_guidance) == "soft_shift":
+            return (
+                "好，我们先换个轻松的。可以聊画画，也可以拍个东西给小白狐看。",
+                "model_control_soft_shift",
+            )
 
         if needs_input == "child_choice" and fallback_reply_text:
             return fallback_reply_text, "checkin_scene_fallback"
@@ -183,7 +195,7 @@ class MockModelProvider(BaseModelProvider):
         if recognized_type == "privacy_sensitive":
             return (
                 "这张图片里可能有隐私信息，我们先不要继续展开。"
-                "如果需要处理它，请先让爸爸妈妈帮你确认。"
+                "如果需要处理它，请先让家长帮你确认。"
             )
         text = str(
             image_context.get("recognized_text")
@@ -198,6 +210,53 @@ class MockModelProvider(BaseModelProvider):
         if self._contains_any(normalized, ("是什么", "这是什么", "问")):
             return f"我先按图片描述来猜：这里像是“{phrase}”。你可以再告诉我一个细节，我们一起判断。"
         return f"我们继续聊这张图吧。我记得你刚刚分享的是“{phrase}”。你最想先说它哪里有趣？"
+
+    def _mock_conversation_control(
+        self,
+        turn_guidance: object,
+        reply_text: str,
+    ) -> dict[str, Any]:
+        continuity = self._mock_control_topic_continuity(turn_guidance)
+        engagement = "unclear"
+        shift_intent = "unclear"
+        reason = "mock_unclear"
+        moves = [
+            {"id": "continue_current", "label": "接着说这个"},
+            {"id": "shift_topic", "label": "换个轻松话题"},
+            {"id": "show_something", "label": "拍给小白狐看"},
+        ]
+        if continuity == "soft_shift":
+            engagement = "low"
+            shift_intent = "likely"
+            reason = "short_answer_after_repeated_topic"
+        elif continuity == "continue":
+            engagement = "high"
+            shift_intent = "unlikely"
+            reason = "child_added_vivid_detail"
+        elif continuity == "stop":
+            engagement = "low"
+            shift_intent = "explicit"
+            reason = "explicit_boundary"
+            moves = []
+        return {
+            "child_engagement": engagement,
+            "topic_continuity": continuity,
+            "topic_shift_intent": shift_intent,
+            "reason": reason,
+            "suggested_next_moves": moves,
+        }
+
+    def _mock_control_topic_continuity(self, turn_guidance: object) -> str:
+        if not isinstance(turn_guidance, dict):
+            return "unclear"
+        boundary = turn_guidance.get("boundary_signal")
+        if boundary in {"bedtime", "no_chat"}:
+            return "stop"
+        if boundary == "topic_change" or turn_guidance.get("topic_shift_recommended") is True:
+            return "soft_shift"
+        if turn_guidance.get("child_engagement_signal") == "engaged":
+            return "continue"
+        return "unclear"
 
     def _compact_image_phrase(self, text: str) -> str:
         compact = " ".join(text.strip().split())
@@ -324,7 +383,7 @@ class MockModelProvider(BaseModelProvider):
         return (
             "今天的日报暂时由 Mock 模型生成，后续会接入结构化摘要。",
             {
-                "summary": "暂无需要父亲立即处理的事项。",
+                "summary": "暂无需要家长立即处理的事项。",
                 "requires_attention": False,
                 "highlights": [],
             },

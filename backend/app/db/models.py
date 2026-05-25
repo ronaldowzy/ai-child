@@ -39,6 +39,62 @@ class Child(Base, TimestampMixin):
     profile: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
+class ChildAccountRecord(Base, TimestampMixin):
+    __tablename__ = "child_accounts"
+    __table_args__ = (
+        UniqueConstraint("username", name="uq_child_accounts_username"),
+    )
+
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    child_id: Mapped[str] = mapped_column(
+        String(120),
+        ForeignKey("children.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    username: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_guardian: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class AuthSessionRecord(Base):
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    child_account_id: Mapped[str] = mapped_column(
+        String(120),
+        ForeignKey("child_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class ParentPolicyRecord(Base, TimestampMixin):
     __tablename__ = "parent_policies"
     __table_args__ = (

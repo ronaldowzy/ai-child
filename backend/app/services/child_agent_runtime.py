@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any
 
@@ -5,6 +6,8 @@ from app.domain.agent_runtime import (
     AgentRuntimeRequest,
     AgentRuntimeResult,
     AgentRuntimeSource,
+    ConversationControl,
+    ConversationControlMove,
 )
 from app.domain.enums import RiskLevel
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
@@ -27,8 +30,8 @@ class ChildAgentRuntime:
     """Executes the child-facing model turn after scene routing."""
 
     SELF_HARM_GUARDIAN_REPLY = (
-        "谢谢你告诉我。这个时候不要一个人待着，先去找爸爸妈妈、"
-        "老师或身边安全的大人，好吗？小白狐会提醒爸爸来陪你。"
+        "谢谢你告诉我。这个时候不要一个人待着，先去找家长、"
+        "老师或身边安全的大人，好吗？小白狐会提醒家长来陪你。"
     )
     BEDTIME_CLOSE_REPLY = "好的，我们今天先轻轻收个尾。晚安，睡个好觉。"
     _STAGE_DIRECTION_PATTERN = re.compile(
@@ -124,12 +127,32 @@ class ChildAgentRuntime:
             "topic_shift_reason",
             turn_guidance_context.topic_shift_reason,
         )
-        raw_reply_text = model_response.response_text.strip()
+        raw_reply_text, model_control = self._reply_and_control_from_response(
+            model_response.response_text,
+            model_response.structured_output,
+        )
+        fallback_control = self._fallback_conversation_control(turn_guidance_context)
+        final_control = self._final_conversation_control(
+            model_control=model_control,
+            fallback_control=fallback_control,
+            request=request,
+            turn_guidance_context=turn_guidance_context,
+        )
+        model_response.metadata["model_conversation_control"] = (
+            model_control.model_dump(mode="json") if model_control else None
+        )
+        model_response.metadata["fallback_conversation_control"] = (
+            fallback_control.model_dump(mode="json")
+        )
+        model_response.metadata["final_conversation_control"] = (
+            final_control.model_dump(mode="json")
+        )
         reply_text = self._normalize_model_reply(
             raw_reply_text,
             request,
             turn_guidance_context,
             age_policy,
+            final_control,
         )
         image_context_reply = self._image_context_repair_reply(request, reply_text)
         if image_context_reply:
@@ -193,6 +216,8 @@ class ChildAgentRuntime:
             age_policy=age_policy,
             reply_text=reply_text,
             reply_normalized=model_response.metadata.get("reply_normalized") is True,
+            model_control=model_control,
+            final_control=final_control,
         )
         return AgentRuntimeResult(
             reply_text=reply_text,
@@ -222,14 +247,28 @@ class ChildAgentRuntime:
             reply_text = self.SELF_HARM_GUARDIAN_REPLY
             fallback_reason = "deterministic_self_harm_guardian"
         metadata = dict(model_metadata or {})
+        fallback_guidance = turn_guidance_context or self._build_turn_guidance_context(
+            request
+        )
+        fallback_control = self._fallback_conversation_control(fallback_guidance)
+        metadata.setdefault("model_conversation_control", None)
+        metadata.setdefault(
+            "fallback_conversation_control",
+            fallback_control.model_dump(mode="json"),
+        )
+        metadata.setdefault(
+            "final_conversation_control",
+            fallback_control.model_dump(mode="json"),
+        )
         self._attach_healthy_engagement_metrics(
             metadata,
             request=request,
-            turn_guidance_context=turn_guidance_context
-            or self._build_turn_guidance_context(request),
+            turn_guidance_context=fallback_guidance,
             age_policy=age_policy or derive_age_band_reply_policy(request.parent_policy),
             reply_text=reply_text,
             reply_normalized=metadata.get("reply_normalized") is True,
+            model_control=None,
+            final_control=fallback_control,
         )
         return AgentRuntimeResult(
             reply_text=reply_text,
@@ -311,6 +350,152 @@ class ChildAgentRuntime:
             "topic_shift_reason": turn_guidance_context.topic_shift_reason,
         }
 
+    def _reply_and_control_from_response(
+        self,
+        response_text: str,
+        structured_output: dict[str, Any],
+    ) -> tuple[str, ConversationControl | None]:
+        raw_text = response_text.strip()
+        payload = structured_output if isinstance(structured_output, dict) else {}
+        if not payload.get("reply") and not payload.get("conversation_control"):
+            parsed = self._parse_json_object(raw_text)
+            if parsed is not None:
+                payload = parsed
+        reply_candidate = payload.get("reply") or payload.get("text")
+        reply_text = str(reply_candidate).strip() if reply_candidate else raw_text
+        control_raw = payload.get("conversation_control")
+        control = self._parse_conversation_control(control_raw, source="model")
+        return reply_text, control
+
+    def _parse_json_object(self, text: str) -> dict[str, Any] | None:
+        if not text.startswith("{") or not text.endswith("}"):
+            return None
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    def _parse_conversation_control(
+        self,
+        value: Any,
+        *,
+        source: str,
+    ) -> ConversationControl | None:
+        if not isinstance(value, dict):
+            return None
+        moves_raw = value.get("suggested_next_moves")
+        moves: list[ConversationControlMove] = []
+        if isinstance(moves_raw, list):
+            for item in moves_raw[:3]:
+                if not isinstance(item, dict):
+                    continue
+                move_id = str(item.get("id") or "").strip()
+                label = str(item.get("label") or "").strip()
+                if move_id and label:
+                    moves.append(ConversationControlMove(id=move_id, label=label))
+        return ConversationControl(
+            child_engagement=str(value.get("child_engagement") or "unclear"),
+            topic_continuity=str(value.get("topic_continuity") or "unclear"),
+            topic_shift_intent=str(value.get("topic_shift_intent") or "unclear"),
+            reason=str(value.get("reason") or "").strip() or None,
+            suggested_next_moves=moves,
+            source=source,
+        )
+
+    def _fallback_conversation_control(
+        self,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> ConversationControl:
+        if turn_guidance_context.boundary_signal == "bedtime":
+            return ConversationControl(
+                child_engagement="low",
+                topic_continuity="stop",
+                topic_shift_intent="explicit",
+                reason="program_bedtime_boundary",
+                source="program_fallback",
+            )
+        if turn_guidance_context.boundary_signal == "no_chat":
+            return ConversationControl(
+                child_engagement="low",
+                topic_continuity="stop",
+                topic_shift_intent="explicit",
+                reason="program_no_chat_boundary",
+                source="program_fallback",
+            )
+        if turn_guidance_context.boundary_signal == "topic_change":
+            return ConversationControl(
+                child_engagement="low",
+                topic_continuity="soft_shift",
+                topic_shift_intent="explicit",
+                reason="program_topic_change_boundary",
+                suggested_next_moves=self._topic_seed_moves(turn_guidance_context),
+                source="program_fallback",
+            )
+        if turn_guidance_context.topic_shift_recommended:
+            return ConversationControl(
+                child_engagement="low",
+                topic_continuity="soft_shift",
+                topic_shift_intent="likely",
+                reason=turn_guidance_context.topic_shift_reason
+                or "program_low_engagement_shift",
+                suggested_next_moves=self._topic_seed_moves(turn_guidance_context),
+                source="program_fallback",
+            )
+        if turn_guidance_context.child_engagement_signal == "engaged":
+            return ConversationControl(
+                child_engagement="high",
+                topic_continuity="continue",
+                topic_shift_intent="unlikely",
+                reason="program_engaged_child",
+                source="program_fallback",
+            )
+        return ConversationControl(
+            child_engagement="unclear",
+            topic_continuity="unclear",
+            topic_shift_intent="unclear",
+            reason="program_unclear",
+            source="program_fallback",
+        )
+
+    def _final_conversation_control(
+        self,
+        *,
+        model_control: ConversationControl | None,
+        fallback_control: ConversationControl,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> ConversationControl:
+        boundary = turn_guidance_context.boundary_signal
+        if boundary in {"bedtime", "no_chat", "topic_change"}:
+            return fallback_control.model_copy(update={"source": "program_guardrail"})
+        if request.route_decision.active_scene != SceneId.OPEN_CONVERSATION:
+            return fallback_control.model_copy(update={"source": "program_guardrail"})
+        if model_control is None:
+            return fallback_control
+        if (
+            model_control.child_engagement == "high"
+            and model_control.topic_continuity == "continue"
+        ):
+            return model_control
+        if model_control.topic_continuity in {"soft_shift", "stop", "continue"}:
+            return model_control
+        return fallback_control
+
+    def _topic_seed_moves(
+        self,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> list[ConversationControlMove]:
+        moves = [
+            ConversationControlMove(id="continue_current", label="接着说这个"),
+            ConversationControlMove(id="shift_topic", label="换个轻松话题"),
+        ]
+        for index, seed in enumerate(turn_guidance_context.suggested_topic_seeds[:1]):
+            moves.append(
+                ConversationControlMove(id=f"topic_seed_{index + 1}", label=seed)
+            )
+        return moves[:3]
+
     def _registry_fallback_reason(self, metadata: dict[str, Any]) -> str | None:
         if metadata.get("policy_blocked") is True:
             return "model_policy_blocked"
@@ -327,6 +512,8 @@ class ChildAgentRuntime:
         age_policy: AgeBandReplyPolicy,
         reply_text: str,
         reply_normalized: bool,
+        model_control: ConversationControl | None,
+        final_control: ConversationControl,
     ) -> None:
         metadata["healthy_engagement"] = self._healthy_engagement_metrics(
             request=request,
@@ -334,6 +521,8 @@ class ChildAgentRuntime:
             age_policy=age_policy,
             reply_text=reply_text,
             reply_normalized=reply_normalized,
+            model_control=model_control,
+            final_control=final_control,
         )
 
     def _healthy_engagement_metrics(
@@ -344,7 +533,12 @@ class ChildAgentRuntime:
         age_policy: AgeBandReplyPolicy,
         reply_text: str,
         reply_normalized: bool,
+        model_control: ConversationControl | None = None,
+        final_control: ConversationControl | None = None,
     ) -> dict[str, Any]:
+        final_control = final_control or self._fallback_conversation_control(
+            turn_guidance_context
+        )
         question_count = self._question_count(reply_text)
         boundary_signal = turn_guidance_context.boundary_signal
         previous_topic_revived = self._revives_previous_topic(
@@ -373,6 +567,10 @@ class ChildAgentRuntime:
             "child_engagement_signal": turn_guidance_context.child_engagement_signal,
             "topic_shift_recommended": turn_guidance_context.topic_shift_recommended,
             "topic_shift_reason": turn_guidance_context.topic_shift_reason,
+            "model_conversation_control": (
+                model_control.model_dump(mode="json") if model_control else None
+            ),
+            "final_conversation_control": final_control.model_dump(mode="json"),
             "reply_normalized": reply_normalized,
             "first_text_ms": None,
             "first_audio_ms": None,
@@ -452,6 +650,7 @@ class ChildAgentRuntime:
         request: AgentRuntimeRequest,
         turn_guidance_context: TurnGuidanceContext,
         age_policy: AgeBandReplyPolicy,
+        final_control: ConversationControl,
     ) -> str:
         text = reply_text.strip()
         if not text:
@@ -464,10 +663,16 @@ class ChildAgentRuntime:
         text = re.sub(r"([。！？!?])\s+", r"\1", text)
         if self._should_force_bedtime_close(request, text):
             return self.BEDTIME_CLOSE_REPLY
+        if (
+            request.route_decision.active_scene == SceneId.OPEN_CONVERSATION
+            and final_control.topic_continuity == "stop"
+        ):
+            return "好，我们先停一下。想休息也可以。"
         if self._should_replace_with_topic_shift_reply(
             request,
             text,
             turn_guidance_context,
+            final_control,
         ):
             return self._topic_shift_reply(turn_guidance_context)
         if request.route_decision.active_scene != SceneId.SAFETY_GUARDIAN:
@@ -507,7 +712,7 @@ class ChildAgentRuntime:
                 return f"我看到这张图像是一道题，里面大概是：{summary}。我们先看题目在问什么。"
             return "我看到这张图像是一道题，但内容还不够清楚。你可以把题目读一小句给我听。"
         if recognized_type == "privacy_sensitive":
-            return "这张图可能有隐私内容，我们先不展开细节。可以请爸爸妈妈一起看一下。"
+            return "这张图可能有隐私内容，我们先不展开细节。可以请家长一起看一下。"
         if summary:
             return f"我看到这张图里像是：{summary}。你最想让我看哪里？"
         return "图片已经传上来了，但这次识别不够清楚。你可以换一张更清楚的，或者告诉我你想让我看哪里。"
@@ -660,10 +865,16 @@ class ChildAgentRuntime:
         request: AgentRuntimeRequest,
         reply_text: str,
         turn_guidance_context: TurnGuidanceContext,
+        final_control: ConversationControl,
     ) -> bool:
         if request.route_decision.active_scene != SceneId.OPEN_CONVERSATION:
             return False
-        if not turn_guidance_context.topic_shift_recommended:
+        if (
+            final_control.child_engagement == "high"
+            and final_control.topic_continuity == "continue"
+        ):
+            return False
+        if final_control.topic_continuity != "soft_shift":
             return False
         normalized = reply_text.strip().lower().replace(" ", "")
         topic_markers = self._topic_markers(turn_guidance_context.recent_topic or "")

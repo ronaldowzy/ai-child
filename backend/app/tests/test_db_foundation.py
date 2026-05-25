@@ -17,8 +17,14 @@ EXPECTED_TABLES = {
     "parent_reports",
     "model_debug_traces",
     "tts_cache_records",
+    "child_accounts",
+    "auth_sessions",
 }
-INITIAL_REVISION_TABLES = EXPECTED_TABLES - {"model_debug_traces"}
+INITIAL_REVISION_TABLES = EXPECTED_TABLES - {
+    "model_debug_traces",
+    "child_accounts",
+    "auth_sessions",
+}
 
 
 def test_db_metadata_includes_initial_tables() -> None:
@@ -154,6 +160,24 @@ def test_db_metadata_includes_key_columns() -> None:
             "created_at",
             "updated_at",
         },
+        "child_accounts": {
+            "id",
+            "child_id",
+            "username",
+            "password_hash",
+            "created_by_guardian",
+            "last_login_at",
+            "created_at",
+            "updated_at",
+        },
+        "auth_sessions": {
+            "id",
+            "child_account_id",
+            "token_hash",
+            "created_at",
+            "expires_at",
+            "revoked_at",
+        },
     }
 
     for table_name, column_names in expected_columns.items():
@@ -212,6 +236,8 @@ def test_db_datetime_columns_are_timezone_aware() -> None:
         "parent_reports": {"created_at"},
         "model_debug_traces": {"created_at"},
         "tts_cache_records": {"created_at", "updated_at", "last_accessed_at"},
+        "child_accounts": {"created_at", "updated_at", "last_login_at"},
+        "auth_sessions": {"created_at", "expires_at", "revoked_at"},
     }
 
     for table_name, column_names in datetime_columns.items():
@@ -300,3 +326,22 @@ def test_alembic_model_debug_trace_revision_is_readable() -> None:
     assert "model_debug_traces" in revision_text
     assert "request_messages_json" in revision_text
     assert "response_structured_output_json" in revision_text
+
+
+def test_alembic_child_account_auth_revision_is_readable() -> None:
+    backend_dir = Path(__file__).resolve().parents[2]
+    revision_path = (
+        backend_dir
+        / "alembic"
+        / "versions"
+        / "20260525_0006_create_child_accounts_auth_sessions.py"
+    )
+
+    assert revision_path.is_file()
+    revision_text = revision_path.read_text(encoding="utf-8")
+    assert 'revision = "20260525_0006"' in revision_text
+    assert 'down_revision = "20260524_0005"' in revision_text
+    assert "child_accounts" in revision_text
+    assert "auth_sessions" in revision_text
+    assert "password_hash" in revision_text
+    assert "token_hash" in revision_text

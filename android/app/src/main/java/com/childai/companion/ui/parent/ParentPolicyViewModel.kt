@@ -21,6 +21,7 @@ class ParentPolicyViewModel(
     private val policyWriter: suspend (ParentPolicyUpdateRequest) -> ParentPolicyResponse =
         repository::updatePolicy,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val childId: String = DevSettings.CHILD_ID,
 ) : ViewModel() {
     private var loadedPolicy: ParentPolicyResponse? = null
 
@@ -42,7 +43,7 @@ class ParentPolicyViewModel(
         }
         viewModelScope.launch(dispatcher) {
             runCatching {
-                policyReader(DevSettings.CHILD_ID)
+                policyReader(childId)
             }.onSuccess { policy ->
                 loadedPolicy = policy
                 _uiState.update {
@@ -56,7 +57,7 @@ class ParentPolicyViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "没有读到父亲设置，请检查后端是否启动。",
+                        errorMessage = "没有读到家长设置，请检查后端是否启动。",
                     )
                 }
             }
@@ -148,7 +149,7 @@ class ParentPolicyViewModel(
         val basePolicy = loadedPolicy
         val schedule = basePolicy?.schedule ?: defaultParentSchedule()
         val request = ParentPolicyUpdateRequest(
-            childId = DevSettings.CHILD_ID,
+            childId = childId,
             childNickname = form.childNickname.trim(),
             childDisplayName = form.childDisplayName.trim(),
             parentMessageRaw = form.parentMessageRaw.trim(),
@@ -171,7 +172,7 @@ class ParentPolicyViewModel(
                     it.copy(
                         form = policy.toFormState(),
                         isSaving = false,
-                        statusMessage = "已保存，下一次对话会使用新的父亲设置。",
+                        statusMessage = "已保存，下一次对话会使用新的家长设置。",
                     )
                 }
             }.onFailure {

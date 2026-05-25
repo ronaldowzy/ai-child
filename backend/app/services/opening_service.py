@@ -77,7 +77,12 @@ class OpeningService:
             parent_policy=parent_policy,
             opening_policy=opening_policy,
         )
-        text = fallback_text
+        text = self._generate_model_opening(
+            parent_policy=parent_policy,
+            time_context=time_context,
+            opening_policy=opening_policy,
+            fallback_text=fallback_text,
+        )
         reply = Reply(
             text=text,
             voice_enabled=True,
@@ -207,7 +212,7 @@ class OpeningService:
         ]
         return (
             "你是小白狐。请给孩子一句自然、短、亲切的开场白，适合直接朗读。"
-            "根据当前时间段、父母寄语、孩子称呼和家庭沟通偏好调整语气。"
+            "根据当前时间段、家长寄语、孩子称呼和家庭沟通偏好调整语气。"
             "不要像老师点名，不要查岗，不要强行追问日间经历，不要每次都问固定日常问题。"
             "如果是晚上，低刺激、短句；如果刚放学，轻松欢迎回来。"
             "opening 必须遵守 opening policy，不要自己扩大目标。"
@@ -228,12 +233,12 @@ class OpeningService:
             f"\n回访原因：{opening_policy.seed_recall_reason or '无'}"
             f"\n边界类型：{opening_policy.boundary_kind or '无'}"
             f"\n边界冷却中：{opening_policy.boundary_cooldown_active}"
-            f"\n父亲目标低压力转译：{opening_policy.parent_goal_hint or '无'}"
+            f"\n家长目标低压力转译：{opening_policy.parent_goal_hint or '无'}"
             f"\n必须给孩子选择权：{opening_policy.must_offer_topic_switch}"
             f"\n必须允许孩子不聊：{opening_policy.must_allow_no_chat}"
             f"\nopening policy rules：\n- {prompt_rules}"
             f"\n禁止话术：{forbidden}"
-            f"\n父母寄语背景：{parent_message[:500]}"
+            f"\n家长寄语背景：{parent_message[:500]}"
         )
 
     def _sanitize_opening_text(
@@ -277,7 +282,7 @@ class OpeningService:
         elif opening_policy.mode == OpeningMode.BEDTIME_DEFER_INTEREST and topic:
             text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
-            text = f"{prefix}这句话也可以告诉爸爸妈妈。小白狐先听你说一点点。"
+            text = f"{prefix}这句话也可以告诉家长。小白狐先听你说一点点。"
         else:
             text = f"{prefix}我在这里。你可以慢慢说一句，也可以先听小白狐说一句。"
         return self._sanitize_opening_text(

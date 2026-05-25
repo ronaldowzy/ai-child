@@ -399,7 +399,7 @@ class ParentReportService:
             expression_observations=[],
             emotion_observations=[],
             safety_alerts=[],
-            suggested_parent_actions=["请稍后重试生成父亲日报；不要把当前失败状态当作孩子当天表现。"],
+            suggested_parent_actions=["请稍后重试生成家长日报；不要把当前失败状态当作孩子当天表现。"],
             tonight_parent_bridge=(
                 "今天的小结还没准备好。今晚先轻松陪孩子做一件日常小事，"
                 "不要追问孩子在小白狐里聊了什么。"
@@ -464,15 +464,15 @@ class ParentReportService:
 
     def _parent_report_system_prompt(self) -> str:
         return (
-            "你是小白狐项目的父亲日报分析器。请只基于当天受控素材生成父亲可读的中文日报，"
+            "你是小白狐项目的家长日报分析器。请只基于当天受控素材生成家长可读的中文日报，"
             "不要编造素材里没有的事实。重点回答：孩子今天实际关注了什么、内容主线是什么、"
-            "表达状态怎样、有没有学习、情绪或安全线索、父亲今晚应该怎么跟进。不要输出逐字聊天记录，"
+            "表达状态怎样、有没有学习、情绪或安全线索、家长今晚应该怎么跟进。不要输出逐字聊天记录，"
             "不要输出图片识别报告，不要输出 prompt、debug、provider 信息，不要给孩子贴固定负面标签。"
             "必须输出非空、可解析的严格 JSON object；不要返回空字符串、none、null、Markdown 或解释文字。"
             "suggested_parent_actions 每条建议都应包含 starter + avoid 语义：可以怎么轻轻开口，以及避免怎么追问。"
-            "tonight_parent_bridge 必须是一句现实可执行的父亲接话或动作，不要像监控报告，"
+            "tonight_parent_bridge 必须是一句现实可执行的家长接话或动作，不要像监控报告，"
             "孩子不想说时要提醒不追问或换轻松方式。"
-            "topic_overview 要归纳为父亲看得懂的话题卡片，不引用孩子原话；avoid_followup 写清今晚不要追问什么。"
+            "topic_overview 要归纳为家长看得懂的话题卡片，不引用孩子原话；avoid_followup 写清今晚不要追问什么。"
             "返回严格 JSON，字段为 summary、topic_overview、conversation_summary、learning_observations、"
             "expression_observations、emotion_observations、safety_alerts、suggested_parent_actions、"
             "tonight_parent_bridge、avoid_followup。"
@@ -531,7 +531,7 @@ class ParentReportService:
                 "safety_alerts": "list[str]",
                 "suggested_parent_actions": "list[str]，每条包含 starter + avoid 语义",
                 "tonight_parent_bridge": (
-                    "非空中文字符串。父亲今晚可以自然接的一句话或一个动作；"
+                    "非空中文字符串。家长今晚可以自然接的一句话或一个动作；"
                     "不要逐字引用敏感内容，不要追问，孩子不想说时换轻松方式。"
                 ),
                 "avoid_followup": "list[str]，今晚避免追问、纠错、监控式盘问的点。",
@@ -894,19 +894,19 @@ class ParentReportService:
         if has_sports_topic:
             topics.append("运动比赛/跑步")
             expression_observations.append(
-                "孩子今天围绕运动比赛、跑步或速度感受连续表达，说明他能把一个主动话题延展开；父亲可以轻轻问比赛项目或他最在意的一个细节。"
+                "孩子今天围绕运动比赛、跑步或速度感受连续表达，说明他能把一个主动话题延展开；家长可以轻轻问比赛项目或他最在意的一个细节。"
             )
         if has_game_topic:
             topics.append("游戏/CS")
             expression_observations.append(
-                "孩子今天围绕游戏、地图、队友或规则表达兴趣；父亲可以把它当作普通兴趣入口，不把游戏话题变成盘问或限制谈判。"
+                "孩子今天围绕游戏、地图、队友或规则表达兴趣；家长可以把它当作普通兴趣入口，不把游戏话题变成盘问或限制谈判。"
             )
             if game_detail_summary:
                 state_summary.append(game_detail_summary)
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
-                "孩子今天把图片作为表达入口；更像是在把看到的东西交给小白狐一起看，父亲可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
+                "孩子今天把图片作为表达入口；更像是在把看到的东西交给小白狐一起看，家长可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
             )
         elif image_question_count:
             topics.append("看图交流")
@@ -916,7 +916,7 @@ class ParentReportService:
         if any(scene.startswith("privacy.") or scene.startswith("safety.") for scene in scenes):
             topics.append("安全或隐私边界")
             safety_alerts.append(
-                "今天对话触发过安全或隐私边界。建议父亲平静确认是否只是误触发，必要时再做具体了解。"
+                "今天对话触发过安全或隐私边界。建议家长平静确认是否只是误触发，必要时再做具体了解。"
             )
         if any(
             self._contains_any(
@@ -927,7 +927,7 @@ class ParentReportService:
         ):
             topics.append("情绪表达")
             emotion_observations.append(
-                "今天出现过情绪、疲惫或“没听清”一类状态线索；父亲可以先确认孩子是不是累了、被打断了，或只是想重说一遍。"
+                "今天出现过情绪、疲惫或“没听清”一类状态线索；家长可以先确认孩子是不是累了、被打断了，或只是想重说一遍。"
             )
         if has_sports_fatigue:
             emotion_observations.append(
@@ -947,12 +947,12 @@ class ParentReportService:
         )
         if avg_len <= 8:
             expression_observations.append(
-                "孩子今天更多使用短句或指令式表达；父亲可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
+                "孩子今天更多使用短句或指令式表达；家长可以用二选一、三选一或让孩子先说一个关键词来降低开口压力。"
             )
             state_summary.append("孩子今天更多是短句或指令式表达，需要更具体、低压力的追问来展开。")
         else:
             expression_observations.append(
-                "孩子今天整体能连续表达；父亲可以围绕孩子主动提到的主题轻轻接一个具体细节，不要连续追问。"
+                "孩子今天整体能连续表达；家长可以围绕孩子主动提到的主题轻轻接一个具体细节，不要连续追问。"
             )
             state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
         if attachment_count:
@@ -1063,7 +1063,7 @@ class ParentReportService:
                     ParentReportTopicOverview(
                         topic=topic,
                         child_intent="把看到的东西交给小白狐一起看",
-                        summary="今天图片更像是表达入口，父亲可以先顺着孩子想看的点，而不是默认当成作业。",
+                        summary="今天图片更像是表达入口，家长可以先顺着孩子想看的点，而不是默认当成作业。",
                         emotion_tone="好奇或想分享",
                         parent_bridge="今晚可以问：“那张图你最想让我看哪里？”孩子不想说就换轻松话题。",
                     )
@@ -1073,7 +1073,7 @@ class ParentReportService:
                     ParentReportTopicOverview(
                         topic=topic,
                         child_intent="对话触发了边界提醒",
-                        summary="需要父亲平静确认是否只是误触发；如果确有不舒服的事，再做具体了解。",
+                        summary="需要家长平静确认是否只是误触发；如果确有不舒服的事，再做具体了解。",
                         emotion_tone="需要稳定、安全的成人支持",
                         parent_bridge="今晚先平静确认有没有需要大人帮忙的事，不追问细节。",
                     )
@@ -1258,7 +1258,7 @@ class ParentReportService:
         if not memories:
             return []
         alerts = [
-            "今天出现需要父亲关注的安全信号。请用平静语气确认孩子是否遇到让他不舒服、要求保密或涉及陌生人的情况。"
+            "今天出现需要家长关注的安全信号。请用平静语气确认孩子是否遇到让他不舒服、要求保密或涉及陌生人的情况。"
         ]
         for memory in memories:
             content = self._safe_text(memory.content)
@@ -1406,7 +1406,7 @@ class ParentReportService:
             )
         if relationship_memories(memories, relationship_memory_type=TOPIC_BOUNDARY):
             actions.append(
-                "孩子表达不想聊或想换题时，父亲可以尊重停顿，给两个轻松选择，不把话题拉回旧问题。"
+                "孩子表达不想聊或想换题时，家长可以尊重停顿，给两个轻松选择，不把话题拉回旧问题。"
             )
         return actions
 
@@ -1444,7 +1444,7 @@ class ParentReportService:
             return "今天暂无可汇总的结构化会话素材。建议保持轻量观察，不做额外判断。"
         if has_safety:
             return (
-                "今天的结构化素材里包含需要父亲关注的安全信号或隐私边界。"
+                "今天的结构化素材里包含需要家长关注的安全信号或隐私边界。"
                 "建议先完成安全确认，再进行学习或日常交流。"
             )
 

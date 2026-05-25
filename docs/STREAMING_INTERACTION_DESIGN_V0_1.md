@@ -922,6 +922,15 @@ S-Stream-2 Android 建议：
 5. Android 单测覆盖 parser、fallback、delta append、segment ordering。
 ```
 
+Task 09 补充约束：
+
+```text
+1. stream / message 都应在 Android 登录后带 bearer token，后端优先使用当前账号 child_id。
+2. `conversation_control` 是 child_chat 同一次模型调用的结构化结果，不新增第二次模型调用。
+3. stream UI 只展示后端返回的 safe quick actions / topic choices；Android 不再在无后端上下文时写死恐龙、太空等固定话题 chips。
+4. opening v2 不阻塞首屏 Ready；如果孩子先开始 stream turn，迟到 opening 不插入活跃会话。
+```
+
 暂不做：
 
 ```text

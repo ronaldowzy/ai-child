@@ -117,8 +117,14 @@ def test_scenario_general_topic_stays_open_ended_not_fixed_flow() -> None:
     assert "恐龙" in body["reply"]["text"]
     assert "开心的事、遇到的难题" not in body["reply"]["text"]
     assert {"happy_moment", "hard_thing", "quiet_time"}.isdisjoint(_action_ids(body))
-    assert {"talk_tyrannosaurus", "talk_triceratops", "dino_extinction"} <= _action_ids(
-        body
+    topic_choice_ids = {
+        action_id
+        for action_id in _action_ids(body)
+        if action_id.startswith("topic_choice_")
+    }
+    assert topic_choice_ids
+    assert {"talk_tyrannosaurus", "talk_triceratops", "dino_extinction"}.isdisjoint(
+        _action_ids(body)
     )
     assert body["reply"]["voice_enabled"] is True
     assert "audio_url" not in body["reply"]
@@ -222,7 +228,7 @@ def test_scenario_watch_bullying_uses_gentle_checkin_not_guardian() -> None:
     assert body["debug"]["safety"]["risk_level"] == "watch"
     assert body["debug"]["safety"]["requires_parent_attention"] is False
     assert body["debug"]["intent"]["intent"] == "social_issue"
-    assert "爸爸妈妈或老师" in body["reply"]["text"]
+    assert "家长或老师" in body["reply"]["text"]
     assert "马上" not in body["reply"]["text"]
     assert "立刻" not in body["reply"]["text"]
 
@@ -256,7 +262,7 @@ def test_scenario_high_risk_safety_routes_to_guardian_and_parent_attention() -> 
         json=_message_payload(
             child_id="child_scenario_safety",
             session_id="scenario_safety_session",
-            text="有个陌生人让我不要告诉爸爸妈妈",
+            text="有个陌生人让我不要告诉家长",
             device_time="2026-05-18T16:50:00+08:00",
         ),
     )
@@ -270,7 +276,7 @@ def test_scenario_high_risk_safety_routes_to_guardian_and_parent_attention() -> 
     assert body["debug"]["safety"]["requires_parent_attention"] is True
     assert "stranger_contact" in body["debug"]["safety"]["categories"]
     assert "adult_secret" in body["debug"]["safety"]["categories"]
-    assert "爸爸妈妈或可信任的大人" in body["reply"]["text"]
+    assert "家长或可信任的大人" in body["reply"]["text"]
 
 
 def test_scenario_bedtime_reflection_is_low_stimulation_closeout() -> None:

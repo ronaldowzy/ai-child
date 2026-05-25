@@ -1,6 +1,7 @@
 package com.childai.companion.data.conversation
 
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -11,6 +12,7 @@ class ConversationApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = 45_000,
+    private val authTokenProvider: () -> String? = { null },
 ) {
     suspend fun sendMessage(
         request: ConversationMessageRequest,
@@ -70,6 +72,7 @@ class ConversationApiClient(
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
+            setBearerToken(authTokenProvider())
         }
     }
 

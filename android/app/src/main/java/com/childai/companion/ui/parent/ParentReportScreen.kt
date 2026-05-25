@@ -67,7 +67,7 @@ private fun ParentReportScreenContent(
             .windowInsetsPadding(WindowInsets.safeDrawing),
         topBar = {
             ParentTopBar(
-                title = "父亲日报",
+                title = "家长日报",
                 onBack = onBack,
             )
         },
@@ -188,7 +188,7 @@ private fun ReportBody(report: ParentReport) {
         items = report.emotionObservations,
     )
     ReportSection(
-        title = "建议父亲动作",
+        title = "建议家长动作",
         items = report.suggestedParentActions,
     )
     ReportSection(

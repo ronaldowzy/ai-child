@@ -40,6 +40,7 @@ fun ParentSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ParentPolicyViewModel = viewModel(),
+    onLogout: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -60,6 +61,7 @@ fun ParentSettingsScreen(
         onOfferChoicesChange = viewModel::updateOfferChoices,
         onDoNotForceExpressionChange = viewModel::updateDoNotForceExpression,
         onAskThinkingBeforeAnswerChange = viewModel::updateAskThinkingBeforeAnswer,
+        onLogout = onLogout,
         modifier = modifier,
     )
 }
@@ -82,6 +84,7 @@ private fun ParentSettingsScreenContent(
     onOfferChoicesChange: (Boolean) -> Unit,
     onDoNotForceExpressionChange: (Boolean) -> Unit,
     onAskThinkingBeforeAnswerChange: (Boolean) -> Unit,
+    onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -90,14 +93,22 @@ private fun ParentSettingsScreenContent(
             .windowInsetsPadding(WindowInsets.safeDrawing),
         topBar = {
             ParentTopBar(
-                title = "父亲设置",
+                title = "家长设置",
                 onBack = onBack,
                 trailing = {
-                    TextButton(
-                        onClick = onReload,
-                        enabled = !uiState.isLoading && !uiState.isSaving,
-                    ) {
-                        Text(text = "刷新")
+                    Row {
+                        TextButton(
+                            onClick = onReload,
+                            enabled = !uiState.isLoading && !uiState.isSaving,
+                        ) {
+                            Text(text = "刷新")
+                        }
+                        TextButton(
+                            onClick = onLogout,
+                            enabled = !uiState.isSaving,
+                        ) {
+                            Text(text = "退出登录")
+                        }
                     }
                 },
             )
@@ -235,7 +246,7 @@ private fun ParentSettingsScreenContent(
                     },
                 )
             }
-            SettingsSection(title = "父母寄语 / 小白狐了解孩子") {
+            SettingsSection(title = "家长寄语 / 小白狐了解孩子") {
                 OutlinedTextField(
                     value = uiState.form.parentMessageRaw,
                     onValueChange = onParentMessageChange,
@@ -414,6 +425,7 @@ private fun ParentSettingsScreenPreview() {
             onOfferChoicesChange = {},
             onDoNotForceExpressionChange = {},
             onAskThinkingBeforeAnswerChange = {},
+            onLogout = {},
         )
     }
 }

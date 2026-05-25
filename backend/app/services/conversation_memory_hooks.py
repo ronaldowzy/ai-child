@@ -152,12 +152,12 @@ class ConversationMemoryHooks:
                     session_id=session_id,
                     memory_type=MemoryType.SAFETY,
                     content=(
-                        "本次会话出现需要父亲关注的安全信号，系统鼓励孩子告诉"
-                        "父母或可信成人，并提醒不需要保守让自己不舒服的秘密。"
+                        "本次会话出现需要家长关注的安全信号，系统鼓励孩子告诉"
+                        "家长或可信成人，并提醒不需要保守让自己不舒服的秘密。"
                     ),
-                    tags=["安全提醒", "父亲关注", "可信成人"],
+                    tags=["安全提醒", "家长关注", "可信成人"],
                     quote_summary=(
-                        "会话出现高风险安全信号，系统鼓励孩子告诉父母或可信成人。"
+                        "会话出现高风险安全信号，系统鼓励孩子告诉家长或可信成人。"
                     ),
                     sensitivity=(
                         MemorySensitivity.CRITICAL
@@ -180,11 +180,11 @@ class ConversationMemoryHooks:
                     memory_type=MemoryType.EMOTION_OBSERVATION,
                     content=(
                         "孩子本次提到学校同伴互动中有让他不舒服的情况，"
-                        "系统温和鼓励告诉父母或老师。"
+                        "系统温和鼓励告诉家长或老师。"
                     ),
                     tags=["watch_observation", "同学", "欺负", "老师", "情绪观察"],
                     quote_summary=(
-                        "孩子提到同伴互动中有不舒服的情况，系统温和鼓励告诉父母或老师。"
+                        "孩子提到同伴互动中有不舒服的情况，系统温和鼓励告诉家长或老师。"
                     ),
                     sensitivity=MemorySensitivity.MEDIUM,
                     confidence=0.82,
@@ -203,7 +203,7 @@ class ConversationMemoryHooks:
                     memory_type=MemoryType.STRATEGY,
                     content=(
                         "系统本次提醒孩子不要分享家庭地址、电话、学校名字或照片，"
-                        "涉及真实信息时先问父母。"
+                        "涉及真实信息时先问家长。"
                     ),
                     tags=["隐私边界", "地址", "电话", "学校名字", "照片"],
                     quote_summary=(
@@ -555,7 +555,7 @@ class ConversationMemoryHooks:
                 "growth_signal": "topic_project_feeling",
                 "content": "孩子能把运动比赛、项目或感受连起来表达，适合给低压力成长反馈。",
                 "quote_summary": "孩子围绕运动比赛表达了主题、项目或感受。",
-                "next_hook": "父亲可具体肯定孩子把事情说清楚了，再轻轻问一个最喜欢的瞬间。",
+                "next_hook": "家长可具体肯定孩子把事情说清楚了，再轻轻问一个最喜欢的瞬间。",
             }
         if self._contains_any(text, ("我画", "我做", "我搭", "我编", "我的作品")):
             return {
@@ -563,7 +563,7 @@ class ConversationMemoryHooks:
                 "growth_signal": "created_work_shared",
                 "content": "孩子主动分享作品或共创内容，适合肯定表达和创作过程。",
                 "quote_summary": "孩子主动分享作品或故事共创线索。",
-                "next_hook": "父亲可先问作品里孩子最喜欢的一处，不做评分。",
+                "next_hook": "家长可先问作品里孩子最喜欢的一处，不做评分。",
             }
         return None
 

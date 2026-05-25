@@ -37,7 +37,7 @@ class ModalityManager:
                 recognized_content=recognized_content,
                 reply_text=(
                     "这张图里好像有家庭地址、电话、学校名字或类似隐私信息。"
-                    "这些内容不要随便发给 AI 或陌生人，先请爸爸妈妈帮你确认。"
+                    "这些内容不要随便发给 AI 或陌生人，先请家长帮你确认。"
                 ),
                 needs_input="privacy_boundary_ack",
                 sub_scene="privacy_boundary",
@@ -45,7 +45,7 @@ class ModalityManager:
                 reply_emotion="steady",
                 quick_actions=[
                     QuickAction(id="understand_privacy", label="我知道了"),
-                    QuickAction(id="ask_parent", label="问爸爸妈妈"),
+                    QuickAction(id="ask_parent", label="问家长"),
                 ],
             )
 

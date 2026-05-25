@@ -23,7 +23,7 @@ def _memory_payload(
     memory_type: str = "learning_pattern",
     content: str = "孩子在学习求助时需要先确认题意，再一步一步说出已知条件。",
     tags: list[str] | None = None,
-    quote_summary: str = "孩子的完整逐字聊天记录不应出现在父亲日报 API 中。",
+    quote_summary: str = "孩子的完整逐字聊天记录不应出现在家长日报 API 中。",
     sensitivity: str = "medium",
     requires_parent_attention: bool = False,
 ) -> dict:
@@ -77,9 +77,9 @@ def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
         json=_memory_payload(
             child_id="child_parent_report_high_risk_api_test",
             memory_type="safety",
-            content="本次会话出现需要父亲关注的安全信号，应由父亲进一步了解情况。",
-            tags=["安全提醒", "父亲关注"],
-            quote_summary="陌生人让孩子保密的完整原话不应出现在父亲日报 API 中。",
+            content="本次会话出现需要家长关注的安全信号，应由家长进一步了解情况。",
+            tags=["安全提醒", "家长关注"],
+            quote_summary="陌生人让孩子保密的完整原话不应出现在家长日报 API 中。",
             sensitivity="critical",
             requires_parent_attention=False,
         ),
@@ -99,7 +99,7 @@ def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
 
 
 def test_parent_report_api_does_not_return_full_chat_transcript_or_evidence() -> None:
-    raw_transcript = "孩子的完整逐字聊天记录不应出现在父亲日报 API 中。"
+    raw_transcript = "孩子的完整逐字聊天记录不应出现在家长日报 API 中。"
     create_response = client.post(
         "/api/v1/memories",
         json=_memory_payload(quote_summary=raw_transcript),

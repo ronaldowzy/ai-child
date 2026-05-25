@@ -741,13 +741,13 @@ def _run_parent_report_scenarios(
     scenarios = (
         (
             "parent-report-relationship-summary",
-            "父亲日报：sports topic -> tonight bridge",
+            "家长日报：sports topic -> tonight bridge",
             "trace_parent_report_relationship",
             "跑步比赛",
         ),
         (
             "parent-report-starter-avoid-style",
-            "父亲日报：starter + avoid 建议风格",
+            "家长日报：starter + avoid 建议风格",
             "trace_parent_report_starter_avoid",
             "画画作品",
         ),
@@ -1019,12 +1019,13 @@ def build_report(
     provider_note = (
         "Synthetic real-provider trace review. This is not real child QA, not "
         "Android device validation, and not a production data policy. Opening "
-        "uses deterministic default paths; child_chat and parent_report traces "
-        "are provider-quality evidence."
+        "uses model-generated v2 with deterministic fallback; child_chat and "
+        "parent_report traces are provider-quality evidence."
         if provider_mode == PROVIDER_MIMO
         else "Synthetic trace review for local prompt analysis. This is not real "
         "child QA, not real MiMo output, and not Android device validation. "
-        "Opening uses deterministic default paths; parent_report is model-first."
+        "Opening uses model-generated v2 with deterministic fallback; "
+        "parent_report is model-first."
     )
     provider_models = sorted(
         {
@@ -1050,7 +1051,7 @@ def build_report(
         + (f" ({status_reason})" if status_reason else ""),
         f"- Provider/model names: `{', '.join(provider_models) or 'none'}`",
         "- Trace source: default `model_debug_traces` system component.",
-        "- Opening default path: `deterministic_policy_template`.",
+        "- Opening default path: `model_generated_v2_with_deterministic_fallback`.",
         "- ParentReport default path: `model_first_parent_report`.",
         "- Provider quality evidence: `child_chat` and `parent_report` traces.",
         f"- Scenario count: `{len(scenarios)}`",

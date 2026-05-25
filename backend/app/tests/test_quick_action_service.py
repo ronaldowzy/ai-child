@@ -24,12 +24,17 @@ def test_open_conversation_quick_actions_follow_child_topic() -> None:
         decision=decision,
         child_text="我想聊恐龙",
         reply_text="恐龙很有意思。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+            }
+        },
     )
 
-    assert [action.id for action in actions] == [
-        "talk_tyrannosaurus",
-        "talk_triceratops",
-        "dino_extinction",
+    assert [action.label for action in actions] == [
+        "聊恐龙",
+        "聊画画",
+        "聊跑步",
     ]
 
 
@@ -78,12 +83,21 @@ def test_open_conversation_quick_actions_offer_child_agency() -> None:
         decision=decision,
         child_text="我今天想说跑步比赛",
         reply_text="你可以接着说，也可以换个轻松话题。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+            }
+        },
+        conversation_control={
+            "topic_continuity": "soft_shift",
+            "topic_shift_intent": "likely",
+        },
     )
 
     assert [action.label for action in actions] == [
-        "继续说",
-        "换个话题",
-        "今天不聊了",
+        "聊恐龙",
+        "聊画画",
+        "聊跑步",
     ]
 
 
@@ -116,3 +130,73 @@ def test_open_conversation_quick_actions_can_offer_story_without_gamification() 
         "今天不聊了",
     ]
     assert all("积分" not in action.label and "签到" not in action.label for action in actions)
+
+
+def test_open_conversation_topic_choices_filter_boundaries() -> None:
+    service = QuickActionService()
+    decision = SceneRouteDecision(
+        session_id="quick_action_boundary_session",
+        primary_intent=IntentType.CASUAL_CHAT,
+        base_scene=SceneId.OPEN_CONVERSATION,
+        active_scene=SceneId.OPEN_CONVERSATION,
+        transition=SceneTransitionType.MERGE,
+        scene_stack=[SceneId.OPEN_CONVERSATION],
+        risk_level=RiskLevel.NONE,
+        confidence=0.8,
+        reason="open_conversation",
+        needs_input=None,
+        reply_text="我们可以换个轻松话题。",
+        quick_actions=[],
+    )
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="嗯",
+        reply_text="我们可以换个轻松话题。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+                "topic_boundaries": ["跑步"],
+            }
+        },
+        conversation_control={
+            "topic_continuity": "soft_shift",
+            "topic_shift_intent": "likely",
+        },
+    )
+
+    labels = [action.label for action in actions]
+    assert labels[:2] == ["聊恐龙", "聊画画"]
+    assert all("跑步" not in label for label in labels)
+
+
+def test_open_conversation_topic_choices_use_curated_seeds_without_interests() -> None:
+    service = QuickActionService()
+    decision = SceneRouteDecision(
+        session_id="quick_action_seed_session",
+        primary_intent=IntentType.CASUAL_CHAT,
+        base_scene=SceneId.OPEN_CONVERSATION,
+        active_scene=SceneId.OPEN_CONVERSATION,
+        transition=SceneTransitionType.MERGE,
+        scene_stack=[SceneId.OPEN_CONVERSATION],
+        risk_level=RiskLevel.NONE,
+        confidence=0.8,
+        reason="open_conversation",
+        needs_input=None,
+        reply_text="我们可以换个轻松话题。",
+        quick_actions=[],
+    )
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="嗯",
+        reply_text="我们可以换个轻松话题。",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_control={
+            "topic_continuity": "soft_shift",
+            "topic_shift_intent": "likely",
+        },
+    )
+
+    assert len(actions) >= 1
+    assert all("热搜" not in action.label and "排行榜" not in action.label for action in actions)

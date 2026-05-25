@@ -586,6 +586,7 @@ TTS 自然度主观评价
 | VQA-19 | Opening greeting | App 打开后小白狐请求一次 opening；有小名喊小名，有 display name 用 display name，都没有不强行称呼 |
 | VQA-20 | Opening 不打断孩子 | 如果孩子先点击语音或发送文本，迟到的 opening 不插入、不覆盖孩子消息 |
 | VQA-21 | TTS perceived latency breakdown | 记录一次慢 turn 的后端 `request_id`，同时抓 `app.conversation` / `app.stream_timing` / `app.tts_timing` 和 Android `XiaobaohuTtsTiming` logcat；用 `model_ms`、`tts_ms`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`elapsed_ms` 区分模型、TTS 生成、stream audio_ready 和 Android 播放启动延迟 |
+| VQA-22 | Task 09 login + opening v2 | 家长登录后进入儿童端；Ready 首屏不等待 opening/TTS，opening v2 可用账号画像/兴趣生成短句，退出登录后回到家长登录页 |
 
 语音体验 QA 记录必须包含：
 

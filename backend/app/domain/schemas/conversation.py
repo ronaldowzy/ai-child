@@ -101,6 +101,12 @@ class HealthyEngagementDebug(BaseModel):
     boundary_respected: bool | None = None
     same_topic_score: int = 0
     consecutive_recent_questions: int = 0
+    child_engagement_signal: str | None = None
+    topic_shift_recommended: bool | None = None
+    topic_shift_reason: str | None = None
+    previous_topic_revived: bool | None = None
+    model_conversation_control: dict[str, Any] | None = None
+    final_conversation_control: dict[str, Any] | None = None
     reply_normalized: bool = False
     first_text_ms: float | None = None
     first_audio_ms: float | None = None

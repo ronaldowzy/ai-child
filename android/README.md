@@ -2,7 +2,7 @@
 
 本目录是儿童 AI 成长智能体的 Android 平板端。当前阶段已在 S11 / A1 静态壳和 S12 / A2 Conversation API 基础上接入 S13 / A3-A4 演示闭环。
 
-当前 Android MVP 已完成儿童统一聊天、系统相机/相册真实图片上传、父亲设置/日报和父亲入口轻量保护。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 父亲调试模式。家庭内测前体验优化已完成 Android unified interaction state thin slice，并补上图片本地确认卡、父亲入口降噪和 Task 06 post-device QA UI polish thin slice，仍待 Redmi K60 / Honor Pad 5 真机 QA。
+当前 Android MVP 已完成儿童统一聊天、家长代创建/登录一个孩子账号、系统相机/相册真实图片上传、家长设置/日报和家长入口降噪。TTS 已接入远程 `reply.audio_url` 播放：后端 MiMo VoiceClone 音频是小白狐正式音色，Android 不再用系统 TextToSpeech 作为儿童端自动朗读 fallback，避免同一轮出现系统音色混播。Streaming v1 首版已接入 `/api/v1/conversation/stream`；语音输入 ASR v1 已接入录音、上传后端 ASR 和儿童默认自动发送，确认面板仅保留为 DevSettings / 家长调试模式。Task 09 已接入本地家庭内测账号、家长术语、opening v2 和后端生成 topic choices；仍待 Redmi K60 / Honor Pad 5 真机 QA。
 
 Task 04 家庭内测 QA runbook 已新增：
 
@@ -10,41 +10,42 @@ Task 04 家庭内测 QA runbook 已新增：
 docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 ```
 
-该清单是 Redmi K60 / Honor Pad 5 真机执行入口；`./gradlew test` 通过不代表真机 QA 通过。证据只记录 request_id、日志路径、视频时间点和非敏感统计，不记录儿童原文、完整回复、原始音频、原图或父母寄语原文。
+该清单是 Redmi K60 / Honor Pad 5 真机执行入口；`./gradlew test` 通过不代表真机 QA 通过。证据只记录 request_id、日志路径、视频时间点和非敏感统计，不记录儿童原文、完整回复、原始音频、原图或家长寄语原文。
 
 ## 当前范围
 
 - 单一儿童聊天入口。
+- Task 09 家庭内测账号薄片：无本地 token 时显示“家长登录 / 创建孩子账号”，注册和登录都由家长操作；登录后 token 持久保存到 SharedPreferences，除非家长手动退出或后端 token 失效。孩子不管理密码，Android 不展示 token/debug 信息。
 - 小白狐智能体形象占位，会根据后端 `reply.emotion` 和
   `reply.agent_motion` 做轻量状态变化。
 - 儿童默认 voice-first 输入：主按钮用于开始说话 / 说完了 / 正在听懂；文字输入框和发送按钮默认隐藏，可通过 DevSettings 打开。
 - Android 已新增 `ChildTurnUiPhase` / `ChildInteractionPresentation` thin slice，把 Ready、Listening、Recognizing、Thinking、SpeakingPending、Speaking、ImageProcessing、NeedsRetry、PermissionNeeded、ServiceError 等儿童可见 phase 统一派生为小白狐状态、短状态文案、InputBar 主按钮、图片按钮可见性和 TTS stop 控制。
 - Task 04 已补 `XiaobaohuStateCoverageTest` 和 `FOX_AGENT_VISUAL_DESIGN_V0_1.md` 状态覆盖矩阵，固定 ChildTurnUiPhase / backend scene signal 到 FoxMood、FoxMotion、MascotState 的映射；Resting 目前为 phase/test covered，但业务触发仍待后续扩展。
 - 默认优先调用后端 `POST /api/v1/conversation/stream`；失败时 fallback 到 `POST /api/v1/conversation/message`。
-- 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
+- 渲染后端返回的 `reply.text` 和 `ui_actions` 快捷按钮；Task 09 后儿童端不再独立硬编码恐龙/太空等 fallback topic chips，话题选择来自后端 quick actions / conversation_control。`session_state` 只保存在 UI state 中供续会话和开发排查使用，默认不展示给儿童。
 - DTO 已解析 `reply.voice_enabled`、`reply.audio_url`、`reply.emotion` 和
   `reply.agent_motion`；当前 UI 已接入小白狐 `animation_v1` WebP 序列帧、旧静态 WebP 和 Canvas 三层 fallback。TTS v1 会默认自动朗读小白狐回复，优先播放后端远程音频，并在朗读时切到 speaking 状态。Stream audio segment 会进入队列顺序播放；语音输入 ASR 使用后端 `/api/v1/asr/transcribe`，儿童默认自动发送 transcript，调试模式才展示确认面板。
 - “拍给小白狐看”默认调用 Android 系统相机或系统相册，压缩为 JPEG 后通过 multipart 上传后端 `/api/v1/attachments/images`；Android 不保存 MiMo key，不直接调用 MiMo。CameraX 自定义相机不是当前目标。
 - 拍照/相册发送后，儿童消息区显示本地临时图片确认卡：优先展示压缩缩略图，并显示图片类型、大小和上传状态；本地路径不进入模型 prompt，上传文件名会去掉本地目录。
 - 普通图片分享成功后，Android 会暂存图片摘要和 `attachment_id`。孩子点击“聊聊它 / 编个故事 / 问这是什么”时，会把图片上下文和 `attachment_id` 一起发送给后端，让小白狐围绕刚才那张图继续聊。
-- 父亲设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、父母寄语、目标和沟通偏好；v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
-- 父亲日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”，增加“今日聊了什么”话题/内容摘要和“今晚先不追问”；失败态不默认暴露后端/model/provider/config 文案。
-- 儿童聊天页中的父亲入口降噪为一个小“大人”入口：点击只提示，长按后选择父亲日报或父亲设置，再输入开发 PIN 才进入。该入口不是生产级账号/auth。
+- 家长设置页可读取和保存孩子小名 / 显示名、年龄、年级、称呼偏好、兴趣、近期不想被追问的话题、家长寄语、目标和沟通偏好；v0.1 家庭内测 UI 不再显性配置放学后/作业/睡前时间段，小白狐 opening greeting 仍优先使用小名，没有小名时使用显示名，都没有时不强行称呼。
+- 家长日报页读取后端 `GET /api/v1/parent/reports/{child_id}` 只读摘要，并在顶部显示“今晚可以怎么接一句”，增加“今日聊了什么”话题/内容摘要和“今晚先不追问”；失败态不默认暴露后端/model/provider/config 文案。
+- 儿童聊天页中的家长入口降噪为一个小“大人”入口：登录态默认可直接进入家长设置/日报，不再要求开发 PIN；开发/旧路径可保留 PIN 误触保护，但它不是生产级账号/auth。
 - 使用内存保存当前 `session_id` 和最新 `session_state`。
-- 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、父母寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
+- 当前产品方向是 freedom-first：儿童端默认让孩子自由说；时段、家长寄语、记忆和图片能力作为上下文或工具，安全、隐私、学习和睡前边界由后端按需介入。
 
 ## Freedom-first 第二轮收口
 
 当前 Android 行为：
 
 ```text
-1. 父母寄语可在父亲设置页编辑；后端会在 PostgreSQL 可用时持久化，数据库不可用时 dev fallback 到内存。
-2. 孩子小名 / 显示名可在父亲设置页编辑；不要强制填写真实全名。
-3. 父母寄语不会出现在儿童聊天 UI 或 session_state debug 中。
+1. 家长寄语可在家长设置页编辑；后端会在 PostgreSQL 可用时持久化，数据库不可用时 dev fallback 到内存。
+2. 孩子小名 / 显示名可在家长设置页编辑；不要强制填写真实全名。
+3. 家长寄语不会出现在儿童聊天 UI 或 session_state debug 中。
 4. 普通图片上传失败文案使用“图片”，作业图片失败文案才使用“题目”。
 5. 普通图片后续快捷动作会带上 pendingImageContext；后端缺失时不崩溃。
 6. “拍给小白狐看”是默认图片入口；旧 mock attachment 不作为儿童端默认路径。
-7. Task 06 后父亲设置显性重点从作息时间转向孩子画像、兴趣和话题边界；作息仍可作为后端时间上下文，不把场景硬锁给孩子。
+7. Task 06 后家长设置显性重点从作息时间转向孩子画像、兴趣和话题边界；作息仍可作为后端时间上下文，不把场景硬锁给孩子。
 8. 儿童聊天页小白狐区域新增 phase-derived 短状态 chip 和轻背景；这是 thin slice polish，不代表最终视觉体验完成。
 ```
 
@@ -57,8 +58,8 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 4. 后端缺 key、`allow_image` 未开或 provider 失败时，儿童端显示失败，不假装看到了。
 5. 断开后端时，普通图片和作业图片分别显示正确失败文案。
 6. 拍照/相册发送后，消息区缩略图/图片确认卡在上传中、成功、失败状态下不挤占横屏消息区。
-7. 父亲入口默认只显示小“大人”入口；长按 + PIN 后父亲日报和设置都仍可进入。
-8. 父亲日报顶部“今晚可以怎么接一句”和失败态家庭化文案在真机可读。
+7. 家长入口默认只显示小“大人”入口；登录后可进入家长日报和设置，旧开发 PIN 路径只作为 fallback。
+8. 家长日报顶部“今晚可以怎么接一句”和失败态家庭化文案在真机可读。
 ```
 
 ## 下一阶段语音和小白狐方向
@@ -67,13 +68,13 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 
 - 语音输入 ASR v1 目标已修订为后端本地 SenseVoice ASR 优先，MiMo audio input / ASR 作为本地异常后的云端 fallback。
 - Android 不直接调用 MiMo，不保存 MiMo API key，也不持有本地 ASR 模型；Android 只负责点击录音、上传后端 ASR 和儿童端语音状态。
-- 语音输入 v1 儿童默认流程：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> ASR ok 自动发送 transcript -> text 走 conversation stream；confirm-before-send 仅保留为 DevSettings / 父亲调试模式。
+- 语音输入 v1 儿童默认流程：点击语音 -> 孩子说话 -> Android 上传短音频到后端 ASR -> ASR ok 自动发送 transcript -> text 走 conversation stream；confirm-before-send 仅保留为 DevSettings / 家长调试模式。
 - Future hands-free conversational mode 不进入 v1。
 - 自动发送后的文本继续调用 conversation API；如果 streaming enabled，优先走 `/api/v1/conversation/stream`。
 - 原始音频只作为一次性 ASR 请求数据，不长期保存、不写日志、不入库；开发阶段只用 fake/smoke audio 或非儿童测试音频做 ASR smoke，不用真实儿童录音。
 - 当前 Android 已实现 `RECORD_AUDIO` 点击触发、短 WAV 录音、最长 30 秒自动停止、上传后端 ASR、默认自动发送、重说/取消；pending transcript 编辑面板仅在 `VOICE_CONFIRM_BEFORE_SEND=true` 时展示。
 - App 打开儿童聊天页后会请求 `POST /api/v1/conversation/opening`，把 opening greeting 作为第一条小白狐消息展示；后端 opening 默认尝试生成小白狐 `audio_url`，Android 只播放该远程音频，不用系统 TTS 顶替。孩子先开口时，迟到的 opening 不插入。
-- opening greeting 的称呼来自父亲设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。
+- opening greeting 的称呼来自家长设置页的孩子小名 / 显示名：小名优先，其次显示名；都为空时不强行称呼。Task 09 后 opening v2 可结合账号画像、兴趣和低敏历史生成短开场，Android Ready 首屏不等待 opening/TTS。
 - TTS 朗读只播放后端返回的 `reply.audio_url` 对应音频；远程播放失败或缺失 `audio_url` 时保留文字和温和错误提示，不用系统 TextToSpeech 混播。
 - TTS 已有停止/静音控制，并受 `DevSettings.AUTO_TTS_ENABLED` / `DevSettings.TTS_MUTED` 初始配置治理；`DevSettings.SHOW_TTS_DIAGNOSTICS` 用于开发构建显示 engine、locale、voice、speak 返回值和失败原因。本轮保证 voice-first 下 TTS pending/speaking 时儿童可见“停一下”和“静音/打开朗读”；停止会清空当前播放和 segment queue，静音会阻止后续自动朗读。
 - TTS 不可用时 UI 会显示温和文字提示，并提供“检查朗读设置”和“安装语音数据”入口；文字聊天不受影响。
@@ -114,7 +115,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 
 ```text
 1. Redmi K60：普通聊天能看到渐进文字，不出现重复 agent bubble。
-2. Redmi K60：MiMo TTS segment 能按顺序播放，小白狐切 speaking，TTS pending/speaking 时“停一下”和“静音/打开朗读”可见且生效；静音治理仍需结合 DevSettings/父亲设置做真机确认。
+2. Redmi K60：MiMo TTS segment 能按顺序播放，小白狐切 speaking，TTS pending/speaking 时“停一下”和“静音/打开朗读”可见且生效；静音治理仍需结合 DevSettings/家长设置做真机确认。
 3. 后端断开或 stream 中断：已显示文本不被清空，旧接口 fallback 或温和错误可见。
 4. Honor Pad 5：横屏双栏、animation_v1 和 stream 更新同时运行不卡顿；必要时记录低性能降级。
 ```
@@ -128,7 +129,7 @@ docs/QA_FAMILY_BETA_CHECKLIST_V0_1.md
 
 ## 小白狐 animation_v1 序列帧资源
 
-父亲 / 产品负责人已提供完整小白狐动态资源包。当前 Android 运行时必要文件已经导入：
+家长 / 产品负责人已提供完整小白狐动态资源包。当前 Android 运行时必要文件已经导入：
 
 ```text
 android/app/src/main/assets/mascot/xiaobaohu/v1/
@@ -216,7 +217,7 @@ adb logcat -v time | grep XiaobaohuTtsTiming
 ```
 
 证据只记录 request_id、timing 字段、日志路径和视频时间点；不要记录儿童原文、
-完整回复、原始音频、原图、父母寄语原文、provider key 或完整带签名音频 URL。
+完整回复、原始音频、原图、家长寄语原文、provider key 或完整带签名音频 URL。
 
 交给 Redmi K60 / Honor Pad 5 前必须使用 Mac LAN IP 构建并重新记录 sha256：
 
@@ -229,7 +230,7 @@ MiMo VoiceClone 开启后，`/api/v1/conversation/message` 会同步等待“对
 
 ## 小白狐 v1 静态候选资源
 
-当前候选资源来自父亲 / 产品负责人提供的小白狐角色设定，已经归档到：
+当前候选资源来自家长 / 产品负责人提供的小白狐角色设定，已经归档到：
 
 ```text
 docs/assets/fox/v1/little_white_fox_character_sheet_v1.png
@@ -317,7 +318,7 @@ base URL：http://192.168.0.118:8000/
 
 ## 双设备测试策略
 
-父亲 / 产品负责人已确认双设备策略：
+家长 / 产品负责人已确认双设备策略：
 
 | 设备 | 定位 | 重点 |
 |---|---|---|
@@ -340,8 +341,8 @@ base URL：http://192.168.0.118:8000/
 - 当前 Android 不直接调用 MiMo，也不保存模型、TTS 或 ASR API key。小白狐正式语音由后端生成 `audio_url`，后端 smoke 已确认可返回可下载 WAV；Android 播放远程音频，失败时只保留文字和错误提示，不再 fallback 系统 TextToSpeech。
 - 不默认上传原始音频到后端，不把原始音频保存到长期记忆。
 - 不长期保存真实图片；当前图片路径上传真实图片给后端临时处理，后端只把受控 image context 带入 conversation。
-- 不做账号系统。
-- 不把父亲入口 PIN 当作强安全机制；它只是 v0.1 开发期的轻量误触保护。
+- 不做完整 family org、多孩子、多家长角色矩阵、找回密码、短信/邮箱/OAuth 或生产级账号合规承诺。
+- 不把旧家长入口 PIN 当作强安全机制；Task 09 默认路径以家长登录态进入家长页面，PIN 仅可作为开发/旧路径误触保护。
 - 不在 Android 端放任何模型 API key。
 - 不在客户端实现 AI 决策。
 - 不在客户端做安全分类、意图识别或场景路由。
@@ -483,14 +484,15 @@ bash scripts/dev_backend.sh
 3. 点击“拍给小白狐看”，选择“拍照”或“从相册选”，应调用系统相机/相册并上传真实图片。
 4. 页面应通过 `/api/v1/attachments/images` 创建 attachment，再通过 `/conversation/message` 携带 attachment_id。
 5. 页面应显示后端基于 MiMo vision 形成的图片分享引导；如果图片像题目，也不应直接显示最终答案。
-6. 点击“父亲设置”不应直接进入；长按“父亲设置”后输入开发 PIN `0000`，读取当前 policy，修改目标、沟通偏好或时间段，保存后应显示成功提示。
-7. 回到聊天页再发送消息，后端应使用更新后的 parent policy。
-7a. 在父亲设置页填写小名或显示名并保存后，重新进入儿童聊天页，opening greeting 应按“小名 -> 显示名 -> 不称呼”的优先级称呼孩子。
-8. 点击“父亲日报”不应直接进入；长按“父亲日报”后输入开发 PIN `0000`，读取当天 summary；如果当天没有结构化记忆，后端会返回“暂无可汇总的结构化会话素材”类摘要。
+6. 首次启动如果没有保存 token，应显示家长登录/创建孩子账号；注册成功后进入儿童聊天，重启 App 后仍保持登录态。
+7. 进入“家长设置”，读取当前账号 child_id 的 policy，修改目标、沟通偏好或孩子画像，保存后应显示成功提示。
+7a. 在家长设置页填写小名或显示名并保存后，重新进入儿童聊天页，opening greeting 应按“小名 -> 显示名 -> 不称呼”的优先级称呼孩子。
+8. 进入“家长日报”，读取当前账号 child_id 的 summary；如果当天没有结构化记忆，后端会返回空状态或可重试状态，不展示逐字聊天记录。
 9. 页面不应默认显示 `base=... | active=...` 这类内部 session_state 调试文本。
 10. 断开后端时，页面应显示温和错误，提示请大人检查网络。
 11. 小白狐状态应随后端 `emotion` / `agent_motion` 轻量变化；小白狐回复默认自动朗读，朗读时切到 speaking，可停止或静音。
 12. 底部语音按钮只在点击后请求麦克风权限；儿童默认 ASR 成功后自动发送，不显示文字编辑确认面板；打开 `VOICE_CONFIRM_BEFORE_SEND=true` 后才进入待确认文本。
+13. 普通对话换题/建议 chips 应来自后端 `ui_actions`，Android 不应独立展示固定恐龙、太空等硬编码话题。
 ```
 
 如果需要先排除后端 API 合约问题，可以在仓库根目录运行：
@@ -513,12 +515,12 @@ bash scripts/e2e_local_api_check.sh
 
 横屏第一版不做完整视觉重设计，不删除 animation_v1、静态 WebP 或 Canvas fallback。真机 QA 需要记录 Redmi K60 和 Honor Pad 5 的布局、字体、输入区、动画流畅度、MiMo 音频延迟和 stream/fallback 行为。
 
-## 父亲日报说明
+## 家长日报说明
 
-后端当前已提供父亲日报 API：
+后端当前已提供家长日报 API：
 
 ```text
 GET /api/v1/parent/reports/{child_id}?date=YYYY-MM-DD
 ```
 
-Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议父亲动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；首次生成可能需要几十秒，Android 父亲日报 client read timeout 为 70s，避免前端先超时而后端稍后生成成功。如果返回 `model_failed` / `model_blocked`，父亲端只显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。
+Android 端按只读页展示后端 `generation_status=model_generated` 的 summary、学习观察、表达观察、情绪/社交观察、建议家长动作和需要关注事项。该页不展示 evidence、quote_summary 或孩子完整逐字聊天记录。ParentReport v2 由后端读取当天会话和 parent-visible memory 后调用 `ModelTaskType.PARENT_REPORT` 生成；首次生成可能需要几十秒，Android 家长日报 client read timeout 为 70s，避免前端先超时而后端稍后生成成功。如果返回 `model_failed` / `model_blocked`，家长端只显示“日报暂时生成失败，请稍后重试”，不展示 deterministic fallback 正文。

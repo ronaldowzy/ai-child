@@ -44,11 +44,12 @@ def _model_response(
     text: str,
     *,
     metadata: dict[str, object] | None = None,
+    structured_output: dict[str, object] | None = None,
 ) -> ModelResponse:
     return ModelResponse(
         task_type=ModelTaskType.CHILD_CHAT,
         response_text=text,
-        structured_output={"reply": text},
+        structured_output=structured_output or {"reply": text},
         provider_name="fixed",
         model_name="fixed-child-chat",
         metadata=metadata or {},
@@ -186,16 +187,16 @@ def test_child_agent_runtime_falls_back_when_model_response_is_empty() -> None:
 
 def test_child_agent_runtime_falls_back_when_output_is_high_risk() -> None:
     registry = CapturingModelRegistry(
-        response=_model_response("陌生人让我不要告诉爸爸妈妈。")
+        response=_model_response("陌生人让我不要告诉家长。")
     )
-    route_decision = _route_decision(reply_text="请马上告诉爸爸妈妈或可信任的大人。")
+    route_decision = _route_decision(reply_text="请马上告诉家长或可信任的大人。")
 
     result = ChildAgentRuntime(model_registry=registry).run(
         _runtime_request(route_decision=route_decision)
     )
 
     assert result.source == AgentRuntimeSource.FALLBACK
-    assert result.reply_text == "请马上告诉爸爸妈妈或可信任的大人。"
+    assert result.reply_text == "请马上告诉家长或可信任的大人。"
     assert result.fallback_reason == "unsafe_model_output"
     assert result.output_risk_level == RiskLevel.HIGH
 
@@ -341,7 +342,7 @@ def test_child_agent_runtime_does_not_echo_topic_change_request_verbatim() -> No
 
     assert result.source == AgentRuntimeSource.MODEL
     assert "我们换个话题" not in result.reply_text
-    assert "换一个轻松的" in result.reply_text
+    assert "换个轻松" in result.reply_text or "换一个轻松" in result.reply_text
 
 
 def test_child_agent_runtime_bedtime_closeout_removes_open_question() -> None:
@@ -395,7 +396,7 @@ def test_child_agent_runtime_self_harm_critical_uses_child_facing_fallback() -> 
     route_decision = _route_decision(
         active_scene=SceneId.SAFETY_GUARDIAN,
         risk_level=RiskLevel.CRITICAL,
-        reply_text="请告诉爸爸妈妈或可信任的大人。",
+        reply_text="请告诉家长或可信任的大人。",
         signals={"safety_evidence": ["self_harm"]},
     )
 
@@ -408,7 +409,7 @@ def test_child_agent_runtime_self_harm_critical_uses_child_facing_fallback() -> 
 
     assert result.source == AgentRuntimeSource.FALLBACK
     assert result.fallback_reason == "deterministic_self_harm_guardian"
-    assert "爸爸妈妈" in result.reply_text
+    assert "家长" in result.reply_text
     assert "老师" in result.reply_text
     assert "安全的大人" in result.reply_text
     assert "心理健康专业人士" not in result.reply_text
@@ -517,6 +518,153 @@ def test_child_agent_runtime_throttles_consecutive_question_hooks() -> None:
         "turn_guidance_hints"
     ]
     assert result.model_metadata["reply_normalized"] is True
+
+
+def test_child_agent_runtime_uses_model_control_soft_shift_for_cs_short_answer() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "那我们先换个轻松的，可以聊画画，也可以拍个东西给小白狐看。",
+            structured_output={
+                "reply": "我们继续聊 CS。你队友这次怎么配合？",
+                "conversation_control": {
+                    "child_engagement": "low",
+                    "topic_continuity": "soft_shift",
+                    "topic_shift_intent": "likely",
+                    "reason": "short_answer_after_repeated_topic",
+                    "suggested_next_moves": [
+                        {"id": "shift_topic", "label": "换个轻松话题"}
+                    ],
+                },
+            },
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="嗯",
+            conversation_history=[
+                ModelMessage(role="user", content="我想聊 CS"),
+                ModelMessage(role="assistant", content="CS 里你打的是哪张地图？"),
+                ModelMessage(role="user", content="CS 沙二"),
+                ModelMessage(role="assistant", content="CS 队友怎么配合？"),
+            ],
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert "继续聊 CS" not in result.reply_text
+    assert result.model_metadata["model_conversation_control"]["topic_continuity"] == "soft_shift"
+    assert result.model_metadata["final_conversation_control"]["source"] == "model"
+    assert result.model_metadata["healthy_engagement"]["final_conversation_control"][
+        "topic_continuity"
+    ] == "soft_shift"
+
+
+def test_child_agent_runtime_allows_high_engagement_to_continue_topic() -> None:
+    reply = "这个地图配合听起来很具体。你刚才提到烟雾和队友站位，我先跟着这个线索听。"
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            reply,
+            structured_output={
+                "reply": reply,
+                "conversation_control": {
+                    "child_engagement": "high",
+                    "topic_continuity": "continue",
+                    "topic_shift_intent": "unlikely",
+                    "reason": "child_added_vivid_detail",
+                },
+            },
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="我在沙二丢了烟，然后队友从 A 小拉出去，我还听到脚步。",
+            conversation_history=[
+                ModelMessage(role="user", content="我想聊 CS"),
+                ModelMessage(role="assistant", content="CS 里你打的是哪张地图？"),
+                ModelMessage(role="user", content="CS 沙二"),
+                ModelMessage(role="assistant", content="CS 队友怎么配合？"),
+            ],
+        )
+    )
+
+    assert result.reply_text == reply
+    assert result.model_metadata["final_conversation_control"]["topic_continuity"] == "continue"
+
+
+def test_child_agent_runtime_program_guardrail_overrides_model_control_continue() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "好呀，我们继续聊比赛。你还想说哪一段？",
+            structured_output={
+                "reply": "好呀，我们继续聊比赛。你还想说哪一段？",
+                "conversation_control": {
+                    "child_engagement": "high",
+                    "topic_continuity": "continue",
+                    "topic_shift_intent": "unlikely",
+                    "reason": "model_missed_boundary",
+                },
+            },
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="不聊了，换个话题。",
+        )
+    )
+
+    assert "继续聊比赛" not in result.reply_text
+    assert result.model_metadata["final_conversation_control"]["source"] == "program_guardrail"
+    assert result.model_metadata["final_conversation_control"]["topic_continuity"] == "stop"
+
+
+def test_child_agent_runtime_invalid_control_falls_back_to_turn_guidance() -> None:
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            "我们继续聊 CS。你队友怎么配合？",
+            structured_output={
+                "reply": "我们继续聊 CS。你队友怎么配合？",
+                "conversation_control": {"topic_continuity": "???"},
+            },
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="嗯",
+            conversation_history=[
+                ModelMessage(role="user", content="我想聊 CS"),
+                ModelMessage(role="assistant", content="CS 里你打的是哪张地图？"),
+                ModelMessage(role="user", content="CS 沙二"),
+                ModelMessage(role="assistant", content="CS 队友怎么配合？"),
+            ],
+        )
+    )
+
+    assert result.model_metadata["final_conversation_control"]["source"] == "program_fallback"
+    assert result.model_metadata["final_conversation_control"]["topic_continuity"] == "soft_shift"
 
 
 def test_child_agent_runtime_respects_boundary_and_correction_without_new_hook() -> None:
@@ -766,10 +914,10 @@ def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:
 
 def test_child_agent_runtime_composes_safety_guardian_prompt() -> None:
     registry = CapturingModelRegistry(
-        response=_model_response("请告诉爸爸妈妈或可信任的大人。")
+        response=_model_response("请告诉家长或可信任的大人。")
     )
     route_decision = _route_decision(
-        reply_text="请告诉爸爸妈妈或可信任的大人。",
+        reply_text="请告诉家长或可信任的大人。",
         active_scene=SceneId.SAFETY_GUARDIAN,
         risk_level=RiskLevel.HIGH,
     )

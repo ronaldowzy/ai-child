@@ -150,7 +150,7 @@ def test_memory_service_marks_critical_memory_for_parent_attention() -> None:
     memory = service.create(
         _request(
             memory_type=MemoryType.SAFETY,
-            content="本次会话出现需要父亲关注的安全信号，应进一步了解情况。",
+            content="本次会话出现需要家长关注的安全信号，应进一步了解情况。",
             tags=["安全提醒"],
             sensitivity=MemorySensitivity.CRITICAL,
             requires_parent_attention=False,

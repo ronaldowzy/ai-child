@@ -160,14 +160,14 @@ class SceneOrchestrator:
         scene_id = SceneId.SAFETY_GUARDIAN
         if "self_harm" in request.safety_evidence:
             reply_text = (
-                "谢谢你告诉我。这个时候不要一个人待着，先去找爸爸妈妈、"
-                "老师或身边安全的大人，好吗？小白狐会提醒爸爸来陪你。"
+                "谢谢你告诉我。这个时候不要一个人待着，先去找家长、"
+                "老师或身边安全的大人，好吗？小白狐会提醒家长来陪你。"
             )
         else:
             reply_text = (
-                "这件事需要让爸爸妈妈或可信任的大人知道。"
+                "这件事需要让家长或可信任的大人知道。"
                 "你不用一个人处理，也不用替别人保守让你不舒服的秘密。"
-                "如果那个人还在附近，请先去爸爸妈妈、老师或安全的大人身边。"
+                "如果那个人还在附近，请先去家长、老师或安全的大人身边。"
             )
         return SceneRouteDecision(
             message_id=request.message_id,
@@ -185,7 +185,7 @@ class SceneOrchestrator:
             reply_text=reply_text,
             reply_emotion="steady",
             quick_actions=[
-                SceneAction(id="tell_parent", label="告诉爸爸妈妈"),
+                SceneAction(id="tell_parent", label="告诉家长"),
                 SceneAction(id="find_trusted_adult", label="找可信任的大人"),
             ],
             signals=self._signals(request, transition=SceneTransitionType.REPLACE),
@@ -215,7 +215,7 @@ class SceneOrchestrator:
             needs_input=self._scene_registry.get(scene_id).default_needs_input,
             reply_text=(
                 "听起来这件事让你不舒服，谢谢你告诉我。"
-                "你可以把这件事告诉爸爸妈妈或老师，让他们一起帮你想办法。"
+                "你可以把这件事告诉家长或老师，让他们一起帮你想办法。"
                 "现在你想先说一句发生了什么，还是先安静一下？"
             ),
             reply_emotion="gentle",
@@ -251,13 +251,13 @@ class SceneOrchestrator:
             needs_input=self._scene_registry.get(scene_id).default_needs_input,
             reply_text=(
                 "可以问我，但不要把家庭地址、电话、学校名字或照片"
-                "随便告诉 AI 或陌生人。需要填写这些信息时，先问爸爸妈妈。"
+                "随便告诉 AI 或陌生人。需要填写这些信息时，先问家长。"
                 "你可以只说“我想问隐私问题”，不用说真实信息。"
             ),
             reply_emotion="steady",
             quick_actions=[
                 SceneAction(id="understand_privacy", label="我知道了"),
-                SceneAction(id="ask_parent", label="问爸爸妈妈"),
+                SceneAction(id="ask_parent", label="问家长"),
             ],
             signals=self._signals(request, transition=transition),
         )

@@ -41,7 +41,7 @@ def _memory_request(
             MemoryEvidence(
                 source="chat_summary",
                 session_id="session_parent_report_service_test",
-                quote_summary="这里是结构化摘要来源，不应在父亲日报中逐字返回。",
+                quote_summary="这里是结构化摘要来源，不应在家长日报中逐字返回。",
             )
         ],
         confidence=0.82,
@@ -844,8 +844,8 @@ def test_parent_report_service_generates_high_risk_report_without_raw_detail() -
     memory_service.create(
         _memory_request(
             memory_type=MemoryType.SAFETY,
-            content="本次会话出现需要父亲关注的安全信号，应由父亲进一步了解情况。",
-            tags=["安全提醒", "父亲关注"],
+            content="本次会话出现需要家长关注的安全信号，应由家长进一步了解情况。",
+            tags=["安全提醒", "家长关注"],
             sensitivity=MemorySensitivity.CRITICAL,
             requires_parent_attention=True,
         )
@@ -931,7 +931,7 @@ def test_parent_report_uses_relationship_memory_for_low_pressure_parent_action()
                     metadata={
                         "relationship_memory_type": "proud_moment",
                         "topic": "运动比赛表达",
-                        "next_hook": "父亲可具体肯定孩子把事情说清楚了。",
+                        "next_hook": "家长可具体肯定孩子把事情说清楚了。",
                     },
                 )
             ],

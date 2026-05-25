@@ -1,6 +1,6 @@
 # Family Beta QA Checklist v0.1
 
-Status: Task 06 post-device QA refinement automated snapshot added; real-device QA remains NOT_RUN
+Status: Task 09 account/personalization automated snapshot added; real-device QA remains NOT_RUN
 Scope: Redmi K60 primary functional QA, Honor Pad 5 Android 9 / 4GB compatibility QA  
 Data policy: use only fictional child IDs, synthetic/fake audio, non-child test images, and non-private family settings. Do not record raw child text, full assistant text, raw audio, raw photos, parent_message_raw, provider keys, or private family data in this checklist or logs.
 
@@ -16,7 +16,21 @@ video timestamp=00:01:23
 APK sha256=...
 ```
 
-Do not paste screenshots containing real child photos, real names, raw transcripts, or provider keys.
+Do not paste screenshots containing real child photos, real names, raw transcripts, auth tokens, or provider keys.
+
+## Task 09 QA focus
+
+Task 09 adds account and personalization foundations. The next device round must explicitly cover:
+
+```text
+1. 家长创建一个孩子账号、登录、重启保持登录、手动退出。
+2. 家长设置和家长日报使用当前登录账号 child_id，默认不再要求开发 PIN。
+3. Opening v2 个性化但不阻塞首屏 Ready；孩子先开口时迟到 opening 不插入。
+4. CS/game/sports 短答时 conversation_control soft_shift 自然给换题机会，高参与时不强制换题。
+5. Topic choices 来自后端 quick actions；Android 不展示独立硬编码恐龙/太空 fallback chips。
+```
+
+Evidence stays non-sensitive: account username can be synthetic, but do not record passwords, bearer tokens, real child names, raw transcript, raw audio, raw image, or provider key.
 
 ## Task 08 evidence collection protocol
 
@@ -72,21 +86,31 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-ANDROID-03 | Landscape main layout | Launch child chat. | App is horizontal; left 小白狐 area and right chat/input area are usable; input bar does not crowd out messages. |  | NOT_RUN |  | Low-end tablet visual QA required. |
 | QA-ANDROID-04 | No adult/debug text in child UI | Browse child chat idle, voice, image, TTS, network error states. | Child sees family-safe wording, not provider/config/stack/debug wording. |  | NOT_RUN |  | DevSettings diagnostics only in dev surfaces. |
 
+## 3A. Account and parent-operated login
+
+| ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
+|---|---|---|---|---|---|---|---|
+| QA-AUTH-01 | Register one child account | Launch app with no saved token; create a synthetic child account from the parent-operated screen. | Registration succeeds, app enters child chat, and child UI never asks the child to manage credentials. |  | NOT_RUN |  | Do not record password/token. |
+| QA-AUTH-02 | Login existing account | Log out, then log in with the same synthetic username/password. | Login succeeds and settings/report/conversation use that account child_id. |  | NOT_RUN |  |  |
+| QA-AUTH-03 | Persistent session | Close/relaunch the app after login. | App remains logged in and opens the child experience without retyping password. |  | NOT_RUN |  |  |
+| QA-AUTH-04 | Manual logout | From家长设置 tap logout. | Token clears and app returns to parent-operated login/register screen. |  | NOT_RUN |  |  |
+| QA-AUTH-05 | Invalid credentials | Try an incorrect password for a synthetic account. | App shows a parent-facing failure message; child UI does not expose token/server internals. |  | NOT_RUN |  |  |
+
 ## 4. Opening greeting
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-OPEN-01 | First screen opening | Start app with backend running. | One short 小白狐 opening appears without blocking first screen for remote TTS. |  | NOT_RUN |  | Request id from opening call. |
+| QA-OPEN-01 | First screen opening | Start app with backend running after login. | Ready state appears quickly; one short personalized 小白狐 opening may arrive without blocking first screen or remote TTS. |  | NOT_RUN |  | Request id from opening call. |
 | QA-OPEN-02 | Child speaks before late opening | Immediately start voice/text turn after entering chat. | Late opening does not insert above the child’s active turn. |  | NOT_RUN |  |  |
-| QA-OPEN-03 | Nickname/display-name priority | Set fictional child nickname/display name in father settings, restart chat. | Opening uses nickname first, display name second, and no forced real name when empty. |  | NOT_RUN |  | Do not use real child name. |
+| QA-OPEN-03 | Nickname/display-name priority | Set fictional child nickname/display name in家长设置, restart chat. | Opening uses nickname first, display name second, and no forced real name when empty. |  | NOT_RUN |  | Do not use real child name. |
 | QA-OPEN-04 | Interest callback safety | With synthetic low-sensitivity interest seed, open chat. | Opening may lightly revisit one topic and allows switching away; no pressure to continue. |  | NOT_RUN |  | Backend/log evidence only; no raw memory text. |
 
 ## 4A. Parent settings child profile
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-SETTINGS-01 | Child profile fields | In father settings, enter fictional nickname, age, optional grade, call preference, interests, and topic boundaries. | Settings save successfully; child age/profile context affects later prompt metadata without exposing parent raw notes to child UI. |  | NOT_RUN |  | Do not use real child name or private family details. |
-| QA-SETTINGS-02 | Visible schedule deemphasis | Open father settings. | 放学后/作业/睡前 time ranges are not the main visible v0.1 setup burden; time remains gentle context only. |  | NOT_RUN |  | Existing backend schedule compatibility remains. |
+| QA-SETTINGS-01 | Child profile fields | In家长设置, enter fictional nickname, age, optional grade, call preference, interests, and topic boundaries. | Settings save successfully; child age/profile context affects later prompt metadata without exposing parent raw notes to child UI. |  | NOT_RUN |  | Do not use real child name or private family details. |
+| QA-SETTINGS-02 | Visible schedule deemphasis | Open家长设置. | 放学后/作业/睡前 time ranges are not the main visible v0.1 setup burden; time remains gentle context only. |  | NOT_RUN |  | Existing backend schedule compatibility remains. |
 | QA-SETTINGS-03 | Invalid age | Enter age outside 5-10. | UI asks for 5-10 or blank; no crash. |  | NOT_RUN |  |  |
 | QA-SETTINGS-04 | Hidden schedule closeout | Save settings after backend already has a synthetic custom schedule. | Save succeeds even if hidden schedule UI defaults are not visible; existing schedule is preserved and hidden default times are not re-saved as a side effect. |  | NOT_RUN |  | Automated ViewModel test covers this; device still needs save/load QA. |
 
@@ -138,9 +162,9 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-AGE-02 | Age 5-6 policy | Temporarily set fictional child age 5/6. | Reply is shorter and simpler; no babyish dependency wording. |  | NOT_RUN |  |  |
 | QA-AGE-03 | Age 9-10 policy | Temporarily set fictional child age 9/10. | Reply can be slightly richer but still voice-first and bounded. |  | NOT_RUN |  |  |
 | QA-THROTTLE-01 | Consecutive questions | Run ordinary chat where 小白狐 already asked two questions. | Next reply responds/settles instead of adding another question hook. |  | NOT_RUN |  | Check healthy_engagement log fields. |
-| QA-TOPIC-01 | Same topic low engagement | Use a synthetic game/CS or sports topic for 3+ turns, then give a short flat reply. | 小白狐 offers a gentle topic shift with curated seeds instead of deeper interview. |  | NOT_RUN |  | Evidence should be request_id/video timestamp, not raw text. |
+| QA-TOPIC-01 | Same topic low engagement | Use a synthetic game/CS or sports topic for 3+ turns, then give a short flat reply. | Model `conversation_control` or safe fallback recommends soft_shift; 小白狐 offers a gentle topic shift with curated/backend seeds instead of deeper interview. |  | NOT_RUN |  | Evidence should be request_id/video timestamp, not raw text. |
 | QA-TOPIC-02 | Engaged same topic | Use a synthetic topic where the child gives longer engaged replies. | 小白狐 may continue naturally; topic shift should not fire too early. |  | NOT_RUN |  |  |
-| QA-TOPIC-03 | Idle shift chips | After a completed turn with no backend quick actions, inspect Ready/Resting child chat. | Small chips may show “换个轻松话题”、safe seed labels, and “拍给小白狐看”; they do not cover voice/TTS controls or look like tasks/rewards. |  | NOT_RUN |  | Local fallback chips only; no live web/trend fetch. |
+| QA-TOPIC-03 | Backend generated topic choices | Trigger a backend soft_shift or inspect returned `ui_actions`. | Small chips come from backend quick actions/control, may include safe interest/curated labels, and do not cover voice/TTS controls or look like tasks/rewards. |  | NOT_RUN |  | No Android hard-coded independent topic chips; no live web/trend fetch. |
 
 ## 9. Image sharing
 
@@ -156,13 +180,12 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
-| QA-PARENT-01 | Normal tap | Child chat: tap small “大人” entry. | Shows child-safe hint only; does not enter parent pages. |  | NOT_RUN |  |  |
-| QA-PARENT-02 | Long press menu | Long press “大人”. | Shows report/settings choices before PIN. |  | NOT_RUN |  |  |
-| QA-PARENT-03 | Wrong PIN | Enter wrong dev PIN. | Access denied; no report/settings visible. |  | NOT_RUN |  |  |
-| QA-PARENT-04 | Correct PIN report | Enter correct dev PIN and choose report. | Father report opens. |  | NOT_RUN |  | Dev PIN is not production auth. |
-| QA-PARENT-05 | Correct PIN settings | Enter correct dev PIN and choose settings. | Father settings opens and can return to chat. |  | NOT_RUN |  |  |
+| QA-PARENT-01 | Normal tap | Logged-in child chat: tap small “大人” entry. | Opens parent target choice or parent page according to current logged-in path; no token/debug details are shown. |  | NOT_RUN |  | Child account login replaces default PIN path. |
+| QA-PARENT-02 | Parent report entry | Choose家长日报. | 家长日报 opens for the current logged-in child account. |  | NOT_RUN |  |  |
+| QA-PARENT-03 | Parent settings entry | Choose家长设置. | 家长设置 opens for the current logged-in child account and can return to chat. |  | NOT_RUN |  |  |
+| QA-PARENT-04 | Dev PIN fallback | If a dev build enables PIN fallback, try wrong/correct PIN. | PIN protects only the dev fallback path; default logged-in path does not depend on PIN. |  | NOT_RUN |  | Dev PIN is not production auth. |
 
-## 11. Father report
+## 11. Parent report
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
 |---|---|---|---|---|---|---|---|
@@ -171,7 +194,7 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-REPORT-03 | Empty material | Generate report with no day material. | Empty state is calm and does not invent child activity. |  | NOT_RUN |  |  |
 | QA-REPORT-04 | Tonight bridge | Inspect top bridge. | Bridge is a concrete real-life suggestion, not surveillance or a demand. |  | NOT_RUN |  |  |
 | QA-REPORT-05 | Topic/content summary | Generate a report after synthetic game/image/learning turns. | Topic cards summarize content and intent without quoting child原文. |  | NOT_RUN |  |  |
-| QA-REPORT-06 | Avoid follow-up | Inspect “今晚先不追问”. | It tells father what not to over-ask, including old topics or answer chasing when relevant. |  | NOT_RUN |  |  |
+| QA-REPORT-06 | Avoid follow-up | Inspect “今晚先不追问”. | It tells the parent what not to over-ask, including old topics or answer chasing when relevant. |  | NOT_RUN |  |  |
 | QA-REPORT-07 | CS/game summary | Generate a report from a synthetic CS/game conversation with friends/team/map/loss/short replies. | Report summarizes topic/content at a high level, gives a concrete tonight bridge, includes avoid_followup, and does not show raw transcript/provider/debug/scoring wording. |  | NOT_RUN |  | Automated synthetic test covers backend summary; parent UI device reading still pending. |
 
 ## 12. Healthy Engagement boundaries
@@ -222,11 +245,11 @@ Real-device QA: NOT_RUN; adb listed no attached device.
 
 ```text
 Date: 2026-05-24
-Scope: parent settings child profile simplification; conversation topic shift and curated seeds; father report topic/content summary redesign; child UI polish thin slice.
+Scope: parent settings child profile simplification; conversation topic shift and curated seeds; parent report topic/content summary redesign; child UI polish thin slice.
 Backend tests: `bash scripts/test_backend.sh` -> 424 passed; `bash scripts/lint_backend.sh` -> passed.
 Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
 Real-device QA: NOT_RUN; earlier doctor reported no attached physical Android device.
-Device QA required: Redmi K60 / Honor Pad 5 for settings readability, topic shift naturalness, father report hierarchy, and 小白狐 phase chip/layout.
+Device QA required: Redmi K60 / Honor Pad 5 for settings readability, topic shift naturalness, parent report hierarchy, and 小白狐 phase chip/layout.
 ```
 
 ## 17. Task 07 automated closeout snapshot
@@ -237,7 +260,7 @@ Scope: parent schedule closeout; reviewed age-aware topic seed pack; child-facin
 Backend tests: `bash scripts/test_backend.sh` -> 428 passed; `bash scripts/lint_backend.sh` -> All checks passed.
 Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL; `bash scripts/android_gradle.sh assembleDebug` -> BUILD SUCCESSFUL.
 Real-device QA: NOT_RUN; doctor reported no attached physical Android device.
-Device QA required: Redmi K60 / Honor Pad 5 for hidden schedule save/load, shift chip layout, TTS log collection, slow-turn diagnosis, and father report CS/game readability.
+Device QA required: Redmi K60 / Honor Pad 5 for hidden schedule save/load, shift chip layout, TTS log collection, slow-turn diagnosis, and parent report CS/game readability.
 ```
 
 ## 18. Task 08 real-device QA round 2 package snapshot
@@ -262,6 +285,19 @@ P1 issues: none observed in this run.
 P2 issues: none observed in this run; device layout/audio/report naturalness still unvalidated.
 P3 issues: git reported loose-object gc housekeeping warnings; not product/runtime blocking.
 Remaining NOT_RUN QA: all Redmi K60 / Honor Pad 5 device rows in sections 3-14, especially QA-TTS-06, QA-TOPIC-03, QA-SETTINGS-04, QA-REPORT-07, QA-DEVICE-RK60-01/02, and QA-DEVICE-HP5-01/02.
+```
+
+## 19. Task 09 account and personalization snapshot
+
+```text
+Date: 2026-05-25
+Scope: Child account/auth foundation; 父亲->家长 copy; model-driven conversation_control; personalized opening v2; backend-generated interest-aware topic choices.
+Backend tests: `bash scripts/test_backend.sh` -> 441 passed.
+Backend lint: `bash scripts/lint_backend.sh` -> All checks passed.
+Android tests: `bash scripts/android_gradle.sh test` -> BUILD SUCCESSFUL.
+Real-device QA: NOT_RUN; no Redmi K60 / Honor Pad 5 device evidence was available in this implementation run.
+Device QA required: Redmi K60 / Honor Pad 5 for register/login/persistent session/logout, 家长设置/日报 default logged-in entry, opening v2 non-blocking behavior, CS/game conversation_control naturalness, backend topic choices layout, and auth screens on low-end landscape.
+Data boundary: do not record passwords, bearer tokens, real child names, raw transcript, raw audio, raw image, provider key, parent_message_raw, or DB dumps.
 ```
 
 ## Closeout rules

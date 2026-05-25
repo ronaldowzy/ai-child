@@ -1,6 +1,7 @@
 package com.childai.companion.data.parent
 
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -12,6 +13,7 @@ class ParentPolicyApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = 12_000,
+    private val authTokenProvider: () -> String? = { null },
 ) {
     suspend fun getPolicy(childId: String): ParentPolicyResponse =
         withContext(Dispatchers.IO) {
@@ -69,6 +71,7 @@ class ParentPolicyApiClient(
             readTimeout = readTimeoutMs
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
+            setBearerToken(authTokenProvider())
         }
     }
 

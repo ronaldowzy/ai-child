@@ -22,7 +22,7 @@ class ParentReportDtosTest {
                   "parent_bridge": "今晚可以先听孩子说题目在问什么。"
                 }
               ],
-              "conversation_summary": "今天主要聊了学习求助，父亲可看内容主线，不看原文。",
+              "conversation_summary": "今天主要聊了学习求助，家长可看内容主线，不看原文。",
               "learning_observations": ["孩子在学习求助时需要先确认题意。"],
               "expression_observations": [],
               "emotion_observations": [],
@@ -47,7 +47,7 @@ class ParentReportDtosTest {
             report.tonightParentBridge,
         )
         assertEquals(report.tonightParentBridge, report.bridgeText)
-        assertEquals("今天主要聊了学习求助，父亲可看内容主线，不看原文。", report.conversationSummary)
+        assertEquals("今天主要聊了学习求助，家长可看内容主线，不看原文。", report.conversationSummary)
         assertEquals(1, report.topicOverview.size)
         assertEquals("学习求助", report.topicOverview.first().topic)
         assertEquals("不要直接追问最终答案。", report.avoidFollowup.first())

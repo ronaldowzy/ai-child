@@ -32,7 +32,7 @@ class AgentReplyCarouselTest {
     }
 
     @Test
-    fun topicShiftChipsAreSmallIdleFallbackOnly() {
+    fun topicShiftChipsAreBackendDrivenOnly() {
         val state = ChatUiState(
             messages = initialChatMessages() + ChatMessage(
                 id = "agent-after-turn",
@@ -43,10 +43,7 @@ class AgentReplyCarouselTest {
 
         val actions = topicShiftChipActions(state)
 
-        assertEquals(
-            listOf("换个轻松话题", "画画或手工", "恐龙或太空", "拍给小白狐看"),
-            actions.map { it.label },
-        )
+        assertTrue(actions.isEmpty())
     }
 
     @Test

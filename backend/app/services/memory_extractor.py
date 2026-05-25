@@ -100,8 +100,8 @@ class MemoryExtractor:
                 self._build_memory(
                     request=request,
                     memory_type=MemoryType.SAFETY,
-                    content="本次会话出现需要父亲关注的安全信号，应由父亲进一步了解情况。",
-                    tags=["安全提醒", "父亲关注"],
+                    content="本次会话出现需要家长关注的安全信号，应由家长进一步了解情况。",
+                    tags=["安全提醒", "家长关注"],
                     confidence=0.9,
                     importance=1.0,
                     sensitivity=MemorySensitivity.CRITICAL,

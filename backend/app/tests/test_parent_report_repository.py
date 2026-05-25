@@ -33,7 +33,7 @@ def _report(
         learning_observations=["孩子在学习求助时适合先复述题意。"],
         expression_observations=["选择题式引导更容易开始表达。"],
         emotion_observations=["先回应感受，再进入问题解决。"],
-        safety_alerts=["今天出现需要父亲关注的安全信号。"],
+        safety_alerts=["今天出现需要家长关注的安全信号。"],
         suggested_parent_actions=["今晚先做安全确认。"],
         created_at=created_at,
         generation_status=ParentReportGenerationStatus.MODEL_GENERATED,

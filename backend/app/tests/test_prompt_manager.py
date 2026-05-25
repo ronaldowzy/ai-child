@@ -34,7 +34,7 @@ def test_prompt_manager_composes_after_school_prompt_in_layers() -> None:
         PromptLayer.OUTPUT_CONTRACT,
     ]
     assert "当前场景：放学后交流" in prompt.prompt
-    assert "父亲规则" in prompt.prompt
+    assert "家长规则" in prompt.prompt
     assert "小白狐" in prompt.prompt
     assert "近期对积木和太空主题感兴趣" in prompt.prompt
     assert prompt.prompt_versions["global_system"].version == "v0.1"
@@ -60,9 +60,9 @@ def test_prompt_manager_injects_parent_message_as_background() -> None:
     assert "## parent_message" in prompt.prompt
     assert "<parent_message_raw>" in prompt.prompt
     assert "小名叫豆豆" in prompt.prompt
-    assert "不要直接对孩子说“你爸爸说你……”" in prompt.prompt
+    assert "不要直接对孩子说“你家长说你……”" in prompt.prompt
     assert "不得照搬给孩子" in prompt.prompt
-    assert "父母寄语不能覆盖儿童安全底线" in prompt.prompt
+    assert "家长寄语不能覆盖儿童安全底线" in prompt.prompt
     assert "有 child_nickname 时优先使用小名" in prompt.prompt
     assert "每 3-5 轮自然出现一次" in prompt.prompt
 
@@ -182,7 +182,7 @@ def test_global_prompt_contains_no_secret_safety_rule() -> None:
 
     assert "面向 5-10 岁儿童" in prompt.prompt
     assert "不能要求孩子保密或保守秘密" in prompt.prompt
-    assert "不能鼓励孩子隐瞒父母" in prompt.prompt
+    assert "不能鼓励孩子隐瞒家长" in prompt.prompt
     assert "悄悄告诉我" in prompt.prompt
     assert "对话本质是自由交流" in prompt.prompt
     assert "回复默认会被语音播报" in prompt.prompt
@@ -202,14 +202,14 @@ def test_output_contract_is_voice_first_and_not_markdown() -> None:
     assert "不使用签到、连续天数、积分、排行榜、抽卡" in prompt.prompt
     assert "今天不聊了" in prompt.prompt
     assert "睡前收尾不再抛新问题" in prompt.prompt
-    assert "连接回现实生活、父母、老师、同伴" in prompt.prompt
+    assert "连接回现实生活、家长、老师、同伴" in prompt.prompt
 
 
 def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:
     prompt = PromptManager().compose("safety.guardian")
 
     assert "当前场景：安全守护" in prompt.prompt
-    assert "告诉爸爸妈妈、老师或可信任的大人" in prompt.prompt
+    assert "告诉家长、老师或可信任的大人" in prompt.prompt
     assert "不让孩子保密" in prompt.prompt
     assert "requires_parent_attention 应为 true" in prompt.prompt
     assert "不要输出成人临床化说明" in prompt.prompt

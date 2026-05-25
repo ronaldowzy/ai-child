@@ -1,6 +1,7 @@
 package com.childai.companion.data.attachment
 
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -12,6 +13,7 @@ class AttachmentApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
     private val connectTimeoutMs: Int = 8_000,
     private val readTimeoutMs: Int = 12_000,
+    private val authTokenProvider: () -> String? = { null },
 ) {
     suspend fun createAttachment(
         request: AttachmentCreateRequest,
@@ -88,6 +90,7 @@ class AttachmentApiClient(
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
+            setBearerToken(authTokenProvider())
         }
     }
 
@@ -99,6 +102,7 @@ class AttachmentApiClient(
             doOutput = true
             setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             setRequestProperty("Accept", "application/json")
+            setBearerToken(authTokenProvider())
         }
     }
 

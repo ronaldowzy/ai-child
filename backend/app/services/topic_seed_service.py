@@ -105,6 +105,34 @@ class TopicSeedService:
             seeds = self._active_seeds_for_age_band("unknown")
         return seeds[: max(limit, 0)]
 
+    def topic_choice_labels(
+        self,
+        parent_policy: Any | None,
+        *,
+        recent_topic: str | None = None,
+        limit: int = 3,
+    ) -> list[str]:
+        boundaries = self._profile_string_list(
+            self._policy_preferences(parent_policy).get("topic_boundaries")
+        )
+        labels: list[str] = []
+        for interest in self._profile_string_list(
+            self._policy_preferences(parent_policy).get("child_interests")
+        ):
+            label = self._interest_label(interest)
+            if self._choice_allowed(label, boundaries, recent_topic):
+                labels.append(label)
+        if len(labels) < limit:
+            for seed in self.seed_objects_for_parent_policy(parent_policy, limit=limit):
+                label = seed.prompt_label()
+                if self._choice_allowed(label, boundaries, recent_topic):
+                    labels.append(label)
+        deduped: list[str] = []
+        for label in labels:
+            if label not in deduped:
+                deduped.append(label)
+        return deduped[: max(limit, 0)]
+
     def _active_seeds_for_age_band(self, age_band: str) -> list[TopicSeed]:
         today = self._today_provider()
         return [
@@ -174,3 +202,48 @@ class TopicSeedService:
     def _contains_unsafe_label(self, label: str) -> bool:
         normalized = label.lower().replace(" ", "")
         return any(marker.lower() in normalized for marker in UNSAFE_LABEL_MARKERS)
+
+    def _policy_preferences(self, parent_policy: Any | None) -> dict[str, Any]:
+        if parent_policy is None:
+            return {}
+        if isinstance(parent_policy, dict):
+            value = parent_policy.get("communication_preferences")
+        else:
+            value = getattr(parent_policy, "communication_preferences", {})
+        return dict(value) if isinstance(value, dict) else {}
+
+    def _profile_string_list(self, value: Any) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [
+                item.strip()
+                for item in value.replace("、", "，").replace(",", "，").split("，")
+                if item.strip()
+            ]
+        return []
+
+    def _interest_label(self, interest: str) -> str:
+        compact = interest.strip("，。！？ ")
+        if not compact:
+            return ""
+        if any(marker in compact.lower() for marker in ("游戏", "cs", "反恐")):
+            return f"聊{compact}里的想法"
+        return f"聊{compact}"
+
+    def _choice_allowed(
+        self,
+        label: str,
+        boundaries: list[str],
+        recent_topic: str | None,
+    ) -> bool:
+        if not label or self._contains_unsafe_label(label):
+            return False
+        normalized = label.lower().replace(" ", "")
+        if recent_topic and recent_topic.lower().replace(" ", "") in normalized:
+            return False
+        for boundary in boundaries:
+            compact_boundary = boundary.lower().replace(" ", "")
+            if compact_boundary and compact_boundary in normalized:
+                return False
+        return True

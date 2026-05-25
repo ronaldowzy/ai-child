@@ -240,6 +240,7 @@ class ConversationService:
             route_decision,
             runtime_result,
             child_text=request.input.text,
+            parent_policy=parent_policy,
         )
         tts_ms = self._attach_audio_url_if_enabled(response)
         self._persist_turn_if_enabled(
@@ -452,11 +453,16 @@ class ConversationService:
         runtime_result: AgentRuntimeResult,
         *,
         child_text: str,
+        parent_policy: object | None,
     ) -> ConversationMessageResponse:
         quick_actions = self._quick_action_service.actions_for(
             decision=decision,
             child_text=child_text,
             reply_text=runtime_result.reply_text,
+            parent_policy=parent_policy,
+            conversation_control=runtime_result.model_metadata.get(
+                "final_conversation_control"
+            ),
         )
         return ConversationMessageResponse(
             reply=Reply(

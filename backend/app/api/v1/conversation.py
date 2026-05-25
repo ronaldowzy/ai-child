@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 
+from app.api.v1.auth import optional_auth_account
 from app.domain.schemas.conversation import (
     ConversationMessageRequest,
     ConversationMessageResponse,
@@ -20,5 +21,9 @@ conversation_service = ConversationService(
 )
 def create_message(
     request: ConversationMessageRequest,
+    authorization: str | None = Header(default=None),
 ) -> ConversationMessageResponse:
+    account = optional_auth_account(authorization)
+    if account is not None:
+        request = request.model_copy(update={"child_id": account.child_id})
     return conversation_service.handle_message(request)

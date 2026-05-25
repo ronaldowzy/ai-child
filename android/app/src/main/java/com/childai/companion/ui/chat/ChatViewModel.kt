@@ -55,6 +55,7 @@ class ChatViewModel(
     private val sendDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     requestOpeningOnInit: Boolean = false,
     private val voiceConfirmBeforeSend: Boolean = DevSettings.VOICE_CONFIRM_BEFORE_SEND,
+    private val childId: String = DevSettings.CHILD_ID,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
     private var nextMessageIndex = 0
@@ -213,7 +214,7 @@ class ChatViewModel(
                 requireNotNull(speechInputController) {
                     "Speech input controller is not ready"
                 }.stopAndTranscribe(
-                    childId = DevSettings.CHILD_ID,
+                    childId = childId,
                     sessionId = sessionId,
                     timezone = DevSettings.TIMEZONE,
                 )
@@ -311,7 +312,7 @@ class ChatViewModel(
 
             runCatching {
                 conversationSender.sendTextMessage(
-                    childId = DevSettings.CHILD_ID,
+                    childId = childId,
                     sessionId = sessionId,
                     text = text,
                     attachments = attachments,
@@ -432,13 +433,13 @@ class ChatViewModel(
             runCatching {
                 if (mockPhoto.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
                     attachmentRepository.createMockHomeworkPhoto(
-                        childId = DevSettings.CHILD_ID,
+                        childId = childId,
                         sessionId = sessionId,
                         mockOcrText = problemText,
                     )
                 } else {
                     attachmentRepository.createMockImageShare(
-                        childId = DevSettings.CHILD_ID,
+                        childId = childId,
                         sessionId = sessionId,
                         mockVisionText = problemText,
                         imagePurpose = mockPhoto.imagePurpose,
@@ -504,7 +505,7 @@ class ChatViewModel(
         viewModelScope.launch(sendDispatcher) {
             runCatching {
                 attachmentRepository.createCapturedImage(
-                    childId = DevSettings.CHILD_ID,
+                    childId = childId,
                     sessionId = sessionId,
                     imageBytes = payload.bytes,
                     mimeType = payload.mimeType,
@@ -619,7 +620,7 @@ class ChatViewModel(
 
         runCatching {
             conversationSender.sendTextMessage(
-                childId = DevSettings.CHILD_ID,
+                childId = childId,
                 sessionId = sessionId,
                 text = "这是刚才拍的题目",
                 attachments = listOf(attachmentResponse.attachmentId),
@@ -919,7 +920,7 @@ class ChatViewModel(
     ): Boolean {
         var doneReceived = false
         conversationSender.streamTextMessage(
-            childId = DevSettings.CHILD_ID,
+            childId = childId,
             sessionId = sessionId,
             text = text,
             attachments = attachments,
@@ -1334,7 +1335,7 @@ class ChatViewModel(
         viewModelScope.launch(sendDispatcher) {
             runCatching {
                 conversationSender.requestOpening(
-                    childId = DevSettings.CHILD_ID,
+                    childId = childId,
                     sessionId = sessionId,
                     timezone = DevSettings.TIMEZONE,
                 )
@@ -1535,7 +1536,7 @@ interface ConversationMessageSender {
     )
 }
 
-private class ConversationRepositoryMessageSender(
+class ConversationRepositoryMessageSender(
     private val repository: ConversationRepository = ConversationRepository(),
 ) : ConversationMessageSender {
     override suspend fun requestOpening(

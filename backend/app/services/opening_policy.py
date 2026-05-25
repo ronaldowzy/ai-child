@@ -31,7 +31,7 @@ FORBIDDEN_OPENING_PHRASES: tuple[str, ...] = (
     "你不来我会难过",
     "只有小白狐懂你",
     "这是我们的小秘密",
-    "不要告诉爸爸妈妈",
+    "不要告诉家长",
     "每天都要来",
     "再聊一会儿就有奖励",
     "连续来几天就有惊喜",
@@ -109,7 +109,7 @@ class OpeningPolicyBuilder:
         parent_goal_hint = self._parent_goal_hint(parent_policy, time_context)
         prefer_parent_bridge = bedtime or self._contains_any(
             self._parent_text(parent_policy),
-            ("爸爸妈妈", "爸爸", "妈妈", "父母"),
+            ("家长", "爸爸妈妈", "爸爸", "妈妈", "父母"),
         )
         no_school_check = self._no_school_check(parent_policy)
 
@@ -132,15 +132,22 @@ class OpeningPolicyBuilder:
         elif low_expression_state is not None:
             mode = OpeningMode.LOW_EXPRESSION_SUPPORT
             seed_recall_reason = "low_expression_state"
-        elif seed_topic and not recall_blocked:
+        elif not seed_topic:
+            seed_topic = self._profile_interest_seed(parent_policy, boundary_topic)
+            recall_blocked = self._interest_recall_count(child_id, seed_topic) > 0
+            if seed_topic and not recall_blocked:
+                mode = OpeningMode.INTEREST_CALLBACK
+                seed_recall_allowed = True
+                seed_recall_reason = "profile_interest_seed"
+        if mode == OpeningMode.DEFAULT_LIGHT and seed_topic and not recall_blocked:
             mode = OpeningMode.INTEREST_CALLBACK
             seed_recall_allowed = True
             seed_recall_reason = "low_sensitivity_interest_seed"
-        elif recall_blocked:
+        elif mode == OpeningMode.DEFAULT_LIGHT and recall_blocked:
             seed_recall_reason = "recently_recalled"
-        elif parent_goal_hint and self._contains_any(
+        elif mode == OpeningMode.DEFAULT_LIGHT and parent_goal_hint and self._contains_any(
             parent_goal_hint,
-            ("爸爸妈妈", "爸爸", "妈妈", "一起告诉"),
+            ("家长", "爸爸妈妈", "爸爸", "妈妈", "一起告诉"),
         ):
             mode = OpeningMode.PARENT_BRIDGE_LIGHT
             seed_recall_reason = "parent_bridge"
@@ -224,9 +231,9 @@ class OpeningPolicyBuilder:
         if boundary_cooldown_active:
             rules.append("尊重孩子上次表达的边界，不主动拉回旧话题。")
         if no_school_check:
-            rules.append("父亲要求不做日间经历查岗，不提固定场所。")
+            rules.append("家长要求不做日间经历查岗，不提固定场所。")
         if parent_goal_hint:
-            rules.append(f"父亲目标只能低压力转译：{parent_goal_hint}")
+            rules.append(f"家长目标只能低压力转译：{parent_goal_hint}")
 
         return OpeningPolicy(
             mode=mode,
@@ -353,11 +360,11 @@ class OpeningPolicyBuilder:
             text,
             ("早点睡", "睡眠", "睡觉", "早睡"),
         ):
-            return "低刺激收束，必要时提醒可以告诉爸爸妈妈后去休息。"
+            return "低刺激收束，必要时提醒可以告诉家长后去休息。"
         if self._contains_any(text, ("学习", "作业", "题目", "复习")):
             return "如果孩子主动提到学习，只提供一个小问题或帮他拆开一点。"
-        if self._contains_any(text, ("爸爸妈妈", "父母", "告诉爸爸", "告诉妈妈")):
-            return "这句话也可以告诉爸爸妈妈，小白狐只先听一点点。"
+        if self._contains_any(text, ("家长", "爸爸妈妈", "父母", "告诉爸爸", "告诉妈妈")):
+            return "这句话也可以告诉家长，小白狐只先听一点点。"
         return None
 
     def _parent_text(self, parent_policy: ParentPolicy) -> str:
@@ -369,6 +376,31 @@ class OpeningPolicyBuilder:
             text,
             ("不要查岗学校", "不要问学校", "别问学校"),
         )
+
+    def _profile_interest_seed(
+        self,
+        parent_policy: ParentPolicy,
+        boundary_topic: str | None,
+    ) -> str | None:
+        interests = parent_policy.communication_preferences.get("child_interests")
+        if isinstance(interests, str):
+            candidates = [
+                item.strip()
+                for item in interests.replace("、", "，").replace(",", "，").split("，")
+                if item.strip()
+            ]
+        elif isinstance(interests, list):
+            candidates = [str(item).strip() for item in interests if str(item).strip()]
+        else:
+            candidates = []
+        boundary = (boundary_topic or "").strip()
+        for candidate in candidates:
+            if boundary and boundary in candidate:
+                continue
+            if self._is_exciting_topic(candidate):
+                continue
+            return candidate[:40]
+        return None
 
     def _is_exciting_topic(self, topic: str) -> bool:
         return self._contains_any(topic, _EXCITING_TOPICS)

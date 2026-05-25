@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 
 class ParentReportViewModel(
     private val repository: ParentReportRepository = ParentReportRepository(),
+    private val childId: String = DevSettings.CHILD_ID,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         ParentReportUiState(date = todayDateText()),
@@ -46,7 +47,7 @@ class ParentReportViewModel(
         viewModelScope.launch {
             runCatching {
                 repository.getReport(
-                    childId = DevSettings.CHILD_ID,
+                    childId = childId,
                     date = date,
                 )
             }.onSuccess { report ->

@@ -103,7 +103,7 @@ def test_memory_api_keeps_high_risk_memory_visible_to_parent() -> None:
         "/api/v1/memories",
         json=_memory_payload(
             memory_type="safety",
-            content="本次会话出现需要父亲关注的安全信号，应进一步了解情况。",
+            content="本次会话出现需要家长关注的安全信号，应进一步了解情况。",
         )
         | {
             "tags": ["安全提醒"],

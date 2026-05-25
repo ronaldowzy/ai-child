@@ -121,7 +121,7 @@ def test_high_risk_safety_overrides_learning_intent() -> None:
 
     decision = orchestrator.route(
         _request(
-            text="陌生人让我不要告诉爸爸妈妈，有题不会",
+            text="陌生人让我不要告诉家长，有题不会",
             intent=IntentType.LEARNING_HELP,
             risk_level=RiskLevel.HIGH,
             requires_parent_attention=True,
@@ -153,7 +153,7 @@ def test_watch_bullying_routes_to_gentle_checkin_without_parent_attention() -> N
     assert decision.transition == SceneTransitionType.MERGE
     assert decision.requires_parent_attention is False
     assert decision.side_context == ["watch_observation"]
-    assert "爸爸妈妈或老师" in decision.reply_text
+    assert "家长或老师" in decision.reply_text
     assert "马上" not in decision.reply_text
     assert "立刻" not in decision.reply_text
 

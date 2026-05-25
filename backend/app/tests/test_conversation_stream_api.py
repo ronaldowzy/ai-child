@@ -593,7 +593,7 @@ def test_safety_stream_keeps_guardian_routing_and_parent_attention() -> None:
     events = _events_from_service(
         service,
         _payload(
-            text="陌生人让我不要告诉爸爸妈妈",
+            text="陌生人让我不要告诉家长",
             include_tts=False,
             session_id="stream_safety_session",
         ),
@@ -605,7 +605,7 @@ def test_safety_stream_keeps_guardian_routing_and_parent_attention() -> None:
     assert route_event["payload"]["active_scene"] == "safety.guardian"
     assert route_event["payload"]["requires_parent_attention"] is True
     assert route_event["payload"]["risk_level"] == "high"
-    assert "爸爸妈妈" in final_event["payload"]["text"]
+    assert "家长" in final_event["payload"]["text"]
     assert "可信任的大人" in final_event["payload"]["text"]
 
 
@@ -660,7 +660,7 @@ def test_privacy_stream_keeps_boundary_routing() -> None:
 
     assert route_event["payload"]["active_scene"] == "privacy.boundary"
     assert "地址" in final_event["payload"]["text"]
-    assert "爸爸妈妈" in final_event["payload"]["text"]
+    assert "家长" in final_event["payload"]["text"]
 
 
 def test_text_final_payload_excludes_debug_and_session_state_internals() -> None:

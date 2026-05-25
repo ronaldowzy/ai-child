@@ -168,6 +168,20 @@ def test_no_seed_uses_default_light() -> None:
     assert policy.seed_topic is None
 
 
+def test_profile_interest_can_seed_personalized_opening() -> None:
+    policy = OpeningPolicyBuilder(memory_service=_memory_service()).build(
+        child_id="child_opening_policy",
+        parent_policy=_parent_policy(
+            preferences={"child_interests": ["恐龙", "画画"]}
+        ),
+        time_context=_time_context(),
+    )
+
+    assert policy.mode == OpeningMode.INTEREST_CALLBACK
+    assert policy.seed_topic == "恐龙"
+    assert policy.seed_recall_allowed is True
+
+
 def test_low_expression_state_uses_low_expression_support() -> None:
     service = _memory_service()
     _create_low_expression_state(service)

@@ -82,6 +82,7 @@ fun ChildChatScreen(
     onOpenParentSettings: () -> Unit = {},
     onOpenParentReport: () -> Unit = {},
     viewModel: ChatViewModel = viewModel(),
+    requireParentPin: Boolean = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -133,6 +134,7 @@ fun ChildChatScreen(
         onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
+        requireParentPin = requireParentPin,
         modifier = modifier,
     )
 }
@@ -154,6 +156,7 @@ private fun ChildChatScreenContent(
     onPhotoCaptureFailed: (String) -> Unit,
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
+    requireParentPin: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var pendingParentEntry by rememberSaveable { mutableStateOf<ParentEntryTarget?>(null) }
@@ -171,6 +174,13 @@ private fun ChildChatScreenContent(
     fun openParentGate(target: ParentEntryTarget) {
         parentEntryHint = null
         showParentEntryChoices = false
+        if (!requireParentPin) {
+            when (target) {
+                ParentEntryTarget.Report -> onOpenParentReport()
+                ParentEntryTarget.Settings -> onOpenParentSettings()
+            }
+            return
+        }
         pendingParentEntry = target
         parentPinInput = ""
         parentPinError = null
@@ -608,7 +618,7 @@ private fun ChatPanel(
 
 internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
 
-internal fun parentEntryTapHint(): String = "这是给大人看的，请让大人长按进入。"
+internal fun parentEntryTapHint(): String = "这是给家长看的，请让家长长按进入。"
 
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 
@@ -616,25 +626,7 @@ internal fun parentEntryLongPressTargets(): List<ParentEntryTarget> =
     listOf(ParentEntryTarget.Report, ParentEntryTarget.Settings)
 
 internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
-    val phase = uiState.interactionPresentation.phase
-    val canSuggest = phase == ChildTurnUiPhase.Ready ||
-        phase == ChildTurnUiPhase.Resting ||
-        phase == ChildTurnUiPhase.NeedsRetry
-    if (
-        !canSuggest ||
-        uiState.isSending ||
-        uiState.quickActions.isNotEmpty() ||
-        uiState.pendingImageContext != null ||
-        uiState.messages.size <= initialChatMessages().size
-    ) {
-        return emptyList()
-    }
-    return listOf(
-        QuickActionUi(id = "topic_shift", label = "换个轻松话题"),
-        QuickActionUi(id = "topic_seed_drawing", label = "画画或手工"),
-        QuickActionUi(id = "topic_seed_dinosaur_space", label = "恐龙或太空"),
-        QuickActionUi(id = "share_photo", label = "拍给小白狐看"),
-    )
+    return emptyList()
 }
 
 @Composable
@@ -751,7 +743,7 @@ private fun ParentEntryButton(
         modifier = Modifier.combinedClickable(
             onClick = onTap,
             onLongClick = onLongPress,
-            onLongClickLabel = "输入 PIN",
+            onLongClickLabel = "进入家长页面",
         ),
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surface,
@@ -779,7 +771,7 @@ private fun ParentEntryTargetDialog(
         },
         text = {
             Text(
-                text = "请选择要进入的页面，下一步需要大人输入 PIN。",
+                text = "请选择要进入的家长页面。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1046,6 +1038,7 @@ private fun ChildChatScreenPreview() {
             onSubmitMockPhoto = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
+            requireParentPin = false,
         )
     }
 }

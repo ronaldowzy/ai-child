@@ -17,12 +17,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
 enum class ParentEntryTarget(val label: String) {
-    Report("父亲日报"),
-    Settings("父亲设置"),
+    Report("家长日报"),
+    Settings("家长设置"),
 }
 
 object ParentPinGate {
-    const val GENTLE_ERROR_MESSAGE = "这次没有打开，请让爸爸再试一次。"
+    const val GENTLE_ERROR_MESSAGE = "这次没有打开，请让家长再试一次。"
 
     fun isPinAccepted(input: String, expectedPin: String): Boolean =
         expectedPin.isNotBlank() && input.trim() == expectedPin

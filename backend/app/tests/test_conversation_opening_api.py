@@ -125,14 +125,18 @@ def test_parent_message_can_block_school_checkin() -> None:
     assert "今天在学校怎么样" not in text
 
 
-def test_opening_default_is_deterministic_and_does_not_call_model() -> None:
-    class NoCallOpeningModelRegistry:
+def test_opening_falls_back_when_model_opening_unavailable() -> None:
+    class FailingOpeningModelRegistry:
+        requests = 0
+
         def generate(self, _request):
-            raise AssertionError("opening default path must not call model")
+            self.requests += 1
+            raise RuntimeError("opening model unavailable")
 
     child_id = "opening_model_child"
     _update_policy(child_id, child_nickname="豆豆", parent_message_raw="晚上要低刺激。")
-    service = OpeningService(model_registry=NoCallOpeningModelRegistry())
+    model_registry = FailingOpeningModelRegistry()
+    service = OpeningService(model_registry=model_registry)
     request = _request_model(
         child_id=child_id,
         session_id="opening-model-session",
@@ -143,6 +147,39 @@ def test_opening_default_is_deterministic_and_does_not_call_model() -> None:
 
     assert response.reply.text.startswith("豆豆，")
     assert "一小句" in response.reply.text
+    assert model_registry.requests == 1
+
+
+def test_opening_can_use_non_mock_model_text_when_safe() -> None:
+    class FixedOpeningModelRegistry:
+        def generate(self, _request):
+            from app.domain.model_types import ModelResponse, ModelTaskType
+
+            return ModelResponse(
+                task_type=ModelTaskType.CHILD_CHAT,
+                response_text="豆豆，今天可以从恐龙或画画里选一个轻松说。",
+                structured_output={},
+                provider_name="fixed",
+                model_name="fixed-opening",
+                metadata={},
+            )
+
+    child_id = "opening_model_v2_child"
+    _update_policy(
+        child_id,
+        child_nickname="豆豆",
+        communication_preferences={"child_interests": ["恐龙", "画画"]},
+    )
+    service = OpeningService(model_registry=FixedOpeningModelRegistry())
+
+    response = service.create_opening(
+        _request_model(
+            child_id=child_id,
+            session_id="opening-model-v2-session",
+        )
+    )
+
+    assert response.reply.text == "豆豆，今天可以从恐龙或画画里选一个轻松说。"
 
 
 def test_model_opening_prompt_constrains_interest_revisit() -> None:
@@ -180,13 +217,13 @@ def test_model_opening_prompt_constrains_interest_revisit() -> None:
     assert "这是我们的小秘密" in prompt
 
 
-def test_opening_default_does_not_retry_model_response() -> None:
+def test_opening_model_failure_does_not_retry_more_than_once() -> None:
     class CountingOpeningModelRegistry:
         requests = 0
 
         def generate(self, _request):
             self.requests += 1
-            raise AssertionError("opening default path must not retry model")
+            raise RuntimeError("opening model unavailable")
 
     child_id = "opening_empty_retry_child"
     _update_policy(child_id, child_nickname="豆豆")
@@ -202,17 +239,21 @@ def test_opening_default_does_not_retry_model_response() -> None:
 
     assert response.reply.text
     assert response.reply.text.startswith("豆豆，")
-    assert model_registry.requests == 0
+    assert model_registry.requests == 1
 
 
-def test_opening_default_returns_nonempty_text_without_model() -> None:
+def test_opening_returns_nonempty_text_when_model_fails() -> None:
     class EmptyOpeningModelRegistry:
+        requests = 0
+
         def generate(self, _request):
-            raise AssertionError("opening default path must not call model")
+            self.requests += 1
+            raise RuntimeError("opening model unavailable")
 
     child_id = "opening_empty_fallback_child"
     _update_policy(child_id, child_nickname="豆豆")
-    service = OpeningService(model_registry=EmptyOpeningModelRegistry())
+    model_registry = EmptyOpeningModelRegistry()
+    service = OpeningService(model_registry=model_registry)
 
     response = service.create_opening(
         _request_model(
@@ -223,6 +264,7 @@ def test_opening_default_returns_nonempty_text_without_model() -> None:
 
     assert response.reply.text
     assert response.reply.text.startswith("豆豆，")
+    assert model_registry.requests == 1
 
 
 def test_model_opening_prompt_honors_no_school_check_without_school_word() -> None:

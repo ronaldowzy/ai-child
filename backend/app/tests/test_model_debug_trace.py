@@ -210,10 +210,10 @@ def test_parent_report_request_and_response_are_saved() -> None:
         ModelRequest(
             task_type=ModelTaskType.PARENT_REPORT,
             messages=[
-                {"role": "system", "content": "父亲日报 system prompt"},
+                {"role": "system", "content": "家长日报 system prompt"},
                 {"role": "user", "content": "{\"topics\":[\"跑步比赛\"]}"},
             ],
-            input_text="生成父亲日报",
+            input_text="生成家长日报",
             context={"conversation": {"child_id": "child_report_trace"}},
             metadata={"report_date": "2026-05-23"},
         )
@@ -221,7 +221,7 @@ def test_parent_report_request_and_response_are_saved() -> None:
 
     trace = repository.list_recent(limit=1)[0]
     assert trace.task_type == "parent_report"
-    assert trace.request_messages_json[0]["content"] == "父亲日报 system prompt"
+    assert trace.request_messages_json[0]["content"] == "家长日报 system prompt"
     assert trace.response_text == "trace response for parent_report"
 
 

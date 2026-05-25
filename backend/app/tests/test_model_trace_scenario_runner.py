@@ -70,10 +70,9 @@ def test_trace_scenario_runner_generates_traces_and_report(tmp_path: Path) -> No
     assert "连续追问 throttle" in report
     assert "图片分享：积木城堡" in report
     assert "图片分享：低置信兜底" in report
-    assert "父亲日报" in report
+    assert "家长日报" in report
     assert "mock responses do not represent real MiMo quality" in report
-    assert "deterministic_default/no_model_trace" in report
-    assert "opening deterministic default used: yes" in report
+    assert "model_generated_v2_with_deterministic_fallback" in report
     assert "ParentReport default path: `model_first_parent_report`" in report
     assert "Trace count" in report
     assert "Request IDs" in report
@@ -253,7 +252,7 @@ def test_real_provider_report_treats_opening_as_deterministic_and_report_as_mode
     )
     parent_report = runner.ScenarioResult(
         scenario_id="parent-report-relationship-summary",
-        title="父亲日报：interest_seed / proud_moment / topic_boundary",
+        title="家长日报：interest_seed / proud_moment / topic_boundary",
         category="parent_report",
         child_id="trace_parent_report_relationship",
         session_id=None,
@@ -292,7 +291,7 @@ def test_real_provider_report_treats_opening_as_deterministic_and_report_as_mode
         policy_blocked=False,
         error_type=None,
         response_text='{"summary":"今天孩子围绕跑步比赛表达了兴趣。"}',
-        request_messages_json=[{"role": "system", "content": "父亲日报分析器"}],
+        request_messages_json=[{"role": "system", "content": "家长日报分析器"}],
         request_input_text="",
         request_context_json={},
         request_metadata_json={},

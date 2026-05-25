@@ -10,16 +10,16 @@ class ParentEntryDeemphasisTest {
     @Test
     fun topBarDefaultsToOneCompactAdultEntry() {
         assertEquals(listOf("大人"), parentEntryDefaultLabels())
-        assertFalse(parentEntryDefaultLabels().contains("父亲日报"))
-        assertFalse(parentEntryDefaultLabels().contains("父亲设置"))
+        assertFalse(parentEntryDefaultLabels().contains(ParentEntryTarget.Report.label))
+        assertFalse(parentEntryDefaultLabels().contains(ParentEntryTarget.Settings.label))
     }
 
     @Test
     fun normalTapOnlyShowsFamilyFriendlyHint() {
         val hint = parentEntryTapHint()
 
-        assertEquals("这是给大人看的，请让大人长按进入。", hint)
-        assertTrue(hint.contains("大人"))
+        assertEquals("这是给家长看的，请让家长长按进入。", hint)
+        assertTrue(hint.contains("家长"))
         assertTrue(hint.contains("长按"))
     }
 

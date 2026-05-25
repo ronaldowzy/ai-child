@@ -37,7 +37,7 @@ class ParentPolicyViewModelTest {
                 policyResponse(
                     childNickname = "旧小名",
                     childDisplayName = "旧显示名",
-                    parentMessageRaw = "原来的父母寄语",
+                    parentMessageRaw = "原来的家长寄语",
                     goals = listOf("保留目标"),
                     communicationPreferences = mapOf(
                         "custom_preference" to "kept",
@@ -68,7 +68,7 @@ class ParentPolicyViewModelTest {
         requireNotNull(request)
         assertEquals("豆豆", request.childNickname)
         assertEquals("王小明", request.childDisplayName)
-        assertEquals("原来的父母寄语", request.parentMessageRaw)
+        assertEquals("原来的家长寄语", request.parentMessageRaw)
         assertEquals(listOf("保留目标"), request.goals)
         assertEquals("kept", request.communicationPreferences["custom_preference"])
         assertEquals(

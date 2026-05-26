@@ -382,3 +382,123 @@ def test_default_greeting_mode() -> None:
         phrase in text
         for phrase in ("慢慢说", "我在这里", "小白狐在这里", "回来啦", "想聊什么都可以")
     ), f"Should be a gentle greeting: {text}"
+
+
+# --- Correction tests: memory must not override bedtime/boundary/low-expression modes ---
+
+
+def _memory_repo_with_all_types() -> MemoryService:
+    """Build a memory service pre-loaded with interest, show-and-tell, and unfinished thread."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+    for mid, content, rel_type, mtype in [
+        ("mem_interest", "孩子自然提到跑步比赛", INTEREST_SEED, MemoryType.INTEREST),
+        ("mem_show_tell", "孩子展示了一幅自己画的小狐狸", SHOW_AND_TELL_EVENT, MemoryType.EVENT),
+        ("mem_thread", "孩子说要去英语打卡", UNFINISHED_THREAD, MemoryType.EVENT),
+    ]:
+        repo.save(_make_memory(mid, content, memory_type=mtype, relationship_type=rel_type))
+    return memory_service
+
+
+def test_bedtime_closure_ignores_memory() -> None:
+    """BEDTIME_CLOSURE must produce bedtime text, not a memory callback."""
+    memory_service = _memory_repo_with_all_types()
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.BEDTIME_CLOSURE,
+        seed_topic=None,
+        bedtime=True,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must be bedtime text
+    assert any(
+        phrase in text for phrase in ("晚上好", "只说一小句", "说完就休息")
+    ), f"Should be bedtime opening: {text}"
+    # Must NOT contain memory callbacks
+    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
+    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+    assert "跑步" not in text, f"Should not mention interest seed: {text}"
+
+
+def test_bedtime_defer_interest_ignores_memory() -> None:
+    """BEDTIME_DEFER_INTEREST must defer the topic, not pull in old memories."""
+    memory_service = _memory_repo_with_all_types()
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.BEDTIME_DEFER_INTEREST,
+        seed_topic="画画",
+        bedtime=True,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must defer the topic
+    assert any(
+        phrase in text for phrase in ("明天白天", "明天", "轻轻收个尾")
+    ), f"Should defer interest: {text}"
+    # Must NOT contain memory callbacks
+    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
+    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+
+
+def test_boundary_respect_ignores_memory() -> None:
+    """BOUNDARY_RESPECT must produce boundary text, not a memory callback."""
+    memory_service = _memory_repo_with_all_types()
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.BOUNDARY_RESPECT,
+        seed_topic=None,
+        boundary_kind="avoid_followup",
+        boundary_topic="比赛",
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must be boundary-respect text
+    assert any(
+        phrase in text for phrase in ("先不聊", "先放一放", "上次那个")
+    ), f"Should be boundary-respect opening: {text}"
+    # Must NOT contain memory callbacks
+    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
+    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+    assert "跑步" not in text, f"Should not mention interest seed: {text}"
+
+
+def test_low_expression_support_ignores_memory() -> None:
+    """LOW_EXPRESSION_SUPPORT must say the child can answer with one word, not memory callback."""
+    memory_service = _memory_repo_with_all_types()
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.LOW_EXPRESSION_SUPPORT,
+        seed_topic=None,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must be low-expression support text
+    assert any(
+        phrase in text for phrase in ("只说一个词", "说不完整也没关系")
+    ), f"Should be low-expression support: {text}"
+    # Must NOT contain memory callbacks
+    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
+    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+    assert "跑步" not in text, f"Should not mention interest seed: {text}"
+
+
+def test_parent_bridge_light_ignores_memory() -> None:
+    """PARENT_BRIDGE_LIGHT must produce bridge text, not a memory callback."""
+    memory_service = _memory_repo_with_all_types()
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.PARENT_BRIDGE_LIGHT,
+        seed_topic=None,
+        prefer_parent_bridge=True,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must be parent-bridge text
+    assert any(
+        phrase in text for phrase in ("告诉家长", "小白狐先听你说")
+    ), f"Should be parent-bridge opening: {text}"
+    # Must NOT contain memory callbacks
+    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
+    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+    assert "跑步" not in text, f"Should not mention interest seed: {text}"

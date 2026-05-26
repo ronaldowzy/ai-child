@@ -411,14 +411,16 @@ class OpeningService:
         prefix = f"{name}，" if name else ""
         topic = opening_policy.seed_topic or ""
 
-        # Try memory-aware opening first (unfinished thread, show-and-tell, interest)
-        memory_opening = self._memory_aware_opening(
-            prefix=prefix,
-            parent_policy=parent_policy,
-            opening_policy=opening_policy,
-        )
-        if memory_opening:
-            return memory_opening
+        # Memory-aware opening only for safe modes — bedtime/boundary/low-expression
+        # modes must stay low-stimulation and must not pull the child back into old topics.
+        if self._memory_aware_opening_allowed(opening_policy):
+            memory_opening = self._memory_aware_opening(
+                prefix=prefix,
+                parent_policy=parent_policy,
+                opening_policy=opening_policy,
+            )
+            if memory_opening:
+                return memory_opening
 
         if opening_policy.mode == OpeningMode.INTEREST_CALLBACK and topic:
             templates = self._interest_callback_templates(prefix, topic, opening_policy)
@@ -440,6 +442,15 @@ class OpeningService:
         return self._sanitize_opening_text(
             text,
             opening_policy=opening_policy,
+        )
+
+    def _memory_aware_opening_allowed(self, opening_policy: OpeningPolicy) -> bool:
+        """Memory callbacks are only safe for INTEREST_CALLBACK and DEFAULT_LIGHT."""
+        if opening_policy.bedtime or opening_policy.boundary_cooldown_active:
+            return False
+        return opening_policy.mode in (
+            OpeningMode.INTEREST_CALLBACK,
+            OpeningMode.DEFAULT_LIGHT,
         )
 
     def _memory_aware_opening(

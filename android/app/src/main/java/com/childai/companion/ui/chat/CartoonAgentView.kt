@@ -53,7 +53,37 @@ fun CartoonAgentView(
         MascotController(manifest)
     }
     var completedShortState by remember { mutableStateOf<MascotState?>(null) }
-    val baseMascotState = debugMascotState ?: mascotController.stateFor(agent)
+
+    // Resolve visual state from agent (or debug override)
+    // Debug override bypasses throttle entirely for debug switcher usability
+    val resolvedVisualState = remember(agent, debugMascotState) {
+        if (debugMascotState != null) {
+            null // debug path — skip resolver
+        } else {
+            XiaobaohuVisualStateResolver.resolve(agent)
+        }
+    }
+
+    // Apply runtime transition throttle (debug override bypasses)
+    var displayedState by remember { mutableStateOf<XiaobaohuDisplayedVisualState?>(null) }
+    val baseMascotState = if (debugMascotState != null) {
+        debugMascotState
+    } else {
+        val resolved = resolvedVisualState
+        if (resolved != null) {
+            val nowMs = System.currentTimeMillis()
+            val next = XiaobaohuVisualStateRuntime.reduce(
+                current = displayedState,
+                requested = resolved.mascotState,
+                requestedMinHoldMs = resolved.minHoldMs,
+                nowMs = nowMs,
+            )
+            displayedState = next
+            next.mascotState
+        } else {
+            mascotController.stateFor(agent)
+        }
+    }
     val requestedMascotState = if (completedShortState == baseMascotState) {
         MascotState.Idle
     } else {

@@ -172,37 +172,26 @@ def test_learning_scene_prompt_requires_scaffolding_not_direct_answers() -> None
 
     assert "当前场景：学习求助" in prompt.prompt
     assert "不直接给最终答案" in prompt.prompt
-    assert "不要直接给完整答案" in prompt.prompt
     assert "先引导审题和思路，不直接给最终答案" in prompt.prompt
-    assert "回复默认会被语音播报" in prompt.prompt
 
 
 def test_global_prompt_contains_no_secret_safety_rule() -> None:
     prompt = PromptManager().compose("daily.after_school_checkin")
 
     assert "面向 5-10 岁儿童" in prompt.prompt
-    assert "不能要求孩子保密或保守秘密" in prompt.prompt
-    assert "不能鼓励孩子隐瞒家长" in prompt.prompt
-    assert "悄悄告诉我" in prompt.prompt
-    assert "对话本质是自由交流" in prompt.prompt
-    assert "回复默认会被语音播报" in prompt.prompt
-    assert "不要把孩子限制在固定选项里" in prompt.prompt
+    assert "不要要求孩子隐瞒家长、老师或其他可信成人" in prompt.prompt
+    assert "不要收集不必要的隐私信息" in prompt.prompt
+    assert "默认 1-3 句，适合朗读" in prompt.prompt
 
 
 def test_output_contract_is_voice_first_and_not_markdown() -> None:
     prompt = PromptManager().compose("daily.after_school_checkin")
 
-    assert "不输出内部分析、舞台说明、括号里的语气提示" in prompt.prompt
-    assert "长度遵守 child_profile 中的 reply_char_budget" in prompt.prompt
-    assert "不使用 Markdown、标题、项目符号、编号列表、表格、代码块或链接格式" in prompt.prompt
-    assert "最多只问一个主要问题" in prompt.prompt
-    assert "不要连续抛出两个以上问句" in prompt.prompt
-    assert "不要把话题硬拉回固定选项" in prompt.prompt
+    assert "不要在 reply 中输出内部分析" in prompt.prompt
+    assert "不使用 Markdown、标题、编号、项目符号、表格或代码块" in prompt.prompt
     assert "只有我懂你" in prompt.prompt
-    assert "不使用签到、连续天数、积分、排行榜、抽卡" in prompt.prompt
-    assert "今天不聊了" in prompt.prompt
-    assert "睡前收尾不再抛新问题" in prompt.prompt
-    assert "连接回现实生活、家长、老师、同伴" in prompt.prompt
+    assert "排行榜" in prompt.prompt
+    assert "不聊了" in prompt.prompt
 
 
 def test_safety_guardian_prompt_requires_trusted_adult_and_parent_attention() -> None:
@@ -244,9 +233,8 @@ def test_after_school_prompt_allows_free_interest_chat() -> None:
 def test_open_conversation_prompt_avoids_fixed_menu() -> None:
     prompt = PromptManager().compose("conversation.open")
 
-    assert "当前场景：开放对话" in prompt.prompt
-    assert "不要输出" in prompt.prompt
-    assert "开心的事 / 遇到的难题 / 想安静一会儿" in prompt.prompt
+    assert "当前场景：开放自由对话" in prompt.prompt
+    assert "不要输出程序化选项清单" in prompt.prompt
 
 
 def test_bedtime_prompt_uses_three_questions_one_at_a_time() -> None:

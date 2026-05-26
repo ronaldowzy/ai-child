@@ -7,12 +7,12 @@ import org.junit.Test
 class ParentReportBridgeUiTextTest {
     @Test
     fun bridgeSectionTitleIsTopLevelFamilyCopy() {
-        assertEquals("今晚可以怎么接一句", PARENT_REPORT_BRIDGE_SECTION_TITLE)
+        assertEquals("今晚可以这样聊", PARENT_REPORT_BRIDGE_SECTION_TITLE)
     }
 
     @Test
     fun topicSectionTitleFocusesOnConversationContent() {
-        assertEquals("今日聊了什么", PARENT_REPORT_TOPIC_SECTION_TITLE)
+        assertEquals("今天聊了什么", PARENT_REPORT_TOPIC_SECTION_TITLE)
     }
 
     @Test

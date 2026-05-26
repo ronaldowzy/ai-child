@@ -464,13 +464,61 @@ class ParentReportService:
 
     def _parent_report_system_prompt(self) -> str:
         return (
-            "你是小白狐项目的家长日报分析器。只基于输入里的结构化摘要生成中文家长日报，"
-            "不要编造事实，不要引用逐字聊天记录，不要输出 prompt/debug/provider 信息，"
-            "不要给孩子贴固定负面标签。只返回严格 JSON object，不要 Markdown。字段："
-            "summary、topic_overview、conversation_summary、learning_observations、"
-            "expression_observations、emotion_observations、safety_alerts、"
-            "suggested_parent_actions、tonight_parent_bridge、avoid_followup。"
-            "整体尽量简洁；家长建议要包含轻轻开口和避免追问的意思。"
+            '你是"小白狐"项目的家长日报撰写器。\n'
+            '\n'
+            '你的读者是孩子的家长。家长想知道：今天孩子大概和小白狐聊了什么，孩子表达了什么状态，'
+            '家长今晚可以怎样自然接话，以及哪些问法最好避免。\n'
+            '\n'
+            '你只能基于输入中的受控摘要、话题提示、结构化观察和少量脱敏信号生成日报。'
+            '不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。'
+            '不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。'
+            '不要把孩子贴成固定标签。不要把日报写成监控报告。\n'
+            '\n'
+            '请使用自然、清楚、家长能看懂的中文。不要使用"接一句""桥接""结构化摘要""表达入口"这类内部产品词。'
+            '不要写空泛套话。每个字段都要短而具体。\n'
+            '\n'
+            '你必须返回严格 JSON object，只包含以下字段：\n'
+            '\n'
+            'summary:\n'
+            '  一句话总览今天的对话。必须让家长看懂今天主要发生了什么。\n'
+            '  示例：今天孩子主要聊了比赛紧张、图片里的物品，以及最后表示要去完成英语打卡。\n'
+            '\n'
+            'topic_overview:\n'
+            '  列表，每项包含 topic、child_intent、summary、emotion_tone、parent_bridge。\n'
+            '  topic 用家长看得懂的短标题，例如"比赛和紧张感""图片里的物品""英语打卡前结束对话"。\n'
+            '  child_intent 写孩子大概想做什么，例如"想分享一件让他紧张的比赛""想让小白狐看看图片里的东西"。\n'
+            '  summary 写清楚这个话题里孩子大概说了什么，不要泛化成"表达兴趣"。\n'
+            '  emotion_tone 只在有证据时写，例如"紧张""好奇""想结束对话"；不确定就写"未明显体现"。\n'
+            '  parent_bridge 写家长今晚可以自然说的一句话。必须像真人家长能说的话，不要写"接一句"。\n'
+            '\n'
+            'conversation_summary:\n'
+            '  2-4 句，按时间顺序概括今天聊了什么。不要写逐字原文，不要写技术词。\n'
+            '\n'
+            'learning_observations:\n'
+            '  只有出现真实学习/作业/题目线索时才写。否则返回空列表。\n'
+            '\n'
+            'expression_observations:\n'
+            '  只写具体观察。例如"孩子多次用短句回答，可能需要更具体的二选一问题"。不要写泛泛的"表达能力较好"。\n'
+            '\n'
+            'emotion_observations:\n'
+            '  只写有证据的情绪，例如紧张、困、想停、好奇。不要心理诊断。\n'
+            '\n'
+            'safety_alerts:\n'
+            '  只有出现安全/隐私/高风险线索时才写。没有就返回空列表。\n'
+            '\n'
+            'suggested_parent_actions:\n'
+            '  1-3 条，必须是家长今晚能做的小动作。每条要具体、低压力。\n'
+            '  示例：可以在睡前轻轻说："你今天提到比赛有点紧张，明天要不要只准备一件最重要的小事？"\n'
+            '\n'
+            'tonight_parent_bridge:\n'
+            '  改为"今晚可以这样聊"的一句话。必须通顺自然。\n'
+            '  禁止写"今晚可以接一句""桥接""跟进一下表达状态"。\n'
+            '\n'
+            'avoid_followup:\n'
+            '  1-4 条，告诉家长今晚尽量别怎么问。\n'
+            '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；孩子说要去打卡时，不要继续拉回聊天。\n'
+            '\n'
+            '如果素材很少，就明确说"今天素材不多，只能做轻量总结"，不要硬凑观察。'
         )
 
     def _parent_report_model_payload(
@@ -552,15 +600,17 @@ class ParentReportService:
         self,
         message: ConversationReportMessage,
     ) -> dict[str, object]:
+        raw_text = message.normalized_text or ""
+        safe_text = self._safe_text(raw_text)
+        short_hint = safe_text[:40] if safe_text and "[redacted]" not in safe_text else ""
         return {
             "actor": message.actor,
             "message_type": message.message_type,
             "scene": message.active_scene,
             "risk_level": message.risk_level,
             "has_attachment": message.attachments_count > 0,
-            "text_signal": self._conversation_text_signal(
-                message.normalized_text or ""
-            ),
+            "text_signal": self._conversation_text_signal(raw_text),
+            "short_content_hint": short_hint,
         }
 
     def _conversation_text_signal(self, text: str) -> str:

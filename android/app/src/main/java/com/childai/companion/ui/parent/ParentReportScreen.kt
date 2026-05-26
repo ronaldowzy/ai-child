@@ -131,11 +131,6 @@ private fun ReportGenerationStatus(report: ParentReport) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.error,
         )
-        Text(
-            text = report.bridgeText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -188,11 +183,11 @@ private fun ReportBody(report: ParentReport) {
         items = report.emotionObservations,
     )
     ReportSection(
-        title = "建议家长动作",
+        title = "家长可以怎么做",
         items = report.suggestedParentActions,
     )
     ReportSection(
-        title = "今晚先不追问",
+        title = "今晚尽量别这样问",
         items = report.avoidFollowup,
         emptyText = "避免连续追问，先轻松陪孩子做一件现实里的小事。",
     )
@@ -327,5 +322,5 @@ private fun ParentReportScreenPreview() {
     }
 }
 
-internal const val PARENT_REPORT_BRIDGE_SECTION_TITLE = "今晚可以怎么接一句"
-internal const val PARENT_REPORT_TOPIC_SECTION_TITLE = "今日聊了什么"
+internal const val PARENT_REPORT_BRIDGE_SECTION_TITLE = "今晚可以这样聊"
+internal const val PARENT_REPORT_TOPIC_SECTION_TITLE = "今天聊了什么"

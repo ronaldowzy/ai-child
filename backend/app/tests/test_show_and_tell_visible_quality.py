@@ -30,7 +30,12 @@ FIXED_NOW = datetime(2026, 5, 26, 15, 0, tzinfo=timezone.utc)
 
 IMAGE_REFUSAL_TEXT = "抱歉，我无法看到图片，我只能处理文字消息。"
 
-INTERNAL_WORDS = ("接一句", "桥接", "结构化摘要", "表达入口", "image_context", "recognized_type", "prompt", "provider")
+INTERNAL_WORDS = (
+    "接一句", "桥接", "结构化摘要", "表达入口",
+    "image_context", "recognized_type", "prompt", "provider",
+    "后端", "给小白狐看的是什么", "那张图",
+    "条孩子消息", "条小白狐回复", "表达能力较好",
+)
 
 
 def _make_request(
@@ -333,3 +338,21 @@ def test_parent_report_image_sharing_avoids_internal_words() -> None:
 
     # Should mention image sharing as expression
     assert "图片" in all_text or "画" in all_text or "分享" in all_text
+
+
+# --- Test 8: PromptManager image context does not contain engineering terms ---
+
+def test_prompt_manager_image_context_no_engineering_terms() -> None:
+    """PromptManager image context should not contain '后端图片理解' or similar engineering terms."""
+    pm = PromptManager()
+    result = pm._render_image_context({
+        "recognized_type": "child_drawing",
+        "image_purpose": "art_feedback",
+        "recognized_text": "一只猫",
+    })
+    assert "后端图片理解" not in result, f"Contains '后端图片理解': {result}"
+    assert "后端" not in result, f"Contains '后端': {result}"
+    assert "provider" not in result, f"Contains 'provider': {result}"
+    assert "安全图片摘要" in result or "系统提供的" in result, (
+        f"Should use soft wording: {result}"
+    )

@@ -422,7 +422,7 @@ private fun PendingVoiceTranscriptPanel(
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 label = {
-                    Text(text = "先确认这句话")
+                    Text(text = "确认识别到的话")
                 },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 minLines = 1,

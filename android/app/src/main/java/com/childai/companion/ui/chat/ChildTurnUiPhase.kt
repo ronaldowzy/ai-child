@@ -92,8 +92,8 @@ private fun ChildTurnUiPhase.statusText(): String {
         ChildTurnUiPhase.Recognizing -> "我在听懂刚才的话。"
         ChildTurnUiPhase.Sending -> "我先想一想。"
         ChildTurnUiPhase.Thinking -> "我先想一想。"
-        ChildTurnUiPhase.SpeakingPending -> "小白狐准备说。"
-        ChildTurnUiPhase.Speaking -> "小白狐正在说。"
+        ChildTurnUiPhase.SpeakingPending -> "我马上说给你听。"
+        ChildTurnUiPhase.Speaking -> "我在说给你听。"
         ChildTurnUiPhase.ImageProcessing -> "我在看这张图片。"
         ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
@@ -107,7 +107,7 @@ private fun ChildTurnUiPhase.primaryButtonText(): String {
         ChildTurnUiPhase.Listening -> "说完了"
         ChildTurnUiPhase.Recognizing -> "正在听懂"
         ChildTurnUiPhase.NeedsRetry -> "再说一次"
-        ChildTurnUiPhase.PermissionNeeded -> "请大人检查后再说"
+        ChildTurnUiPhase.PermissionNeeded -> "请大人帮忙看看"
         ChildTurnUiPhase.ServiceError -> "按一下开始说"
         ChildTurnUiPhase.Sending,
         ChildTurnUiPhase.Thinking,

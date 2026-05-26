@@ -518,13 +518,17 @@ class ParentReportService:
         return (
             '你是"小白狐"项目的家长日报撰写器。\n'
             '\n'
-            '你的读者是孩子的家长。家长想知道：今天孩子大概和小白狐聊了什么，孩子表达了什么状态，'
-            '家长今晚可以怎样自然接话，以及哪些问法最好避免。\n'
+            '你的读者是孩子的家长。家长想知道：孩子今天大概表达了哪些主题或状态，'
+            '家长今晚可以怎样自然接住，以及哪些问法最好避免。\n'
+            '\n'
+            '家长日报不是孩子和小白狐的聊天监控。不要让家长像是在追问孩子与小白狐的私密互动细节。\n'
+            '不要把日报写成使用统计、老师评语、心理诊断、行为评分或家长盘问清单。\n'
             '\n'
             '你只能基于输入中的受控摘要、话题提示、结构化观察和少量脱敏信号生成日报。'
             '不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。'
             '不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。'
-            '不要把孩子贴成固定标签。不要把日报写成监控报告。\n'
+            '不要把孩子贴成固定标签。\n'
+            'short_content_hint / conversation_snippets 只用于判断大概主题，不得改写成“孩子说了……”或作为准原话输出。\n'
             '\n'
             '请使用自然、清楚、家长能看懂的中文。不要使用"接一句""桥接""结构化摘要""表达入口"这类内部产品词。'
             '不要写空泛套话。每个字段都要短而具体。\n'
@@ -544,7 +548,7 @@ class ParentReportService:
             '  parent_bridge 写家长今晚可以自然说的一句话。必须像真人家长能说的话，不要写"接一句"。\n'
             '\n'
             'conversation_summary:\n'
-            '  2-4 句，按时间顺序概括今天聊了什么。不要写逐字原文，不要写技术词。\n'
+            '  2-4 句，按时间顺序概括今天聊了什么。不要写逐字原文，不要写技术词。不要写消息数量。\n'
             '\n'
             'learning_observations:\n'
             '  只有出现真实学习/作业/题目线索时才写。否则返回空列表。\n'
@@ -560,17 +564,31 @@ class ParentReportService:
             '\n'
             'suggested_parent_actions:\n'
             '  1-3 条，必须是家长今晚能做的小动作。每条要具体、低压力。\n'
+            '  优先用“如果孩子自己提起……”的句式，不要把每个话题都变成家长今晚必须问的问题。\n'
             '  示例：可以在睡前轻轻说："你今天提到比赛有点紧张，明天要不要只准备一件最重要的小事？"\n'
             '\n'
             'tonight_parent_bridge:\n'
-            '  改为"今晚可以这样聊"的一句话。必须通顺自然。\n'
+            '  一句话，“今晚可以这样聊”。必须通顺自然，像真人家长能说的话。\n'
             '  禁止写"今晚可以接一句""桥接""跟进一下表达状态"。\n'
             '\n'
             'avoid_followup:\n'
             '  1-4 条，告诉家长今晚尽量别怎么问。\n'
             '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；孩子说要去打卡时，不要继续拉回聊天。\n'
             '\n'
-            '如果素材很少，就明确说"今天素材不多，只能做轻量总结"，不要硬凑观察。'
+            '如果素材很少，就明确说"今天素材不多，只能做轻量总结"，不要硬凑观察。\n'
+            '\n'
+            '---\n'
+            '好的输出示例：\n'
+            'summary: 今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。\n'
+            'conversation_summary: 孩子今天有用图片表达的倾向，也出现过想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
+            'tonight_parent_bridge: 今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
+            'avoid_followup: 不要追问孩子具体给小白狐看了哪张图；不要要求孩子复述和小白狐的聊天内容。\n'
+            '\n'
+            '不好的输出示例（禁止模仿）：\n'
+            '今天孩子和小白狐聊了三件事...\n'
+            '你今天给小白狐看的是什么？\n'
+            '小白狐发现孩子表达能力较好...\n'
+            '孩子今天共有 5 条消息...\n'
         )
 
     def _parent_report_model_payload(
@@ -1043,7 +1061,7 @@ class ParentReportService:
         if has_sports_topic:
             topics.append("运动比赛/跑步")
             expression_observations.append(
-                "孩子今天围绕运动比赛、跑步或速度感受连续表达，说明他能把一个主动话题延展开；家长可以轻轻问比赛项目或他最在意的一个细节。"
+                "孩子今天围绕运动比赛、跑步或速度感受连续表达；家长可以顺着孩子主动提起的部分轻轻接一句，不核对成绩和真假。"
             )
         if has_game_topic:
             topics.append("游戏/CS")
@@ -1055,7 +1073,7 @@ class ParentReportService:
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
-                '孩子今天更多是通过图片来表达自己；更像是想把看到的东西给小白狐一起看，家长可以先问「你最想让我看哪里？」再判断是否需要进入学习帮助。'
+                '孩子今天有通过图片表达或展示的倾向；家长可以顺着孩子愿意分享的部分看一眼，不需要追问具体是哪张图。'
             )
         elif image_question_count:
             topics.append("看图交流")
@@ -1101,9 +1119,9 @@ class ParentReportService:
             state_summary.append("孩子今天更多是短句或指令式表达，需要更具体、低压力的追问来展开。")
         else:
             expression_observations.append(
-                "孩子今天整体能连续表达；家长可以围绕孩子主动提到的主题轻轻接一个具体细节，不要连续追问。"
+                "孩子今天愿意围绕一个主题多说几句；家长可以围绕孩子主动提到的主题轻轻接一个具体细节，不要连续追问。"
             )
-            state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
+            state_summary.append("孩子今天愿意围绕一个主题多说几句，适合围绕他主动发起的话题轻轻延展。")
         if attachment_count:
             state_summary.append("孩子今天更多是通过图片来表达自己，不要默认当成作业或隐私问题。")
         if has_sports_topic:
@@ -1191,7 +1209,7 @@ class ParentReportService:
                         emotion_tone="兴奋里带一点疲惫"
                         if has_sports_fatigue
                         else "有主动表达兴趣",
-                        parent_bridge="今晚可以轻轻问跑步里最有意思的一段，不追问距离真假。",
+                        parent_bridge="如果孩子自己提起跑步，可以先顺着他说一小句，不核对成绩和真假。",
                     )
                 )
             elif topic == "游戏/CS" and has_game:
@@ -1202,7 +1220,7 @@ class ParentReportService:
                         summary=game_detail_summary
                         or "今天游戏话题更像是孩子在分享兴趣；如果孩子回复变短，后续适合给换题选择。",
                         emotion_tone="有兴趣，但可能不想被继续盘问",
-                        parent_bridge="今晚可以轻轻接一句游戏里的创意规则，再给孩子换话题自由。",
+                        parent_bridge="如果孩子自己提起游戏，可以先把它当作普通兴趣听一句，不急着谈时长或输赢。",
                     )
                 )
             elif topic in {"图片分享", "看图交流"} and (
@@ -1211,10 +1229,10 @@ class ParentReportService:
                 overview.append(
                     ParentReportTopicOverview(
                         topic=topic,
-                        child_intent="把看到的东西交给小白狐一起看",
-                        summary="今天图片更像是孩子想分享看到的东西，家长可以先顺着孩子想看的点，而不是默认当成作业。",
+                        child_intent="通过图片表达或展示自己看到、做出的东西",
+                        summary="今天图片更像是孩子表达或展示的入口。家长可以给一个开放分享机会，不需要追问具体是哪张图。",
                         emotion_tone="好奇或想分享",
-                        parent_bridge="今晚可以问：“那张图你最想让我看哪里？”孩子不想说就换轻松话题。",
+                        parent_bridge="今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。",
                     )
                 )
             elif topic == "安全或隐私边界":
@@ -1267,10 +1285,7 @@ class ParentReportService:
         if not topics:
             return "今天没有足够会话素材，不做额外判断。"
         topic_text = "、".join(topics[:4])
-        base = (
-            f"今天主要聊了{topic_text}。"
-            f"今天共有 {child_turn_count} 条孩子消息和 {agent_turn_count} 条小白狐回复。"
-        )
+        base = f"今天有一些轻量互动，主要围绕{topic_text}。"
         if state_summary:
             base += f" {state_summary[0]}"
         return base
@@ -1460,7 +1475,7 @@ class ParentReportService:
                 )
         if conversation_topics and "图片分享" in conversation_topics:
             actions.append(
-                "如果孩子今天分享了图片，可以先问“你最想让我看哪里？”而不是直接判断这是题目或隐私。"
+                "孩子今天有通过图片表达或展示的倾向；家长可以顺着孩子愿意分享的部分看一眼，不需要追问具体是哪张图。"
             )
         if conversation_topics and "运动比赛/跑步" in conversation_topics:
             actions.append(
@@ -1510,18 +1525,16 @@ class ParentReportService:
             )
         if "图片分享" in topics or "看图交流" in topics:
             return (
-                "今晚可以轻轻问：“你今天那张图，最想让我看哪里？”"
-                "如果孩子不想说，就一起看一眼图片或换轻松话题，不追问。"
+                "今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”"
+                "如果孩子不想说，就不用追问。"
             )
         if "运动比赛/跑步" in topics:
             return (
-                "今晚可以轻轻问：“你今天说到跑步，最有意思的是哪一段？”"
-                "如果孩子不想说，就换成整理鞋子或喝水休息，不追问。"
+                "如果孩子自己提起跑步，可以先顺着他说一小句，不核对成绩和真假。"
             )
         if "游戏/CS" in topics:
             return (
-                "今晚可以轻轻说：“你今天说到游戏里的规则，听起来有点像在设计玩法。”"
-                "如果孩子不想接，就给他换个轻松话题，不追问时长或输赢。"
+                "如果孩子自己提起游戏，可以先把它当作普通兴趣听一句，不急着谈时长或输赢。"
             )
         if "学习求助" in topics:
             return (
@@ -1548,7 +1561,7 @@ class ParentReportService:
             return None
         if self._contains_any(
             safe,
-            ("backend", "provider", "config", "debug", "模型配置", "后端", "逐字聊天记录"),
+            ("backend", "provider", "config", "debug", "模型配置", "后端", "逐字聊天记录", "那张图", "给小白狐看的是什么", "条孩子消息", "条小白狐回复"),
         ):
             return None
         return safe[:260]
@@ -1594,10 +1607,8 @@ class ParentReportService:
             memories,
             relationship_memory_type=SHOW_AND_TELL_EVENT,
         )[:1]:
-            topic = memory_relationship_topic(memory) or "一个东西"
             actions.append(
-                f"孩子今天拿了一个{topic}给小白狐看；"
-                "家长今晚可以轻轻问一句\u201c今天给小白狐看的是什么呀\u201d，不做评价。"
+                "孩子今天有展示或分享的表达；家长可以轻轻问：\u201c今天有没有什么想让我也看看？\u201d不需要追问是不是给小白狐看过。"
             )
         for memory in relationship_memories(
             memories,

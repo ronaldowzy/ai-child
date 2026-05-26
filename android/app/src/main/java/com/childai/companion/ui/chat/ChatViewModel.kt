@@ -508,7 +508,7 @@ class ChatViewModel(
             renderAgentReply(response)
         }.onFailure {
             appendAgentMessage(
-                "题目已经识别到了，但还没有连上后端继续引导。请大人检查网络后再试。",
+                "题目已经看到了，但这次没有接稳。请大人稍后再试。",
             )
             _uiState.update {
                 it.copy(
@@ -518,7 +518,7 @@ class ChatViewModel(
                     agent = FoxAgentUiState(
                         mood = FoxMood.NetworkError,
                         motion = FoxMotion.NetworkError,
-                        statusText = "题目在这里，我们等后端恢复。",
+                        statusText = "题目已经看到了，我们等一下再试。",
                     ),
                     voice = it.voice.copy(
                         inputMode = VoiceInputMode.Idle,
@@ -964,12 +964,12 @@ class ChatViewModel(
     private fun followupFailureMessage(attachments: List<String>): String {
         val context = _uiState.value.pendingImageContext
         if (attachments.isEmpty() || context == null) {
-            return "小白狐现在没有连上后端。我们先停一下，请大人检查网络后再试。"
+            return "小白狐这边没有接稳。我们先停一下，请大人检查网络后再试。"
         }
         return if (context.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
-            "题目已经识别到了，但还没有连上后端继续引导。请大人检查网络后再试。"
+            "题目已经看到了，但这次没有接稳。请大人稍后再试。"
         } else {
-            "图片已经识别到了，但还没有连上后端继续聊。请大人检查网络后再试。"
+            "图片已经看到了，但这次没有接稳。请大人稍后再试。"
         }
     }
 

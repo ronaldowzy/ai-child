@@ -563,9 +563,9 @@ private fun ChatPanel(
 
 internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
 
-internal fun parentEntryTapHint(): String = "这是给家长看的，请让家长长按进入。"
+internal fun parentEntryTapHint(): String = "这里给大人用。请大人长按进入。"
 
-internal fun parentEntryDefaultHint(): String = "长按“大人”并输入家长账号密码，才能进入家长页面。"
+internal fun parentEntryDefaultHint(): String = "大人长按”大人”，输入家长账号密码后进入。"
 
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 

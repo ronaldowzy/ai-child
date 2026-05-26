@@ -427,15 +427,13 @@ class PromptManager:
         if image_context is None:
             return (
                 "当前没有图片上下文。不要假装看到了图片。"
-                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传，"
-                "不要说小白狐没有看图功能。"
+                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传。"
             )
         data = self._to_mapping(image_context)
         if not data:
             return (
-                "当前没有可用的图片上下文。不要假装看到了图片。"
-                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传，"
-                "不要说小白狐没有看图功能。"
+                "当前没有图片上下文。不要假装看到了图片。"
+                "如果孩子只是说想拍照给你看，请告诉孩子可以点“拍给小白狐看”上传。"
             )
 
         text = str(data.get("recognized_text") or data.get("text") or "").strip()
@@ -444,8 +442,8 @@ class PromptManager:
         recognized_type = str(data.get("recognized_type") or "unknown")
 
         lines = [
-            "孩子刚刚分享了一张图片。以下内容是后端图片理解的安全摘要，不是原始图片本身。",
-            "你已经拿到了后端图片理解结果，可以基于它自然回应；不要说你看不到图片、不能看图片或没有看图功能。",
+            "孩子刚刚分享了一张图片。以下内容是系统提供的安全图片摘要，不是原始图片本身。",
+            "你可以基于这段摘要自然回应；不要说你看不到图片、不能看图片或没有看图功能。",
             f"图片意图：{purpose}。",
             f"识别类型：{recognized_type}。",
         ]
@@ -453,8 +451,8 @@ class PromptManager:
             lines.append(f"图片描述：{text}")
         if child_caption:
             lines.append(f"孩子说明：{child_caption}")
-        lines.append("图片描述是内部安全摘要，不是原始图片。不要逐字复述给孩子，也不要展开成识别报告。")
-        lines.append("最多提及一个具体的、安全可见细节。不要编造图片中没有被描述的细节。")
+        lines.append("这段图片描述只用于帮助你回应，不要逐字复述给孩子，也不要写成识别报告。")
+        lines.append("最多提及一个具体、安全、被摘要支持的细节。不要编造摘要里没有的内容。")
         if recognized_type == "homework_problem":
             lines.append(
                 "如果孩子是在问图片里的题目，请先引导孩子复述题意或说出卡点；"
@@ -472,8 +470,7 @@ class PromptManager:
             )
         elif recognized_type == "privacy_sensitive":
             lines.append(
-                "如果图片可能包含隐私内容，不要描述私密细节。"
-                "可以请家长一起看一下。"
+                "如果图片可能包含隐私内容，不要描述私密细节。可以建议孩子请家长一起看一下。"
             )
         lines.append("如果孩子没有说这是作业题，请自然围绕图片继续聊，不要把它强行当成作业。")
         return "\n".join(lines)

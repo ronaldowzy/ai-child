@@ -40,7 +40,12 @@ CHILD_ID = "child_report_quality"
 TARGET_DATE = date(2026, 5, 26)
 
 # Internal words that must never appear in parent-facing report
-INTERNAL_WORDS = ("接一句", "桥接", "结构化摘要", "表达入口")
+INTERNAL_WORDS = (
+    "接一句", "桥接", "结构化摘要", "表达入口",
+    "后端", "给小白狐看的是什么", "那张图",
+    "条孩子消息", "条小白狐回复", "表达能力较好",
+    "image_context", "recognized_type", "prompt", "provider",
+)
 
 # Raw transcript fragments that should NOT be exposed
 RAW_TRANSCRIPT = ("比赛前有点紧张", "我跑得很快", "英语打卡好难")
@@ -496,3 +501,195 @@ def test_topic_boundaries_sourced_from_parent_policy() -> None:
     assert boundaries == ["不要追问比赛输赢", "不要聊恐怖故事"], (
         f"Should lookup from parent policy: {boundaries}"
     )
+
+
+# --- Test: image bridge does not contain "那张图" or Xiaobaihu follow-up ---
+
+
+def test_image_bridge_does_not_ask_about_xiaobaohu_image() -> None:
+    """Image topic parent_bridge should not ask about '那张图' or '给小白狐看的是什么'."""
+    conversation_messages = [
+        _make_conversation_message("child", "你看我画的画", attachments=1),
+        _make_conversation_message("agent", "画了什么呢？"),
+    ]
+
+    fallback, _ = _build_report(
+        memories=[],
+        conversation_messages=conversation_messages,
+    )
+
+    bridge = fallback.tonight_parent_bridge or ""
+    topic_overview = fallback.topic_overview or []
+
+    assert "那张图" not in bridge, f"Bridge contains '那张图': {bridge}"
+    assert "给小白狐看的是什么" not in bridge, f"Bridge asks about Xiaobaihu image: {bridge}"
+
+    for item in topic_overview:
+        item_bridge = item.parent_bridge or ""
+        assert "那张图" not in item_bridge, f"Topic bridge contains '那张图': {item_bridge}"
+        assert "给小白狐看的是什么" not in item_bridge, (
+            f"Topic bridge asks about Xiaobaihu image: {item_bridge}"
+        )
+
+
+# --- Test: image observations use open family invitation ---
+
+
+def test_image_observations_use_open_family_invitation() -> None:
+    """Image sharing expression observations should use open family wording."""
+    conversation_messages = [
+        _make_conversation_message("child", "你看这个", attachments=1),
+        _make_conversation_message("agent", "你最想让我看哪里？"),
+    ]
+
+    fallback, _ = _build_report(
+        memories=[],
+        conversation_messages=conversation_messages,
+    )
+
+    all_text = " ".join([
+        fallback.summary or "",
+        fallback.conversation_expression_observations if hasattr(fallback, 'conversation_expression_observations') else "",
+        " ".join(fallback.expression_observations or []),
+    ])
+
+    # Should mention open sharing, not Xiaobaihu-specific follow-up
+    assert "给小白狐" not in all_text or "不需要追问" in all_text, (
+        f"Should use open family invitation: {all_text}"
+    )
+
+
+# --- Test: conversation summary does not include message counts ---
+
+
+def test_conversation_summary_no_message_counts() -> None:
+    """_conversation_summary should not include exact message counts."""
+    service = ParentReportService(
+        memory_service=MemoryService(repository=InMemoryMemoryRepository()),
+        model_registry=None,
+        now_provider=lambda: FIXED_NOW,
+    )
+
+    summary = service._conversation_summary(
+        topics=["日常聊天"],
+        state_summary=[],
+        child_turn_count=5,
+        agent_turn_count=4,
+    )
+
+    assert "5 条" not in summary, f"Summary contains message count: {summary}"
+    assert "4 条" not in summary, f"Summary contains message count: {summary}"
+    assert "条孩子消息" not in summary, f"Summary contains '条孩子消息': {summary}"
+    assert "条小白狐回复" not in summary, f"Summary contains '条小白狐回复': {summary}"
+
+
+# --- Test: parent report system prompt is not monitoring ---
+
+
+def test_parent_report_prompt_says_not_monitoring() -> None:
+    """System prompt should say it is not a child-Xiaobaihu chat-monitoring record."""
+    service = ParentReportService(
+        memory_service=MemoryService(repository=InMemoryMemoryRepository()),
+        model_registry=None,
+        now_provider=lambda: FIXED_NOW,
+    )
+
+    prompt = service._parent_report_system_prompt()
+
+    assert "不是孩子和小白狐的聊天监控" in prompt, (
+        f"Prompt should say 'not monitoring': {prompt[:200]}"
+    )
+
+
+# --- Test: parent report prompt forbids snippet reconstruction ---
+
+
+def test_parent_report_prompt_forbids_snippet_reconstruction() -> None:
+    """System prompt should forbid reconstructing child utterances from snippets."""
+    service = ParentReportService(
+        memory_service=MemoryService(repository=InMemoryMemoryRepository()),
+        model_registry=None,
+        now_provider=lambda: FIXED_NOW,
+    )
+
+    prompt = service._parent_report_system_prompt()
+
+    assert "short_content_hint" in prompt, (
+        f"Prompt should mention short_content_hint: {prompt[:200]}"
+    )
+    assert "不得改写成" in prompt or "不得作为准原话" in prompt, (
+        f"Prompt should forbid snippet reconstruction: {prompt[:200]}"
+    )
+
+
+# --- Test: parent report prompt includes good/bad examples ---
+
+
+def test_parent_report_prompt_includes_examples() -> None:
+    """System prompt should include good and bad output examples."""
+    service = ParentReportService(
+        memory_service=MemoryService(repository=InMemoryMemoryRepository()),
+        model_registry=None,
+        now_provider=lambda: FIXED_NOW,
+    )
+
+    prompt = service._parent_report_system_prompt()
+
+    assert "好的输出示例" in prompt, f"Prompt should have good examples: {prompt[-300:]}"
+    assert "不好的输出示例" in prompt, f"Prompt should have bad examples: {prompt[-300:]}"
+
+
+# --- Test: parent actions are not all direct questions ---
+
+
+def test_parent_actions_are_not_all_questions() -> None:
+    """Suggested parent actions should not all be direct questions."""
+    conversation_messages = [
+        _make_conversation_message("child", "我今天跑步比赛了"),
+        _make_conversation_message("agent", "感觉怎么样？"),
+        _make_conversation_message("child", "还行吧"),
+        _make_conversation_message("agent", "画了什么呢？"),
+        _make_conversation_message("child", "画了一只猫"),
+    ]
+
+    fallback, _ = _build_report(
+        memories=[],
+        conversation_messages=conversation_messages,
+    )
+
+    actions = fallback.suggested_parent_actions or []
+    # Not all actions should start with "今晚可以问" or "今晚可以轻轻问"
+    question_actions = [
+        a for a in actions
+        if a.startswith("今晚可以问") or a.startswith("今晚可以轻轻问")
+    ]
+    assert len(question_actions) < len(actions), (
+        f"All actions are questions: {actions}"
+    )
+
+
+# --- Test: avoids teacher-style assessment ---
+
+
+def test_report_avoids_teacher_assessment_language() -> None:
+    """Report should avoid teacher-style assessment like '表达能力较好'."""
+    conversation_messages = [
+        _make_conversation_message("child", "我今天跑步比赛了，跑了很快"),
+        _make_conversation_message("agent", "跑步比赛感觉怎么样？"),
+        _make_conversation_message("child", "还行吧，有点累"),
+    ]
+
+    fallback, _ = _build_report(
+        memories=[],
+        conversation_messages=conversation_messages,
+    )
+
+    all_text = " ".join([
+        fallback.summary or "",
+        " ".join(fallback.expression_observations or []),
+        " ".join(fallback.suggested_parent_actions or []),
+    ])
+
+    assert "表达能力较好" not in all_text, f"Contains teacher assessment: {all_text}"
+    assert "整体能连续表达" not in all_text, f"Contains teacher assessment: {all_text}"
+    assert "能把一个主动话题延展开" not in all_text, f"Contains teacher assessment: {all_text}"

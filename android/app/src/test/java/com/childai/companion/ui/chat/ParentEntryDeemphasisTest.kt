@@ -18,8 +18,8 @@ class ParentEntryDeemphasisTest {
     fun normalTapOnlyShowsFamilyFriendlyHint() {
         val hint = parentEntryTapHint()
 
-        assertEquals("这是给家长看的，请让家长长按进入。", hint)
-        assertTrue(hint.contains("家长"))
+        assertEquals("这里给大人用。请大人长按进入。", hint)
+        assertTrue(hint.contains("大人"))
         assertTrue(hint.contains("长按"))
     }
 

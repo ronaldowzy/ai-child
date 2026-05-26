@@ -83,7 +83,7 @@ class InputBarVoiceFirstTest {
             ),
         )
         assertEquals(
-            "请大人检查后再说",
+            "请大人帮忙看看",
             inputBarPrimaryVoiceButtonText(
                 childInteractionPresentation(
                     voice = VoiceUiState(inputMode = VoiceInputMode.PermissionDenied),

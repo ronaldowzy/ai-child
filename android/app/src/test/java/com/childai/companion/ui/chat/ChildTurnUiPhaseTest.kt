@@ -61,7 +61,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.Speaking, presentation.phase)
-        assertEquals("小白狐正在说。", presentation.statusText)
+        assertEquals("我在说给你听。", presentation.statusText)
         assertTrue(presentation.showStopSpeaking)
         assertTrue(presentation.showMuteToggle)
         assertEquals(FoxMotion.Speaking, presentation.agent.motion)
@@ -74,7 +74,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.SpeakingPending, presentation.phase)
-        assertEquals("小白狐准备说。", presentation.statusText)
+        assertEquals("我马上说给你听。", presentation.statusText)
         assertTrue(presentation.showStopSpeaking)
         assertTrue(presentation.showMuteToggle)
         assertEquals("小白狐在说", presentation.primaryButtonText)

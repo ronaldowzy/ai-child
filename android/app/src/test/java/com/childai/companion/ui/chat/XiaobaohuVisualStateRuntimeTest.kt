@@ -339,6 +339,69 @@ class XiaobaohuVisualStateRuntimeTest {
         assertEquals(false, canInterrupt)
     }
 
+    // --- Additional: pending metadata carries minHoldMs for scheduled expiry ---
+
+    @Test
+    fun `pending state carries min hold metadata for scheduled expiry`() {
+        // Scenario: Thinking is displayed (500ms hold). Speaking arrives at 100ms.
+        // Speaking has higher precedence → interrupts immediately.
+        // No pending needed.
+        val thinking = XiaobaohuDisplayedVisualState(
+            mascotState = MascotState.Thinking,
+            displaySinceMs = 1000L,
+            minHoldMs = 500L,
+        )
+
+        // Thinking → Idle at 1200ms (hold active, Idle can't interrupt)
+        val withPending = XiaobaohuVisualStateRuntime.reduce(
+            current = thinking,
+            requested = MascotState.Idle,
+            requestedMinHoldMs = 0L,
+            nowMs = 1200L,
+        )
+        assertEquals(MascotState.Thinking, withPending.mascotState)
+        assertEquals(MascotState.Idle, withPending.pendingState)
+        assertEquals(0L, withPending.pendingMinHoldMs)
+
+        // Thinking → Listening at 1200ms (hold active, Listening can't interrupt Thinking)
+        val withPendingListening = XiaobaohuVisualStateRuntime.reduce(
+            current = thinking,
+            requested = MascotState.Listening,
+            requestedMinHoldMs = 0L,
+            nowMs = 1200L,
+        )
+        assertEquals(MascotState.Thinking, withPendingListening.mascotState)
+        assertEquals(MascotState.Listening, withPendingListening.pendingState)
+        assertEquals(0L, withPendingListening.pendingMinHoldMs)
+
+        // SafetyConcern → Idle at 200ms (hold active, 1500ms hold, Idle can't interrupt)
+        val safety = XiaobaohuDisplayedVisualState(
+            mascotState = MascotState.SafetyConcern,
+            displaySinceMs = 1000L,
+            minHoldMs = 1500L,
+        )
+        val safetyPending = XiaobaohuVisualStateRuntime.reduce(
+            current = safety,
+            requested = MascotState.Idle,
+            requestedMinHoldMs = 0L,
+            nowMs = 1200L,
+        )
+        assertEquals(MascotState.SafetyConcern, safetyPending.mascotState)
+        assertEquals(MascotState.Idle, safetyPending.pendingState)
+        assertEquals(0L, safetyPending.pendingMinHoldMs)
+
+        // Same state clears pending metadata
+        val sameState = XiaobaohuVisualStateRuntime.reduce(
+            current = withPending,
+            requested = MascotState.Thinking,
+            requestedMinHoldMs = 500L,
+            nowMs = 1300L,
+        )
+        assertEquals(MascotState.Thinking, sameState.mascotState)
+        assertNull(sameState.pendingState)
+        assertEquals(0L, sameState.pendingMinHoldMs)
+    }
+
     // --- Additional: homework focus holds ---
 
     @Test

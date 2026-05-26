@@ -19,6 +19,7 @@ data class XiaobaohuDisplayedVisualState(
     val displaySinceMs: Long,
     val minHoldMs: Long,
     val pendingState: MascotState? = null,
+    val pendingMinHoldMs: Long = 0L,
 )
 
 object XiaobaohuVisualStateRuntime {
@@ -72,11 +73,12 @@ object XiaobaohuVisualStateRuntime {
             )
         }
 
-        // Same state — keep, refresh hold metadata
+        // Same state — keep, refresh hold metadata, clear pending
         if (requested == current.mascotState) {
             return current.copy(
                 minHoldMs = requestedMinHoldMs,
                 pendingState = null,
+                pendingMinHoldMs = 0L,
             )
         }
 
@@ -101,8 +103,11 @@ object XiaobaohuVisualStateRuntime {
             )
         }
 
-        // Hold active, cannot interrupt — store as pending
-        return current.copy(pendingState = requested)
+        // Hold active, cannot interrupt — store as pending with its minHoldMs
+        return current.copy(
+            pendingState = requested,
+            pendingMinHoldMs = requestedMinHoldMs,
+        )
     }
 
     /**

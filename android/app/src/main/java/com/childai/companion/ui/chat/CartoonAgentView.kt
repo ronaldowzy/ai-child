@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -64,25 +66,71 @@ fun CartoonAgentView(
         }
     }
 
-    // Apply runtime transition throttle (debug override bypasses)
+    // Apply runtime transition throttle via LaunchedEffect.
+    // State is never mutated during composition — only read.
+    // LaunchedEffect handles initial state + hold-expiry scheduling.
     var displayedState by remember { mutableStateOf<XiaobaohuDisplayedVisualState?>(null) }
-    val baseMascotState = if (debugMascotState != null) {
-        debugMascotState
+
+    val nowMs = System.currentTimeMillis()
+    val requestedMascotStateForThrottle = resolvedVisualState?.mascotState
+    val requestedMinHoldMsForThrottle = resolvedVisualState?.minHoldMs ?: 0L
+
+    // Compute immediate reduce result for first-frame render (read-only, no mutation)
+    val immediateResult = if (debugMascotState == null && requestedMascotStateForThrottle != null) {
+        XiaobaohuVisualStateRuntime.reduce(
+            current = displayedState,
+            requested = requestedMascotStateForThrottle,
+            requestedMinHoldMs = requestedMinHoldMsForThrottle,
+            nowMs = nowMs,
+        )
     } else {
-        val resolved = resolvedVisualState
-        if (resolved != null) {
-            val nowMs = System.currentTimeMillis()
+        null
+    }
+
+    // Schedule state updates via side-effect, not during composition.
+    // Key changes when requested state changes → cancels old delay, starts fresh.
+    LaunchedEffect(
+        debugMascotState,
+        requestedMascotStateForThrottle,
+        requestedMinHoldMsForThrottle,
+        mascotController,
+    ) {
+        if (debugMascotState != null) {
+            // Debug override — bypass throttle
+            displayedState = null
+        } else if (requestedMascotStateForThrottle != null) {
             val next = XiaobaohuVisualStateRuntime.reduce(
                 current = displayedState,
-                requested = resolved.mascotState,
-                requestedMinHoldMs = resolved.minHoldMs,
+                requested = requestedMascotStateForThrottle,
+                requestedMinHoldMs = requestedMinHoldMsForThrottle,
                 nowMs = nowMs,
             )
             displayedState = next
-            next.mascotState
+
+            // If hold not expired, schedule delayed pending-state application
+            if (next.pendingState != null && next.pendingState != next.mascotState) {
+                val elapsed = nowMs - next.displaySinceMs
+                val remainingMs = (next.minHoldMs - elapsed).coerceAtLeast(1L)
+                delay(remainingMs)
+                displayedState = XiaobaohuVisualStateRuntime.reduce(
+                    current = displayedState,
+                    requested = next.pendingState,
+                    requestedMinHoldMs = next.pendingMinHoldMs,
+                    nowMs = System.currentTimeMillis(),
+                )
+            }
         } else {
-            mascotController.stateFor(agent)
+            displayedState = null
         }
+    }
+
+    val baseMascotState = if (debugMascotState != null) {
+        debugMascotState
+    } else {
+        // Read from displayedState (set by LaunchedEffect) or fall back to immediate result
+        displayedState?.mascotState
+            ?: immediateResult?.mascotState
+            ?: mascotController.stateFor(agent)
     }
     val requestedMascotState = if (completedShortState == baseMascotState) {
         MascotState.Idle

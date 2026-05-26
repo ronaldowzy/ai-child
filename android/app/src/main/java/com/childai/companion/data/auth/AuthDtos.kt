@@ -11,9 +11,13 @@ data class AuthAccount(
     val childDisplayName: String?,
     val childAge: Int?,
     val childGrade: String?,
+    val childGender: String?,
     val childCallPreference: String?,
     val childInterests: List<String>,
     val topicBoundaries: List<String>,
+    val childTemperament: List<String>,
+    val supportStylePreferences: List<String>,
+    val learningSupportPreferences: List<String>,
 ) {
     companion object {
         fun fromJson(json: JSONObject): AuthAccount {
@@ -29,9 +33,13 @@ data class AuthAccount(
                     null
                 },
                 childGrade = json.optNullableString("child_grade"),
+                childGender = json.optNullableString("child_gender"),
                 childCallPreference = json.optNullableString("child_call_preference"),
                 childInterests = json.optJSONArray("child_interests").toStringList(),
                 topicBoundaries = json.optJSONArray("topic_boundaries").toStringList(),
+                childTemperament = json.optJSONArray("child_temperament").toStringList(),
+                supportStylePreferences = json.optJSONArray("support_style_preferences").toStringList(),
+                learningSupportPreferences = json.optJSONArray("learning_support_preferences").toStringList(),
             )
         }
     }
@@ -63,9 +71,13 @@ data class AuthRegisterRequest(
     val childDisplayName: String = "",
     val childAge: Int? = null,
     val childGrade: String = "",
+    val childGender: String = "",
     val childCallPreference: String = "",
     val childInterests: List<String> = emptyList(),
     val topicBoundaries: List<String> = emptyList(),
+    val childTemperament: List<String> = emptyList(),
+    val supportStylePreferences: List<String> = emptyList(),
+    val learningSupportPreferences: List<String> = emptyList(),
 ) {
     fun toJsonString(): String {
         return JSONObject()
@@ -75,9 +87,13 @@ data class AuthRegisterRequest(
             .put("child_display_name", childDisplayName.ifBlank { JSONObject.NULL })
             .put("child_age", childAge ?: JSONObject.NULL)
             .put("child_grade", childGrade.ifBlank { JSONObject.NULL })
+            .put("child_gender", childGender.ifBlank { JSONObject.NULL })
             .put("child_call_preference", childCallPreference.ifBlank { JSONObject.NULL })
             .put("child_interests", JSONArray(childInterests))
             .put("topic_boundaries", JSONArray(topicBoundaries))
+            .put("child_temperament", JSONArray(childTemperament))
+            .put("support_style_preferences", JSONArray(supportStylePreferences))
+            .put("learning_support_preferences", JSONArray(learningSupportPreferences))
             .toString()
     }
 }

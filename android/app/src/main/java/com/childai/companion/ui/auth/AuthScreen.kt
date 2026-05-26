@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -23,12 +27,22 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
+
+private val genderOptions = listOf(
+    "" to "不填写",
+    "boy" to "男孩",
+    "girl" to "女孩",
+    "prefer_not_to_say" to "不填写",
+)
 
 @Composable
 fun AuthScreen(
@@ -44,12 +58,14 @@ fun AuthScreen(
         onChildNicknameChange = viewModel::updateChildNickname,
         onChildAgeChange = viewModel::updateChildAge,
         onChildGradeChange = viewModel::updateChildGrade,
+        onChildGenderChange = viewModel::updateChildGender,
         onChildInterestsChange = viewModel::updateChildInterests,
         onSubmit = viewModel::submit,
         modifier = modifier,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AuthScreenContent(
     uiState: AuthUiState,
@@ -59,6 +75,7 @@ private fun AuthScreenContent(
     onChildNicknameChange: (String) -> Unit,
     onChildAgeChange: (String) -> Unit,
     onChildGradeChange: (String) -> Unit,
+    onChildGenderChange: (String) -> Unit,
     onChildInterestsChange: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -135,6 +152,11 @@ private fun AuthScreenContent(
                         label = { Text("年级（可选）") },
                         enabled = !uiState.isSubmitting,
                     )
+                    GenderDropdown(
+                        selected = uiState.childGender,
+                        onSelect = onChildGenderChange,
+                        enabled = !uiState.isSubmitting,
+                    )
                     OutlinedTextField(
                         value = uiState.childInterestsText,
                         onValueChange = onChildInterestsChange,
@@ -197,6 +219,49 @@ private fun AuthScreenContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GenderDropdown(
+    selected: String,
+    onSelect: (String) -> Unit,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = genderOptions.firstOrNull { it.first == selected }?.second ?: "不填写"
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            readOnly = true,
+            singleLine = true,
+            label = { Text("性别（可选）") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            enabled = enabled,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            genderOptions.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onSelect(value)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
 @Preview(showBackground = true, widthDp = 420, heightDp = 720)
 @Composable
 private fun AuthScreenPreview() {
@@ -209,6 +274,7 @@ private fun AuthScreenPreview() {
             onChildNicknameChange = {},
             onChildAgeChange = {},
             onChildGradeChange = {},
+            onChildGenderChange = {},
             onChildInterestsChange = {},
             onSubmit = {},
         )
@@ -227,6 +293,7 @@ private fun AuthScreenLandscapePreview() {
             onChildNicknameChange = {},
             onChildAgeChange = {},
             onChildGradeChange = {},
+            onChildGenderChange = {},
             onChildInterestsChange = {},
             onSubmit = {},
         )

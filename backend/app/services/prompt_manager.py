@@ -240,6 +240,41 @@ class PromptManager:
             lines.append(f"- 规则摘要：{self._compact_value(data)}")
         return "\n".join(lines)
 
+    _TEMPERAMENT_LABELS = {
+        "warms_up_slowly": "慢热，需要一点时间",
+        "expressive": "爱表达，话比较多",
+        "concise": "说话短，需要小选择",
+        "imaginative": "爱想象/编故事",
+        "active": "喜欢运动和动手",
+        "sensitive_to_pressure": "不喜欢被追问或催促",
+        "easily_frustrated": "遇到困难容易急",
+        "curious": "爱问为什么",
+    }
+
+    _SUPPORT_STYLE_LABELS = {
+        "offer_two_choices": "多给二选一",
+        "ask_fewer_questions": "少追问",
+        "encourage_gently": "多温和鼓励",
+        "slow_down_explanations": "解释慢一点",
+        "use_shorter_sentences": "句子短一点",
+        "invite_show_and_tell": "多鼓励展示作品/物品",
+        "avoid_competition_framing": "少用输赢/排名框架",
+    }
+
+    _LEARNING_SUPPORT_LABELS = {
+        "hint_first": "先提示，不直接给答案",
+        "ask_what_child_knows": "先问孩子知道什么",
+        "use_examples": "用例子解释",
+        "keep_homework_short": "作业帮助要短",
+    }
+
+    _GENDER_LABELS = {
+        "boy": "男孩",
+        "girl": "女孩",
+        "prefer_not_to_say": "不填写",
+        "custom": "自定义称呼",
+    }
+
     def _render_child_profile(self, parent_policy: Any | None) -> str:
         data = self._to_mapping(parent_policy) if parent_policy is not None else {}
         raw_message = str(data.get("parent_message_raw") or "").strip()
@@ -253,11 +288,19 @@ class PromptManager:
         )
         child_age = self._compact_profile_scalar(preferences.get("child_age"))
         child_grade = self._compact_profile_scalar(preferences.get("child_grade"))
+        child_gender = self._compact_profile_scalar(preferences.get("child_gender"))
         call_preference = self._compact_profile_scalar(
             preferences.get("child_call_preference")
         )
         child_interests = self._profile_string_list(preferences.get("child_interests"))
         topic_boundaries = self._profile_string_list(preferences.get("topic_boundaries"))
+        temperament = self._profile_string_list(preferences.get("child_temperament"))
+        support_style = self._profile_string_list(
+            preferences.get("support_style_preferences")
+        )
+        learning_support = self._profile_string_list(
+            preferences.get("learning_support_preferences")
+        )
         age_policy = derive_age_band_reply_policy(parent_policy)
         age_lines = [
             "年龄与回复节奏是内部提示，不要直接说给孩子：",
@@ -274,6 +317,12 @@ class PromptManager:
             profile_lines.append(f"- child_age: {child_age}")
         if child_grade:
             profile_lines.append(f"- child_grade: {child_grade}")
+        if child_gender and child_gender not in ("unknown", "未设置"):
+            gender_label = self._GENDER_LABELS.get(child_gender, child_gender)
+            profile_lines.append(
+                f"- child_gender: {gender_label}。"
+                "只用于尊重称呼和措辞，不推断性格、能力、兴趣或偏好。"
+            )
         if call_preference:
             profile_lines.append(
                 "- child_call_preference: "
@@ -288,6 +337,30 @@ class PromptManager:
             profile_lines.append(
                 "- topic_boundaries: "
                 f"{'，'.join(topic_boundaries[:8])}。孩子不想聊时优先尊重，不拉回旧话题。"
+            )
+        if temperament:
+            labels = [self._TEMPERAMENT_LABELS.get(t, t) for t in temperament[:6]]
+            profile_lines.append(
+                "- child_temperament: "
+                f"{'，'.join(labels)}。"
+                "这些是家长提供的背景参考，不要给孩子贴标签或直接说出来。"
+            )
+        if support_style:
+            labels = [self._SUPPORT_STYLE_LABELS.get(s, s) for s in support_style[:5]]
+            profile_lines.append(
+                "- support_style_preferences: "
+                f"{'，'.join(labels)}。"
+                "在回复中自然体现这些支持方式，不要告诉孩子家长设置了这些偏好。"
+            )
+        if learning_support:
+            labels = [
+                self._LEARNING_SUPPORT_LABELS.get(s, s)
+                for s in learning_support[:4]
+            ]
+            profile_lines.append(
+                "- learning_support_preferences: "
+                f"{'，'.join(labels)}。"
+                "在学习帮助场景中自然体现这些方式。"
             )
 
         if not raw_message and not profile_lines:

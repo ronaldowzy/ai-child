@@ -20,9 +20,13 @@ class ParentPolicyRepository:
     _CHILD_PROFILE_PREFERENCE_KEYS = {
         "child_age",
         "child_grade",
+        "child_gender",
         "child_call_preference",
         "child_interests",
         "topic_boundaries",
+        "child_temperament",
+        "support_style_preferences",
+        "learning_support_preferences",
         "child_profile_schema",
     }
 
@@ -139,9 +143,28 @@ class ParentPolicyRepository:
             profile["topic_boundaries"] = self._string_list(
                 preferences.get("topic_boundaries")
             )
+
+        # New child profile fields (v0.2)
+        child_gender = self._optional_str(preferences.get("child_gender"))
+        if child_gender is not None:
+            profile["child_gender"] = child_gender
+
+        if "child_temperament" in preferences:
+            profile["child_temperament"] = self._string_list(
+                preferences.get("child_temperament")
+            )
+        if "support_style_preferences" in preferences:
+            profile["support_style_preferences"] = self._string_list(
+                preferences.get("support_style_preferences")
+            )
+        if "learning_support_preferences" in preferences:
+            profile["learning_support_preferences"] = self._string_list(
+                preferences.get("learning_support_preferences")
+            )
+
         if any(key in preferences for key in self._CHILD_PROFILE_PREFERENCE_KEYS):
             profile["child_profile_schema"] = str(
-                preferences.get("child_profile_schema") or "child_profile_v0_1"
+                preferences.get("child_profile_schema") or "child_profile_v0_2"
             )
         child.profile = profile
 
@@ -184,6 +207,10 @@ class ParentPolicyRepository:
             "child_call_preference",
             "child_interests",
             "topic_boundaries",
+            "child_gender",
+            "child_temperament",
+            "support_style_preferences",
+            "learning_support_preferences",
             "child_profile_schema",
         ):
             if key in profile:

@@ -251,11 +251,19 @@ class AuthService:
             child_display_name=policy.child_display_name,
             child_age=self._optional_int(preferences.get("child_age")),
             child_grade=self._optional_str(preferences.get("child_grade")),
+            child_gender=self._optional_str(preferences.get("child_gender")),
             child_call_preference=self._optional_str(
                 preferences.get("child_call_preference")
             ),
             child_interests=self._string_list(preferences.get("child_interests")),
             topic_boundaries=self._string_list(preferences.get("topic_boundaries")),
+            child_temperament=self._string_list(preferences.get("child_temperament")),
+            support_style_preferences=self._string_list(
+                preferences.get("support_style_preferences")
+            ),
+            learning_support_preferences=self._string_list(
+                preferences.get("learning_support_preferences")
+            ),
             last_login_at=account.last_login_at,
         )
 

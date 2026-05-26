@@ -100,6 +100,22 @@ class ParentPolicyViewModel(
         updateForm { it.copy(topicBoundariesText = value) }
     }
 
+    fun updateChildGender(value: String) {
+        updateForm { it.copy(childGender = value) }
+    }
+
+    fun updateChildTemperament(selected: List<String>) {
+        updateForm { it.copy(childTemperament = selected) }
+    }
+
+    fun updateSupportStylePreferences(selected: List<String>) {
+        updateForm { it.copy(supportStylePreferences = selected) }
+    }
+
+    fun updateLearningSupportPreferences(selected: List<String>) {
+        updateForm { it.copy(learningSupportPreferences = selected) }
+    }
+
     fun updateOfferChoices(value: Boolean) {
         updateForm { it.copy(offerChoices = value) }
     }
@@ -210,9 +226,13 @@ data class ParentPolicyFormState(
     val childDisplayName: String = "",
     val childAge: String = "",
     val childGrade: String = "",
+    val childGender: String = "",
     val childCallPreference: String = "",
     val childInterestsText: String = "",
     val topicBoundariesText: String = "",
+    val childTemperament: List<String> = emptyList(),
+    val supportStylePreferences: List<String> = emptyList(),
+    val learningSupportPreferences: List<String> = emptyList(),
     val parentMessageRaw: String = "",
     val goalsText: String = "鼓励孩子每天说一件学校小事\n学习问题先引导思路，不直接给答案",
     val offerChoices: Boolean = true,
@@ -241,12 +261,16 @@ data class ParentPolicyFormState(
             "ask_thinking_before_learning_answer" to askThinkingBeforeAnswer,
             "tone" to "warm_calm",
             "avoid_labels" to true,
-            "child_profile_schema" to "post_device_qa_v0_1",
+            "child_profile_schema" to "child_profile_v0_2",
             "child_age" to (age ?: ""),
             "child_grade" to childGrade.trim(),
+            "child_gender" to childGender.trim(),
             "child_call_preference" to childCallPreference.trim(),
             "child_interests" to childInterests(),
             "topic_boundaries" to topicBoundaries(),
+            "child_temperament" to childTemperament,
+            "support_style_preferences" to supportStylePreferences,
+            "learning_support_preferences" to learningSupportPreferences,
             "visible_schedule_deprecated_v0_1" to true,
         )
     }
@@ -278,6 +302,12 @@ data class ParentPolicyFormState(
             .ifEmpty { "未填写" }
         val ageText = childAge.trim().ifEmpty { "未填写" }
         val gradeText = childGrade.trim().ifEmpty { "未填写" }
+        val genderText = when (childGender.trim()) {
+            "boy" -> "男孩"
+            "girl" -> "女孩"
+            "prefer_not_to_say" -> "不填写"
+            else -> "未填写"
+        }
         val interests = childInterests()
         val interestsText = if (interests.isEmpty()) {
             "未填写"
@@ -288,6 +318,7 @@ data class ParentPolicyFormState(
             "称呼：$callName",
             "年龄：$ageText",
             "年级：$gradeText",
+            "性别：$genderText",
             "兴趣：$interestsText",
         )
     }
@@ -301,6 +332,7 @@ private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
         childDisplayName = childDisplayName.orEmpty(),
         childAge = communicationPreferences.stringValue("child_age"),
         childGrade = communicationPreferences.stringValue("child_grade"),
+        childGender = communicationPreferences.stringValue("child_gender"),
         childCallPreference = communicationPreferences.stringValue("child_call_preference"),
         childInterestsText = communicationPreferences.stringListValue(
             "child_interests",
@@ -308,6 +340,9 @@ private fun ParentPolicyResponse.toFormState(): ParentPolicyFormState {
         topicBoundariesText = communicationPreferences.stringListValue(
             "topic_boundaries",
         ).joinToString(separator = "\n"),
+        childTemperament = communicationPreferences.stringListValue("child_temperament"),
+        supportStylePreferences = communicationPreferences.stringListValue("support_style_preferences"),
+        learningSupportPreferences = communicationPreferences.stringListValue("learning_support_preferences"),
         parentMessageRaw = parentMessageRaw.orEmpty(),
         goalsText = goals.joinToString(separator = "\n"),
         offerChoices = communicationPreferences.booleanValue(

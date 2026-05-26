@@ -9,9 +9,13 @@ class ChildAccountProfileInput(BaseModel):
     child_display_name: str | None = Field(default=None, max_length=120)
     child_age: int | None = Field(default=None, ge=5, le=10)
     child_grade: str | None = Field(default=None, max_length=80)
+    child_gender: str | None = Field(default=None, max_length=40)
     child_call_preference: str | None = Field(default=None, max_length=120)
     child_interests: list[str] = Field(default_factory=list, max_length=12)
     topic_boundaries: list[str] = Field(default_factory=list, max_length=12)
+    child_temperament: list[str] = Field(default_factory=list, max_length=8)
+    support_style_preferences: list[str] = Field(default_factory=list, max_length=7)
+    learning_support_preferences: list[str] = Field(default_factory=list, max_length=4)
 
     @field_validator("child_interests", "topic_boundaries")
     @classmethod
@@ -53,9 +57,13 @@ class AuthAccountProfile(BaseModel):
     child_display_name: str | None = None
     child_age: int | None = None
     child_grade: str | None = None
+    child_gender: str | None = None
     child_call_preference: str | None = None
     child_interests: list[str] = Field(default_factory=list)
     topic_boundaries: list[str] = Field(default_factory=list)
+    child_temperament: list[str] = Field(default_factory=list)
+    support_style_preferences: list[str] = Field(default_factory=list)
+    learning_support_preferences: list[str] = Field(default_factory=list)
     last_login_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -103,9 +111,14 @@ def profile_preferences_from_input(
         preferences["child_age"] = profile.child_age
     if profile.child_grade is not None:
         preferences["child_grade"] = profile.child_grade.strip()
+    if profile.child_gender is not None:
+        preferences["child_gender"] = profile.child_gender.strip()
     if profile.child_call_preference is not None:
         preferences["child_call_preference"] = profile.child_call_preference.strip()
     preferences["child_interests"] = list(profile.child_interests)
     preferences["topic_boundaries"] = list(profile.topic_boundaries)
-    preferences["child_profile_schema"] = "task09_account_v0_1"
+    preferences["child_temperament"] = list(profile.child_temperament)
+    preferences["support_style_preferences"] = list(profile.support_style_preferences)
+    preferences["learning_support_preferences"] = list(profile.learning_support_preferences)
+    preferences["child_profile_schema"] = "child_profile_v0_2"
     return preferences

@@ -1055,7 +1055,7 @@ class ParentReportService:
         if attachment_count:
             topics.append("图片分享")
             expression_observations.append(
-                "孩子今天把图片作为表达入口；更像是在把看到的东西交给小白狐一起看，家长可以先问“你最想让我看哪里？”再判断是否需要进入学习帮助。"
+                '孩子今天更多是通过图片来表达自己；更像是想把看到的东西给小白狐一起看，家长可以先问「你最想让我看哪里？」再判断是否需要进入学习帮助。'
             )
         elif image_question_count:
             topics.append("看图交流")
@@ -1105,7 +1105,7 @@ class ParentReportService:
             )
             state_summary.append("孩子今天能持续表达自己的关注点，适合围绕他主动发起的话题轻轻延展。")
         if attachment_count:
-            state_summary.append("孩子今天明显在使用图片作为表达入口，不要默认当成作业或隐私问题。")
+            state_summary.append("孩子今天更多是通过图片来表达自己，不要默认当成作业或隐私问题。")
         if has_sports_topic:
             state_summary.append("孩子今天的主线更接近运动比赛和跑步体验，不应误判为学习求助。")
         if agent_turn_count and child_turn_count:
@@ -1200,7 +1200,7 @@ class ParentReportService:
                         topic=topic,
                         child_intent="分享游戏里的地图、规则或队友体验",
                         summary=game_detail_summary
-                        or "今天游戏话题更像兴趣表达入口；如果孩子回复变短，后续适合给换题选择。",
+                        or "今天游戏话题更像是孩子在分享兴趣；如果孩子回复变短，后续适合给换题选择。",
                         emotion_tone="有兴趣，但可能不想被继续盘问",
                         parent_bridge="今晚可以轻轻接一句游戏里的创意规则，再给孩子换话题自由。",
                     )
@@ -1212,7 +1212,7 @@ class ParentReportService:
                     ParentReportTopicOverview(
                         topic=topic,
                         child_intent="把看到的东西交给小白狐一起看",
-                        summary="今天图片更像是表达入口，家长可以先顺着孩子想看的点，而不是默认当成作业。",
+                        summary="今天图片更像是孩子想分享看到的东西，家长可以先顺着孩子想看的点，而不是默认当成作业。",
                         emotion_tone="好奇或想分享",
                         parent_bridge="今晚可以问：“那张图你最想让我看哪里？”孩子不想说就换轻松话题。",
                     )
@@ -1269,7 +1269,7 @@ class ParentReportService:
         topic_text = "、".join(topics[:4])
         base = (
             f"今天主要聊了{topic_text}。"
-            f"可用素材包含 {child_turn_count} 个孩子回合和 {agent_turn_count} 个小白狐回合的结构化摘要。"
+            f"今天共有 {child_turn_count} 条孩子消息和 {agent_turn_count} 条小白狐回复。"
         )
         if state_summary:
             base += f" {state_summary[0]}"

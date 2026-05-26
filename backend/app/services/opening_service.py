@@ -7,6 +7,7 @@ import time
 
 from app.core.logging import hash_identifier
 from app.core.config import get_settings
+from app.domain.memory import MemorySensitivity
 from app.domain.schemas.conversation import (
     ConversationMessageResponse,
     ConversationOpeningRequest,
@@ -431,9 +432,22 @@ class OpeningService:
         elif opening_policy.mode == OpeningMode.LOW_EXPRESSION_SUPPORT:
             text = f"{prefix}你可以只说一个词。说不完整也没关系。"
         elif opening_policy.mode == OpeningMode.BEDTIME_CLOSURE:
-            text = f"{prefix}晚上好。我们只说一小句，说完就休息。"
+            bedtime_mem = self._bedtime_memory_opening(
+                prefix=prefix, parent_policy=parent_policy, opening_policy=opening_policy,
+            )
+            text = bedtime_mem or f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再接着聊。"
         elif opening_policy.mode == OpeningMode.BEDTIME_DEFER_INTEREST and topic:
-            text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
+            bedtime_mem = self._bedtime_memory_opening(
+                prefix=prefix, parent_policy=parent_policy, opening_policy=opening_policy,
+            )
+            # If the seed topic itself is exciting, use generic bedtime fallback
+            topic_is_exciting = any(m in topic for m in self._BEDTIME_EXCITING_MARKERS)
+            if bedtime_mem:
+                text = bedtime_mem
+            elif topic_is_exciting:
+                text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再接着聊。"
+            else:
+                text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
             text = f"{prefix}这句话也可以告诉家长。小白狐先听你说一点点。"
         else:
@@ -445,13 +459,58 @@ class OpeningService:
         )
 
     def _memory_aware_opening_allowed(self, opening_policy: OpeningPolicy) -> bool:
-        """Memory callbacks are only safe for INTEREST_CALLBACK and DEFAULT_LIGHT."""
-        if opening_policy.bedtime or opening_policy.boundary_cooldown_active:
+        """Memory callbacks for INTEREST_CALLBACK and DEFAULT_LIGHT only.
+
+        Bedtime modes have their own low-stimulation path via _bedtime_memory_opening.
+        BOUNDARY_RESPECT / LOW_EXPRESSION_SUPPORT / PARENT_BRIDGE_LIGHT never use memory.
+        """
+        if opening_policy.boundary_cooldown_active:
             return False
         return opening_policy.mode in (
             OpeningMode.INTEREST_CALLBACK,
             OpeningMode.DEFAULT_LIGHT,
         )
+
+    # High-stimulation topics that must NOT be opened at bedtime.
+    _BEDTIME_EXCITING_MARKERS = (
+        "比赛", "输赢", "排名", "恐龙", "大战", "冒险",
+        "挑战", "任务", "奖励", "游戏", "cs", "反恐",
+    )
+
+    def _bedtime_memory_opening(
+        self,
+        *,
+        prefix: str,
+        parent_policy: ParentPolicy,
+        opening_policy: OpeningPolicy,
+    ) -> str | None:
+        """Bedtime-friendly memory touch: warm, short, low-stimulus, allows declining."""
+        child_id = parent_policy.child_id
+        if not child_id:
+            return None
+
+        # Try low-sensitivity memories only: interest seed, show-and-tell, unfinished thread.
+        for fetcher in (latest_interest_seed, latest_show_and_tell_event, latest_unfinished_thread):
+            mem = fetcher(self._memory_service, child_id=child_id)
+            if not mem:
+                continue
+            if mem.sensitivity != MemorySensitivity.LOW:
+                continue
+            safe_hook = self._safe_memory_hook(mem.content or "")
+            if not safe_hook:
+                continue
+            # Block high-stimulation topics at bedtime
+            if any(marker in safe_hook for marker in self._BEDTIME_EXCITING_MARKERS):
+                continue
+            text = (
+                f"{prefix}小白狐还记得你聊过{safe_hook}。"
+                "今晚可以只说一小点，不想说也没关系。"
+            )
+            sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
+            if sanitized:
+                return sanitized
+
+        return None
 
     def _memory_aware_opening(
         self,

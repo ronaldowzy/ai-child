@@ -400,9 +400,16 @@ def _memory_repo_with_all_types() -> MemoryService:
     return memory_service
 
 
-def test_bedtime_closure_ignores_memory() -> None:
-    """BEDTIME_CLOSURE must produce bedtime text, not a memory callback."""
-    memory_service = _memory_repo_with_all_types()
+def test_bedtime_closure_with_low_sensitivity_memory() -> None:
+    """BEDTIME_CLOSURE + low-sensitivity memory (e.g. drawing) should produce
+    a warm, low-stimulus memory-aware opening, not chase the child away."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+    repo.save(_make_memory(
+        "mem_calm", "孩子自然提到画画",
+        memory_type=MemoryType.INTEREST, relationship_type=INTEREST_SEED,
+    ))
+
     opening_policy = _make_opening_policy(
         mode=OpeningMode.BEDTIME_CLOSURE,
         seed_topic=None,
@@ -411,19 +418,28 @@ def test_bedtime_closure_ignores_memory() -> None:
 
     text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
 
-    # Must be bedtime text
+    # Should mention the calm topic
+    assert "画画" in text, f"Should mention low-sensitivity memory: {text}"
+    # Should be short, low-stimulus, allow declining
     assert any(
-        phrase in text for phrase in ("晚上好", "只说一小句", "说完就休息")
-    ), f"Should be bedtime opening: {text}"
-    # Must NOT contain memory callbacks
-    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
-    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
-    assert "跑步" not in text, f"Should not mention interest seed: {text}"
+        phrase in text for phrase in ("只说一小点", "不想说也没关系", "明天")
+    ), f"Should allow declining: {text}"
+    # Must NOT contain pressure/retention language
+    assert not any(
+        phrase in text for phrase in ("必须", "任务", "等你一天", "终于来了")
+    ), f"Should not contain pressure: {text}"
 
 
-def test_bedtime_defer_interest_ignores_memory() -> None:
-    """BEDTIME_DEFER_INTEREST must defer the topic, not pull in old memories."""
-    memory_service = _memory_repo_with_all_types()
+def test_bedtime_defer_interest_with_low_sensitivity_memory() -> None:
+    """BEDTIME_DEFER_INTEREST + low-sensitivity memory should produce
+    a warm memory-aware opening, not just a dry defer."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+    repo.save(_make_memory(
+        "mem_calm", "孩子自然提到画画",
+        memory_type=MemoryType.INTEREST, relationship_type=INTEREST_SEED,
+    ))
+
     opening_policy = _make_opening_policy(
         mode=OpeningMode.BEDTIME_DEFER_INTEREST,
         seed_topic="画画",
@@ -432,13 +448,64 @@ def test_bedtime_defer_interest_ignores_memory() -> None:
 
     text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
 
-    # Must defer the topic
+    # Should mention the calm topic
+    assert "画画" in text, f"Should mention low-sensitivity memory: {text}"
+    # Should allow declining
+    assert any(
+        phrase in text for phrase in ("只说一小点", "不想说也没关系", "明天")
+    ), f"Should allow declining: {text}"
+
+
+def test_bedtime_closure_blocks_exciting_memory() -> None:
+    """BEDTIME_CLOSURE must NOT open exciting topics like 比赛/恐龙/游戏.
+    Should fall back to a warm generic bedtime greeting."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+    repo.save(_make_memory(
+        "mem_exciting", "孩子自然提到跑步比赛",
+        memory_type=MemoryType.INTEREST, relationship_type=INTEREST_SEED,
+    ))
+
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.BEDTIME_CLOSURE,
+        seed_topic=None,
+        bedtime=True,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must NOT mention exciting topics
+    assert "比赛" not in text, f"Should not open exciting topic at bedtime: {text}"
+    assert "跑步" not in text, f"Should not open exciting topic at bedtime: {text}"
+    # Should be a warm bedtime greeting
+    assert any(
+        phrase in text for phrase in ("小白狐在这里", "慢慢说一小会儿", "明天")
+    ), f"Should be warm bedtime greeting: {text}"
+
+
+def test_bedtime_defer_interest_blocks_exciting_memory() -> None:
+    """BEDTIME_DEFER_INTEREST with exciting memory should fall back to defer template."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+    repo.save(_make_memory(
+        "mem_exciting", "孩子自然提到恐龙大战",
+        memory_type=MemoryType.INTEREST, relationship_type=INTEREST_SEED,
+    ))
+
+    opening_policy = _make_opening_policy(
+        mode=OpeningMode.BEDTIME_DEFER_INTEREST,
+        seed_topic="恐龙大战",
+        bedtime=True,
+    )
+
+    text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
+
+    # Must NOT mention exciting topics
+    assert "恐龙" not in text, f"Should not open exciting topic at bedtime: {text}"
+    # Should defer
     assert any(
         phrase in text for phrase in ("明天白天", "明天", "轻轻收个尾")
-    ), f"Should defer interest: {text}"
-    # Must NOT contain memory callbacks
-    assert "英语" not in text, f"Should not mention unfinished thread: {text}"
-    assert "小狐狸" not in text, f"Should not mention show-and-tell: {text}"
+    ), f"Should defer: {text}"
 
 
 def test_boundary_respect_ignores_memory() -> None:

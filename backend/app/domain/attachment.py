@@ -37,6 +37,14 @@ class RecognizedContent(BaseModel):
         "image_observation",
         "privacy_sensitive",
         "unsafe_unknown",
+        "child_drawing",
+        "art_feedback",
+        "toy",
+        "object",
+        "handmade",
+        "daily_life",
+        "unclear",
+        "low_confidence",
     ] = "image_observation"
     text: str | None = Field(default=None, max_length=2000)
     confidence: float = Field(..., ge=0.0, le=1.0)

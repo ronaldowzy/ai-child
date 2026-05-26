@@ -142,6 +142,9 @@ class ChatViewModel(
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
 
         val imageContext = _uiState.value.pendingImageContext
+        if (imageContext != null) {
+            _uiState.update { it.copy(pendingImageContext = null) }
+        }
         sendTextWithAttachments(
             trimmedText,
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
@@ -560,6 +563,7 @@ class ChatViewModel(
             sendText(action.label)
             return
         }
+        _uiState.update { it.copy(pendingImageContext = null) }
         val text = when (action.id) {
             "make_story" -> "请根据刚才那张图片编一个小故事。"
             "ask_what_is_this" -> "我想问刚才那张图片里这是什么。"

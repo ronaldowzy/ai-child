@@ -23,10 +23,8 @@ data class ParentPolicyResponse(
                 childDisplayName = root.optNullableString("child_display_name"),
                 parentMessageRaw = root.optNullableString("parent_message_raw"),
                 goals = root.optJSONArray("goals").toStringList(),
-                communicationPreferences = root.optJSONObject(
-                    "communication_preferences",
-                ).toMap(),
-                safetyRules = root.optJSONObject("safety_rules").toMap(),
+                communicationPreferences = parseNestedMap(root, "communication_preferences"),
+                safetyRules = parseNestedMap(root, "safety_rules"),
                 schedule = ParentSchedule.fromJson(root.getJSONObject("schedule")),
                 version = root.optInt("version", 1),
             )
@@ -192,10 +190,9 @@ private fun JSONObject?.toMap(): Map<String, Any> {
     if (this == null) return emptyMap()
 
     return buildMap {
-        val keys = keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            val value = get(key)
+        val keyList = keys().asSequence().toList()
+        for (key in keyList) {
+            val value = opt(key)
             if (value != null && value != JSONObject.NULL) {
                 put(key, valueToKotlin(value))
             }
@@ -234,6 +231,27 @@ private fun Any.toJsonValue(): Any {
         is Iterable<*> -> JSONArray(mapNotNull { item -> item?.toJsonValue() })
         else -> this
     }
+}
+
+/**
+ * Parse a nested JSON object by re-serializing and re-parsing.
+ * Works around an Android org.json bug where JSONObject.get(key) returns null
+ * even though toString() shows correct values.
+ */
+private fun parseNestedMap(root: JSONObject, key: String): Map<String, Any> {
+    if (!root.has(key)) return emptyMap()
+    val nestedJson = root.optJSONObject(key)
+    if (nestedJson == null) return emptyMap()
+    // Re-serialize and re-parse to work around get() returning null
+    val reparsed = JSONObject(nestedJson.toString())
+    val result = mutableMapOf<String, Any>()
+    for (k in reparsed.keys()) {
+        val value = reparsed.opt(k)
+        if (value != null && value != JSONObject.NULL) {
+            result[k] = valueToKotlin(value)
+        }
+    }
+    return result
 }
 
 private fun valueToKotlin(value: Any): Any {

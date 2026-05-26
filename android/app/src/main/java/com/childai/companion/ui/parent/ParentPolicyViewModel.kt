@@ -13,7 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import android.util.Log
 import kotlinx.coroutines.launch
+
+private const val TAG = "ParentPolicy"
 
 class ParentPolicyViewModel(
     private val repository: ParentPolicyRepository = ParentPolicyRepository(),
@@ -53,7 +56,8 @@ class ParentPolicyViewModel(
                         errorMessage = null,
                     )
                 }
-            }.onFailure {
+            }.onFailure { error ->
+                Log.e(TAG, "loadPolicy: failed childId=$childId", error)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -176,6 +180,9 @@ class ParentPolicyViewModel(
             schedule = schedule,
         )
 
+        Log.d(TAG, "savePolicy: request childAge=${form.childAge}, childGender=${form.childGender}, childGrade=${form.childGrade}")
+        Log.d(TAG, "savePolicy: request communicationPreferences=${request.communicationPreferences}")
+
         _uiState.update {
             it.copy(isSaving = true, errorMessage = null, statusMessage = null)
         }
@@ -186,7 +193,6 @@ class ParentPolicyViewModel(
                 loadedPolicy = policy
                 _uiState.update {
                     it.copy(
-                        form = policy.toFormState(),
                         isSaving = false,
                         statusMessage = "已保存，下一次对话会使用新的家长设置。",
                     )

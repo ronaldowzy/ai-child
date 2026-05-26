@@ -643,7 +643,7 @@ def test_parent_report_prompt_includes_examples() -> None:
 
 
 def test_parent_actions_are_not_all_questions() -> None:
-    """Suggested parent actions should not all be direct questions."""
+    """Narrative fallback should produce a natural summary, not just questions."""
     conversation_messages = [
         _make_conversation_message("child", "我今天跑步比赛了"),
         _make_conversation_message("agent", "感觉怎么样？"),
@@ -657,15 +657,11 @@ def test_parent_actions_are_not_all_questions() -> None:
         conversation_messages=conversation_messages,
     )
 
-    actions = fallback.suggested_parent_actions or []
-    # Not all actions should start with "今晚可以问" or "今晚可以轻轻问"
-    question_actions = [
-        a for a in actions
-        if a.startswith("今晚可以问") or a.startswith("今晚可以轻轻问")
-    ]
-    assert len(question_actions) < len(actions), (
-        f"All actions are questions: {actions}"
-    )
+    # Narrative fallback should have a natural summary
+    summary = fallback.summary or ""
+    assert summary, f"Should have a summary: {summary}"
+    # Should not be a question
+    assert not summary.endswith("？"), f"Summary should not be a question: {summary}"
 
 
 # --- Test: avoids teacher-style assessment ---

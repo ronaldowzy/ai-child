@@ -222,66 +222,88 @@ class ParentReportService:
         support_style: list[str] | None = None,
     ) -> ParentReport:
 
-        learning = self._observations_for(memories, {MemoryType.LEARNING_PATTERN})
-        expression = self._observations_for(
-            memories,
-            {MemoryType.EXPRESSION_PATTERN},
-        )
-        emotion = self._observations_for(memories, {MemoryType.EMOTION_OBSERVATION})
-        learning.extend(conversation["learning_observations"])
-        expression.extend(conversation["expression_observations"])
-        emotion.extend(conversation["emotion_observations"])
-        learning = self._dedupe_and_limit(learning, limit=5)
-        expression = self._dedupe_and_limit(expression, limit=5)
-        emotion = self._dedupe_and_limit(emotion, limit=5)
-
+        has_material = bool(memories or conversation_messages)
+        topics = conversation.get("topics", [])
         safety_memories = self._safety_memories(memories)
-        safety_alerts = self._safety_alerts(safety_memories)
-        safety_alerts.extend(conversation["safety_alerts"])
-        safety_alerts = self._dedupe_and_limit(safety_alerts, limit=5)
-        actions = self._suggested_actions(
-            memories=memories,
-            has_learning=bool(learning),
-            has_expression=bool(expression),
-            has_emotion=bool(emotion),
-            has_safety=bool(safety_alerts),
-            conversation_topics=conversation["topics"],
-            support_style=support_style,
-        )
+        has_safety = bool(safety_memories) or bool(conversation.get("safety_alerts"))
+
+        # Build a minimal, honest narrative summary
+        if not has_material:
+            narrative = "今天暂无可汇总的素材。建议保持轻量观察，不做额外判断。"
+        elif has_safety:
+            narrative = "今天的素材里包含需要家长关注的安全信号。建议先平静确认孩子是否遇到让他不舒服的情况，再做其他了解。"
+        else:
+            # Build a natural 2-3 sentence summary
+            parts: list[str] = []
+
+            # Mention main topics naturally
+            if topics:
+                topic_text = "、".join(topics[:3])
+                parts.append(f"今天孩子主要聊了{topic_text}")
+
+            # Mention show-and-tell if present
+            show_tell_memories = [
+                m for m in memories
+                if self._memory_relationship_type(m) == "show_and_tell_event"
+            ]
+            if show_tell_memories:
+                parts.append("展示了一样自己画或拿给小白狐看的东西")
+
+            # Mention unfinished thread if present
+            unfinished_memories = [
+                m for m in memories
+                if self._memory_relationship_type(m) == "unfinished_thread"
+            ]
+            if unfinished_memories:
+                parts.append("最后说要去打卡或做别的事")
+
+            if parts:
+                narrative = "，".join(parts) + "。"
+            else:
+                narrative = "今天有一些轻量交流，素材不多，只能做轻量总结。"
+
+        # Build tonight_parent_bridge
         tonight_parent_bridge = self._tonight_parent_bridge(
-            actions=actions,
-            topics=conversation["topics"],
-            has_material=bool(memories or conversation_messages),
-            has_safety=bool(safety_alerts),
+            actions=[],
+            topics=topics,
+            has_material=has_material,
+            has_safety=has_safety,
+        )
+
+        # Build avoid_followup
+        avoid_followup = self._avoid_followup(
+            topics=topics,
+            has_topic_change=any(
+                self._contains_any(
+                    text,
+                    ("换个话题", "聊点别的", "别聊这个", "不说了", "算了"),
+                )
+                for text in [
+                    msg.normalized_text or ""
+                    for msg in conversation_messages
+                    if msg.actor == "child"
+                ]
+            ),
+            has_sports_fatigue=any(
+                self._has_sports_fatigue_expression(msg.normalized_text or "")
+                for msg in conversation_messages
+                if msg.actor == "child"
+            ),
         )
 
         return ParentReport(
             child_id=child_id,
             date=target_date,
-            summary=self._summary(
-                memories=memories,
-                conversation_messages=conversation_messages,
-                conversation_topics=conversation["topics"],
-                conversation_state=conversation["state_summary"],
-                has_learning=bool(learning),
-                has_expression=bool(expression),
-                has_emotion=bool(emotion),
-                has_safety=bool(safety_alerts),
-            ),
-            topic_overview=conversation.get("topic_overview", []),
-            conversation_summary=conversation.get("conversation_summary", [None])[0]
-            if conversation.get("conversation_summary")
-            else None,
-            learning_observations=learning,
-            expression_observations=expression,
-            emotion_observations=emotion,
-            safety_alerts=safety_alerts,
-            suggested_parent_actions=actions,
+            summary=narrative,
+            topic_overview=[],
+            conversation_summary=None,
+            learning_observations=[],
+            expression_observations=[],
+            emotion_observations=[],
+            safety_alerts=list(conversation.get("safety_alerts", [])),
+            suggested_parent_actions=[],
             tonight_parent_bridge=tonight_parent_bridge,
-            avoid_followup=conversation.get(
-                "avoid_followup",
-                ["不要追问孩子今天在小白狐里聊了什么。"],
-            ),
+            avoid_followup=avoid_followup,
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -516,10 +538,10 @@ class ParentReportService:
 
     def _parent_report_system_prompt(self) -> str:
         return (
-            '你是"小白狐"项目的家长日报撰写器。\n'
+            '你是”小白狐”项目的家长日报撰写器。\n'
             '\n'
-            '你的读者是孩子的家长。家长想知道：孩子今天大概表达了哪些主题或状态，'
-            '家长今晚可以怎样自然接住，以及哪些问法最好避免。\n'
+            '你的读者是孩子的家长。家长想知道：孩子今天大概怎么样，'
+            '有没有什么值得留意的信号，今晚可以怎么自然地和孩子聊几句。\n'
             '\n'
             '家长日报不是孩子和小白狐的聊天监控。不要让家长像是在追问孩子与小白狐的私密互动细节。\n'
             '不要把日报写成使用统计、老师评语、心理诊断、行为评分或家长盘问清单。\n'
@@ -528,67 +550,38 @@ class ParentReportService:
             '不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。'
             '不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。'
             '不要把孩子贴成固定标签。\n'
-            'short_content_hint / conversation_snippets 只用于判断大概主题，不得改写成“孩子说了……”或作为准原话输出。\n'
+            'short_content_hint / conversation_snippets 只用于判断大概主题，不得改写成”孩子说了……”或作为准原话输出。\n'
             '\n'
-            '请使用自然、清楚、家长能看懂的中文。不要使用"接一句""桥接""结构化摘要""表达入口"这类内部产品词。'
+            '请使用自然、清楚、家长能看懂的中文。不要使用”接一句””桥接””结构化摘要””表达入口”这类内部产品词。'
             '不要写空泛套话。每个字段都要短而具体。\n'
             '\n'
             '你必须返回严格 JSON object，只包含以下字段：\n'
             '\n'
-            'summary:\n'
-            '  一句话总览今天的对话。必须让家长看懂今天主要发生了什么。\n'
-            '  示例：今天孩子主要聊了比赛紧张、图片里的物品，以及最后表示要去完成英语打卡。\n'
-            '\n'
-            'topic_overview:\n'
-            '  列表，每项包含 topic、child_intent、summary、emotion_tone、parent_bridge。\n'
-            '  topic 用家长看得懂的短标题，例如"比赛和紧张感""图片里的物品""英语打卡前结束对话"。\n'
-            '  child_intent 写孩子大概想做什么，例如"想分享一件让他紧张的比赛""想让小白狐看看图片里的东西"。\n'
-            '  summary 写清楚这个话题里孩子大概说了什么，不要泛化成"表达兴趣"。\n'
-            '  emotion_tone 只在有证据时写，例如"紧张""好奇""想结束对话"；不确定就写"未明显体现"。\n'
-            '  parent_bridge 写家长今晚可以自然说的一句话。必须像真人家长能说的话，不要写"接一句"。\n'
-            '\n'
-            'conversation_summary:\n'
-            '  2-4 句，按时间顺序概括今天聊了什么。不要写逐字原文，不要写技术词。不要写消息数量。\n'
-            '\n'
-            'learning_observations:\n'
-            '  只有出现真实学习/作业/题目线索时才写。否则返回空列表。\n'
-            '\n'
-            'expression_observations:\n'
-            '  只写具体观察。例如"孩子多次用短句回答，可能需要更具体的二选一问题"。不要写泛泛的"表达能力较好"。\n'
-            '\n'
-            'emotion_observations:\n'
-            '  只写有证据的情绪，例如紧张、困、想停、好奇。不要心理诊断。\n'
-            '\n'
-            'safety_alerts:\n'
-            '  只有出现安全/隐私/高风险线索时才写。没有就返回空列表。\n'
-            '\n'
-            'suggested_parent_actions:\n'
-            '  1-3 条，必须是家长今晚能做的小动作。每条要具体、低压力。\n'
-            '  优先用“如果孩子自己提起……”的句式，不要把每个话题都变成家长今晚必须问的问题。\n'
-            '  示例：可以在睡前轻轻说："你今天提到比赛有点紧张，明天要不要只准备一件最重要的小事？"\n'
+            'narrative_report:\n'
+            '  2-4 句自然段落，像一个了解孩子的人在给家长做简短、温暖、诚实的当日小结。\n'
+            '  不要分点列举，不要用”一、二、三”或”首先、其次”。\n'
+            '  不要写消息数量、不要写”小白狐发现”、不要写”那张图”或”给小白狐看的是什么”。\n'
+            '  如果素材很少，就明确说”今天素材不多，只能做轻量总结”，不要硬凑。\n'
+            '  示例：今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
             '\n'
             'tonight_parent_bridge:\n'
-            '  一句话，“今晚可以这样聊”。必须通顺自然，像真人家长能说的话。\n'
-            '  禁止写"今晚可以接一句""桥接""跟进一下表达状态"。\n'
+            '  一句话，”今晚可以这样聊”。必须通顺自然，像真人家长能说的话。\n'
+            '  禁止写”今晚可以接一句””桥接””跟进一下表达状态”。\n'
+            '  示例：今晚可以自然留个入口：”今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
             '\n'
             'avoid_followup:\n'
-            '  1-4 条，告诉家长今晚尽量别怎么问。\n'
+            '  1-3 条，告诉家长今晚尽量别怎么问。\n'
             '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；孩子说要去打卡时，不要继续拉回聊天。\n'
-            '\n'
-            '如果素材很少，就明确说"今天素材不多，只能做轻量总结"，不要硬凑观察。\n'
             '\n'
             '---\n'
             '好的输出示例：\n'
-            'summary: 今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。\n'
-            'conversation_summary: 孩子今天有用图片表达的倾向，也出现过想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
-            'tonight_parent_bridge: 今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
-            'avoid_followup: 不要追问孩子具体给小白狐看了哪张图；不要要求孩子复述和小白狐的聊天内容。\n'
+            '{“narrative_report”: “今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。”, “tonight_parent_bridge”: “今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。”, “avoid_followup”: [“不要追问孩子具体给小白狐看了哪张图”, “不要要求孩子复述和小白狐的聊天内容”]}\n'
             '\n'
             '不好的输出示例（禁止模仿）：\n'
-            '今天孩子和小白狐聊了三件事...\n'
-            '你今天给小白狐看的是什么？\n'
-            '小白狐发现孩子表达能力较好...\n'
-            '孩子今天共有 5 条消息...\n'
+            '{“narrative_report”: “今天孩子和小白狐聊了三件事...”}\n'
+            '{“narrative_report”: “你今天给小白狐看的是什么？”}\n'
+            '{“narrative_report”: “小白狐发现孩子表达能力较好...”}\n'
+            '{“narrative_report”: “孩子今天共有 5 条消息...”}\n'
         )
 
     def _parent_report_model_payload(
@@ -663,9 +656,7 @@ class ParentReportService:
                 for message in conversation_messages[:2]
             ],
             "report_schema": (
-                "Return strict JSON. Keys: summary, topic_overview, conversation_summary, "
-                "learning_observations, expression_observations, emotion_observations, "
-                "safety_alerts, suggested_parent_actions, tonight_parent_bridge, avoid_followup."
+                "Return strict JSON. Keys: narrative_report, tonight_parent_bridge, avoid_followup."
             ),
             "deterministic_fallback_hints": {
                 "topics": conversation["topics"],
@@ -744,6 +735,25 @@ class ParentReportService:
         if not isinstance(raw, dict):
             return None
 
+        # Support new narrative format
+        narrative = self._safe_text(str(raw.get("narrative_report") or ""))
+        if narrative:
+            return {
+                "summary": narrative[:500],
+                "topic_overview": [],
+                "conversation_summary": None,
+                "learning_observations": [],
+                "expression_observations": [],
+                "emotion_observations": [],
+                "safety_alerts": [],
+                "suggested_parent_actions": [],
+                "tonight_parent_bridge": self._safe_bridge_text(
+                    str(raw.get("tonight_parent_bridge") or ""),
+                ),
+                "avoid_followup": self._model_list(raw, "avoid_followup"),
+            }
+
+        # Fallback: support legacy format
         summary = self._safe_text(str(raw.get("summary") or ""))
         if not summary:
             return None

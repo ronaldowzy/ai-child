@@ -867,14 +867,21 @@ The Android app never stores model API keys. All model configuration belongs on 
 The backend now owns the official 小白狐 voice path. Android should not call
 MiMo directly and must not store any TTS API key.
 
+sherpa-onnx local TTS is **experimental / family-beta**. It requires real-device
+QA before being promoted. MiMo VoiceClone remains the default primary path.
+
 Current TTS strategy:
 
 ```text
 1. Primary: MiMo VoiceClone (cloud) — full emotion support via style_prompt.
-2. Fallback: sherpa-onnx ZipVoice (local) — zero-shot voice cloning, no emotion,
-   runs on CPU, no API key needed.
+2. Fallback: sherpa-onnx ZipVoice (local, experimental) — zero-shot voice cloning,
+   no emotion, runs on CPU, no API key needed. Requires TWO config flags:
+   CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true AND CHILD_AI_TTS_ENABLE_LOCAL_FALLBACK=true.
 3. Configuration errors (missing model files, disabled provider) propagate without fallback.
-4. Transient errors (network, provider timeout, data policy block) trigger fallback to sherpa-onnx.
+4. Transient errors (network, provider timeout, data policy block) trigger fallback
+   to sherpa-onnx ONLY when both flags above are set.
+5. Without TTS_ENABLE_LOCAL_FALLBACK=true, sherpa-onnx is available only as a
+   standalone primary (TTS_PROVIDER=sherpa_onnx), NOT as automatic fallback.
 ```
 
 sherpa-onnx TTS uses the same voice sample as MiMo VoiceClone for consistent
@@ -898,7 +905,8 @@ Configuration:
 
 ```bash
 CHILD_AI_TTS_PROVIDER=mimo              # or sherpa_onnx for local-only
-CHILD_AI_SHERPA_ONNX_TTS_ENABLED=false  # set true to enable fallback
+CHILD_AI_TTS_ENABLE_LOCAL_FALLBACK=false  # set true + sherpa_onnx_tts_enabled=true for auto fallback
+CHILD_AI_SHERPA_ONNX_TTS_ENABLED=false  # set true to enable sherpa-onnx (experimental)
 CHILD_AI_SHERPA_ONNX_TTS_MODEL_DIR=backend/models/tts/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia
 CHILD_AI_SHERPA_ONNX_TTS_VOCODER_PATH=backend/models/tts/vocos_24khz.onnx
 CHILD_AI_SHERPA_ONNX_TTS_NUM_THREADS=2

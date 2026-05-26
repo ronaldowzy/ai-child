@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     mimo_allow_image: bool = False
     mimo_retention_policy_checked: bool = False
     tts_provider: str = "mimo"
+    tts_fallback_provider: str = ""
+    tts_enable_local_fallback: bool = False
     conversation_tts_enabled: bool = False
     mimo_tts_enabled: bool = False
     mimo_tts_api_key: str = ""

@@ -139,6 +139,18 @@ No request_id/logcat/video -> NOT_RUN; do not guess or modify code.
 | QA-TTS-05 | Remote failure | Break media URL or disable TTS provider. | Child sees gentle text/failure state; no Android system TTS fallback or mixed system voice. |  | NOT_RUN |  |  |
 | QA-TTS-06 | Perceived latency breakdown | For one slow synthetic turn, record backend request_id and Android logcat around the turn. | Backend has model/TTS/stream timing; Android has `XiaobaohuTtsTiming` URL received/start/done/error lines with request_id or turn_id; evidence contains IDs and timings only. |  | NOT_RUN |  | Do not paste child text, full reply, raw audio, parent_message_raw, provider key, or complete signed audio URL. |
 
+## 6A. TTS provider fallback and experimental local TTS
+
+| ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |
+|---|---|---|---|---|---|---|---|
+| QA-TTS-FB-01 | MiMo VoiceClone baseline | `CHILD_AI_TTS_PROVIDER=mimo`, `SHERPA_ONNX_TTS_ENABLED=false`, `TTS_ENABLE_LOCAL_FALLBACK=false`. Send a normal turn. | MiMo VoiceClone generates audio; `provider=mimo` in response and cache metadata. |  | NOT_RUN |  | Primary path. Record request_id. |
+| QA-TTS-FB-02 | sherpa-onnx as primary | `CHILD_AI_TTS_PROVIDER=sherpa_onnx`. Send a normal turn. | sherpa-onnx generates audio locally; no API key needed; no network call to MiMo. |  | NOT_RUN |  | sherpa-onnx model files must exist locally. |
+| QA-TTS-FB-03 | Local fallback off by default | `TTS_PROVIDER=mimo`, `SHERPA_ONNX_TTS_ENABLED=true`, `TTS_ENABLE_LOCAL_FALLBACK=false`. Force MiMo timeout. | MiMo error propagates; NO automatic fallback to sherpa-onnx; child sees gentle TTS failure. |  | NOT_RUN |  | Config gate: `TTS_ENABLE_LOCAL_FALLBACK` must be explicit. |
+| QA-TTS-FB-04 | Local fallback on, transient error | `TTS_PROVIDER=mimo`, `SHERPA_ONNX_TTS_ENABLED=true`, `TTS_ENABLE_LOCAL_FALLBACK=true`. Force MiMo timeout. | Fallback to sherpa-onnx; audio plays; `provider=sherpa_onnx` in response; backend logs `tts_primary_failed_fallback`. |  | NOT_RUN |  | Record request_id and fallback log event. |
+| QA-TTS-FB-05 | Config error NOT masked | `TTS_PROVIDER=mimo`, `SHERPA_ONNX_TTS_ENABLED=true`, `TTS_ENABLE_LOCAL_FALLBACK=true`. Remove sherpa model files, force MiMo config error. | Config error raises; does NOT silently fall back to sherpa-onnx. |  | NOT_RUN |  | TtsProviderConfigurationError always propagates. |
+| QA-TTS-FB-06 | No system TTS mixing | Observe TTS playback across all fallback scenarios. | Android never plays system TextToSpeech; only backend-generated WAV from `/media/tts/...` is used. |  | NOT_RUN |  | System TTS is dev diagnostic only. |
+| QA-TTS-FB-07 | Opening TTS latency | Measure opening greeting TTS from request to audio playback. | Opening TTS completes within `OPENING_TTS_SOFT_TIMEOUT_MS` (default 15s); cache hit should be near-instant. |  | NOT_RUN |  | Record backend `tts_call_finished` elapsed_ms. |
+
 ## 7. Xiaobaihu state coverage
 
 | ID | Scenario | Steps | Expected result | Actual result | Status | Evidence | Notes |

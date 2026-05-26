@@ -44,13 +44,13 @@ PD-037：儿童聊天页打开后，小白狐请求 opening greeting；称呼优
 ```text
 1. 语音输入 v1：Android 点击录音后上传短音频到后端 ASR，后端优先调用本地 sherpa-onnx + SenseVoice-Small int8；本地异常时再走配置的原有识别方式。
 2. 儿童默认不展示可编辑识别文本，ASR ok 且 transcript 非空后自动发送 conversation stream；确认面板只作为 DevSettings / 父亲调试模式。
-3. TTS 朗读 v1：后端主路径使用 MiMo VoiceClone 生成 `audio_url`；MiMo 异常时自动 fallback 到本地 sherpa-onnx ZipVoice 生成；Android 优先播放 `audio_url`。
+3. TTS 朗读 v1：后端主路径使用 MiMo VoiceClone 生成 `audio_url`；显式开启 `tts_enable_local_fallback` 后，MiMo 异常时才 fallback 到本地 sherpa-onnx ZipVoice 生成；Android 优先播放 `audio_url`。
 4. `audio_url` 不可用或播放失败时，Android 保留文字和温和提示，不用系统 TextToSpeech 顶替儿童端自动朗读；系统 TTS 不再作为正式小白狐音色方案。
 5. 后端 ASR endpoint 可以接收一次性短音频做转写，但原始音频不入长期库、不进日志、不进入 memory；语音输入正式进入对话的仍是自动发送后的文本。
 6. Hands-free conversational mode 是 future，不进入 v1。
 7. 本地 ASR 方案见 `docs/LOCAL_ASR_SENSEVOICE_DESIGN_V0_1.md`；MiMo ASR / audio input 仍作为 fallback 和对照测试路径，结论见 `docs/ASR_INPUT_RESEARCH_V0_1.md` 和 `docs/MIMO_ASR_INTEGRATION_DESIGN_V0_1.md`；真实儿童音频外发必须由父亲授权和 ASR policy flags 控制。
 8. 语音输出下一步转向文本流式和 TTS 分句/分段播放，不能继续依赖增加同步 read timeout。
-9. 本地 TTS fallback 方案使用 sherpa-onnx ZipVoice zero-shot 声音克隆，无需 API key 和网络，MiMo 异常时自动切换；详见本文档 5.1 节。
+9. 本地 TTS fallback 方案使用 sherpa-onnx ZipVoice zero-shot 声音克隆，无需 API key 和网络；显式开启 `tts_enable_local_fallback` 后，MiMo 异常时自动切换；详见本文档 5.1 节。sherpa-onnx 为 experimental / family-beta 能力，需 real-device QA 验收。
 ```
 
 ---
@@ -220,7 +220,7 @@ ChildChatScreen 首次可见
 16. Redmi K60 真机已听到 MiMo 小白狐音频，但同步等待时间仍长；下一阶段不能继续靠提高 read timeout，需进入文本流式、TTS 分句/分段播放、预生成缓存或更快正式音色链路设计。
 17. Task 07 已增加 TTS latency observability：非 stream `/conversation/message` 日志记录 `conversation_turn_latency`，包含 `request_id`、`request_start`、`model_ms`、`tts_ms`、`audio_url_present`、`turn_total_ms`；stream 日志记录 `conversation_stream_finished`，包含 `request_start`、`first_text_ms`、`tts_started_ms`、`first_audio_ms`、`turn_total_ms`。Android logcat 使用 `XiaobaohuTtsTiming` 记录 remote audio URL received / playback started / done / error，包含 request_id、turn_id、segment_index、elapsed_ms，不显示给儿童。
 18. 2026-05-25 backend-only 日志复盘：`conversation_stream_finished` 出现 `tts_segment_failed`，但随后 `tts_call_finished` 在 0.7-3.9 秒后成功，说明旧 8 秒 soft timeout 会制造无声 turn。本次只把 formal VoiceClone 等待窗口校准到 15 秒；Android 播放启动和真机听感仍需 Redmi K60 / Honor Pad 5 logcat + 视频复验。
-19. 2026-05-25 新增 sherpa-onnx ZipVoice 本地 TTS 作为 MiMo VoiceClone 的 fallback。本地 TTS 使用同一份小白狐 voice sample 做 zero-shot 声音克隆，无需 API key，无需网络，无需 data policy flags。MiMo 主路径异常（网络超时、provider 错误、data policy 拦截）时自动切换到本地生成；配置错误（模型文件缺失、provider 未启用）不触发 fallback，直接报错。本地 TTS 不支持 emotion 控制，生成音色与 MiMo VoiceClone 接近但语调更平。
+19. 2026-05-25 新增 sherpa-onnx ZipVoice 本地 TTS 作为 MiMo VoiceClone 的 experimental / family-beta fallback。本地 TTS 使用同一份小白狐 voice sample 做 zero-shot 声音克隆，无需 API key，无需网络，无需 data policy flags。显式开启 `tts_enable_local_fallback=true` 后，MiMo 主路径异常（网络超时、provider 错误、data policy 拦截）时才 fallback 到本地生成；配置错误（模型文件缺失、provider 未启用）不触发 fallback，直接报错。仅开启 `sherpa_onnx_tts_enabled` 而不开 `tts_enable_local_fallback` 时，sherpa-onnx 仅可用于作为 `tts_provider=sherpa_onnx` 主路径，不作为自动 fallback。本地 TTS 不支持 emotion 控制，生成音色与 MiMo VoiceClone 接近但语调更平。
 ```
 
 ### 5.1 Local TTS Fallback Strategy
@@ -234,10 +234,11 @@ Fallback：sherpa-onnx ZipVoice（本地，不支持 emotion）
 选择逻辑：
 
 ```text
-1. CHILD_AI_TTS_PROVIDER=mimo 且 CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true：
+1. CHILD_AI_TTS_PROVIDER=mimo 且 CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true 且 CHILD_AI_TTS_ENABLE_LOCAL_FALLBACK=true：
    MiMo 为主，异常时 fallback 到 sherpa-onnx。
+   注意：仅 CHILD_AI_SHERPA_ONNX_TTS_ENABLED=true 不够，还必须显式开启 CHILD_AI_TTS_ENABLE_LOCAL_FALLBACK=true。
 2. CHILD_AI_TTS_PROVIDER=sherpa_onnx：
-   直接使用本地 TTS，不尝试 MiMo。
+   直接使用本地 TTS，不尝试 MiMo。sherpa-onnx 作为主路径时无需开启 local fallback 开关。
 3. CHILD_AI_TTS_PROVIDER=mock：
    测试用，生成静音 WAV。
 ```

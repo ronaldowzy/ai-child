@@ -350,8 +350,9 @@ class TtsService:
     ):
         from app.providers.tts.base import TtsProviderConfigurationError
 
-        sherpa_available = (
-            self._settings.sherpa_onnx_tts_enabled
+        local_fallback_enabled = (
+            self._settings.tts_enable_local_fallback
+            and self._settings.sherpa_onnx_tts_enabled
             and provider != TtsProviderName.SHERPA_ONNX
         )
         try:
@@ -364,7 +365,7 @@ class TtsService:
         except TtsProviderConfigurationError:
             raise
         except (TtsProviderError, TtsDataPolicyBlockedError) as exc:
-            if not sherpa_available:
+            if not local_fallback_enabled:
                 raise
             logging.getLogger("app.tts_timing").warning(
                 "tts_primary_failed_fallback",

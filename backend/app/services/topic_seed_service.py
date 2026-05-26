@@ -2,6 +2,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,27 @@ CHOICE_FILTER_MARKER_GROUPS = (
     ("跑步", "运动", "比赛"),
     ("画画", "画", "手工", "积木"),
     ("恐龙", "太空", "星球", "动物", "昆虫", "植物"),
+)
+
+# --- Boundary semantics v2 ---
+
+
+class BoundaryCategory(str, Enum):
+    AVOID_TOPIC = "avoid_topic"
+    AVOID_FOLLOWUP = "avoid_followup"
+    AVOID_FRAMING = "avoid_framing"
+    UNKNOWN = "unknown"
+
+
+_FOLLOWUP_MARKERS = ("不要追问", "少追问", "别问", "不要问", "别追问")
+_FRAMING_MARKERS = ("输赢", "赢", "输", "排名", "第几", "成绩", "分数", "表现")
+_TOPIC_BAN_MARKERS = ("不要聊", "不想聊", "别聊", "不聊", "禁止聊")
+
+# Forbidden framing words that should not appear in labels when boundary is avoid_framing
+_FORBIDDEN_FRAMING_WORDS = (
+    "输赢", "谁赢", "谁输", "赢了吗", "输了", "赢了",
+    "排名", "第几", "成绩", "分数", "表现好坏",
+    "输了赢了", "赢了输了",
 )
 
 
@@ -259,10 +281,42 @@ class TopicSeedService:
         ):
             return False
         for boundary in boundaries:
-            boundary_markers = self._choice_marker_set(boundary)
-            if boundary_markers and label_markers & boundary_markers:
+            if not self._boundary_allows_label(label, boundary):
                 return False
         return True
+
+    def _boundary_allows_label(self, label: str, boundary: str) -> bool:
+        category = self._classify_boundary(boundary)
+        label_markers = self._choice_marker_set(label)
+        boundary_markers = self._choice_marker_set(boundary)
+
+        if category == BoundaryCategory.AVOID_TOPIC:
+            # Hard filter: reject if markers overlap
+            return not (boundary_markers and label_markers & boundary_markers)
+
+        if category == BoundaryCategory.AVOID_FOLLOWUP:
+            # Allow the topic, but filter labels that追问 the specific angle
+            # If boundary markers don't overlap with label, always allow
+            if not boundary_markers or not (label_markers & boundary_markers):
+                return True
+            # Markers overlap — allow if label doesn't contain追问 framing
+            label_lower = label.lower()
+            return not any(
+                marker in label_lower for marker in ("追问", "问问", "深挖", "继续问")
+            )
+
+        if category == BoundaryCategory.AVOID_FRAMING:
+            # Allow the topic, but filter labels with forbidden framing
+            if not boundary_markers or not (label_markers & boundary_markers):
+                return True
+            # Markers overlap — allow if label avoids forbidden framing words
+            label_lower = label.lower()
+            return not any(
+                fw in label_lower for fw in _FORBIDDEN_FRAMING_WORDS
+            )
+
+        # Unknown: safe fallback, filter if markers overlap
+        return not (boundary_markers and label_markers & boundary_markers)
 
     def _choice_marker_set(self, text: str) -> set[str]:
         compact = text.lower().replace(" ", "")
@@ -273,3 +327,34 @@ class TopicSeedService:
             if any(marker in compact for marker in group):
                 markers.update(group)
         return markers
+
+    def classify_boundary(self, boundary: str) -> BoundaryCategory:
+        return self._classify_boundary(boundary)
+
+    def _classify_boundary(self, boundary: str) -> BoundaryCategory:
+        compact = boundary.lower().replace(" ", "")
+
+        # Check for topic ban first (strongest signal)
+        if any(marker in compact for marker in _TOPIC_BAN_MARKERS):
+            return BoundaryCategory.AVOID_TOPIC
+
+        # Check for framing avoidance
+        has_framing = any(marker in compact for marker in _FRAMING_MARKERS)
+        # Check for followup avoidance
+        has_followup = any(marker in compact for marker in _FOLLOWUP_MARKERS)
+
+        if has_framing and has_followup:
+            # Check if the boundary is specifically about a hard metric framing
+            # (排名, 成绩, 分数, 表现, 第几) → avoid_framing
+            # vs soft framing (输赢, 赢, 输) → avoid_followup
+            hard_metric_markers = ("排名", "成绩", "分数", "表现", "第几")
+            if any(marker in compact for marker in hard_metric_markers):
+                return BoundaryCategory.AVOID_FRAMING
+            # "不要追问比赛输赢" → avoid_followup (allow topic, don't追问)
+            return BoundaryCategory.AVOID_FOLLOWUP
+        if has_framing:
+            return BoundaryCategory.AVOID_FRAMING
+        if has_followup:
+            return BoundaryCategory.AVOID_FOLLOWUP
+
+        return BoundaryCategory.UNKNOWN

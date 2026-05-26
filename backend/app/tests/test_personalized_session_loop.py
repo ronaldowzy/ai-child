@@ -314,8 +314,9 @@ def test_opening_does_not_use_gender_to_infer() -> None:
 def test_topic_choices_prioritize_interests_filter_boundaries_limit_two() -> None:
     """Topic choices must: prefer interests, filter boundaries, max 2 with offer_two_choices.
 
-    Note: "不要追问比赛输赢" boundary shares the "比赛" marker group with "跑步比赛",
-    so "聊跑步比赛" is correctly filtered. "聊画画" should still appear.
+    With boundary semantics v2: "不要追问比赛输赢" is avoid_followup, so
+    "聊跑步比赛" is allowed (safe topic), but labels with forbidden framing
+    (输赢/排名/结果) are filtered.
     """
     service = TopicSeedService(today_provider=lambda: date(2026, 5, 26))
 
@@ -324,20 +325,21 @@ def test_topic_choices_prioritize_interests_filter_boundaries_limit_two() -> Non
         limit=3,
     )
 
-    # Must include drawing interest (not filtered by boundary)
-    assert "聊画画" in labels or any("画画" in lbl for lbl in labels), (
+    # Must include interests
+    assert any("画画" in lbl for lbl in labels), (
         f"Should include drawing interest: {labels}"
     )
-
-    # Must NOT include boundary-related topics
-    for label in labels:
-        assert "追问比赛输赢" not in label, (
-            f"Topic choice contains boundary: {label}"
-        )
-    # "聊跑步比赛" is filtered because boundary "不要追问比赛输赢" shares "比赛" marker
-    assert all("跑步比赛" not in lbl for lbl in labels), (
-        f"Running race should be filtered by boundary: {labels}"
+    # 跑步比赛 should be allowed (avoid_followup allows safe topic)
+    assert any("跑步比赛" in lbl for lbl in labels), (
+        f"Should include safe 跑步比赛 label: {labels}"
     )
+
+    # Must NOT include forbidden framing
+    for label in labels:
+        for fw in ("输赢", "谁赢", "谁输", "赢了吗", "排名"):
+            assert fw not in label, (
+                f"Label '{label}' contains forbidden framing '{fw}'"
+            )
 
     # offer_two_choices must limit to 2
     assert len(labels) <= 2, (
@@ -346,7 +348,7 @@ def test_topic_choices_prioritize_interests_filter_boundaries_limit_two() -> Non
 
 
 def test_topic_boundary_filtered_from_suggestions() -> None:
-    """Topic boundaries must be filtered from suggestions."""
+    """Topic boundaries must filter forbidden framing, not the safe topic."""
     service = TopicSeedService(today_provider=lambda: date(2026, 5, 26))
 
     labels = service.topic_choice_labels(
@@ -361,9 +363,14 @@ def test_topic_boundary_filtered_from_suggestions() -> None:
         limit=3,
     )
 
-    # Boundary must not appear
+    # Safe topic should be allowed
+    assert any("跑步比赛" in lbl for lbl in labels), (
+        f"Safe 跑步比赛 should be allowed: {labels}"
+    )
+    # Forbidden framing must not appear
     for label in labels:
-        assert "追问" not in label, f"Boundary leaked into topic choice: {label}"
+        for fw in ("输赢", "谁赢", "谁输", "排名"):
+            assert fw not in label, f"Forbidden framing '{fw}' in label: {label}"
 
 
 def test_ask_fewer_questions_not_all_questions() -> None:

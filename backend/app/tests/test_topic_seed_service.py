@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.topic_seed_service import TopicSeedService
+from app.services.topic_seed_service import BoundaryCategory, TopicSeedService
 
 
 def test_topic_seed_pack_returns_age_aware_safe_labels() -> None:
@@ -155,6 +155,117 @@ def test_topic_choice_labels_offer_two_choices_with_boundaries() -> None:
 
     assert len(labels) == 2
     assert "聊恐龙" not in labels
+
+
+# --- Boundary semantics v2 tests ---
+
+
+def test_classify_boundary_avoid_followup() -> None:
+    """'不要追问比赛输赢' should be classified as avoid_followup."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    assert service.classify_boundary("不要追问比赛输赢") == BoundaryCategory.AVOID_FOLLOWUP
+    assert service.classify_boundary("少追问比赛") == BoundaryCategory.AVOID_FOLLOWUP
+    assert service.classify_boundary("别问这个") == BoundaryCategory.AVOID_FOLLOWUP
+
+
+def test_classify_boundary_avoid_topic() -> None:
+    """'不要聊游戏' should be classified as avoid_topic."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    assert service.classify_boundary("不要聊游戏") == BoundaryCategory.AVOID_TOPIC
+    assert service.classify_boundary("不想聊这个") == BoundaryCategory.AVOID_TOPIC
+    assert service.classify_boundary("别聊政治") == BoundaryCategory.AVOID_TOPIC
+
+
+def test_classify_boundary_avoid_framing() -> None:
+    """'不要问排名' should be classified as avoid_framing."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    assert service.classify_boundary("不要问排名") == BoundaryCategory.AVOID_FRAMING
+    assert service.classify_boundary("别提成绩") == BoundaryCategory.AVOID_FRAMING
+
+
+def test_classify_boundary_unknown() -> None:
+    """Boundary without known markers should be unknown."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    assert service.classify_boundary("随便什么") == BoundaryCategory.UNKNOWN
+
+
+def test_boundary_nuance_avoid_followup_allows_safe_topic() -> None:
+    """'不要追问比赛输赢' should allow '聊跑步比赛' but not '聊比赛输赢'."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 7,
+                "child_interests": ["跑步比赛", "画画"],
+                "topic_boundaries": ["不要追问比赛输赢"],
+            }
+        },
+        limit=3,
+    )
+
+    # 聊跑步比赛 should be allowed (safe topic)
+    assert any("跑步比赛" in lbl for lbl in labels), (
+        f"Should include safe 跑步比赛 label: {labels}"
+    )
+    # 聊画画 should be allowed
+    assert any("画画" in lbl for lbl in labels), (
+        f"Should include 画画 label: {labels}"
+    )
+    # No label should contain forbidden framing
+    for label in labels:
+        for fw in ("输赢", "谁赢", "谁输", "赢了吗", "输了", "赢了"):
+            assert fw not in label, (
+                f"Label '{label}' contains forbidden framing '{fw}'"
+            )
+
+
+def test_boundary_nuance_avoid_topic_hard_filter() -> None:
+    """'不要聊游戏' should filter out all 游戏-related topics."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 7,
+                "child_interests": ["游戏", "画画"],
+                "topic_boundaries": ["不要聊游戏"],
+            }
+        },
+        limit=3,
+    )
+
+    # No game-related labels
+    assert all("游戏" not in lbl and "cs" not in lbl.lower() for lbl in labels), (
+        f"Should not include game labels: {labels}"
+    )
+    # 画画 should still be there
+    assert any("画画" in lbl for lbl in labels), (
+        f"Should include 画画 label: {labels}"
+    )
+
+
+def test_boundary_nuance_avoid_followup_no追问_in_label() -> None:
+    """Labels should not contain追问 when boundary is avoid_followup."""
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 7,
+                "child_interests": ["跑步比赛", "画画"],
+                "topic_boundaries": ["不要追问比赛输赢"],
+            }
+        },
+        limit=3,
+    )
+
+    for label in labels:
+        assert "追问" not in label, f"Label should not contain追问: {label}"
 
 
 def _seed(

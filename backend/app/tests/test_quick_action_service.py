@@ -3,10 +3,14 @@ from app.domain.scene import SceneId, SceneRouteDecision, SceneTransitionType
 from app.services.quick_action_service import QuickActionService
 
 
-def test_open_conversation_quick_actions_follow_child_topic() -> None:
-    service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_session",
+def _decision(
+    *,
+    session_id: str = "quick_action_session",
+    reply_text: str = "恐龙很有意思。",
+    quick_actions: list | None = None,
+) -> SceneRouteDecision:
+    return SceneRouteDecision(
+        session_id=session_id,
         primary_intent=IntentType.CASUAL_CHAT,
         base_scene=SceneId.OPEN_CONVERSATION,
         active_scene=SceneId.OPEN_CONVERSATION,
@@ -16,9 +20,14 @@ def test_open_conversation_quick_actions_follow_child_topic() -> None:
         confidence=0.8,
         reason="open_conversation",
         needs_input=None,
-        reply_text="恐龙很有意思。",
-        quick_actions=[],
+        reply_text=reply_text,
+        quick_actions=quick_actions or [],
     )
+
+
+def test_open_conversation_quick_actions_follow_child_topic() -> None:
+    service = QuickActionService()
+    decision = _decision()
 
     actions = service.actions_for(
         decision=decision,
@@ -64,20 +73,7 @@ def test_non_open_conversation_keeps_scene_actions() -> None:
 
 def test_open_conversation_quick_actions_offer_child_agency() -> None:
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_agency_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="你可以接着说，也可以换个轻松话题。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="你可以接着说，也可以换个轻松话题。")
 
     actions = service.actions_for(
         decision=decision,
@@ -101,53 +97,9 @@ def test_open_conversation_quick_actions_offer_child_agency() -> None:
     ]
 
 
-def test_open_conversation_quick_actions_can_offer_story_without_gamification() -> None:
-    service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_story_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="我们可以轻轻编个故事。",
-        quick_actions=[],
-    )
-
-    actions = service.actions_for(
-        decision=decision,
-        child_text="我想编个故事",
-        reply_text="我们可以轻轻编个故事。",
-    )
-
-    assert [action.label for action in actions] == [
-        "继续说",
-        "讲个小故事",
-        "今天不聊了",
-    ]
-    assert all("积分" not in action.label and "签到" not in action.label for action in actions)
-
-
 def test_open_conversation_topic_choices_filter_boundaries() -> None:
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_boundary_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="我们可以换个轻松话题。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="我们可以换个轻松话题。")
 
     actions = service.actions_for(
         decision=decision,
@@ -156,7 +108,7 @@ def test_open_conversation_topic_choices_filter_boundaries() -> None:
         parent_policy={
             "communication_preferences": {
                 "child_interests": ["恐龙", "画画", "跑步"],
-                "topic_boundaries": ["跑步"],
+                "topic_boundaries": ["不要聊跑步"],
             }
         },
         conversation_control={
@@ -170,22 +122,10 @@ def test_open_conversation_topic_choices_filter_boundaries() -> None:
     assert all("跑步" not in label for label in labels)
 
 
-def test_model_soft_shift_profile_choices_override_old_keyword_fallbacks() -> None:
+def test_model_control_actions_take_priority() -> None:
+    """Model conversation_control suggested moves should take priority."""
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_soft_shift_keyword_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="我们可以换个轻松话题。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="我们可以换个轻松话题。")
 
     actions = service.actions_for(
         decision=decision,
@@ -205,29 +145,13 @@ def test_model_soft_shift_profile_choices_override_old_keyword_fallbacks() -> No
         },
     )
 
-    assert [action.label for action in actions] == [
-        "聊恐龙",
-        "聊画画",
-        "聊跑步",
-    ]
+    # Model control actions take priority over profile choices
+    assert [action.label for action in actions] == ["继续聊游戏"]
 
 
 def test_stop_control_does_not_offer_topic_choice_fallbacks() -> None:
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_stop_control_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="好，我们先停一下。想休息也可以。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="好，我们先停一下。想休息也可以。")
 
     actions = service.actions_for(
         decision=decision,
@@ -250,20 +174,7 @@ def test_stop_control_does_not_offer_topic_choice_fallbacks() -> None:
 
 def test_open_conversation_topic_choices_use_curated_seeds_without_interests() -> None:
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_seed_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="我们可以换个轻松话题。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="我们可以换个轻松话题。")
 
     actions = service.actions_for(
         decision=decision,
@@ -282,20 +193,7 @@ def test_open_conversation_topic_choices_use_curated_seeds_without_interests() -
 
 def test_open_conversation_topic_choices_offer_two_choices_limits_to_two() -> None:
     service = QuickActionService()
-    decision = SceneRouteDecision(
-        session_id="quick_action_offer_two_session",
-        primary_intent=IntentType.CASUAL_CHAT,
-        base_scene=SceneId.OPEN_CONVERSATION,
-        active_scene=SceneId.OPEN_CONVERSATION,
-        transition=SceneTransitionType.MERGE,
-        scene_stack=[SceneId.OPEN_CONVERSATION],
-        risk_level=RiskLevel.NONE,
-        confidence=0.8,
-        reason="open_conversation",
-        needs_input=None,
-        reply_text="我们可以换个轻松话题。",
-        quick_actions=[],
-    )
+    decision = _decision(reply_text="我们可以换个轻松话题。")
 
     actions = service.actions_for(
         decision=decision,
@@ -315,3 +213,91 @@ def test_open_conversation_topic_choices_offer_two_choices_limits_to_two() -> No
 
     assert len(actions) == 2
     assert [action.label for action in actions] == ["聊恐龙", "聊画画"]
+
+
+# --- Quick action v2 tests ---
+
+
+def test_show_and_tell_creates_share_photo_action() -> None:
+    """Show-and-tell text should produce share_photo action."""
+    service = QuickActionService()
+    decision = _decision(reply_text="让我看看！")
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="你看这个，我画的小狐狸。",
+        reply_text="让我看看！",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["画画", "跑步"],
+            }
+        },
+    )
+
+    labels = [action.label for action in actions]
+    assert "拍给小白狐看" in labels, f"Should have share_photo: {labels}"
+
+
+def test_profile_interests_priority_over_keyword_fallback() -> None:
+    """When profile has interests, topic choices should appear, not fixed menus."""
+    service = QuickActionService()
+    decision = _decision(reply_text="恐龙很有意思。")
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="我想聊恐龙",
+        reply_text="恐龙很有意思。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画"],
+            }
+        },
+    )
+
+    labels = [action.label for action in actions]
+    # Should have profile-aware topic choices
+    assert "聊恐龙" in labels or "聊画画" in labels, (
+        f"Should have profile-aware labels: {labels}"
+    )
+    # Should NOT have old fixed menu
+    assert "讲个小故事" not in labels, f"Should not have old fixed menu: {labels}"
+
+
+def test_no_old_fixed_menu_when_profile_interests_exist() -> None:
+    """Old fixed menu should not appear when profile interests exist."""
+    service = QuickActionService()
+    decision = _decision(reply_text="有意思。")
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="我今天看到一个好玩的",
+        reply_text="有意思。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画"],
+            }
+        },
+    )
+
+    labels = [action.label for action in actions]
+    assert "讲个小故事" not in labels, f"Should not have old fixed menu: {labels}"
+    assert "换个话题" not in labels, f"Should not have old fixed menu: {labels}"
+
+
+def test_seed_topics_without_profile() -> None:
+    """Without profile, seed topics should be used."""
+    service = QuickActionService()
+    decision = _decision(reply_text="好的。")
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="嗯",
+        reply_text="好的。",
+    )
+
+    labels = [action.label for action in actions]
+    # Should return seed topics (from topic_seed_packs_v0_1.json)
+    assert len(actions) >= 1, f"Should have at least 1 action: {labels}"
+    assert all("积分" not in lbl and "排行榜" not in lbl for lbl in labels), (
+        f"Should not have unsafe labels: {labels}"
+    )

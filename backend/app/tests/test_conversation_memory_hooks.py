@@ -34,6 +34,7 @@ from app.services.relationship_memory import (
     PROUD_MOMENT,
     RELATIONSHIP_MEMORY_TYPE_KEY,
     TOPIC_BOUNDARY,
+    build_relationship_profile,
     memory_relationship_topic,
 )
 from app.services.scene_orchestrator import SceneOrchestrator
@@ -805,3 +806,134 @@ def test_memory_hook_failure_does_not_block_child_reply(caplog) -> None:
     assert "conversation_memory_hook_failed" in caplog.text
     assert child_text not in caplog.text
     assert "contains memory content" not in caplog.text
+
+
+def test_relationship_memory_source_labels_conversation_summary() -> None:
+    child_id = "child_relationship_source_conversation"
+    memory_service, _, conversation_service, _ = _conversation_stack()
+
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_relationship_source_conversation",
+            text="我喜欢恐龙。",
+        )
+    )
+
+    memories = _relationship_memories(
+        _memories(memory_service, child_id),
+        INTEREST_SEED,
+    )
+    assert len(memories) == 1
+    for evidence in memories[0].evidence:
+        assert evidence.metadata.get("source") == "conversation_summary"
+
+
+def test_build_relationship_profile_merges_parent_and_conversation_sources() -> None:
+    child_id = "child_relationship_profile_merge"
+    memory_service, _, conversation_service, _ = _conversation_stack()
+
+    conversation_service.handle_message(
+        _message(
+            child_id=child_id,
+            session_id="session_relationship_profile_merge",
+            text="我喜欢恐龙。",
+        )
+    )
+
+    profile = build_relationship_profile(
+        memory_service,
+        child_id=child_id,
+        parent_profile_interests=["画画", "恐龙"],
+        parent_profile_boundaries=["不要追问学校"],
+    )
+
+    assert "画画" in profile["interests"]
+    assert "恐龙" in profile["interests"]
+    assert "不要追问学校" in profile["topic_boundaries"]
+
+    interest_details = profile["interest_details"]
+    assert interest_details[0]["topic"] == "画画"
+    assert interest_details[0]["source"] == "parent_setting"
+    # 恐龙 is from both parent and conversation; parent comes first
+    assert interest_details[1]["topic"] == "恐龙"
+    assert interest_details[1]["source"] == "parent_setting"
+
+    boundary_details = profile["boundary_details"]
+    assert boundary_details[0]["topic"] == "不要追问学校"
+    assert boundary_details[0]["source"] == "parent_setting"
+
+
+def test_parent_report_support_style_offer_two_choices_tailors_actions() -> None:
+    child_id = "child_report_offer_two"
+    repository = InMemoryMemoryRepository()
+    memory_service = MemoryService(
+        repository=repository,
+        now_provider=_fixed_now,
+    )
+
+    expression_memory = memory_service.create(
+        MemoryCreateRequest(
+            child_id=child_id,
+            memory_type=MemoryType.EXPRESSION_PATTERN,
+            content="孩子今天更多使用短句或指令式表达。",
+            tags=["表达"],
+            evidence=[MemoryEvidence(
+                source="conversation_summary",
+                session_id="s",
+                quote_summary="短句表达",
+                metadata={},
+            )],
+            confidence=0.8,
+            importance=0.5,
+        )
+    )
+
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        conversation_repository=EmptyConversationRepository(),
+        model_registry=ReportModelRegistry(),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service._deterministic_fallback_report(
+        child_id=child_id,
+        target_date=date(2026, 5, 19),
+        memories=[expression_memory],
+        conversation_messages=[],
+        conversation=report_service._conversation_analysis([]),
+        support_style=["offer_two_choices"],
+    )
+
+    actions_text = " ".join(report.suggested_parent_actions)
+    assert "两个简单选择" in actions_text or "选择就好" in actions_text
+
+
+def test_parent_report_support_style_ask_fewer_questions_tailors_actions() -> None:
+    child_id = "child_report_ask_fewer"
+    repository = InMemoryMemoryRepository()
+    memory_service = MemoryService(
+        repository=repository,
+        now_provider=_fixed_now,
+    )
+
+    report_service = ParentReportService(
+        memory_service=memory_service,
+        conversation_repository=EmptyConversationRepository(),
+        model_registry=ReportModelRegistry(),
+        now_provider=_fixed_now,
+    )
+
+    report = report_service._deterministic_fallback_report(
+        child_id=child_id,
+        target_date=date(2026, 5, 19),
+        memories=[],
+        conversation_messages=[],
+        conversation=report_service._conversation_analysis([]),
+        support_style=["ask_fewer_questions"],
+    )
+
+    actions_text = " ".join(report.suggested_parent_actions)
+    bridge = report.tonight_parent_bridge or ""
+    # With ask_fewer_questions, the default action should emphasize not追问
+    assert "不追问" in actions_text or "不追问" in bridge or "只轻轻" in actions_text

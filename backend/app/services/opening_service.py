@@ -33,6 +33,7 @@ from app.services.time_context_service import (
     get_time_context_service,
 )
 from app.services.tts_service import TtsService, get_tts_service
+from app.domain.schemas.child_profile import render_child_profile_for_prompt
 from app.middleware.request_id import get_request_id
 
 
@@ -330,7 +331,8 @@ class OpeningService:
     ) -> str:
         name = self._child_call_name(parent_policy)
         parent_message = self._parent_message_for_prompt(parent_policy, opening_policy)
-        preferences = parent_policy.communication_preferences
+        policy_data = self._policy_data_for_profile(parent_policy)
+        profile_block = render_child_profile_for_prompt(policy_data)
         prompt_rules = "\n- ".join(opening_policy.prompt_rules)
         forbidden = "；".join(self._forbidden_phrases_for_prompt(opening_policy))
         schedule_goal = self._text_for_prompt(
@@ -353,12 +355,13 @@ class OpeningService:
             "opening 必须遵守 opening policy，不要自己扩大目标。"
             "必须直接输出一句或两句中文开场白，不输出空内容、none、null，不使用 Markdown 或 JSON。"
             "如果不确定怎么写，也必须输出一条 8 个中文字符以上的安全短开场白。"
+            "不要在开场白中提及家长设置的偏好标签、性格描述或支持方式。"
             f"\n孩子称呼：{name or '无'}"
             f"\n当前时间段：{time_context.time_period.value}"
             f"\n时间目标：{schedule_goal}"
             f"\n推荐互动：{'、'.join(preferred_interactions)}"
             f"\n避免事项：{'、'.join(avoid)}"
-            f"\n沟通偏好：{preferences}"
+            f"\n孩子画像：\n{profile_block}"
             f"\nopening_mode：{opening_policy.mode.value}"
             f"\n年龄段：{opening_policy.age_band}"
             f"\n最大字数：{opening_policy.max_chars}"
@@ -430,6 +433,14 @@ class OpeningService:
             (parent_policy.child_nickname or "").strip()
             or (parent_policy.child_display_name or "").strip()
         )
+
+    def _policy_data_for_profile(self, parent_policy: ParentPolicy) -> dict[str, object]:
+        return {
+            "child_nickname": parent_policy.child_nickname,
+            "child_display_name": parent_policy.child_display_name,
+            "parent_message_raw": parent_policy.parent_message_raw,
+            "communication_preferences": parent_policy.communication_preferences,
+        }
 
     def _attach_audio_url(self, reply: Reply) -> _OpeningTtsResult:
         started_at = time.perf_counter()

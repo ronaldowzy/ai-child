@@ -118,18 +118,18 @@ class TopicSeedService:
         recent_topic: str | None = None,
         limit: int = 3,
     ) -> list[str]:
-        boundaries = self._profile_string_list(
-            self._policy_preferences(parent_policy).get("topic_boundaries")
-        )
+        preferences = self._policy_preferences(parent_policy)
+        effective_limit = self._effective_limit(preferences, limit)
+        boundaries = self._profile_string_list(preferences.get("topic_boundaries"))
         labels: list[str] = []
-        for interest in self._profile_string_list(
-            self._policy_preferences(parent_policy).get("child_interests")
-        ):
+        for interest in self._profile_string_list(preferences.get("child_interests")):
             label = self._interest_label(interest)
             if self._choice_allowed(label, boundaries, recent_topic):
                 labels.append(label)
-        if len(labels) < limit:
-            for seed in self.seed_objects_for_parent_policy(parent_policy, limit=limit):
+        if len(labels) < effective_limit:
+            for seed in self.seed_objects_for_parent_policy(
+                parent_policy, limit=effective_limit
+            ):
                 label = seed.prompt_label()
                 if self._choice_allowed(label, boundaries, recent_topic):
                     labels.append(label)
@@ -137,7 +137,15 @@ class TopicSeedService:
         for label in labels:
             if label not in deduped:
                 deduped.append(label)
-        return deduped[: max(limit, 0)]
+        return deduped[: max(effective_limit, 0)]
+
+    def _effective_limit(self, preferences: dict[str, Any], limit: int) -> int:
+        support_style = self._profile_string_list(
+            preferences.get("support_style_preferences")
+        )
+        if "offer_two_choices" in support_style:
+            return min(limit, 2)
+        return limit
 
     def _active_seeds_for_age_band(self, age_band: str) -> list[TopicSeed]:
         today = self._today_provider()

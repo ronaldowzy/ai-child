@@ -278,3 +278,40 @@ def test_open_conversation_topic_choices_use_curated_seeds_without_interests() -
 
     assert len(actions) >= 1
     assert all("热搜" not in action.label and "排行榜" not in action.label for action in actions)
+
+
+def test_open_conversation_topic_choices_offer_two_choices_limits_to_two() -> None:
+    service = QuickActionService()
+    decision = SceneRouteDecision(
+        session_id="quick_action_offer_two_session",
+        primary_intent=IntentType.CASUAL_CHAT,
+        base_scene=SceneId.OPEN_CONVERSATION,
+        active_scene=SceneId.OPEN_CONVERSATION,
+        transition=SceneTransitionType.MERGE,
+        scene_stack=[SceneId.OPEN_CONVERSATION],
+        risk_level=RiskLevel.NONE,
+        confidence=0.8,
+        reason="open_conversation",
+        needs_input=None,
+        reply_text="我们可以换个轻松话题。",
+        quick_actions=[],
+    )
+
+    actions = service.actions_for(
+        decision=decision,
+        child_text="嗯",
+        reply_text="我们可以换个轻松话题。",
+        parent_policy={
+            "communication_preferences": {
+                "child_interests": ["恐龙", "画画", "跑步"],
+                "support_style_preferences": ["offer_two_choices"],
+            }
+        },
+        conversation_control={
+            "topic_continuity": "soft_shift",
+            "topic_shift_intent": "likely",
+        },
+    )
+
+    assert len(actions) == 2
+    assert [action.label for action in actions] == ["聊恐龙", "聊画画"]

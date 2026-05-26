@@ -28,6 +28,7 @@ from app.repositories.parent_report_repository import (
 )
 from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
+from app.services.parent_policy_service import ParentPolicyService
 from app.services.relationship_memory import (
     INTEREST_SEED,
     PROUD_MOMENT,
@@ -72,6 +73,7 @@ class ParentReportService:
         fallback_repository: InMemoryParentReportRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
         fallback_to_memory: bool = True,
+        parent_policy_service: ParentPolicyService | None = None,
     ) -> None:
         self._memory_service = memory_service or get_memory_service()
         self._repository = repository or ParentReportRepository()
@@ -82,6 +84,7 @@ class ParentReportService:
             conversation_repository or ConversationPersistenceRepository()
         )
         self._model_registry = model_registry or get_model_registry()
+        self._parent_policy_service = parent_policy_service
         self._fallback_to_memory = fallback_to_memory
         self._repository_available = True
         self._conversation_repository_available = True
@@ -135,6 +138,21 @@ class ParentReportService:
             conversation_messages=conversation_messages,
         )
 
+    def _lookup_support_style(self, child_id: str) -> list[str]:
+        if self._parent_policy_service is None:
+            return []
+        try:
+            policy = self._parent_policy_service.get_policy(child_id)
+        except Exception:  # noqa: BLE001
+            return []
+        preferences = getattr(policy, "communication_preferences", None)
+        if not isinstance(preferences, dict):
+            return []
+        support_style = preferences.get("support_style_preferences")
+        if isinstance(support_style, list):
+            return [str(item) for item in support_style]
+        return []
+
     def _generate_daily_report_from_materials(
         self,
         *,
@@ -143,6 +161,7 @@ class ParentReportService:
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
     ) -> ParentReport:
+        support_style = self._lookup_support_style(child_id)
         conversation = self._conversation_analysis(conversation_messages)
         fallback_report = self._deterministic_fallback_report(
             child_id=child_id,
@@ -150,6 +169,7 @@ class ParentReportService:
             memories=memories,
             conversation_messages=conversation_messages,
             conversation=conversation,
+            support_style=support_style,
         )
         material_fingerprint = self._material_fingerprint(
             memories=memories,
@@ -163,6 +183,7 @@ class ParentReportService:
             conversation=conversation,
             fallback_report=fallback_report,
             material_fingerprint=material_fingerprint,
+            support_style=support_style,
         )
         if model_result.report is not None:
             return model_result.report
@@ -181,6 +202,7 @@ class ParentReportService:
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
         conversation: dict[str, list[str]],
+        support_style: list[str] | None = None,
     ) -> ParentReport:
 
         learning = self._observations_for(memories, {MemoryType.LEARNING_PATTERN})
@@ -207,6 +229,7 @@ class ParentReportService:
             has_emotion=bool(emotion),
             has_safety=bool(safety_alerts),
             conversation_topics=conversation["topics"],
+            support_style=support_style,
         )
         tonight_parent_bridge = self._tonight_parent_bridge(
             actions=actions,
@@ -262,6 +285,7 @@ class ParentReportService:
         conversation: dict[str, list[str]],
         fallback_report: ParentReport,
         material_fingerprint: str,
+        support_style: list[str] | None = None,
     ) -> _ModelDailyReportResult:
         try:
             response = self._request_model_report(
@@ -272,6 +296,7 @@ class ParentReportService:
                 conversation=conversation,
                 fallback_report=fallback_report,
                 retry=False,
+                support_style=support_style,
             )
         except Exception as exc:  # noqa: BLE001 - report generation must not block.
             error_type = exc.__class__.__name__
@@ -305,6 +330,7 @@ class ParentReportService:
                     conversation=conversation,
                     fallback_report=fallback_report,
                     retry=True,
+                    support_style=support_style,
                 )
             except Exception as exc:  # noqa: BLE001 - report fallback must hold.
                 error_type = exc.__class__.__name__
@@ -424,6 +450,7 @@ class ParentReportService:
         conversation: dict[str, list[str]],
         fallback_report: ParentReport,
         retry: bool,
+        support_style: list[str] | None = None,
     ):
         payload = self._parent_report_model_payload(
             target_date=target_date,
@@ -431,6 +458,7 @@ class ParentReportService:
             conversation_messages=conversation_messages,
             conversation=conversation,
             fallback_report=fallback_report,
+            support_style=support_style,
         )
         user_prefix = (
             "上一次输出为空或不可解析。请只返回严格 JSON object，不要解释。\n"
@@ -531,8 +559,9 @@ class ParentReportService:
         conversation_messages: list[ConversationReportMessage],
         conversation: dict[str, list[str]],
         fallback_report: ParentReport,
+        support_style: list[str] | None = None,
     ) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "report_date": target_date.isoformat(),
             "material_policy": (
                 "Only structured summaries are provided; do not quote child text."
@@ -597,6 +626,9 @@ class ParentReportService:
                 ][:2],
             },
         }
+        if support_style:
+            payload["support_style_preferences"] = support_style
+        return payload
 
     def _conversation_snippet(
         self,
@@ -1341,7 +1373,13 @@ class ParentReportService:
         has_emotion: bool,
         has_safety: bool,
         conversation_topics: list[str] | None = None,
+        support_style: list[str] | None = None,
     ) -> list[str]:
+        style = support_style or []
+        offer_two = "offer_two_choices" in style
+        ask_fewer = "ask_fewer_questions" in style
+        gentle = "encourage_gently" in style
+
         actions: list[str] = []
         if has_safety:
             actions.append(
@@ -1352,13 +1390,23 @@ class ParentReportService:
                 "遇到作业问题时，请孩子先复述题目在问什么，再一起圈出已知条件，不直接给最终答案。"
             )
         if has_expression:
-            actions.append(
-                "开场先给二选一或三选一，例如“今天想说开心的事、难的事，还是想安静一会儿？”"
-            )
+            if offer_two:
+                actions.append(
+                    "开场给两个简单选择就好，例如“今天想说开心的事，还是想安静一会儿？”不追问，让孩子自己选。"
+                )
+            else:
+                actions.append(
+                    "开场先给二选一或三选一，例如“今天想说开心的事、难的事，还是想安静一会儿？”"
+                )
         if has_emotion:
-            actions.append(
-                "如果孩子表达低落或紧张，先回应感受，再问他想休息、被陪一会儿，还是一起想一个小办法。"
-            )
+            if gentle:
+                actions.append(
+                    "如果孩子表达低落或紧张，先温和回应感受，给他时间；不急着问怎么办，先陪一会儿。"
+                )
+            else:
+                actions.append(
+                    "如果孩子表达低落或紧张，先回应感受，再问他想休息、被陪一会儿，还是一起想一个小办法。"
+                )
         if conversation_topics and "图片分享" in conversation_topics:
             actions.append(
                 "如果孩子今天分享了图片，可以先问“你最想让我看哪里？”而不是直接判断这是题目或隐私。"
@@ -1372,7 +1420,7 @@ class ParentReportService:
                 "如果孩子聊到游戏，可以先接一个规则或创意点；避免把话题变成时长盘问、输赢评价或连续追问。"
             )
 
-        actions.extend(self._relationship_parent_actions(memories))
+        actions.extend(self._relationship_parent_actions(memories, support_style=style))
 
         strategy_memories = [
             memory for memory in memories if memory.memory_type == MemoryType.STRATEGY
@@ -1381,9 +1429,14 @@ class ParentReportService:
             actions.append(self._safe_text(strategy_memories[0].content))
 
         if not actions:
-            actions.append(
-                "今晚用一个具体问题轻轻收尾，例如“今天有没有一件还不错的小事？”不要追问过多。"
-            )
+            if ask_fewer:
+                actions.append(
+                    "今晚只轻轻问一个很小的事就好，例如“今天有没有一件还不错的小事？”不追问，给孩子空间。"
+                )
+            else:
+                actions.append(
+                    "今晚用一个具体问题轻轻收尾，例如“今天有没有一件还不错的小事？”不要追问过多。"
+                )
         return self._dedupe_and_limit(actions, limit=6)
 
     def _tonight_parent_bridge(
@@ -1449,7 +1502,14 @@ class ParentReportService:
             return None
         return safe[:260]
 
-    def _relationship_parent_actions(self, memories: list[MemoryItem]) -> list[str]:
+    def _relationship_parent_actions(
+        self,
+        memories: list[MemoryItem],
+        *,
+        support_style: list[str] | None = None,
+    ) -> list[str]:
+        style = support_style or []
+        ask_fewer = "ask_fewer_questions" in style
         actions: list[str] = []
         for memory in relationship_memories(
             memories,
@@ -1464,11 +1524,16 @@ class ParentReportService:
                 avoid = "避免连续追问或把兴趣变成任务。"
             hook = memory_relationship_next_hook(memory)
             suffix = f"也可以参考：{hook}。" if hook else ""
-            actions.append(f"今晚可以轻轻问：“{starter}”{avoid}{suffix}")
+            if ask_fewer:
+                actions.append(
+                    f"今晚可以轻轻提一句\u201c{topic}\u201d，如果孩子不想接就不追问。{suffix}"
+                )
+            else:
+                actions.append(f"今晚可以轻轻问：\u201c{starter}\u201d{avoid}{suffix}")
 
         if relationship_memories(memories, relationship_memory_type=PROUD_MOMENT):
             actions.append(
-                "孩子今天有表达展开的小进步；可以具体反馈“你刚才把事情说清楚了”，不要用积分、排名或比较来强化。"
+                "孩子今天有表达展开的小进步；可以具体反馈\u201c你刚才把事情说清楚了\u201d，不要用积分、排名或比较来强化。"
             )
         if relationship_memories(memories, relationship_memory_type=TOPIC_BOUNDARY):
             actions.append(
@@ -1481,7 +1546,7 @@ class ParentReportService:
             topic = memory_relationship_topic(memory) or "一个东西"
             actions.append(
                 f"孩子今天拿了一个{topic}给小白狐看；"
-                "家长今晚可以轻轻问一句“今天给小白狐看的是什么呀”，不做评价。"
+                "家长今晚可以轻轻问一句\u201c今天给小白狐看的是什么呀\u201d，不做评价。"
             )
         for memory in relationship_memories(
             memories,

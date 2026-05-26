@@ -6,6 +6,8 @@ from app.services.memory_service import MemoryService
 
 RELATIONSHIP_MEMORY_TYPE_KEY = "relationship_memory_type"
 RELATIONSHIP_MEMORY_SOURCE = "conversation_summary"
+SOURCE_PARENT_SETTING = "parent_setting"
+SOURCE_CHILD_CONVERSATION = "child_conversation"
 INTEREST_SEED = "interest_seed"
 TOPIC_BOUNDARY = "topic_boundary"
 PROUD_MOMENT = "proud_moment"
@@ -200,33 +202,51 @@ def build_relationship_profile(
     memory_service: MemoryService,
     *,
     child_id: str,
+    parent_profile_interests: list[str] | None = None,
+    parent_profile_boundaries: list[str] | None = None,
 ) -> dict[str, object]:
     """Build a lightweight, non-raw relationship profile for prompt use.
 
     Returns structured fields suitable for opening/topic/prompt context.
     No raw child text is included.
+    Parent-set data is labeled with source=parent_setting;
+    conversation-derived data is labeled with source=child_conversation.
     """
     memories = memory_service.list_memories(
         child_id,
         active_only=True,
         include_safety=False,
     )
-    interests: list[str] = []
-    boundaries: list[str] = []
+    interests: list[dict[str, str]] = []
+    boundaries: list[dict[str, str]] = []
     unfinished: list[str] = []
     show_and_tell: list[str] = []
     seen_interests: set[str] = set()
     seen_boundaries: set[str] = set()
 
+    for interest in parent_profile_interests or []:
+        compact = interest.strip()
+        if compact and compact not in seen_interests:
+            seen_interests.add(compact)
+            interests.append({"topic": compact, "source": SOURCE_PARENT_SETTING})
+
+    for boundary in parent_profile_boundaries or []:
+        compact = boundary.strip()
+        if compact and compact not in seen_boundaries:
+            seen_boundaries.add(compact)
+            boundaries.append({"topic": compact, "source": SOURCE_PARENT_SETTING})
+
     for memory in memories:
         rel_type = memory_relationship_type(memory)
         topic = memory_relationship_topic(memory)
+        metadata = memory_relationship_metadata(memory)
+        mem_source = str(metadata.get("source", SOURCE_CHILD_CONVERSATION))
         if rel_type == INTEREST_SEED and topic and topic not in seen_interests:
             seen_interests.add(topic)
-            interests.append(topic)
+            interests.append({"topic": topic, "source": mem_source})
         elif rel_type == TOPIC_BOUNDARY and topic and topic not in seen_boundaries:
             seen_boundaries.add(topic)
-            boundaries.append(topic)
+            boundaries.append({"topic": topic, "source": mem_source})
         elif rel_type == UNFINISHED_THREAD:
             next_hook = memory_relationship_next_hook(memory)
             if next_hook:
@@ -237,8 +257,10 @@ def build_relationship_profile(
                 show_and_tell.append(next_hook)
 
     return {
-        "interests": interests[:5],
-        "topic_boundaries": boundaries[:3],
+        "interests": [item["topic"] for item in interests[:5]],
+        "interest_details": interests[:5],
+        "topic_boundaries": [item["topic"] for item in boundaries[:3]],
+        "boundary_details": boundaries[:3],
         "unfinished_threads": unfinished[:2],
         "recent_show_and_tell": show_and_tell[:2],
     }

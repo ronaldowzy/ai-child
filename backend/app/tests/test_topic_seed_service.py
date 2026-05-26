@@ -120,6 +120,43 @@ def test_topic_choice_labels_filter_boundaries_and_recent_topic_synonyms() -> No
     assert all("CS" not in label and "游戏" not in label for label in labels)
 
 
+def test_topic_choice_labels_offer_two_choices_limits_to_two() -> None:
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 8,
+                "child_interests": ["恐龙", "画画", "跑步"],
+                "support_style_preferences": ["offer_two_choices"],
+            }
+        },
+        limit=3,
+    )
+
+    assert len(labels) == 2
+    assert labels == ["聊恐龙", "聊画画"]
+
+
+def test_topic_choice_labels_offer_two_choices_with_boundaries() -> None:
+    service = TopicSeedService(today_provider=lambda: date(2026, 5, 24))
+
+    labels = service.topic_choice_labels(
+        {
+            "communication_preferences": {
+                "child_age": 8,
+                "child_interests": ["恐龙", "画画", "跑步"],
+                "topic_boundaries": ["恐龙"],
+                "support_style_preferences": ["offer_two_choices"],
+            }
+        },
+        limit=3,
+    )
+
+    assert len(labels) == 2
+    assert "聊恐龙" not in labels
+
+
 def _seed(
     *,
     seed_id: str,

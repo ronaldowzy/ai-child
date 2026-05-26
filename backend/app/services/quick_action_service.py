@@ -128,12 +128,26 @@ class QuickActionService:
             recent_topic=str(conversation_control.get("recent_topic") or "")
             if conversation_control
             else None,
-            limit=3,
+            limit=self._topic_choice_limit(parent_policy),
         )
         return [
             SceneAction(id=f"topic_choice_{index}", label=label)
             for index, label in enumerate(labels, start=1)
         ]
+
+    def _topic_choice_limit(self, parent_policy: object | None) -> int:
+        if parent_policy is None:
+            return 3
+        if isinstance(parent_policy, dict):
+            preferences = parent_policy.get("communication_preferences")
+        else:
+            preferences = getattr(parent_policy, "communication_preferences", None)
+        if not isinstance(preferences, dict):
+            return 3
+        support_style = preferences.get("support_style_preferences")
+        if isinstance(support_style, list) and "offer_two_choices" in support_style:
+            return 2
+        return 3
 
     def _control_actions(
         self,

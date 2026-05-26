@@ -334,3 +334,77 @@ def test_memory_read_failure_falls_back_without_blocking_policy() -> None:
 
     assert policy.mode == OpeningMode.DEFAULT_LIGHT
     assert policy.seed_topic is None
+
+
+def test_opening_prompt_uses_structured_profile_not_raw_preferences() -> None:
+    from app.services.opening_service import OpeningService
+
+    service = OpeningService(
+        parent_policy_service=_StubParentPolicyService(),
+        time_context_service=_StubTimeContextService(),
+        tts_service=_StubTtsService(),
+        model_registry=_StubModelRegistry(),
+        memory_service=_memory_service(),
+    )
+    parent_policy = _parent_policy(
+        preferences={
+            "child_age": 8,
+            "child_interests": ["恐龙", "画画"],
+            "child_temperament": ["warms_up_slowly"],
+            "support_style_preferences": ["offer_two_choices"],
+        },
+    )
+    parent_policy = parent_policy.model_copy(
+        update={"child_nickname": "豆豆"},
+    )
+    opening_policy = OpeningPolicyBuilder(
+        memory_service=_memory_service(),
+    ).build(
+        child_id="child_opening_policy",
+        parent_policy=parent_policy,
+        time_context=_time_context(),
+    )
+
+    prompt = service._opening_prompt(
+        parent_policy=parent_policy,
+        time_context=_time_context(),
+        opening_policy=opening_policy,
+    )
+
+    assert "孩子画像" in prompt
+    assert "child_interests" in prompt
+    assert "恐龙" in prompt
+    assert "child_temperament" in prompt
+    assert "不要给孩子贴标签" in prompt
+    assert "support_style_preferences" in prompt
+    assert "不要在开场白中提及家长设置的偏好标签" in prompt
+    # Should NOT contain raw dict dump
+    assert "communication_preferences" not in prompt
+
+
+class _StubParentPolicyService:
+    def get_policy(self, child_id):
+        return _parent_policy()
+
+
+class _StubTimeContextService:
+    def build_context(self, **_kwargs):
+        return _time_context()
+
+
+class _StubTtsService:
+    def generate_for_conversation(self, **_kwargs):
+        return None
+
+
+class _StubModelRegistry:
+    def generate(self, request):
+        from app.domain.model_types import ModelResponse
+        return ModelResponse(
+            task_type=request.task_type,
+            response_text="豆豆，你好呀！",
+            structured_output={},
+            provider_name="mock",
+            model_name="mock",
+            metadata={"mock": True},
+        )

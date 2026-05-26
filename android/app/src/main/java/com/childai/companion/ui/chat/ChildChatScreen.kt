@@ -344,20 +344,43 @@ private fun ChatMessageListWithPreviews(
             listState.animateScrollToItem(messages.lastIndex)
         }
     }
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
-    ) {
-        items(
-            items = messages,
-            key = { message -> message.id },
-        ) { message ->
-            ChatMessageBubbleWithPreview(
-                message = message,
-                imagePreview = imagePreviewCards[message.id],
-            )
+    if (messages.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "小白狐在这里。",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "想说什么都可以慢慢说。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxWidth(),
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 8.dp),
+        ) {
+            items(
+                items = messages,
+                key = { message -> message.id },
+            ) { message ->
+                ChatMessageBubbleWithPreview(
+                    message = message,
+                    imagePreview = imagePreviewCards[message.id],
+                )
+            }
         }
     }
 }
@@ -747,6 +770,16 @@ private fun AgentPanel(
                     phase = presentation.phase,
                     compactLandscape = compactLandscape,
                 )
+                if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
+                    Spacer(modifier = Modifier.height(if (compactLandscape) 2.dp else 4.dp))
+                    Text(
+                        text = "可以聊一件小事，也可以拍给我看。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
                 CartoonAgentView(
                     agent = presentation.agent,
@@ -801,17 +834,17 @@ private fun ChildStateChip(
 internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
     return when (phase) {
         ChildTurnUiPhase.Ready,
-        ChildTurnUiPhase.Resting -> "准备好了"
-        ChildTurnUiPhase.Listening -> "正在听"
-        ChildTurnUiPhase.Recognizing -> "正在听懂"
+        ChildTurnUiPhase.Resting -> "小白狐在这里"
+        ChildTurnUiPhase.Listening -> "在听你说"
+        ChildTurnUiPhase.Recognizing -> "在听懂你的话"
         ChildTurnUiPhase.Sending,
-        ChildTurnUiPhase.Thinking -> "正在想"
+        ChildTurnUiPhase.Thinking -> "在想一想"
         ChildTurnUiPhase.SpeakingPending,
-        ChildTurnUiPhase.Speaking -> "正在说"
-        ChildTurnUiPhase.ImageProcessing -> "正在看图"
-        ChildTurnUiPhase.NeedsRetry -> "可以重说"
-        ChildTurnUiPhase.PermissionNeeded -> "需要大人"
-        ChildTurnUiPhase.ServiceError -> "请大人检查"
+        ChildTurnUiPhase.Speaking -> "在说给你听"
+        ChildTurnUiPhase.ImageProcessing -> "在看这张图"
+        ChildTurnUiPhase.NeedsRetry -> "可以再说一次"
+        ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙"
+        ChildTurnUiPhase.ServiceError -> "先请大人看看"
     }
 }
 

@@ -440,6 +440,14 @@ class ChildAgentRuntime:
                 reason="program_no_chat_boundary",
                 source="program_fallback",
             )
+        if turn_guidance_context.boundary_signal == "leave_for_task":
+            return ConversationControl(
+                child_engagement="low",
+                topic_continuity="stop",
+                topic_shift_intent="explicit",
+                reason="program_leave_for_task",
+                source="program_fallback",
+            )
         if turn_guidance_context.boundary_signal == "topic_change":
             return ConversationControl(
                 child_engagement="low",
@@ -484,7 +492,7 @@ class ChildAgentRuntime:
         turn_guidance_context: TurnGuidanceContext,
     ) -> ConversationControl:
         boundary = turn_guidance_context.boundary_signal
-        if boundary in {"bedtime", "no_chat", "topic_change"}:
+        if boundary in {"bedtime", "no_chat", "topic_change", "leave_for_task"}:
             return fallback_control.model_copy(update={"source": "program_guardrail"})
         if request.route_decision.active_scene != SceneId.OPEN_CONVERSATION:
             return fallback_control.model_copy(update={"source": "program_guardrail"})

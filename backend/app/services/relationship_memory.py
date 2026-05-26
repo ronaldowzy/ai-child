@@ -9,6 +9,8 @@ RELATIONSHIP_MEMORY_SOURCE = "conversation_summary"
 INTEREST_SEED = "interest_seed"
 TOPIC_BOUNDARY = "topic_boundary"
 PROUD_MOMENT = "proud_moment"
+UNFINISHED_THREAD = "unfinished_thread"
+SHOW_AND_TELL_EVENT = "show_and_tell_event"
 
 
 def relationship_metadata(
@@ -166,3 +168,77 @@ def latest_topic_boundary(
         relationship_memory_type=TOPIC_BOUNDARY,
         memory_type=MemoryType.STRATEGY,
     )
+
+
+def latest_unfinished_thread(
+    memory_service: MemoryService,
+    *,
+    child_id: str,
+) -> MemoryItem | None:
+    return latest_relationship_memory(
+        memory_service,
+        child_id=child_id,
+        relationship_memory_type=UNFINISHED_THREAD,
+        memory_type=MemoryType.EVENT,
+    )
+
+
+def latest_show_and_tell_event(
+    memory_service: MemoryService,
+    *,
+    child_id: str,
+) -> MemoryItem | None:
+    return latest_relationship_memory(
+        memory_service,
+        child_id=child_id,
+        relationship_memory_type=SHOW_AND_TELL_EVENT,
+        memory_type=MemoryType.EVENT,
+    )
+
+
+def build_relationship_profile(
+    memory_service: MemoryService,
+    *,
+    child_id: str,
+) -> dict[str, object]:
+    """Build a lightweight, non-raw relationship profile for prompt use.
+
+    Returns structured fields suitable for opening/topic/prompt context.
+    No raw child text is included.
+    """
+    memories = memory_service.list_memories(
+        child_id,
+        active_only=True,
+        include_safety=False,
+    )
+    interests: list[str] = []
+    boundaries: list[str] = []
+    unfinished: list[str] = []
+    show_and_tell: list[str] = []
+    seen_interests: set[str] = set()
+    seen_boundaries: set[str] = set()
+
+    for memory in memories:
+        rel_type = memory_relationship_type(memory)
+        topic = memory_relationship_topic(memory)
+        if rel_type == INTEREST_SEED and topic and topic not in seen_interests:
+            seen_interests.add(topic)
+            interests.append(topic)
+        elif rel_type == TOPIC_BOUNDARY and topic and topic not in seen_boundaries:
+            seen_boundaries.add(topic)
+            boundaries.append(topic)
+        elif rel_type == UNFINISHED_THREAD:
+            next_hook = memory_relationship_next_hook(memory)
+            if next_hook:
+                unfinished.append(next_hook)
+        elif rel_type == SHOW_AND_TELL_EVENT:
+            next_hook = memory_relationship_next_hook(memory)
+            if next_hook:
+                show_and_tell.append(next_hook)
+
+    return {
+        "interests": interests[:5],
+        "topic_boundaries": boundaries[:3],
+        "unfinished_threads": unfinished[:2],
+        "recent_show_and_tell": show_and_tell[:2],
+    }

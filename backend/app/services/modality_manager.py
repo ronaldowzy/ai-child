@@ -57,13 +57,13 @@ class ModalityManager:
                 and visible_detail
             ):
                 reply_text = (
-                    f"我看到图里像是{visible_detail}。"
-                    "你想先讲讲它哪里最有意思吗？"
+                    f"我看到像是{visible_detail}。"
+                    "你是想让我看看它哪里有趣吗？"
                 )
             else:
                 reply_text = (
-                    "这张图我看得还不太清楚。"
-                    "你可以告诉我，你最想让我看哪里？"
+                    "我看得还不太清楚，但我知道你是想拿给我看。"
+                    "你可以只告诉我它叫什么。"
                 )
             return ModalityDecision(
                 status=AttachmentStatus.IMAGE_READY,

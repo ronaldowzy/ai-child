@@ -15,7 +15,9 @@ from app.services.relationship_memory import (
     INTEREST_SEED,
     PROUD_MOMENT,
     RELATIONSHIP_MEMORY_TYPE_KEY,
+    SHOW_AND_TELL_EVENT,
     TOPIC_BOUNDARY,
+    UNFINISHED_THREAD,
     relationship_metadata,
 )
 from app.services.safety_engine import SafetyClassification
@@ -401,6 +403,56 @@ class ConversationMemoryHooks:
                     route_decision=route_decision,
                 )
             )
+
+        thread = self._unfinished_thread(text)
+        if thread and not self._has_relationship_memory(
+            child_id=child_id,
+            session_id=session_id,
+            relationship_type=UNFINISHED_THREAD,
+            topic=thread["topic"],
+        ):
+            requests.append(
+                self._relationship_request(
+                    child_id=child_id,
+                    session_id=session_id,
+                    memory_type=MemoryType.EVENT,
+                    relationship_type=UNFINISHED_THREAD,
+                    topic=thread["topic"],
+                    content=thread["content"],
+                    quote_summary=thread["quote_summary"],
+                    tags=["relationship_memory", "unfinished_thread"],
+                    next_hook=thread["next_hook"],
+                    sensitivity=MemorySensitivity.LOW,
+                    confidence=0.8,
+                    importance=0.55,
+                    route_decision=route_decision,
+                )
+            )
+
+        show_tell = self._show_and_tell_event(text)
+        if show_tell and not self._has_relationship_memory(
+            child_id=child_id,
+            session_id=session_id,
+            relationship_type=SHOW_AND_TELL_EVENT,
+            topic=show_tell["topic"],
+        ):
+            requests.append(
+                self._relationship_request(
+                    child_id=child_id,
+                    session_id=session_id,
+                    memory_type=MemoryType.EVENT,
+                    relationship_type=SHOW_AND_TELL_EVENT,
+                    topic=show_tell["topic"],
+                    content=show_tell["content"],
+                    quote_summary=show_tell["quote_summary"],
+                    tags=["relationship_memory", "show_and_tell", show_tell["topic"]],
+                    next_hook=show_tell["next_hook"],
+                    sensitivity=MemorySensitivity.LOW,
+                    confidence=0.78,
+                    importance=0.5,
+                    route_decision=route_decision,
+                )
+            )
         return requests
 
     def _relationship_request(
@@ -567,6 +619,52 @@ class ConversationMemoryHooks:
             }
         return None
 
+    def _unfinished_thread(self, text: str) -> dict[str, str] | None:
+        if self._contains_any(
+            text,
+            ("去英语打卡", "英语打卡", "一会再聊", "等会再聊", "先去写作业", "要去上课"),
+        ):
+            return {
+                "topic": "离开去做其他事",
+                "content": "孩子表达需要离开去做其他事，后续开场不要强追问，只可轻轻提一句。",
+                "quote_summary": "孩子表示需要离开去做其他事，留下未完成话题。",
+                "next_hook": "下次开场不要强追问，只可轻轻提一句上次说到哪里了。",
+            }
+        if self._contains_any(
+            text,
+            ("明天再说", "下次再聊", "明天继续", "先到这里"),
+        ):
+            return {
+                "topic": "主动暂停话题",
+                "content": "孩子主动暂停当前话题，后续开场尊重暂停，不强行继续。",
+                "quote_summary": "孩子主动暂停话题，表示下次再继续。",
+                "next_hook": "下次开场轻轻问一句是否想继续上次的话题，允许孩子说不。",
+            }
+        return None
+
+    def _show_and_tell_event(self, text: str) -> dict[str, str] | None:
+        if self._contains_any(
+            text,
+            ("给你看", "看这个", "你看", "我给你看", "拿给你看"),
+        ):
+            return {
+                "topic": "物品分享",
+                "content": "孩子想给小白狐看一个东西，可能是在分享身边的物品或作品。",
+                "quote_summary": "孩子主动分享物品或作品给小白狐看。",
+                "next_hook": "可以问孩子这个东西叫什么或哪里有趣，只问一个小问题。",
+            }
+        if self._contains_any(
+            text,
+            ("我画了", "我做了", "我搭了", "我编了", "我的作品"),
+        ):
+            return {
+                "topic": "作品分享",
+                "content": "孩子分享了自己的作品或创作，适合温和肯定，不做评分。",
+                "quote_summary": "孩子主动分享了自己的作品或创作。",
+                "next_hook": "可以问孩子作品里最喜欢的一处，不做评分。",
+            }
+        return None
+
     def _is_running_or_sports_interest_text(self, text: str) -> bool:
         if "运动比赛" in text:
             return True
@@ -656,6 +754,8 @@ class ConversationMemoryHooks:
             INTEREST_SEED: MemoryType.INTEREST,
             TOPIC_BOUNDARY: MemoryType.STRATEGY,
             PROUD_MOMENT: MemoryType.EXPRESSION_PATTERN,
+            UNFINISHED_THREAD: MemoryType.EVENT,
+            SHOW_AND_TELL_EVENT: MemoryType.EVENT,
         }
         memories = self._memory_service.list_memories(
             child_id,
@@ -663,10 +763,11 @@ class ConversationMemoryHooks:
             active_only=True,
             include_safety=False,
         )
+        cross_session_types = {INTEREST_SEED, UNFINISHED_THREAD, SHOW_AND_TELL_EVENT}
         for memory in memories:
             for evidence in memory.evidence:
                 if (
-                    relationship_type != INTEREST_SEED
+                    relationship_type not in cross_session_types
                     and evidence.session_id != session_id
                 ):
                     continue

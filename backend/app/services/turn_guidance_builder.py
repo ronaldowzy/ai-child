@@ -7,6 +7,20 @@ from app.domain.model_types import ModelMessage
 from app.services.topic_seed_service import TopicSeedService
 
 
+class ConversationArcState(BaseModel):
+    """Lightweight per-session conversation arc tracking.
+
+    Non-content; usable for prompt context, parent report material, and QA.
+    """
+    session_topic: str | None = None
+    turn_count_on_topic: int = 0
+    child_engagement: str = "unclear"
+    current_arc_phase: str = "opening"
+    last_boundary_signal: str | None = None
+    real_life_bridge_hint: str | None = None
+    memory_update_hint: str | None = None
+
+
 class TurnGuidanceContext(BaseModel):
     hints: list[str] = Field(default_factory=list)
     guidance: dict[str, str] = Field(default_factory=dict)
@@ -19,6 +33,7 @@ class TurnGuidanceContext(BaseModel):
     topic_shift_recommended: bool = False
     topic_shift_reason: str | None = None
     suggested_topic_seeds: list[str] = Field(default_factory=list)
+    arc_state: ConversationArcState = Field(default_factory=ConversationArcState)
 
 
 class TurnGuidanceBuilder:
@@ -110,6 +125,18 @@ class TurnGuidanceBuilder:
         "我没有跑",
         "听错了",
     )
+    _LEAVE_FOR_TASK_MARKERS = (
+        "去英语打卡",
+        "英语打卡",
+        "去写作业",
+        "要去上课",
+        "妈妈叫我",
+        "爸爸叫我",
+        "我要走了",
+        "得走了",
+        "一会再聊",
+        "等会再聊",
+    )
 
     def build(
         self,
@@ -172,6 +199,14 @@ class TurnGuidanceBuilder:
             markers=self._CORRECTION_MARKERS,
             instruction="孩子在纠正你或 ASR 误听时，先承认可能理解错了，按孩子修正后的说法继续；本轮不要新增追问钩子。",
         )
+        self._add_hint(
+            normalized,
+            hints=hints,
+            guidance=guidance,
+            hint="child_leave_for_task",
+            markers=self._LEAVE_FOR_TASK_MARKERS,
+            instruction="孩子说要去做别的事情（打卡、写作业、家长叫），立即温柔收束，不追问、不拉长；可以轻轻说一句回来再聊。",
+        )
 
         recent_topic, same_topic_score = self._recent_topic(
             child_text=child_text,
@@ -222,6 +257,15 @@ class TurnGuidanceBuilder:
                 ),
             )
 
+        boundary_signal = self._boundary_signal(normalized, hints)
+        arc_state = self._build_arc_state(
+            recent_topic=recent_topic,
+            same_topic_score=same_topic_score,
+            child_engagement_signal=child_engagement_signal,
+            boundary_signal=boundary_signal,
+            hints=hints,
+        )
+
         return TurnGuidanceContext(
             hints=hints,
             guidance=guidance,
@@ -229,11 +273,12 @@ class TurnGuidanceBuilder:
             same_topic_score=same_topic_score,
             same_topic_turn_count=same_topic_score,
             consecutive_recent_questions=consecutive_recent_questions,
-            boundary_signal=self._boundary_signal(normalized, hints),
+            boundary_signal=boundary_signal,
             child_engagement_signal=child_engagement_signal,
             topic_shift_recommended=topic_shift_recommended,
             topic_shift_reason=topic_shift_reason,
             suggested_topic_seeds=suggested_topic_seeds,
+            arc_state=arc_state,
         )
 
     def _recent_topic(
@@ -361,9 +406,56 @@ class TurnGuidanceBuilder:
             return "engaged"
         return "neutral"
 
+    def _build_arc_state(
+        self,
+        *,
+        recent_topic: str | None,
+        same_topic_score: int,
+        child_engagement_signal: str,
+        boundary_signal: str | None,
+        hints: list[str],
+    ) -> ConversationArcState:
+        if boundary_signal == "bedtime":
+            arc_phase = "closing"
+        elif boundary_signal == "no_chat":
+            arc_phase = "closing"
+        elif "child_leave_for_task" in hints:
+            arc_phase = "handoff"
+        elif boundary_signal == "topic_change":
+            arc_phase = "soft_shift"
+        elif same_topic_score >= 3 and child_engagement_signal in {"short_or_flat", "boundary"}:
+            arc_phase = "soft_shift"
+        elif child_engagement_signal == "engaged":
+            arc_phase = "deepening"
+        elif recent_topic:
+            arc_phase = "exploring"
+        else:
+            arc_phase = "opening"
+
+        bridge_hint = None
+        memory_hint = None
+        if boundary_signal == "bedtime":
+            bridge_hint = "孩子睡前说了晚安，家长明天可以轻轻问一句睡得好不好"
+        elif "child_leave_for_task" in hints:
+            bridge_hint = "孩子去做别的事了，家长今晚可以轻轻问一句事情做完了吗"
+        elif recent_topic and same_topic_score >= 2:
+            memory_hint = f"孩子今天聊到了{recent_topic}"
+
+        return ConversationArcState(
+            session_topic=recent_topic,
+            turn_count_on_topic=same_topic_score,
+            child_engagement=child_engagement_signal,
+            current_arc_phase=arc_phase,
+            last_boundary_signal=boundary_signal,
+            real_life_bridge_hint=bridge_hint,
+            memory_update_hint=memory_hint,
+        )
+
     def _boundary_signal(self, normalized: str, hints: list[str]) -> str | None:
         if "bedtime_close_requested" in hints:
             return "bedtime"
+        if "child_leave_for_task" in hints:
+            return "leave_for_task"
         if "child_requests_topic_change" in hints:
             if self._contains_any(
                 normalized,

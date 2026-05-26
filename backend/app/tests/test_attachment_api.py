@@ -252,7 +252,7 @@ def test_conversation_attachment_accepts_generic_image_share() -> None:
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
     assert "积木城堡" in body["reply"]["text"]
-    assert "哪里最有意思" in body["reply"]["text"]
+    assert "哪里有趣" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "encourage"
     assert "这道题" not in body["reply"]["text"]
 

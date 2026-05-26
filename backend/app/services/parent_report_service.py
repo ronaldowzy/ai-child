@@ -31,7 +31,9 @@ from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.relationship_memory import (
     INTEREST_SEED,
     PROUD_MOMENT,
+    SHOW_AND_TELL_EVENT,
     TOPIC_BOUNDARY,
+    UNFINISHED_THREAD,
     memory_relationship_next_hook,
     memory_relationship_topic,
     relationship_memories,
@@ -1472,6 +1474,22 @@ class ParentReportService:
             actions.append(
                 "孩子表达不想聊或想换题时，家长可以尊重停顿，给两个轻松选择，不把话题拉回旧问题。"
             )
+        for memory in relationship_memories(
+            memories,
+            relationship_memory_type=SHOW_AND_TELL_EVENT,
+        )[:1]:
+            topic = memory_relationship_topic(memory) or "一个东西"
+            actions.append(
+                f"孩子今天拿了一个{topic}给小白狐看；"
+                "家长今晚可以轻轻问一句“今天给小白狐看的是什么呀”，不做评价。"
+            )
+        for memory in relationship_memories(
+            memories,
+            relationship_memory_type=UNFINISHED_THREAD,
+        )[:1]:
+            hook = memory_relationship_next_hook(memory)
+            if hook:
+                actions.append(f"孩子之前有未完成的话题；{hook}")
         return actions
 
     def _relationship_memory_payload(

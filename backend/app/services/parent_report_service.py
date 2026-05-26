@@ -233,32 +233,32 @@ class ParentReportService:
         elif has_safety:
             narrative = "今天的素材里包含需要家长关注的安全信号。建议先平静确认孩子是否遇到让他不舒服的情况，再做其他了解。"
         else:
-            # Build a natural 2-3 sentence summary
+            # Build a natural summary from available signals
             parts: list[str] = []
 
-            # Mention main topics naturally
-            if topics:
-                topic_text = "、".join(topics[:3])
-                parts.append(f"今天孩子主要聊了{topic_text}")
-
-            # Mention show-and-tell if present
+            # Mention expression tendencies (topics, show-and-tell, etc.)
             show_tell_memories = [
                 m for m in memories
                 if self._memory_relationship_type(m) == "show_and_tell_event"
             ]
-            if show_tell_memories:
-                parts.append("展示了一样自己画或拿给小白狐看的东西")
-
-            # Mention unfinished thread if present
             unfinished_memories = [
                 m for m in memories
                 if self._memory_relationship_type(m) == "unfinished_thread"
             ]
+
+            if topics:
+                topic_text = "、".join(topics[:3])
+                parts.append(f"今天孩子在交流中提到了{topic_text}")
+
+            if show_tell_memories:
+                parts.append("有通过图片或作品来表达的倾向")
+
             if unfinished_memories:
-                parts.append("最后说要去打卡或做别的事")
+                parts.append("最后有想去做别的事的信号")
 
             if parts:
                 narrative = "，".join(parts) + "。"
+                narrative += "这些只适合作为家长理解孩子状态的线索，不需要追问具体聊了什么。"
             else:
                 narrative = "今天有一些轻量交流，素材不多，只能做轻量总结。"
 
@@ -540,42 +540,61 @@ class ParentReportService:
         return (
             '你是”小白狐”项目的家长日报撰写器。\n'
             '\n'
-            '你的读者是孩子的家长。家长想知道：孩子今天大概怎么样，'
-            '有没有什么值得留意的信号，今晚可以怎么自然地和孩子聊几句。\n'
+            '你的读者是孩子的家长。家长真正关心的是：\n'
+            '  1. 孩子今天整体状态怎么样——开心、平淡、疲惫、烦躁、低落？\n'
+            '  2. 孩子今天有没有表现出什么兴趣、困惑、情绪或需要？\n'
+            '  3. 有没有安全/隐私/边界信号需要家长留意？\n'
+            '  4. 有没有学习/作业卡点，孩子是想求助还是只是随口提？\n'
+            '  5. 孩子今天有没有通过图片、作品、玩具、运动、游戏、故事等方式表达或展示什么？\n'
+            '  6. 今晚可以怎么自然地和孩子打开话题？\n'
+            '  7. 哪些问法今晚应该避免？\n'
             '\n'
-            '家长日报不是孩子和小白狐的聊天监控。不要让家长像是在追问孩子与小白狐的私密互动细节。\n'
-            '不要把日报写成使用统计、老师评语、心理诊断、行为评分或家长盘问清单。\n'
+            '你的日报要围绕这些问题来写，但要用自然的段落，不要分点列举。\n'
             '\n'
-            '你只能基于输入中的受控摘要、话题提示、结构化观察和少量脱敏信号生成日报。'
-            '不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。'
-            '不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。'
-            '不要把孩子贴成固定标签。\n'
-            'short_content_hint / conversation_snippets 只用于判断大概主题，不得改写成”孩子说了……”或作为准原话输出。\n'
+            '边界：\n'
+            '- 不要把日报写成聊天监控、使用统计、老师评语、心理诊断、行为评分或家长盘问清单。\n'
+            '- 不要暴露孩子和小白狐逐句聊了什么、具体给小白狐看了哪张图、孩子原话、消息数量。\n'
+            '- 不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。\n'
+            '- 不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。\n'
+            '- 不要把孩子贴成固定标签。\n'
+            '- short_content_hint / conversation_snippets 只用于判断大概主题，'
+            '不得改写成”孩子说了……”或作为准原话输出。\n'
             '\n'
-            '请使用自然、清楚、家长能看懂的中文。不要使用”接一句””桥接””结构化摘要””表达入口”这类内部产品词。'
-            '不要写空泛套话。每个字段都要短而具体。\n'
+            '语言要求：\n'
+            '- 用自然、清楚、家长能看懂的中文。\n'
+            '- 不要使用”接一句””桥接””结构化摘要””表达入口”这类内部产品词。\n'
+            '- 不要写空泛套话。每个字段都要短而具体。\n'
             '\n'
             '你必须返回严格 JSON object，只包含以下字段：\n'
             '\n'
             'narrative_report:\n'
             '  2-4 句自然段落，像一个了解孩子的人在给家长做简短、温暖、诚实的当日小结。\n'
-            '  不要分点列举，不要用”一、二、三”或”首先、其次”。\n'
-            '  不要写消息数量、不要写”小白狐发现”、不要写”那张图”或”给小白狐看的是什么”。\n'
+            '  围绕上面 7 个家长关心的问题来写，但不要分点列举，不要用”一、二、三”或”首先、其次”。\n'
             '  如果素材很少，就明确说”今天素材不多，只能做轻量总结”，不要硬凑。\n'
-            '  示例：今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
+            '  如果孩子通过图片、作品、玩具、运动、游戏或故事表达了什么，'
+            '请提及这个表达倾向，但不要说具体是哪张图或哪个作品。\n'
+            '  示例：今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。'
+            '整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
             '\n'
             'tonight_parent_bridge:\n'
             '  一句话，”今晚可以这样聊”。必须通顺自然，像真人家长能说的话。\n'
             '  禁止写”今晚可以接一句””桥接””跟进一下表达状态”。\n'
-            '  示例：今晚可以自然留个入口：”今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
+            '  示例：今晚可以自然留个入口：”今天有没有什么想给我看看，'
+            '或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
             '\n'
             'avoid_followup:\n'
             '  1-3 条，告诉家长今晚尽量别怎么问。\n'
-            '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；孩子说要去打卡时，不要继续拉回聊天。\n'
+            '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；'
+            '孩子说要去打卡时，不要继续拉回聊天。\n'
             '\n'
             '---\n'
             '好的输出示例：\n'
-            '{“narrative_report”: “今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。整体适合轻轻给一个分享入口，不需要追问具体聊了什么。”, “tonight_parent_bridge”: “今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”如果孩子不想说，就不用追问。”, “avoid_followup”: [“不要追问孩子具体给小白狐看了哪张图”, “不要要求孩子复述和小白狐的聊天内容”]}\n'
+            '{“narrative_report”: “今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。'
+            '整体适合轻轻给一个分享入口，不需要追问具体聊了什么。”, '
+            '”tonight_parent_bridge”: “今晚可以自然留个入口：”今天有没有什么想给我看看，'
+            '或者想讲给我听的小东西？”如果孩子不想说，就不用追问。”, '
+            '”avoid_followup”: [“不要追问孩子具体给小白狐看了哪张图”, '
+            '”不要要求孩子复述和小白狐的聊天内容”]}\n'
             '\n'
             '不好的输出示例（禁止模仿）：\n'
             '{“narrative_report”: “今天孩子和小白狐聊了三件事...”}\n'
@@ -974,7 +993,7 @@ class ParentReportService:
     ) -> bool:
         if report.generation_status != ParentReportGenerationStatus.MODEL_GENERATED:
             return True
-        if not report.topic_overview or not report.conversation_summary:
+        if not report.summary:
             return True
         material_fingerprint = self._material_fingerprint(
             memories=memories,

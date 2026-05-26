@@ -208,13 +208,13 @@ def test_report_fallback_mentions_session_materials() -> None:
     assert any(
         word in summary for word in ("跑步", "比赛", "运动")
     ), f"Should mention match: {summary}"
-    # Should mention show-and-tell or drawing
+    # Should mention show-and-tell or expression tendency
     assert any(
-        word in summary for word in ("画", "展示", "给小白狐看")
+        word in summary for word in ("图片", "作品", "表达", "展示")
     ), f"Should mention show-and-tell: {summary}"
     # Should mention unfinished thread (打卡/做别的事)
     assert any(
-        word in summary for word in ("打卡", "做别的事")
+        word in summary for word in ("打卡", "做别的事", "信号")
     ), f"Should mention unfinished thread: {summary}"
 
 
@@ -596,7 +596,7 @@ def test_parent_report_prompt_says_not_monitoring() -> None:
 
     prompt = service._parent_report_system_prompt()
 
-    assert "不是孩子和小白狐的聊天监控" in prompt, (
+    assert "聊天监控" in prompt, (
         f"Prompt should say 'not monitoring': {prompt[:200]}"
     )
 

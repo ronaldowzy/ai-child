@@ -153,6 +153,21 @@ class ParentReportService:
             return [str(item) for item in support_style]
         return []
 
+    def _lookup_topic_boundaries(self, child_id: str) -> list[str]:
+        if self._parent_policy_service is None:
+            return []
+        try:
+            policy = self._parent_policy_service.get_policy(child_id)
+        except Exception:  # noqa: BLE001
+            return []
+        preferences = getattr(policy, "communication_preferences", None)
+        if not isinstance(preferences, dict):
+            return []
+        boundaries = preferences.get("topic_boundaries")
+        if isinstance(boundaries, list):
+            return [str(item) for item in boundaries if str(item).strip()]
+        return []
+
     def _generate_daily_report_from_materials(
         self,
         *,
@@ -162,6 +177,7 @@ class ParentReportService:
         conversation_messages: list[ConversationReportMessage],
     ) -> ParentReport:
         support_style = self._lookup_support_style(child_id)
+        topic_boundaries = self._lookup_topic_boundaries(child_id)
         conversation = self._conversation_analysis(conversation_messages)
         fallback_report = self._deterministic_fallback_report(
             child_id=child_id,
@@ -184,6 +200,7 @@ class ParentReportService:
             fallback_report=fallback_report,
             material_fingerprint=material_fingerprint,
             support_style=support_style,
+            topic_boundaries=topic_boundaries,
         )
         if model_result.report is not None:
             return model_result.report
@@ -286,6 +303,7 @@ class ParentReportService:
         fallback_report: ParentReport,
         material_fingerprint: str,
         support_style: list[str] | None = None,
+        topic_boundaries: list[str] | None = None,
     ) -> _ModelDailyReportResult:
         try:
             response = self._request_model_report(
@@ -297,6 +315,7 @@ class ParentReportService:
                 fallback_report=fallback_report,
                 retry=False,
                 support_style=support_style,
+                topic_boundaries=topic_boundaries,
             )
         except Exception as exc:  # noqa: BLE001 - report generation must not block.
             error_type = exc.__class__.__name__
@@ -331,6 +350,7 @@ class ParentReportService:
                     fallback_report=fallback_report,
                     retry=True,
                     support_style=support_style,
+                    topic_boundaries=topic_boundaries,
                 )
             except Exception as exc:  # noqa: BLE001 - report fallback must hold.
                 error_type = exc.__class__.__name__
@@ -451,6 +471,7 @@ class ParentReportService:
         fallback_report: ParentReport,
         retry: bool,
         support_style: list[str] | None = None,
+        topic_boundaries: list[str] | None = None,
     ):
         payload = self._parent_report_model_payload(
             target_date=target_date,
@@ -459,6 +480,7 @@ class ParentReportService:
             conversation=conversation,
             fallback_report=fallback_report,
             support_style=support_style,
+            topic_boundaries=topic_boundaries,
         )
         user_prefix = (
             "上一次输出为空或不可解析。请只返回严格 JSON object，不要解释。\n"
@@ -560,11 +582,33 @@ class ParentReportService:
         conversation: dict[str, list[str]],
         fallback_report: ParentReport,
         support_style: list[str] | None = None,
+        topic_boundaries: list[str] | None = None,
     ) -> dict[str, object]:
+        # Build memory summaries with relationship_memory_type
+        memory_summaries = []
+        for memory in memories[:6]:
+            rel_type = self._memory_relationship_type(memory)
+            summary: dict[str, object] = {
+                "type": memory.memory_type.value,
+                "content": self._safe_text(memory.content)[:80],
+                "requires_parent_attention": memory.requires_parent_attention,
+            }
+            if rel_type:
+                summary["relationship_memory_type"] = rel_type
+            memory_summaries.append(summary)
+
+        # Build short_content_hint from conversation snippets
+        short_hints = []
+        for msg in conversation_messages[:2]:
+            hint = self._conversation_snippet(msg).get("short_content_hint", "")
+            if hint:
+                short_hints.append(str(hint)[:40])
+
         payload: dict[str, object] = {
             "report_date": target_date.isoformat(),
             "material_policy": (
-                "Only structured summaries are provided; do not quote child text."
+                "Only structured summaries are provided; do not quote child text verbatim. "
+                "Use safe summaries and topic labels only."
             ),
             "topic_hints": conversation["topics"],
             "topic_overview_hints": [
@@ -581,6 +625,7 @@ class ParentReportService:
             )
             if conversation["conversation_summary"]
             else "",
+            "short_content_hint": "; ".join(short_hints)[:120] if short_hints else "",
             "avoid_followup_hints": conversation["avoid_followup"],
             "observation_hints": {
                 "learning": [
@@ -594,14 +639,7 @@ class ParentReportService:
                 ],
                 "safety": [item[:100] for item in conversation["safety_alerts"][:2]],
             },
-            "memory_summaries": [
-                {
-                    "type": memory.memory_type.value,
-                    "content": self._safe_text(memory.content)[:80],
-                    "requires_parent_attention": memory.requires_parent_attention,
-                }
-                for memory in memories[:4]
-            ],
+            "memory_summaries": memory_summaries,
             "conversation_snippets": [
                 self._conversation_snippet(message)
                 for message in conversation_messages[:2]
@@ -628,7 +666,20 @@ class ParentReportService:
         }
         if support_style:
             payload["support_style_preferences"] = support_style
+
+        # Add topic_boundaries from parent policy
+        if topic_boundaries:
+            payload["topic_boundaries"] = topic_boundaries[:3]
+
         return payload
+
+    def _memory_relationship_type(self, memory: MemoryItem) -> str | None:
+        """Extract relationship_memory_type from memory evidence metadata."""
+        for evidence in memory.evidence:
+            value = evidence.metadata.get("relationship_memory_type")
+            if isinstance(value, str):
+                return value
+        return None
 
     def _conversation_snippet(
         self,
@@ -1595,18 +1646,50 @@ class ParentReportService:
                 "建议先完成安全确认，再进行学习或日常交流。"
             )
 
+        # Build a more specific summary using session material
+        parts: list[str] = []
+
+        # Mention conversation topics if available
+        if conversation_topics:
+            topic_text = "、".join(conversation_topics[:3])
+            parts.append(f"孩子今天主要聊了{topic_text}")
+
+        # Mention show-and-tell if present
+        show_tell_memories = [
+            m for m in memories
+            if self._memory_relationship_type(m) == "show_and_tell_event"
+        ]
+        if show_tell_memories:
+            parts.append("展示了一样自己画或拿给小白狐看的东西")
+
+        # Mention unfinished thread if present
+        unfinished_memories = [
+            m for m in memories
+            if self._memory_relationship_type(m) == "unfinished_thread"
+        ]
+        if unfinished_memories:
+            parts.append("最后说要去打卡或做别的事")
+
+        # Add observation focus
         focus: list[str] = []
-        if has_learning:
-            focus.append("学习支持")
-        if has_expression:
-            focus.append("表达方式")
         if has_emotion:
             focus.append("情绪状态")
+        if has_expression:
+            focus.append("表达方式")
+        if has_learning:
+            focus.append("学习支持")
+
+        if parts:
+            summary = "，".join(parts) + "。"
+            if focus:
+                summary += f"家长可关注{'、'.join(focus)}。"
+            return summary
+
+        # Fallback to generic
         focus.extend(conversation_topics)
         if not focus:
             focus.append("日常兴趣和事件")
         focus = self._dedupe_and_limit(focus, limit=6)
-
         focus_text = "、".join(focus)
         state_text = conversation_state[0] if conversation_state else (
             "整体适合用低压力提问和具体小步骤支持孩子。"

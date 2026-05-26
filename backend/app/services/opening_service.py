@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from contextvars import copy_context
 from dataclasses import dataclass
+import hashlib
 import logging
 import time
 
@@ -27,6 +28,11 @@ from app.services.opening_policy import (
 from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
+)
+from app.services.relationship_memory import (
+    latest_interest_seed,
+    latest_show_and_tell_event,
+    latest_unfinished_thread,
 )
 from app.services.time_context_service import (
     TimeContextService,
@@ -404,15 +410,22 @@ class OpeningService:
         name = self._child_call_name(parent_policy)
         prefix = f"{name}，" if name else ""
         topic = opening_policy.seed_topic or ""
+
+        # Try memory-aware opening first (unfinished thread, show-and-tell, interest)
+        memory_opening = self._memory_aware_opening(
+            prefix=prefix,
+            parent_policy=parent_policy,
+            opening_policy=opening_policy,
+        )
+        if memory_opening:
+            return memory_opening
+
         if opening_policy.mode == OpeningMode.INTEREST_CALLBACK and topic:
-            if opening_policy.age_band == "age_5_6":
-                text = f"{prefix}小白狐记得{topic}。聊它，还是听小故事？"
-            elif opening_policy.age_band == "age_9_10":
-                text = f"{prefix}我记得你提过{topic}。想聊它、换轻松的，还是做个小计划？"
-            else:
-                text = f"{prefix}我记得你提过{topic}。今天想聊它，还是换个轻松的？"
+            templates = self._interest_callback_templates(prefix, topic, opening_policy)
+            text = self._select_by_variation(templates, parent_policy)
         elif opening_policy.mode == OpeningMode.BOUNDARY_RESPECT:
-            text = f"{prefix}上次那个我们先不聊。今天想说新的，还是让小白狐先讲一句？"
+            templates = self._boundary_respect_templates(prefix, opening_policy)
+            text = self._select_by_variation(templates, parent_policy)
         elif opening_policy.mode == OpeningMode.LOW_EXPRESSION_SUPPORT:
             text = f"{prefix}你可以只说一个词。说不完整也没关系。"
         elif opening_policy.mode == OpeningMode.BEDTIME_CLOSURE:
@@ -422,11 +435,132 @@ class OpeningService:
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
             text = f"{prefix}这句话也可以告诉家长。小白狐先听你说一点点。"
         else:
-            text = f"{prefix}我在这里。你可以慢慢说一句，也可以先听小白狐说一句。"
+            templates = self._default_greeting_templates(prefix, opening_policy)
+            text = self._select_by_variation(templates, parent_policy)
         return self._sanitize_opening_text(
             text,
             opening_policy=opening_policy,
         )
+
+    def _memory_aware_opening(
+        self,
+        *,
+        prefix: str,
+        parent_policy: ParentPolicy,
+        opening_policy: OpeningPolicy,
+    ) -> str | None:
+        """Try to build an opening from recent memory (unfinished thread, show-and-tell, interest)."""
+        child_id = parent_policy.child_id
+        if not child_id:
+            return None
+
+        # Unfinished thread — light callback, explicitly allow not continuing
+        unfinished = latest_unfinished_thread(self._memory_service, child_id=child_id)
+        if unfinished:
+            hook = unfinished.content or ""
+            # Extract a safe summary (e.g., "英语打卡") from the thread
+            safe_hook = self._safe_memory_hook(hook)
+            if safe_hook:
+                text = f"{prefix}上次你说要去{safe_hook}，今天不用接着说，想换个话题也可以。"
+                sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
+                if sanitized:
+                    return sanitized
+
+        # Show-and-tell event — light callback
+        show_tell = latest_show_and_tell_event(self._memory_service, child_id=child_id)
+        if show_tell:
+            topic = show_tell.content or ""
+            safe_topic = self._safe_memory_hook(topic)
+            if safe_topic:
+                text = f"{prefix}还记得你上次给小白狐看的{safe_topic}。今天想聊点什么？"
+                sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
+                if sanitized:
+                    return sanitized
+
+        # Interest seed — light callback
+        interest = latest_interest_seed(self._memory_service, child_id=child_id)
+        if interest:
+            topic = interest.content or ""
+            safe_topic = self._safe_memory_hook(topic)
+            if safe_topic:
+                text = f"{prefix}小白狐记得你聊过{safe_topic}。今天想慢慢说一点，还是先换个轻松的？"
+                sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
+                if sanitized:
+                    return sanitized
+
+        return None
+
+    def _safe_memory_hook(self, text: str) -> str:
+        """Extract a safe, short summary from memory content."""
+        # Remove common prefixes
+        for prefix in ("孩子近期自然聊到", "孩子自然提到", "可作为低压力回访的兴趣种子。"):
+            text = text.replace(prefix, "")
+        # Take first clause only
+        for sep in ("，", "。", "、"):
+            if sep in text:
+                text = text.split(sep)[0]
+        return text.strip()[:20]
+
+    def _interest_callback_templates(
+        self,
+        prefix: str,
+        topic: str,
+        opening_policy: OpeningPolicy,
+    ) -> list[str]:
+        if opening_policy.age_band == "age_5_6":
+            return [
+                f"{prefix}小白狐记得{topic}。聊它，还是听小故事？",
+                f"{prefix}{topic}还在吗？想聊就聊，不想聊也行。",
+            ]
+        if opening_policy.age_band == "age_9_10":
+            return [
+                f"{prefix}我记得你提过{topic}。想聊它、换轻松的，还是做个小计划？",
+                f"{prefix}{topic}今天可以接着说，也可以换个新话题。",
+            ]
+        return [
+            f"{prefix}我记得你提过{topic}。今天想聊它，还是换个轻松的？",
+            f"{prefix}小白狐还记得{topic}。想说就说，不想说也行。",
+        ]
+
+    def _boundary_respect_templates(
+        self,
+        prefix: str,
+        opening_policy: OpeningPolicy,
+    ) -> list[str]:
+        return [
+            f"{prefix}上次那个我们先不聊。今天想说新的，还是让小白狐先讲一句？",
+            f"{prefix}那个话题我们先放一放。今天可以换个轻松的，也可以先听小白狐说。",
+        ]
+
+    def _default_greeting_templates(
+        self,
+        prefix: str,
+        opening_policy: OpeningPolicy,
+    ) -> list[str]:
+        return [
+            f"{prefix}我在这里。你可以慢慢说一句，也可以先听小白狐说一句。",
+            f"{prefix}小白狐在这里。今天可以先说一件小事，也可以拍给我看。",
+            f"{prefix}回来啦。想聊什么都可以，不想说也没关系。",
+        ]
+
+    def _select_by_variation(
+        self,
+        templates: list[str],
+        parent_policy: ParentPolicy,
+    ) -> str:
+        """Select a template based on session_id/date hash for variation."""
+        if len(templates) <= 1:
+            return templates[0] if templates else ""
+        # Use child_id + today's date to create variation
+        today = self._now_date()
+        seed = f"{parent_policy.child_id}:{today}"
+        index = int(hashlib.md5(seed.encode()).hexdigest(), 16) % len(templates)
+        return templates[index]
+
+    def _now_date(self) -> str:
+        """Get current date as string for variation hashing."""
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     def _child_call_name(self, parent_policy: ParentPolicy) -> str:
         return (

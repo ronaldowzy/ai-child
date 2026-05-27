@@ -1,6 +1,7 @@
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from contextvars import copy_context
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import logging
@@ -22,6 +23,14 @@ from app.services.conversation_persistence_service import (
 from app.services.conversation_service import ConversationService
 from app.services.text_segmenter import TextSegment, TextSegmenter
 from app.services.tts_service import TtsService, get_tts_service
+
+
+@dataclass
+class _TtsSegmentResult:
+    segment_index: int
+    audio_url: str | None
+    error_code: str | None
+    elapsed_ms: float
 
 
 class _NoopConversationTtsService:
@@ -95,6 +104,7 @@ class ConversationStreamService:
         first_text_ms: float | None = None
         first_tts_start_ms: float | None = None
         first_audio_ms: float | None = None
+        model_ms: float | None = None
         active_scene: str | None = None
         error_type: str | None = None
         healthy_engagement: dict[str, object] | None = None
@@ -121,7 +131,9 @@ class ConversationStreamService:
         )
 
         try:
+            model_started_at = time.perf_counter()
             response = self._conversation_service.handle_message(request)
+            model_ms = round((time.perf_counter() - model_started_at) * 1000, 1)
         except Exception as exc:
             error_type = exc.__class__.__name__
             yield builder.event(
@@ -147,6 +159,7 @@ class ConversationStreamService:
                 first_text_ms=first_text_ms,
                 first_tts_start_ms=first_tts_start_ms,
                 first_audio_ms=first_audio_ms,
+                model_ms=model_ms,
                 text_segment_count=0,
                 tts_segment_count=tts_segment_count,
                 audio_segment_count=audio_segment_count,
@@ -173,55 +186,48 @@ class ConversationStreamService:
             request=request,
             response=response,
         )
+
+        # 阶段1: 先发送所有文字事件，让孩子立刻看到文字
         for segment in segments:
             if first_text_ms is None:
                 first_text_ms = self._elapsed_ms(started_at)
             yield builder.event("text_delta", self._text_delta_payload(segment))
             yield builder.event("sentence_ready", self._sentence_ready_payload(segment))
-            if should_generate_tts:
-                tts_segment_count += 1
-                if first_tts_start_ms is None:
-                    first_tts_start_ms = self._elapsed_ms(started_at)
+
+        # 阶段2: 并行生成所有段的 TTS
+        tts_results: list[_TtsSegmentResult] = []
+        if should_generate_tts and segments:
+            first_tts_start_ms = self._elapsed_ms(started_at)
+            for segment in segments:
                 yield builder.event("tts_started", self._tts_started_payload(segment))
-                try:
-                    audio_url = self._generate_tts_with_soft_timeout(
-                        text=segment.text,
-                        emotion=response.reply.emotion,
-                    )
-                except FutureTimeoutError:
+            tts_results = self._generate_tts_parallel(
+                segments=segments,
+                emotion=response.reply.emotion,
+            )
+            # 按段顺序返回音频事件
+            for result in tts_results:
+                segment = segments[result.segment_index]
+                tts_segment_count += 1
+                if result.error_code:
                     tts_error_count += 1
                     yield builder.event(
                         "error",
-                        self._tts_error_payload(segment, code="tts_timeout"),
+                        self._tts_error_payload(segment, code=result.error_code),
                     )
-                    continue
-                except Exception:
-                    tts_error_count += 1
+                else:
+                    audio_segment_count += 1
+                    if first_audio_ms is None:
+                        first_audio_ms = self._elapsed_ms(started_at)
+                    if first_audio_url is None:
+                        first_audio_url = result.audio_url
                     yield builder.event(
-                        "error",
-                        self._tts_error_payload(segment, code="tts_failed"),
+                        "audio_ready",
+                        self._audio_ready_payload(
+                            segment,
+                            audio_url=result.audio_url,
+                            play_order=audio_segment_count - 1,
+                        ),
                     )
-                    continue
-                if not audio_url:
-                    tts_error_count += 1
-                    yield builder.event(
-                        "error",
-                        self._tts_error_payload(segment, code="tts_unavailable"),
-                    )
-                    continue
-                audio_segment_count += 1
-                if first_audio_ms is None:
-                    first_audio_ms = self._elapsed_ms(started_at)
-                if first_audio_url is None:
-                    first_audio_url = audio_url
-                yield builder.event(
-                    "audio_ready",
-                    self._audio_ready_payload(
-                        segment,
-                        audio_url=audio_url,
-                        play_order=audio_segment_count - 1,
-                    ),
-                )
 
         final_text_hash = self._text_hash(final_text)
         yield builder.event(
@@ -263,6 +269,7 @@ class ConversationStreamService:
             first_text_ms=first_text_ms,
             first_tts_start_ms=first_tts_start_ms,
             first_audio_ms=first_audio_ms,
+            model_ms=model_ms,
             text_segment_count=len(segments),
             tts_segment_count=tts_segment_count,
             audio_segment_count=audio_segment_count,
@@ -430,6 +437,114 @@ class ConversationStreamService:
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
+    def _generate_tts_parallel(
+        self,
+        *,
+        segments: list[TextSegment],
+        emotion: str,
+    ) -> list[_TtsSegmentResult]:
+        """并行生成多段 TTS，按段索引排序返回结果。"""
+        if not segments:
+            return []
+
+        timeout_ms = self._settings.conversation_stream_tts_soft_timeout_ms
+        max_workers = min(len(segments), 4)
+        base_context = copy_context()
+        executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="stream-tts-parallel",
+        )
+        try:
+            future_to_index: dict[Future, int] = {}
+            for segment in segments:
+                # 每个线程需要独立的 context 副本
+                seg_context = copy_context()
+                future = executor.submit(
+                    seg_context.run,
+                    self._tts_service.generate_for_conversation,
+                    text=segment.text,
+                    emotion=emotion,
+                )
+                future_to_index[future] = segment.index
+
+            results_by_index: dict[int, _TtsSegmentResult] = {}
+            for future in future_to_index:
+                seg_index = future_to_index[future]
+                seg_started_at = time.perf_counter()
+                try:
+                    if timeout_ms > 0:
+                        audio_url = future.result(timeout=timeout_ms / 1000)
+                    else:
+                        audio_url = future.result()
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    if not audio_url:
+                        results_by_index[seg_index] = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=None,
+                            error_code="tts_unavailable",
+                            elapsed_ms=elapsed_ms,
+                        )
+                    else:
+                        results_by_index[seg_index] = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=audio_url,
+                            error_code=None,
+                            elapsed_ms=elapsed_ms,
+                        )
+                except FutureTimeoutError:
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    results_by_index[seg_index] = _TtsSegmentResult(
+                        segment_index=seg_index,
+                        audio_url=None,
+                        error_code="tts_timeout",
+                        elapsed_ms=elapsed_ms,
+                    )
+                except Exception:
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    results_by_index[seg_index] = _TtsSegmentResult(
+                        segment_index=seg_index,
+                        audio_url=None,
+                        error_code="tts_failed",
+                        elapsed_ms=elapsed_ms,
+                    )
+
+            self._log_tts_parallel_summary(
+                results=results_by_index,
+                segment_count=len(segments),
+            )
+            return [results_by_index[i] for i in sorted(results_by_index)]
+        finally:
+            # 不使用 cancel_futures=True，避免一个段超时导致其他段被取消
+            executor.shutdown(wait=False)
+
+    def _log_tts_parallel_summary(
+        self,
+        *,
+        results: dict[int, _TtsSegmentResult],
+        segment_count: int,
+    ) -> None:
+        """记录并行 TTS 汇总日志，不含原文内容。"""
+        success_count = sum(1 for r in results.values() if r.error_code is None)
+        error_count = segment_count - success_count
+        elapsed_values = [r.elapsed_ms for r in results.values()]
+        max_elapsed = max(elapsed_values) if elapsed_values else 0
+        min_elapsed = min(elapsed_values) if elapsed_values else 0
+        logging.getLogger("app.tts_timing").info(
+            "tts_parallel_finished",
+            extra={
+                "event": "tts_parallel_finished",
+                "request_id": get_request_id(),
+                "segment_count": segment_count,
+                "success_count": success_count,
+                "error_count": error_count,
+                "max_segment_ms": round(max_elapsed, 1),
+                "min_segment_ms": round(min_elapsed, 1),
+                "parallel_speedup_ms": round(
+                    sum(elapsed_values) - max_elapsed, 1
+                ) if len(elapsed_values) > 1 else 0,
+            },
+        )
+
     def _should_generate_tts(
         self,
         *,
@@ -458,6 +573,7 @@ class ConversationStreamService:
         first_text_ms: float | None,
         first_tts_start_ms: float | None,
         first_audio_ms: float | None,
+        model_ms: float | None = None,
         text_segment_count: int,
         tts_segment_count: int,
         audio_segment_count: int,
@@ -467,6 +583,9 @@ class ConversationStreamService:
         request_start: float,
     ) -> None:
         stream_total_ms = self._elapsed_ms(started_at)
+        text_to_audio_ms = None
+        if first_text_ms is not None and first_audio_ms is not None:
+            text_to_audio_ms = round(first_audio_ms - first_text_ms, 1)
         logging.getLogger("app.stream_timing").info(
             "conversation_stream_finished",
             extra={
@@ -475,10 +594,12 @@ class ConversationStreamService:
                 "request_start": request_start,
                 "session_id_hash": hash_identifier(request.session_id),
                 "active_scene": active_scene,
+                "model_ms": model_ms,
                 "first_text_ms": first_text_ms,
                 "first_tts_start_ms": first_tts_start_ms,
                 "tts_started_ms": first_tts_start_ms,
                 "first_audio_ms": first_audio_ms,
+                "text_to_audio_ms": text_to_audio_ms,
                 "stream_total_ms": stream_total_ms,
                 "turn_total_ms": stream_total_ms,
                 "text_segment_count": text_segment_count,

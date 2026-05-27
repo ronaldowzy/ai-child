@@ -738,10 +738,14 @@ def test_stream_timing_log_contains_request_id_and_latency(
     assert record.active_scene == "conversation.open"
     assert record.session_id_hash
     assert record.request_start is not None
+    assert record.model_ms is not None
+    assert record.model_ms >= 0
     assert record.first_text_ms is not None
     assert record.first_tts_start_ms is not None
     assert record.tts_started_ms == record.first_tts_start_ms
     assert record.first_audio_ms is not None
+    assert record.text_to_audio_ms is not None
+    assert record.text_to_audio_ms >= 0
     assert record.text_segment_count >= 1
     assert record.stream_total_ms >= record.first_text_ms
     assert record.turn_total_ms == record.stream_total_ms
@@ -749,3 +753,100 @@ def test_stream_timing_log_contains_request_id_and_latency(
     assert record.audio_segment_count >= 1
     assert record.tts_error_count == 0
     assert "我想聊恐龙。再聊三角龙！" not in caplog.text
+
+
+def test_parallel_tts_generates_all_audio_events() -> None:
+    """并行 TTS 应为所有段生成音频事件，顺序与段顺序一致。"""
+    tts_service = UrlTtsService()
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段并行测试文字已经准备好了。"
+                "第二段并行测试文字也应该完成。"
+                "第三段并行测试文字同样需要生成。"
+            )
+        ),
+        tts_service=tts_service,
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="并行测试", include_tts=True),
+    )
+
+    audio_ready = [e for e in events if e["type"] == "audio_ready"]
+    tts_started = [e for e in events if e["type"] == "tts_started"]
+
+    assert len(tts_started) == 3
+    assert len(audio_ready) == 3
+    assert len(tts_service.calls) == 3
+
+    # 验证音频事件按段顺序排列
+    for i, event in enumerate(audio_ready):
+        assert event["payload"]["sentence_index"] == i
+        assert event["payload"]["play_order"] == i
+
+    # 验证所有文字事件在音频事件之前
+    last_text_delta_idx = _event_index(events, "text_delta", sentence_index=2)
+    first_audio_idx = _event_index(events, "audio_ready", sentence_index=0)
+    assert last_text_delta_idx < first_audio_idx
+
+
+def test_parallel_tts_partial_failure_preserves_order() -> None:
+    """并行 TTS 中部分失败不影响其他段的顺序。"""
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text=(
+                "第一段文字应该能够成功生成音频。"
+                "第二段文字会模拟失败但不影响后面。"
+                "第三段文字也应该能够成功生成音频。"
+            )
+        ),
+        tts_service=PartiallyFailingTtsService(fail_call_indexes={1}),
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="并行部分失败测试", include_tts=True),
+    )
+
+    audio_ready = [e for e in events if e["type"] == "audio_ready"]
+    error_events = [e for e in events if e["type"] == "error" and e["payload"].get("stage") == "tts"]
+
+    assert len(audio_ready) == 2
+    assert len(error_events) == 1
+    assert error_events[0]["payload"]["sentence_index"] == 1
+    assert {e["payload"]["sentence_index"] for e in audio_ready} == {0, 2}
+    assert events[-1]["type"] == "done"
+    assert events[-1]["payload"]["tts_error_count"] == 1
+
+
+def test_tts_parallel_timing_log_emitted(caplog) -> None:
+    """并行 TTS 完成后应发出 tts_parallel_finished 日志。"""
+    caplog.set_level(logging.INFO, logger="app.tts_timing")
+    service = ConversationStreamService(
+        conversation_service=StaticConversationService(
+            reply_text="第一段日志测试已经完成了。第二段日志测试也要完成了。"
+        ),
+        tts_service=UrlTtsService(),
+        tts_enabled=True,
+    )
+
+    events = _events_from_service(
+        service,
+        _payload(text="并行日志测试", include_tts=True),
+    )
+
+    parallel_records = [
+        r for r in caplog.records
+        if getattr(r, "event", None) == "tts_parallel_finished"
+    ]
+    assert len(parallel_records) == 1
+    record = parallel_records[0]
+    assert record.segment_count == 2
+    assert record.success_count == 2
+    assert record.error_count == 0
+    assert record.max_segment_ms >= 0
+    assert record.min_segment_ms >= 0

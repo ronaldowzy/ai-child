@@ -21,6 +21,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.middleware.request_id import RequestIdMiddleware, get_request_id
 from app.services.runtime_provider_guard import RuntimeProviderGuard
+from app.services.tts_prewarm_service import get_tts_prewarm_service
 
 configure_logging()
 settings = get_settings()
@@ -90,3 +91,10 @@ app.include_router(parent_report_router, prefix=settings.api_v1_prefix)
 app.include_router(memories_router, prefix=settings.api_v1_prefix)
 app.include_router(tts_router, prefix=settings.api_v1_prefix)
 app.include_router(asr_router, prefix=settings.api_v1_prefix)
+
+
+@app.on_event("startup")
+async def prewarm_tts_cache() -> None:
+    """启动时后台预热常见短句的 TTS 缓存。"""
+    if settings.conversation_tts_enabled:
+        get_tts_prewarm_service().prewarm_async()

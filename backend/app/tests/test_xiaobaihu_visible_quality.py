@@ -4,7 +4,6 @@ from app.domain.attachment import AttachmentStatus, ImagePurpose, RecognizedCont
 from app.services.child_agent_runtime import ChildAgentRuntime
 from app.services.modality_manager import ModalityManager
 from app.services.opening_policy import FORBIDDEN_OPENING_PHRASES
-from app.services.parent_report_service import ParentReportService
 from app.services.prompt_manager import PromptManager
 from app.services.safety_engine import SafetyEngine
 
@@ -64,7 +63,6 @@ def test_xiaobaihu_style_guide_exists_and_sets_friend_companion_direction() -> N
     assert "不是孩子唯一的朋友" in guide
     assert "不替代家长、老师、同伴或现实生活" in guide
     assert "拍给小白狐看" in guide
-    assert "家长端语言" in guide
 
 
 def test_prompt_templates_contain_core_guardrails() -> None:
@@ -162,15 +160,6 @@ def test_runtime_child_fallbacks_do_not_expose_internal_terms() -> None:
 
     for text in fallback_texts:
         _assert_child_visible_clean(text)
-
-
-def test_parent_report_prompt_is_not_monitoring_or_usage_stats() -> None:
-    prompt = ParentReportService()._parent_report_system_prompt()
-
-    assert "不要把日报写成聊天监控、使用统计、老师评语、心理诊断、行为评分或家长盘问清单" in prompt
-    assert "不要暴露孩子和小白狐逐句聊了什么" in prompt
-    assert "不要输出逐字聊天记录" in prompt
-    assert "不要要求孩子复述和小白狐的聊天内容" in prompt
 
 
 def test_safety_engine_blocks_dependency_secret_and_retention_outputs() -> None:

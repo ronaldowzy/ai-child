@@ -1,5 +1,9 @@
 package com.childai.companion.voice
 
+import android.util.Log
+
+private const val QUEUE_TAG = "AudioSegQueue"
+
 data class AudioSegment(
     val audioUrl: String?,
     val text: String,
@@ -33,33 +37,43 @@ class AudioSegmentQueuePlayer(
     }
 
     fun enqueue(segment: AudioSegment) {
-        if (isMuted()) return
+        if (isMuted()) {
+            logQueue("enqueue_skip_muted index=${segment.index} text=${segment.text.take(12)}")
+            return
+        }
         queue.addLast(segment)
+        logQueue("enqueue index=${segment.index} queued=${queue.size} text=${segment.text.take(12)}")
         if (currentSegment == null) {
             playNext()
         }
     }
 
     fun stopAndClear() {
+        val clearedCount = queue.size
         queue.clear()
         currentSegment = null
         ttsController.stop()
+        logQueue("stopAndClear cleared=$clearedCount")
     }
 
     private fun playNext() {
         if (currentSegment != null) return
         if (isMuted()) {
+            val droppedCount = queue.size
             queue.clear()
+            logQueue("playNext_skip_muted dropped=$droppedCount")
             callbacks.onQueueDrained()
             return
         }
 
         val next = queue.removeFirstOrNull()
         if (next == null) {
+            logQueue("playNext_drained")
             callbacks.onQueueDrained()
             return
         }
         currentSegment = next
+        logQueue("playNext_start index=${next.index} remaining=${queue.size} text=${next.text.take(12)}")
 
         val accepted = ttsController.speak(
             request = TtsRequest(
@@ -74,14 +88,17 @@ class AudioSegmentQueuePlayer(
             callbacks = TtsCallbacks(
                 onDiagnostics = callbacks.onDiagnostics,
                 onStart = {
+                    logQueue("playback_start index=${next.index}")
                     callbacks.onStart(next)
                 },
                 onDone = {
+                    logQueue("playback_done index=${next.index}")
                     callbacks.onDone(next)
                     currentSegment = null
                     playNext()
                 },
                 onError = { message ->
+                    logQueue("playback_error index=${next.index} msg=${message.take(40)}")
                     callbacks.onError(message)
                     currentSegment = null
                     playNext()
@@ -90,9 +107,14 @@ class AudioSegmentQueuePlayer(
         )
 
         if (!accepted) {
+            logQueue("playNext_rejected index=${next.index}")
             callbacks.onError(TtsController.AUDIO_PLAYBACK_UNAVAILABLE_MESSAGE)
             currentSegment = null
             playNext()
         }
+    }
+
+    private fun logQueue(message: String) {
+        runCatching { Log.d(QUEUE_TAG, message) }
     }
 }

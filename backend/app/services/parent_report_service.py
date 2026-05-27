@@ -29,15 +29,15 @@ from app.repositories.parent_report_repository import (
 from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.parent_policy_service import ParentPolicyService
+from app.services.parent_report_language_v4 import (
+    avoid_followup_v4,
+    deterministic_narrative_v4,
+    parent_report_system_prompt_v4,
+    tonight_parent_bridge_v4,
+)
 from app.services.relationship_memory import (
-    INTEREST_SEED,
-    PROUD_MOMENT,
-    SHOW_AND_TELL_EVENT,
-    TOPIC_BOUNDARY,
-    UNFINISHED_THREAD,
     memory_relationship_next_hook,
     memory_relationship_topic,
-    relationship_memories,
 )
 
 
@@ -221,74 +221,52 @@ class ParentReportService:
         conversation: dict[str, list[str]],
         support_style: list[str] | None = None,
     ) -> ParentReport:
-
         has_material = bool(memories or conversation_messages)
         topics = conversation.get("topics", [])
         safety_memories = self._safety_memories(memories)
         has_safety = bool(safety_memories) or bool(conversation.get("safety_alerts"))
-
-        # Build a minimal, honest narrative summary
-        if not has_material:
-            narrative = "今天暂无可汇总的素材。建议保持轻量观察，不做额外判断。"
-        elif has_safety:
-            narrative = "今天的素材里包含需要家长关注的安全信号。建议先平静确认孩子是否遇到让他不舒服的情况，再做其他了解。"
-        else:
-            # Build a natural summary from available signals
-            parts: list[str] = []
-
-            # Mention expression tendencies (topics, show-and-tell, etc.)
-            show_tell_memories = [
-                m for m in memories
-                if self._memory_relationship_type(m) == "show_and_tell_event"
-            ]
-            unfinished_memories = [
-                m for m in memories
-                if self._memory_relationship_type(m) == "unfinished_thread"
-            ]
-
-            if topics:
-                topic_text = "、".join(topics[:3])
-                parts.append(f"今天孩子在交流中提到了{topic_text}")
-
-            if show_tell_memories:
-                parts.append("有通过图片或作品来表达的倾向")
-
-            if unfinished_memories:
-                parts.append("最后有想去做别的事的信号")
-
-            if parts:
-                narrative = "，".join(parts) + "。"
-                narrative += "这些只适合作为家长理解孩子状态的线索，不需要追问具体聊了什么。"
-            else:
-                narrative = "今天有一些轻量交流，素材不多，只能做轻量总结。"
-
-        # Build tonight_parent_bridge
-        tonight_parent_bridge = self._tonight_parent_bridge(
-            actions=[],
-            topics=topics,
-            has_material=has_material,
-            has_safety=has_safety,
+        has_show_tell = any(
+            self._memory_relationship_type(memory) == "show_and_tell_event"
+            for memory in memories
+        )
+        has_unfinished = any(
+            self._memory_relationship_type(memory) == "unfinished_thread"
+            for memory in memories
         )
 
-        # Build avoid_followup
-        avoid_followup = self._avoid_followup(
+        child_texts = [
+            message.normalized_text or ""
+            for message in conversation_messages
+            if message.actor == "child"
+        ]
+        has_topic_change = any(
+            self._contains_any(
+                text,
+                ("换个话题", "聊点别的", "别聊这个", "不说了", "算了"),
+            )
+            for text in child_texts
+        )
+        has_sports_fatigue = any(
+            self._has_sports_fatigue_expression(text) for text in child_texts
+        )
+
+        narrative = deterministic_narrative_v4(
+            has_material=has_material,
+            has_safety=has_safety,
             topics=topics,
-            has_topic_change=any(
-                self._contains_any(
-                    text,
-                    ("换个话题", "聊点别的", "别聊这个", "不说了", "算了"),
-                )
-                for text in [
-                    msg.normalized_text or ""
-                    for msg in conversation_messages
-                    if msg.actor == "child"
-                ]
-            ),
-            has_sports_fatigue=any(
-                self._has_sports_fatigue_expression(msg.normalized_text or "")
-                for msg in conversation_messages
-                if msg.actor == "child"
-            ),
+            has_show_tell=has_show_tell,
+            has_unfinished=has_unfinished,
+        )
+        bridge = tonight_parent_bridge_v4(
+            has_material=has_material,
+            has_safety=has_safety,
+            topics=topics,
+        )
+        avoid = avoid_followup_v4(
+            topics=topics,
+            has_topic_change=has_topic_change,
+            has_sports_fatigue=has_sports_fatigue,
+            has_safety=has_safety,
         )
 
         return ParentReport(
@@ -302,8 +280,8 @@ class ParentReportService:
             emotion_observations=[],
             safety_alerts=list(conversation.get("safety_alerts", [])),
             suggested_parent_actions=[],
-            tonight_parent_bridge=tonight_parent_bridge,
-            avoid_followup=avoid_followup,
+            tonight_parent_bridge=bridge,
+            avoid_followup=avoid,
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -537,71 +515,7 @@ class ParentReportService:
         )
 
     def _parent_report_system_prompt(self) -> str:
-        return (
-            '你是”小白狐”项目的家长日报撰写器。\n'
-            '\n'
-            '你的读者是孩子的家长。家长真正关心的是：\n'
-            '  1. 孩子今天整体状态怎么样——开心、平淡、疲惫、烦躁、低落？\n'
-            '  2. 孩子今天有没有表现出什么兴趣、困惑、情绪或需要？\n'
-            '  3. 有没有安全/隐私/边界信号需要家长留意？\n'
-            '  4. 有没有学习/作业卡点，孩子是想求助还是只是随口提？\n'
-            '  5. 孩子今天有没有通过图片、作品、玩具、运动、游戏、故事等方式表达或展示什么？\n'
-            '  6. 今晚可以怎么自然地和孩子打开话题？\n'
-            '  7. 哪些问法今晚应该避免？\n'
-            '\n'
-            '你的日报要围绕这些问题来写，但要用自然的段落，不要分点列举。\n'
-            '\n'
-            '边界：\n'
-            '- 不要把日报写成聊天监控、使用统计、老师评语、心理诊断、行为评分或家长盘问清单。\n'
-            '- 不要暴露孩子和小白狐逐句聊了什么、具体给小白狐看了哪张图、孩子原话、消息数量。\n'
-            '- 不要编造没有出现的事情。不要输出逐字聊天记录。不要引用孩子原话。\n'
-            '- 不要输出 prompt、debug、provider、模型、JSON 解释或技术信息。\n'
-            '- 不要把孩子贴成固定标签。\n'
-            '- short_content_hint / conversation_snippets 只用于判断大概主题，'
-            '不得改写成”孩子说了……”或作为准原话输出。\n'
-            '\n'
-            '语言要求：\n'
-            '- 用自然、清楚、家长能看懂的中文。\n'
-            '- 不要使用”接一句””桥接””结构化摘要””表达入口”这类内部产品词。\n'
-            '- 不要写空泛套话。每个字段都要短而具体。\n'
-            '\n'
-            '你必须返回严格 JSON object，只包含以下字段：\n'
-            '\n'
-            'narrative_report:\n'
-            '  2-4 句自然段落，像一个了解孩子的人在给家长做简短、温暖、诚实的当日小结。\n'
-            '  围绕上面 7 个家长关心的问题来写，但不要分点列举，不要用”一、二、三”或”首先、其次”。\n'
-            '  如果素材很少，就明确说”今天素材不多，只能做轻量总结”，不要硬凑。\n'
-            '  如果孩子通过图片、作品、玩具、运动、游戏或故事表达了什么，'
-            '请提及这个表达倾向，但不要说具体是哪张图或哪个作品。\n'
-            '  示例：今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。'
-            '整体适合轻轻给一个分享入口，不需要追问具体聊了什么。\n'
-            '\n'
-            'tonight_parent_bridge:\n'
-            '  一句话，”今晚可以这样聊”。必须通顺自然，像真人家长能说的话。\n'
-            '  禁止写”今晚可以接一句””桥接””跟进一下表达状态”。\n'
-            '  示例：今晚可以自然留个入口：”今天有没有什么想给我看看，'
-            '或者想讲给我听的小东西？”如果孩子不想说，就不用追问。\n'
-            '\n'
-            'avoid_followup:\n'
-            '  1-3 条，告诉家长今晚尽量别怎么问。\n'
-            '  示例：不要连续追问输赢和细节；不要把图片都当作作业检查；'
-            '孩子说要去打卡时，不要继续拉回聊天。\n'
-            '\n'
-            '---\n'
-            '好的输出示例：\n'
-            '{“narrative_report”: “今天孩子有一些轻量交流，主要围绕图片分享和一个想换题的信号。'
-            '整体适合轻轻给一个分享入口，不需要追问具体聊了什么。”, '
-            '”tonight_parent_bridge”: “今晚可以自然留个入口：”今天有没有什么想给我看看，'
-            '或者想讲给我听的小东西？”如果孩子不想说，就不用追问。”, '
-            '”avoid_followup”: [“不要追问孩子具体给小白狐看了哪张图”, '
-            '”不要要求孩子复述和小白狐的聊天内容”]}\n'
-            '\n'
-            '不好的输出示例（禁止模仿）：\n'
-            '{“narrative_report”: “今天孩子和小白狐聊了三件事...”}\n'
-            '{“narrative_report”: “你今天给小白狐看的是什么？”}\n'
-            '{“narrative_report”: “小白狐发现孩子表达能力较好...”}\n'
-            '{“narrative_report”: “孩子今天共有 5 条消息...”}\n'
-        )
+        return parent_report_system_prompt_v4()
 
     def _parent_report_model_payload(
         self,
@@ -1326,18 +1240,12 @@ class ParentReportService:
         has_topic_change: bool,
         has_sports_fatigue: bool,
     ) -> list[str]:
-        avoid = ["不要追问孩子今天在小白狐里逐字聊了什么。"]
-        if has_topic_change:
-            avoid.append("孩子已经表达换题时，不要把话题拉回旧问题。")
-        if has_sports_fatigue or "运动比赛/跑步" in topics:
-            avoid.append("不要连续核对跑了多远、真假或成绩。")
-        if "学习求助" in topics:
-            avoid.append("不要直接追问最终答案或替孩子完成作业。")
-        if "图片分享" in topics or "看图交流" in topics:
-            avoid.append("不要把所有图片都默认当成作业或隐私问题。")
-        if "游戏/CS" in topics:
-            avoid.append("不要把游戏话题立刻变成时长盘问、输赢评价或禁令谈判。")
-        return self._dedupe_and_limit(avoid, limit=5)
+        return avoid_followup_v4(
+            topics=topics,
+            has_topic_change=has_topic_change,
+            has_sports_fatigue=has_sports_fatigue,
+            has_safety="安全或隐私边界" in topics,
+        )
 
     def _contains_any(self, text: str, markers: tuple[str, ...]) -> bool:
         normalized = text.strip().lower().replace(" ", "")
@@ -1542,56 +1450,22 @@ class ParentReportService:
         has_material: bool,
         has_safety: bool,
     ) -> str:
-        if not has_material:
-            return (
-                "今晚可以轻轻说：“今天如果不想聊也没关系，我们一起做一件轻松的小事。”"
-                "不要追问孩子今天在小白狐里说了什么。"
-            )
-        if has_safety:
-            return (
-                "今晚先用平静语气确认孩子有没有不舒服或需要大人帮忙的事；"
-                "如果孩子不想说，先陪在身边，不追问细节。"
-            )
-        if "图片分享" in topics or "看图交流" in topics:
-            return (
-                "今晚可以自然留个入口：“今天有没有什么想给我看看，或者想讲给我听的小东西？”"
-                "如果孩子不想说，就不用追问。"
-            )
-        if "运动比赛/跑步" in topics:
-            return (
-                "如果孩子自己提起跑步，可以先顺着他说一小句，不核对成绩和真假。"
-            )
-        if "游戏/CS" in topics:
-            return (
-                "如果孩子自己提起游戏，可以先把它当作普通兴趣听一句，不急着谈时长或输赢。"
-            )
-        if "学习求助" in topics:
-            return (
-                "今晚可以轻轻说：“如果有题卡住，我们先听你说题目在问什么。”"
-                "如果孩子不想说，就先休息，不追问答案。"
-            )
-
-        first_action = next((action for action in actions if action.strip()), "")
-        if first_action.startswith("今晚可以"):
-            bridge = first_action
-        else:
-            bridge = "今晚可以轻轻问：“今天有没有一件还不错的小事？”"
-            if first_action:
-                bridge += f" 也可以参考：{first_action}"
-        if not self._contains_any(bridge, ("不追问", "不要追问", "避免连续追问", "换轻松")):
-            bridge += " 如果孩子不想说，就换轻松方式，不追问。"
-        return self._safe_bridge_text(bridge) or (
-            "今晚可以轻轻问一个小细节；如果孩子不想说，就换轻松方式，不追问。"
+        return tonight_parent_bridge_v4(
+            has_material=has_material,
+            has_safety=has_safety,
+            topics=topics,
         )
 
     def _safe_bridge_text(self, text: str) -> str | None:
         safe = self._safe_text(text)
         if not safe:
             return None
-        if self._contains_any(
-            safe,
-            ("backend", "provider", "config", "debug", "模型配置", "后端", "逐字聊天记录", "那张图", "给小白狐看的是什么", "条孩子消息", "条小白狐回复"),
-        ):
+        forbidden = (
+            "backend", "provider", "config", "debug", "模型配置", "后端",
+            "逐字聊天记录", "那张图", "给小白狐看的是什么", "给小白狐看的东西",
+            "条孩子消息", "条小白狐回复", "消息数量",
+        )
+        if self._contains_any(safe, forbidden):
             return None
         return safe[:260]
 
@@ -1601,52 +1475,22 @@ class ParentReportService:
         *,
         support_style: list[str] | None = None,
     ) -> list[str]:
-        style = support_style or []
-        ask_fewer = "ask_fewer_questions" in style
         actions: list[str] = []
-        for memory in relationship_memories(
-            memories,
-            relationship_memory_type=INTEREST_SEED,
-        )[:2]:
-            topic = memory_relationship_topic(memory) or "孩子最近主动提到的兴趣"
-            if topic == "跑步比赛":
-                starter = "我听说你最近聊到跑步比赛，你最喜欢跑得快的哪一刻？"
-                avoid = "避免连续追问距离真假或身体问题。"
-            else:
-                starter = f"我听说你最近聊到{topic}，你最喜欢里面哪一小点？"
-                avoid = "避免连续追问或把兴趣变成任务。"
-            hook = memory_relationship_next_hook(memory)
-            suffix = f"也可以参考：{hook}。" if hook else ""
-            if ask_fewer:
-                actions.append(
-                    f"今晚可以轻轻提一句\u201c{topic}\u201d，如果孩子不想接就不追问。{suffix}"
-                )
-            else:
-                actions.append(f"今晚可以轻轻问：\u201c{starter}\u201d{avoid}{suffix}")
-
-        if relationship_memories(memories, relationship_memory_type=PROUD_MOMENT):
+        if any(self._memory_relationship_type(memory) == "show_and_tell_event" for memory in memories):
             actions.append(
-                "孩子今天有表达展开的小进步；可以具体反馈\u201c你刚才把事情说清楚了\u201d，不要用积分、排名或比较来强化。"
+                "孩子今天有通过图片或作品来表达、展示的倾向；家长可以给一个现实里的分享机会，不需要追问具体是哪张图。"
             )
-        if relationship_memories(memories, relationship_memory_type=TOPIC_BOUNDARY):
+        if any(self._memory_relationship_type(memory) == "unfinished_thread" for memory in memories):
+            actions.append(
+                "孩子有自然收尾或转去做别的事的信号；家长可以尊重这个节奏，不把话题拉回 App。"
+            )
+        if any(self._memory_relationship_type(memory) == "topic_boundary" for memory in memories):
             actions.append(
                 "孩子表达不想聊或想换题时，家长可以尊重停顿，给两个轻松选择，不把话题拉回旧问题。"
             )
-        for memory in relationship_memories(
-            memories,
-            relationship_memory_type=SHOW_AND_TELL_EVENT,
-        )[:1]:
-            actions.append(
-                "孩子今天有展示或分享的表达；家长可以轻轻问：\u201c今天有没有什么想让我也看看？\u201d不需要追问是不是给小白狐看过。"
-            )
-        for memory in relationship_memories(
-            memories,
-            relationship_memory_type=UNFINISHED_THREAD,
-        )[:1]:
-            hook = memory_relationship_next_hook(memory)
-            if hook:
-                actions.append(f"孩子之前有未完成的话题；{hook}")
-        return actions
+        if not actions:
+            actions.append("今晚可以轻轻问一件小事；孩子不想说也没关系。")
+        return actions[:4]
 
     def _relationship_memory_payload(
         self,
@@ -1678,65 +1522,20 @@ class ParentReportService:
         has_emotion: bool,
         has_safety: bool,
     ) -> str:
-        if not memories and not conversation_messages:
-            return "今天暂无可汇总的结构化会话素材。建议保持轻量观察，不做额外判断。"
-        if has_safety:
-            return (
-                "今天的结构化素材里包含需要家长关注的安全信号或隐私边界。"
-                "建议先完成安全确认，再进行学习或日常交流。"
-            )
-
-        # Build a more specific summary using session material
-        parts: list[str] = []
-
-        # Mention conversation topics if available
-        if conversation_topics:
-            topic_text = "、".join(conversation_topics[:3])
-            parts.append(f"孩子今天主要聊了{topic_text}")
-
-        # Mention show-and-tell if present
-        show_tell_memories = [
-            m for m in memories
-            if self._memory_relationship_type(m) == "show_and_tell_event"
-        ]
-        if show_tell_memories:
-            parts.append("展示了一样自己画或拿给小白狐看的东西")
-
-        # Mention unfinished thread if present
-        unfinished_memories = [
-            m for m in memories
-            if self._memory_relationship_type(m) == "unfinished_thread"
-        ]
-        if unfinished_memories:
-            parts.append("最后说要去打卡或做别的事")
-
-        # Add observation focus
-        focus: list[str] = []
-        if has_emotion:
-            focus.append("情绪状态")
-        if has_expression:
-            focus.append("表达方式")
-        if has_learning:
-            focus.append("学习支持")
-
-        if parts:
-            summary = "，".join(parts) + "。"
-            if focus:
-                summary += f"家长可关注{'、'.join(focus)}。"
-            return summary
-
-        # Fallback to generic
-        focus.extend(conversation_topics)
-        if not focus:
-            focus.append("日常兴趣和事件")
-        focus = self._dedupe_and_limit(focus, limit=6)
-        focus_text = "、".join(focus)
-        state_text = conversation_state[0] if conversation_state else (
-            "整体适合用低压力提问和具体小步骤支持孩子。"
+        has_show_tell = any(
+            self._memory_relationship_type(memory) == "show_and_tell_event"
+            for memory in memories
         )
-        return (
-            f"今天的结构化素材重点集中在{focus_text}。"
-            f"{state_text}"
+        has_unfinished = any(
+            self._memory_relationship_type(memory) == "unfinished_thread"
+            for memory in memories
+        )
+        return deterministic_narrative_v4(
+            has_material=bool(memories or conversation_messages),
+            has_safety=has_safety,
+            topics=conversation_topics,
+            has_show_tell=has_show_tell,
+            has_unfinished=has_unfinished,
         )
 
     def _safe_text(self, text: str) -> str:

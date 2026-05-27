@@ -450,8 +450,12 @@ def test_parent_report_deterministic_empty_material_bridge_avoids_interrogation(
     )
 
     assert report.tonight_parent_bridge is not None
-    assert "不想聊也没关系" in report.tonight_parent_bridge
-    assert "不要追问" in report.tonight_parent_bridge
+    assert "不想说也没关系" in report.tonight_parent_bridge or "不想聊也没关系" in report.tonight_parent_bridge
+    assert (
+        "不追问" in report.tonight_parent_bridge
+        or "不要追问" in report.tonight_parent_bridge
+        or "不一定要聊" in report.tonight_parent_bridge
+    )
     assert "监控" not in report.model_dump_json()
 
 

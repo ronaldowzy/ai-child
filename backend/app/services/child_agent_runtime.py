@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from typing import Any
 
@@ -24,6 +25,8 @@ from app.services.turn_guidance_builder import (
     TurnGuidanceBuilder,
     TurnGuidanceContext,
 )
+
+logger = logging.getLogger("app.child_agent_runtime")
 
 
 class ChildAgentRuntime:
@@ -54,6 +57,15 @@ class ChildAgentRuntime:
         self._turn_guidance_builder = turn_guidance_builder or TurnGuidanceBuilder()
 
     def run(self, request: AgentRuntimeRequest) -> AgentRuntimeResult:
+        logger.info(
+            "child_agent_run_start",
+            extra={
+                "child_id": request.child_id,
+                "scene": request.route_decision.active_scene.value,
+                "text_length": len(request.child_text),
+                "has_image": request.conversation_metadata.get("contains_image", False),
+            },
+        )
         prompt_versions: dict[str, PromptVersion] = {}
         turn_guidance_context = self._build_turn_guidance_context(request)
         age_policy = derive_age_band_reply_policy(request.parent_policy)
@@ -93,7 +105,17 @@ class ChildAgentRuntime:
 
         try:
             model_response = self._model_registry.generate(model_request)
-        except Exception:
+            logger.info(
+                "child_agent_model_response",
+                extra={
+                    "child_id": request.child_id,
+                    "provider": model_response.provider_name,
+                    "model": model_response.model_name,
+                    "response_length": len(model_response.response_text),
+                },
+            )
+        except Exception as exc:
+            logger.error("child_agent_model_failed: %s", exc, exc_info=True)
             return self._fallback_result(
                 request,
                 fallback_reason="model_generate_failed",
@@ -784,8 +806,8 @@ class ChildAgentRuntime:
         ):
             detail = child_caption or summary
             if detail:
-                return f"我看到你画里有一个{detail}。这个地方很有意思，你想给它起个名字吗？"
-            return "图片已经传上来了。你可以告诉我你画的是什么，或者你最想让我看哪里？"
+                return f"我看到你画里有一个{detail}。这个地方很有意思，你可以给它起个名字。"
+            return "图片已经传上来了。你可以告诉我你画的是什么，或者你最想让我看哪里。"
 
         # Toy / object / handmade / daily life — one detail + invitation
         if recognized_type in ("toy", "object", "handmade", "daily_life") or image_purpose in (
@@ -796,25 +818,25 @@ class ChildAgentRuntime:
             "ask_what_is_this",
         ):
             if summary:
-                return f"我看到图里像是一个{summary}。你最想让我看哪里？"
-            return "图片已经传上来了。你最想让我看哪里？"
+                return f"我看到图里像是一个{summary}。我先陪你看这个小细节。"
+            return "图片已经传上来了。你可以告诉我最想让我看哪里。"
 
         # Tell story — light imaginative bridge
         if image_purpose == "tell_story":
             if summary:
-                return f"我看到图里像是{summary}。你想给它编一个小故事吗？"
-            return "图片已经传上来了。你想给我讲讲这里面的故事吗？"
+                return f"我看到图里像是{summary}。可以从这个小地方开始编一个故事。"
+            return "图片已经传上来了。你可以给我讲讲这里面的故事。"
 
         # Unclear / empty — do not pretend to see
         if recognized_type in ("unclear", "low_confidence", "unsafe_unknown") or not summary:
             if child_caption:
-                return f"图片已经传上来了，但这次我看不太清。你刚才说的「{child_caption}」很有意思，可以再告诉我多一点。"
+                return f"图片已经传上来了，但这次我看不太清。你刚才说的「{child_caption}」很有意思，可以再告诉我一点。"
             return "图片已经传上来了，但这次我看不太清。你可以告诉我最想让我看哪里。"
 
         # Default — generic share with one detail
         if summary:
-            return f"我看到图里像是{summary}。你最想让我看哪里？"
-        return "图片已经传上来了。你最想让我看哪里？"
+            return f"我看到图里像是{summary}。我先陪你看这个小细节。"
+        return "图片已经传上来了。你可以告诉我最想让我看哪里。"
 
     def _looks_like_image_refusal(self, text: str) -> bool:
         compact = text.replace(" ", "")

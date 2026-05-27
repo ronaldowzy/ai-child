@@ -435,7 +435,7 @@ class OpeningService:
             bedtime_mem = self._bedtime_memory_opening(
                 prefix=prefix, parent_policy=parent_policy, opening_policy=opening_policy,
             )
-            text = bedtime_mem or f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再接着聊。"
+            text = bedtime_mem or f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
         elif opening_policy.mode == OpeningMode.BEDTIME_DEFER_INTEREST and topic:
             bedtime_mem = self._bedtime_memory_opening(
                 prefix=prefix, parent_policy=parent_policy, opening_policy=opening_policy,
@@ -445,7 +445,7 @@ class OpeningService:
             if bedtime_mem:
                 text = bedtime_mem
             elif topic_is_exciting:
-                text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再接着聊。"
+                text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
             else:
                 text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
@@ -579,17 +579,17 @@ class OpeningService:
     ) -> list[str]:
         if opening_policy.age_band == "age_5_6":
             return [
-                f"{prefix}小白狐记得{topic}。聊它，还是听小故事？",
-                f"{prefix}{topic}还在吗？想聊就聊，不想聊也行。",
+                f"{prefix}小白狐记得{topic}。想聊就聊，不想聊也行。",
+                f"{prefix}{topic}可以先放在这里。你也可以换个轻松的。",
             ]
         if opening_policy.age_band == "age_9_10":
             return [
-                f"{prefix}我记得你提过{topic}。想聊它、换轻松的，还是做个小计划？",
+                f"{prefix}我记得你提过{topic}。想聊它也可以，换个轻松的也可以。",
                 f"{prefix}{topic}今天可以接着说，也可以换个新话题。",
             ]
         return [
             f"{prefix}我记得你提过{topic}。今天想聊它，还是换个轻松的？",
-            f"{prefix}小白狐还记得{topic}。想说就说，不想说也行。",
+            f"{prefix}小白狐记得{topic}。想说就说，不想说也行。",
         ]
 
     def _boundary_respect_templates(
@@ -598,8 +598,8 @@ class OpeningService:
         opening_policy: OpeningPolicy,
     ) -> list[str]:
         return [
-            f"{prefix}上次那个我们先不聊。今天想说新的，还是让小白狐先讲一句？",
-            f"{prefix}那个话题我们先放一放。今天可以换个轻松的，也可以先听小白狐说。",
+            f"{prefix}上次那个我们先不聊。今天可以说新的，也可以先安静一下。",
+            f"{prefix}那个话题我们先放一放。今天可以换个轻松的。",
         ]
 
     def _default_greeting_templates(

@@ -451,7 +451,7 @@ class PromptManager:
             lines.append(f"图片描述：{text}")
         if child_caption:
             lines.append(f"孩子说明：{child_caption}")
-        lines.append("这段图片描述只用于帮助你回应，不要逐字复述给孩子，也不要写成识别报告。")
+        lines.append("这段图片描述只用于帮助你回应，不要逐字复述给孩子，也不要展开成识别报告。")
         lines.append("最多提及一个具体、安全、被摘要支持的细节。不要编造摘要里没有的内容。")
         if recognized_type == "homework_problem":
             lines.append(

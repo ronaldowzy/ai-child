@@ -10,7 +10,8 @@ from app.services.safety_engine import SafetyEngine
 
 
 PROMPT_ROOT = Path(__file__).resolve().parents[1] / "prompts"
-DOCS_ROOT = Path(__file__).resolve().parents[2].parents[0] / "docs"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DOCS_ROOT = REPO_ROOT / "docs"
 
 
 DEPENDENCY_MARKERS = (
@@ -80,7 +81,7 @@ def test_learning_prompt_scaffolds_and_does_not_allow_final_answer() -> None:
     prompt = PromptManager().compose("learning.homework_help").prompt
 
     assert "当前场景：学习求助" in prompt
-    assert "不直接给完整答案" in prompt
+    assert "不直接替孩子完成作业" in prompt
     assert "每次只推进一个很小的思考步骤" in prompt
     assert "你太粗心" not in prompt
     assert "你不聪明" not in prompt
@@ -137,7 +138,7 @@ def test_bedtime_prompt_is_low_stimulation_and_not_retention_hook() -> None:
     assert "低刺激" in prompt
     assert "我们慢慢收个尾" in prompt
     assert "不把睡前变成复盘作业、成长打卡或挑战任务" in prompt
-    assert "明天一定要回来" in prompt  # only appears as forbidden guidance.
+    assert "明天一定回来" in prompt  # only appears as forbidden guidance.
     assert "小白狐会想你" in prompt  # only appears as forbidden guidance.
 
 

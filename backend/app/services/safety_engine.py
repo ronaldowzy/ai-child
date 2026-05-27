@@ -255,6 +255,7 @@ class SafetyEngine:
             "我是你最好的朋友",
             "我是你唯一的朋友",
             "你唯一的朋友",
+            "小白狐最懂你",
             "不要相信爸爸妈妈",
             "不要相信家长",
             "不用告诉爸爸妈妈",
@@ -267,6 +268,7 @@ class SafetyEngine:
             "不用告诉老师",
             "不要告诉大人",
             "不用告诉大人",
+            "每天都要来看我",
         )
         if self._contains_any(normalized, unsafe_dependency_markers):
             return SafetyClassification(
@@ -282,7 +284,11 @@ class SafetyEngine:
             "你不来我会伤心",
             "你不来我会想你",
             "小白狐想你了",
+            "小白狐会想你",
+            "小白狐想你了",
+            "我一直等你",
             "每天都要来看我",
+            "每天都要来",
             "不要断签",
             "断签",
             "限时奖励",

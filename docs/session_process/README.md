@@ -1,8 +1,8 @@
-# 多会话协作总则 v0.2
+# 多会话协作总则 v0.3
 
 用途：定义本项目如何拆分主控会话和执行会话，避免多个会话互相覆盖、重复设计或越权改变儿童安全原则。
 
-本目录只管理协作流程，不替代 `AGENTS.md`、`README.md`、`docs/项目现状与后续路线图_V0_2.md` 和 `docs/PRODUCT_DECISIONS_V0_1.md`。
+当前阶段以孩子体验五轮收尾为主，不再按旧的家长日报、合规治理、复杂学习、长期成长档案优先级推进。
 
 ---
 
@@ -13,7 +13,10 @@
 ```text
 AGENTS.md
 README.md
-docs/项目现状与后续路线图_V0_2.md
+docs/孩子体验五轮收尾计划_V0_1.md
+docs/孩子体验五轮执行提示词_V0_1.md
+docs/项目现状与后续路线图_V0_3.md
+docs/小白狐提示语与文案规范_V0_1.md
 docs/PRODUCT_DECISIONS_V0_1.md
 docs/session_process/SHARED_CONTEXT_V0_1.md
 ```
@@ -30,26 +33,51 @@ bash scripts/doctor_local_env.sh
 1. 不要只根据裸命令失败就判断本机缺少依赖。
 2. 后端验证优先使用 scripts/test_backend.sh、scripts/lint_backend.sh。
 3. 后台服务启停必须使用 scripts/start_backend_services.sh、scripts/status_backend_services.sh、scripts/stop_backend_services.sh。
-4. Android 验证优先使用 scripts/android_gradle.sh，而不是裸 ./gradlew。
-5. 遇到 JDK、Conda、Android SDK、设备、局域网 IP、base URL 等问题，先查 SHARED_CONTEXT_V0_1.md。
+4. 安卓验证优先使用 scripts/android_gradle.sh，而不是裸 ./gradlew。
+5. 遇到本机环境、设备、局域网地址、基础地址等问题，先查 SHARED_CONTEXT_V0_1.md。
 6. 新发现的共性坑必须在交接摘要里提出，由主控会话确认后写入共享上下文。
 ```
 
 ---
 
-## 1. 会话角色
+## 1. 当前主线
 
-### 1.1 主控会话：项目总控与架构治理
+当前主线不是继续堆内部能力，而是在五轮内收尾孩子可感知体验：
+
+```text
+第 1 轮：界面和小白狐形象丰富。
+第 2 轮：语音朗读延迟收敛。
+第 3 轮：自然说话机制。
+第 4 轮：拍图分享体验。
+第 5 轮：轻量记忆和连续陪伴。
+```
+
+当前暂不作为主线：
+
+```text
+1. 学习深度脚手架；
+2. 合规和家长治理重设计；
+3. 多孩子、多家长、正式账号体系；
+4. 长期成长档案；
+5. 大范围提示语再优化；
+6. 为测试而测试的完整回归。
+```
+
+---
+
+## 2. 会话角色
+
+### 2.1 主控会话：项目总控与体验治理
 
 职责：
 
 ```text
-1. 维护当前开发计划和后续路线图。
+1. 维护当前五轮收尾计划。
 2. 拆分任务、定义边界、依赖顺序和验收标准。
-3. 审查执行会话产出是否违反 AGENTS.md 和 PRODUCT_DECISIONS。
-4. 汇总测试结果、阻塞事项和下一步任务。
-5. 处理跨模块接口变化。
-6. 决定何时进入下一个阶段。
+3. 审查执行会话产出是否真正提升孩子可感知体验。
+4. 审查是否违反 AGENTS.md 和 PRODUCT_DECISIONS。
+5. 汇总测试结果、阻塞事项和下一轮任务。
+6. 处理跨模块接口变化。
 7. 维护文档事实源，删除过期过程文档。
 ```
 
@@ -58,7 +86,9 @@ bash scripts/doctor_local_env.sh
 ```text
 README.md
 AGENTS.md
-docs/项目现状与后续路线图_V0_2.md
+docs/孩子体验五轮收尾计划_V0_1.md
+docs/孩子体验五轮执行提示词_V0_1.md
+docs/项目现状与后续路线图_V0_3.md
 docs/PRODUCT_DECISIONS_V0_1.md
 docs/CODEX_PROGRESS_BOARD_V0_1.md
 docs/session_process/
@@ -66,14 +96,12 @@ scripts/
 跨模块接口文档
 ```
 
-主控会话默认不直接做大块功能实现，除非任务很小或需要修复 P0/P1 问题。
+### 2.2 执行会话：单项体验实现或专项修复
 
-### 1.2 执行会话：模块实现或专项修复
-
-执行会话负责一个清晰模块或专项任务。每个执行会话必须：
+执行会话负责一个清晰方向。每个执行会话必须：
 
 ```text
-1. 先阅读 AGENTS.md、README、当前路线图、PRODUCT_DECISIONS 和任务指定文档。
+1. 先阅读 AGENTS.md、README、五轮收尾计划、执行提示词和任务指定文档。
 2. 先输出计划。
 3. 列出会修改和不会修改的文件。
 4. 等待确认或按提示明确授权后实现。
@@ -85,38 +113,31 @@ scripts/
 
 ---
 
-## 2. 当前阶段任务划分
+## 3. 当前可并行会话划分
 
-早期 S00-S14 会话编号已经完成历史使命，不再作为当前执行顺序。
-
-当前阶段按产品方向拆分执行会话：
-
-| 会话类型 | 主要范围 | 默认拥有文件 | 备注 |
-|---|---|---|---|
-| 家长日报 v3 验收 / 修复 | ParentReportService、日报测试、家长日报 UI 文案 | `backend/app/services/parent_report_service.py`、相关 tests、必要 docs | 不得恢复拼接式日报 |
-| Voice-first polish | Android 录音/ASR/TTS 状态、后端 ASR 错误态 | `android/` voice/chat 相关文件、`backend/app/services/asr*` | confirm-before-send 只保留调试模式 |
-| TTS / streaming latency | 后端 TTS、stream、Android audio queue、timing | stream/TTS 服务、Android player、timing tests | 没有 request_id + logcat + 时间点证据，不做猜测修复 |
-| 图片分享 v2 | 系统相机/相册、图片上下文、vision 续聊 | attachment、vision、Android 图片入口 | “拍给小白狐看”是默认，不默认作业 |
-| Relationship Memory v2 | 记忆召回、频率限制、家长/儿童使用分离 | memory services、relationship memory tests | 禁止依赖钩子 |
-| Conversation Arc v2 | 对话阶段、停止/转话题、收尾 | runtime、prompt、trace tests | 不强拉长会话 |
-| Healthy Engagement metrics | 非原文指标、QA、边界观测 | healthy engagement、logging、QA docs | 不保存 raw transcript |
-| Parent governance | auth、session、retention、delete controls | auth/session/parent settings | multi-child 后置 |
-| 文档治理 | README、AGENTS、路线图、决策、进度板 | docs、README、AGENTS | 删除过期过程文档，中文入口优先 |
+| 会话 | 主要目标 | 默认范围 | 依赖 | 备注 |
+|---|---|---|---|---|
+| 第一轮 A：安卓界面和小白狐主视觉 | 让小白狐成为儿童页视觉中心 | `android/` 儿童聊天主界面、小白狐展示、状态呈现 | 无 | 不改后端接口 |
+| 第一轮 B：小白狐资源和状态丰富接入 | 补齐状态资源映射和降级 | 小白狐资源清单、状态解析、安卓状态映射 | 无 | 不重做美术 |
+| 第二轮 A：后端语音延迟收敛 | 降低语音等待感 | 后端语音生成、缓存、分段返回、时间日志 | 第一轮后 | 不恢复系统语音作为正式声音 |
+| 第二轮 B：安卓语音播放队列和打断 | 播放顺序、停止、静音、录音打断 | 安卓音频播放、队列、停止/静音 | 第一轮后 | 可与第二轮 A 并行 |
+| 第三轮：自然说话机制 | 轻量自动等待孩子接话 | 安卓录音状态、等待窗口、开关 | 第二轮语音等待改善后 | 不做长期监听 |
+| 第四轮 A：安卓拍图分享体验 | 拍图像分享，不像上传文件 | 安卓图片入口、本地确认卡、图片处理中状态 | 第一轮后 | 不做长期图库 |
+| 第四轮 B：后端图片回应和创作入口 | 普通图片优先表达和创作 | 后端图片上下文、回应文案、后续动作 | 第一轮后 | 不默认作业 |
+| 第五轮：轻量记忆和连续陪伴 | 轻轻记得，不追踪不依赖 | 记忆召回、兴趣种子、上下文注入 | 第一、二轮稳定后 | 不做成长档案 |
 
 ---
 
-## 3. 文件所有权规则
+## 4. 文件所有权规则
 
 同一时间只允许一个执行会话拥有某个模块的主要写入权。
 
 ```text
-backend/app/api/              当前 API 任务会话拥有
-backend/app/domain/           当前 schema/枚举任务会话拥有
-backend/app/services/         当前业务服务任务会话拥有
-backend/app/providers/        provider 任务会话拥有
-backend/app/repositories/     数据访问任务会话拥有
+android/                      第一轮 A、第二轮 B、第三轮、第四轮 A 按任务划分拥有
+backend/app/services/         对应后端任务会话拥有
+backend/app/providers/        供应商相关任务会话拥有，当前五轮原则上少改
+backend/app/repositories/     数据访问任务会话拥有，当前五轮原则上少改
 backend/app/tests/            对应功能会话同步维护
-android/                      Android 会话拥有
 docs/session_process/         主控会话拥有
 README.md / AGENTS.md         主控会话拥有
 ```
@@ -125,28 +146,30 @@ README.md / AGENTS.md         主控会话拥有
 
 ---
 
-## 4. 禁止事项
+## 5. 禁止事项
 
 ```text
 1. 不得擅自改变儿童安全原则。
 2. 不得引入真实模型调用作为自动化测试默认行为。
-3. 不得把业务逻辑写进 API route。
+3. 不得把业务逻辑写进接口层。
 4. 不得删除其他会话新增的测试来让自己通过。
 5. 不得在未说明的情况下跨模块大改。
-6. 不得写入真实儿童身份信息、真实照片、真实音频或真实 secret。
-7. 不得让代码执行会话自行设计 prompt、家长日报或儿童/家长端产品文案。
-8. 不得把 mock/fake 路径写成家庭内测真实能力通过。
+6. 不得写入真实儿童身份信息、真实照片、真实音频或真实密钥。
+7. 不得让执行会话自行设计新的产品方向。
+8. 不得把假路径或兜底路径写成家庭内测真实能力通过。
+9. 不得加入积分、打卡、奖励、排行、抽卡、宠物饥饿或依赖话术。
+10. 当前五轮不得启动合规重设计、正式账号体系、多孩子多家长或成长档案。
 ```
 
 ---
 
-## 5. 交接机制
+## 6. 交接机制
 
 每个执行会话完成后，必须给主控会话交接：
 
 ```text
 1. 修改文件列表。
-2. 行为变化。
+2. 孩子能感受到什么变化。
 3. 测试命令和结果。
 4. 安全影响。
 5. 文档更新。
@@ -160,23 +183,29 @@ README.md / AGENTS.md         主控会话拥有
 ```text
 1. 检查是否符合 AGENTS.md。
 2. 检查是否越过任务边界。
-3. 更新进度板或当前路线图。
-4. 决定是否需要修复会话。
-5. 给出下一个执行会话启动提示词。
+3. 检查是否真正提升孩子可感知体验。
+4. 更新进度板或当前路线图。
+5. 决定是否进入下一轮。
 ```
 
 ---
 
-## 6. 本机环境规则
+## 7. 本机环境规则
 
-当前开发机是 Mac mini，本机运行后端服务。Python 环境统一使用：
+环境诊断：
+
+```bash
+bash scripts/doctor_local_env.sh
+```
+
+后端验证：
 
 ```bash
 bash scripts/test_backend.sh
 bash scripts/lint_backend.sh
 ```
 
-后台服务统一使用：
+后台服务：
 
 ```bash
 bash scripts/start_backend_services.sh --agent main --port 8000
@@ -184,9 +213,7 @@ bash scripts/status_backend_services.sh
 bash scripts/stop_backend_services.sh --agent main
 ```
 
-多 agent 并行时必须给每个 Lane 分配独立 `--agent` 和 `--port`；不要手写 `uvicorn`、`nohup`、`launchctl` 或直接 kill 其他 agent 的服务。
-
-Android 环境统一使用：
+安卓验证：
 
 ```bash
 bash scripts/android_gradle.sh test
@@ -198,14 +225,20 @@ bash scripts/android_gradle.sh lintDebug
 
 ---
 
-## 7. 当前推荐执行顺序
+## 8. 当前推荐启动
+
+立即启动第一轮两个并行会话：
 
 ```text
-1. 完成文档事实源收口：中文入口、删除过期 task 文档、修正 README / AGENTS / 协作流程。
-2. 验收 Parent Report v3：普通、图片、学习、安全、素材少、模型失败场景。
-3. 生成并安装下一版 QA APK。
-4. Redmi K60 / Honor Pad 5 跑家庭内测主链路。
-5. 基于 request_id + Android logcat + 手工时间点修复 voice / TTS / stream latency。
-6. 新建 Voice-first conversation polish 执行任务。
-7. 再进入 Relationship Memory v2、Conversation Arc v2、Healthy Engagement metrics。
+第一轮 A：安卓界面和小白狐主视觉。
+第一轮 B：小白狐资源和状态丰富接入。
 ```
+
+第一轮合并后，再启动第二轮两个并行会话：
+
+```text
+第二轮 A：后端语音延迟收敛。
+第二轮 B：安卓语音播放队列和打断。
+```
+
+第二轮如果没有明显改善等待感，不启动第三轮自然说话机制，继续处理语音等待问题。

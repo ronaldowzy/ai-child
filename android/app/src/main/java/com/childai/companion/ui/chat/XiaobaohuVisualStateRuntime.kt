@@ -27,9 +27,10 @@ object XiaobaohuVisualStateRuntime {
     /**
      * Precedence for immediate interruption — states that can break an active hold.
      *
-     * Matches [XiaobaohuVisualStateResolver.mascotStatePrecedence] exactly.
-     * Sleepy and JumpingHappy are intentionally excluded: they remain available assets
-     * but should not be auto-triggered by the runtime throttle.
+     * Sleepy and JumpingHappy are included so that bedtime and encouraging
+     * signals from the backend can display their correct mascot states.
+     * Sleepy is placed low (quiet state, only interrupts idle).
+     * JumpingHappy is placed below Speaking (brief celebration).
      */
     private val INTERRUPT_PRECEDENCE: List<MascotState> = listOf(
         MascotState.NetworkError,
@@ -37,9 +38,11 @@ object XiaobaohuVisualStateRuntime {
         MascotState.PrivacyBoundary,
         MascotState.HomeworkFocus,
         MascotState.Speaking,
+        MascotState.JumpingHappy,
         MascotState.Thinking,
         MascotState.Listening,
         MascotState.Calm,
+        MascotState.Sleepy,
         MascotState.Idle,
     )
 

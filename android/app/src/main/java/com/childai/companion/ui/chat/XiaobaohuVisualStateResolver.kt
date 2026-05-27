@@ -56,9 +56,11 @@ object XiaobaohuVisualStateResolver {
     /**
      * Precedence for states that are safe to auto-resolve from current Android interaction.
      *
-     * `Sleepy` and `JumpingHappy` are intentionally not in this auto-precedence list.
-     * They remain available assets, but should not be attached to reward, streak,
-     * retention, or generic engagement paths by default.
+     * Sleepy and JumpingHappy are now included so bedtime and encouraging backend
+     * signals display their correct mascot states. They remain bounded:
+     *  - JumpingHappy is a ShortLoop that auto-returns to Idle after 2 loops.
+     *  - Sleepy uses a minHold to prevent flicker, then transitions calmly.
+     * Neither is wired into reward, streak, or retention paths.
      */
     val mascotStatePrecedence: List<MascotState> = listOf(
         MascotState.NetworkError,
@@ -66,9 +68,11 @@ object XiaobaohuVisualStateResolver {
         MascotState.PrivacyBoundary,
         MascotState.HomeworkFocus,
         MascotState.Speaking,
+        MascotState.JumpingHappy,
         MascotState.Thinking,
         MascotState.Listening,
         MascotState.Calm,
+        MascotState.Sleepy,
         MascotState.Idle,
     )
 
@@ -143,6 +147,8 @@ object XiaobaohuVisualStateResolver {
                 XiaobaohuBaseAttentionState.Listening -> MascotState.Listening
                 XiaobaohuBaseAttentionState.Resting -> MascotState.Calm
                 XiaobaohuBaseAttentionState.Idle -> when (emotionalOverlay) {
+                    XiaobaohuEmotionalOverlay.Sleepy -> MascotState.Sleepy
+                    XiaobaohuEmotionalOverlay.Encouraging -> MascotState.JumpingHappy
                     XiaobaohuEmotionalOverlay.Calm -> MascotState.Calm
                     else -> MascotState.Idle
                 }
@@ -159,10 +165,10 @@ object XiaobaohuVisualStateResolver {
         return when {
             baseAttention == XiaobaohuBaseAttentionState.LookingAtImage &&
                 mascotState == MascotState.Thinking -> "looking_at_image_uses_thinking_asset"
-            emotionalOverlay == XiaobaohuEmotionalOverlay.Encouraging &&
-                mascotState != MascotState.JumpingHappy -> "encouraging_overlay_no_jumping_happy_by_default"
             emotionalOverlay == XiaobaohuEmotionalOverlay.Sleepy &&
-                mascotState != MascotState.Sleepy -> "sleepy_overlay_not_auto_triggered"
+                mascotState == MascotState.Sleepy -> "bedtime_sleepy_state"
+            emotionalOverlay == XiaobaohuEmotionalOverlay.Encouraging &&
+                mascotState == MascotState.JumpingHappy -> "encouraging_happy_state"
             else -> requestedReason
         }
     }
@@ -179,10 +185,10 @@ object XiaobaohuVisualStateResolver {
             } else {
                 0L
             }
+            MascotState.Sleepy -> RESTING_MIN_HOLD_MS
             MascotState.Speaking,
             MascotState.Listening,
             MascotState.Idle,
-            MascotState.Sleepy,
             MascotState.JumpingHappy -> 0L
         }
     }

@@ -125,17 +125,17 @@ class XiaobaohuBusinessTriggerCoverageTest {
     }
 
     @Test
-    fun rewardRetentionLikeSignalsDoNotResolveToJumpingHappyOrSleepyByDefault() {
-        val maybeReward = XiaobaohuVisualStateResolver.resolve(
+    fun encouragingAndSleepySignalsResolveToCorrectMascotStates() {
+        val encouraging = XiaobaohuVisualStateResolver.resolve(
             agent = FoxAgentUiState(
                 mood = FoxMood.Encouraging,
                 motion = FoxMotion.CelebrateSmall,
             ),
             reason = "generic_encouragement_signal",
         )
-        assertEquals(XiaobaohuEmotionalOverlay.Encouraging, maybeReward.emotionalOverlay)
-        assertEquals(MascotState.Idle, maybeReward.mascotState)
-        assertEquals("encouraging_overlay_no_jumping_happy_by_default", maybeReward.reason)
+        assertEquals(XiaobaohuEmotionalOverlay.Encouraging, encouraging.emotionalOverlay)
+        assertEquals(MascotState.JumpingHappy, encouraging.mascotState)
+        assertEquals("encouraging_happy_state", encouraging.reason)
 
         val sleepy = XiaobaohuVisualStateResolver.resolve(
             agent = FoxAgentUiState(
@@ -145,8 +145,8 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "generic_sleepy_signal",
         )
         assertEquals(XiaobaohuEmotionalOverlay.Sleepy, sleepy.emotionalOverlay)
-        assertEquals(MascotState.Idle, sleepy.mascotState)
-        assertEquals("sleepy_overlay_not_auto_triggered", sleepy.reason)
+        assertEquals(MascotState.Sleepy, sleepy.mascotState)
+        assertEquals("bedtime_sleepy_state", sleepy.reason)
     }
 
     private fun assertBusinessTrigger(

@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -90,6 +91,9 @@ class ImageAttachmentContext(BaseModel):
         }
 
 
+logger = logging.getLogger("app.attachment")
+
+
 class AttachmentService:
     """Business service for image attachments and OCR/vision decisions."""
 
@@ -114,7 +118,19 @@ class AttachmentService:
     def create_attachment(
         self, request: AttachmentCreateRequest
     ) -> AttachmentCreateResponse:
+        logger.info(
+            "create_attachment: childId=%s, type=%s, purpose=%s",
+            request.child_id,
+            request.attachment_type,
+            request.image_purpose,
+        )
         recognized_content = self._recognize(request)
+        logger.info(
+            "create_attachment: recognized type=%s, confidence=%.2f, purpose=%s",
+            recognized_content.type,
+            recognized_content.confidence,
+            recognized_content.image_purpose,
+        )
         decision = self._modality_manager.decide_image_attachment(recognized_content)
         attachment = self._repository.save(
             AttachmentRecord(
@@ -153,6 +169,13 @@ class AttachmentService:
         self,
         upload: RealImageUpload,
     ) -> AttachmentCreateResponse:
+        logger.info(
+            "create_real_image_upload: childId=%s, purpose=%s, size=%dbytes, mime=%s",
+            upload.child_id,
+            upload.image_purpose,
+            len(upload.image_bytes),
+            upload.mime_type,
+        )
         mime_type = upload.mime_type.lower().split(";", 1)[0].strip()
         if mime_type not in ALLOWED_REAL_IMAGE_MIME_TYPES:
             raise AttachmentImageValidationError("unsupported_image_mime_type")

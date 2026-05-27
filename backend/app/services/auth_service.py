@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 from uuid import uuid4
 
@@ -26,6 +27,8 @@ from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
 )
+
+logger = logging.getLogger("app.auth")
 
 
 class AuthServiceError(RuntimeError):
@@ -79,6 +82,7 @@ class AuthService:
 
     def register(self, request: AuthRegisterRequest) -> AuthSessionResponse:
         username = self._normalize_username(request.username)
+        logger.info("register: username=%s", username)
         now = self._now()
         child_id = f"child_{uuid4().hex[:16]}"
         account = AuthAccountRecordData(
@@ -113,11 +117,13 @@ class AuthService:
 
     def login(self, request: AuthLoginRequest) -> AuthSessionResponse:
         username = self._normalize_username(request.username)
+        logger.info("login: username=%s", username)
         account = self._get_account_by_username(username)
         if account is None or not self.verify_password(
             request.password,
             account.password_hash,
         ):
+            logger.warning("login: invalid credentials for username=%s", username)
             raise AuthInvalidCredentials("invalid username or password")
         return self._create_session_response(account, now=self._now())
 
@@ -125,11 +131,14 @@ class AuthService:
         session = self._session_for_token(token)
         now = self._now()
         if session.revoked_at is not None:
+            logger.warning("account_for_token: session revoked")
             raise AuthTokenInvalid("session revoked")
         if self._aware(session.expires_at) <= now:
+            logger.warning("account_for_token: session expired")
             raise AuthTokenExpired("session expired")
         account = self._repo().get_account_by_id(session.child_account_id)
         if account is None:
+            logger.warning("account_for_token: account not found")
             raise AuthTokenInvalid("account not found")
         return self._account_profile(account)
 

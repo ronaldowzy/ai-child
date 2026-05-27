@@ -1,5 +1,6 @@
 package com.childai.companion.data.conversation
 
+import android.util.Log
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
@@ -7,6 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "ConversationApi"
 
 class ConversationApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
@@ -17,7 +20,9 @@ class ConversationApiClient(
     suspend fun sendMessage(
         request: ConversationMessageRequest,
     ): ConversationMessageResponse = withContext(Dispatchers.IO) {
-        val connection = openConnection(messageEndpoint())
+        val endpoint = messageEndpoint()
+        Log.d(TAG, "sendMessage: childId=${request.childId}, inputType=${request.input.type}")
+        val connection = openConnection(endpoint)
         try {
             val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
             connection.outputStream.use { output ->
@@ -26,13 +31,16 @@ class ConversationApiClient(
 
             val statusCode = connection.responseCode
             val responseBody = connection.readBody(statusCode)
+            Log.d(TAG, "sendMessage: status=$statusCode, bodyLength=${responseBody.length}")
             if (statusCode !in 200..299) {
+                Log.e(TAG, "sendMessage: error body=$responseBody")
                 throw ConversationApiException(
                     "Conversation API returned HTTP $statusCode: $responseBody",
                 )
             }
             ConversationMessageResponse.fromJsonString(responseBody)
         } catch (exception: IOException) {
+            Log.e(TAG, "sendMessage: network error", exception)
             throw ConversationApiException("Conversation API request failed", exception)
         } finally {
             connection.disconnect()
@@ -42,7 +50,9 @@ class ConversationApiClient(
     suspend fun requestOpening(
         request: ConversationOpeningRequest,
     ): ConversationMessageResponse = withContext(Dispatchers.IO) {
-        val connection = openConnection(openingEndpoint())
+        val endpoint = openingEndpoint()
+        Log.d(TAG, "requestOpening: childId=${request.childId}")
+        val connection = openConnection(endpoint)
         try {
             val requestBody = request.toJsonString().toByteArray(Charsets.UTF_8)
             connection.outputStream.use { output ->
@@ -51,13 +61,16 @@ class ConversationApiClient(
 
             val statusCode = connection.responseCode
             val responseBody = connection.readBody(statusCode)
+            Log.d(TAG, "requestOpening: status=$statusCode, bodyLength=${responseBody.length}")
             if (statusCode !in 200..299) {
+                Log.e(TAG, "requestOpening: error body=$responseBody")
                 throw ConversationApiException(
                     "Conversation opening API returned HTTP $statusCode: $responseBody",
                 )
             }
             ConversationMessageResponse.fromJsonString(responseBody)
         } catch (exception: IOException) {
+            Log.e(TAG, "requestOpening: network error", exception)
             throw ConversationApiException("Conversation opening request failed", exception)
         } finally {
             connection.disconnect()

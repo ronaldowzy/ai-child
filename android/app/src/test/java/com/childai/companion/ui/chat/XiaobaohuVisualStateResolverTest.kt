@@ -188,7 +188,7 @@ class XiaobaohuVisualStateResolverTest {
     }
 
     @Test
-    fun precedenceListDoesNotAutoWireSleepyOrJumpingHappy() {
+    fun precedenceListIncludesSleepyAndJumpingHappy() {
         assertEquals(
             listOf(
                 MascotState.NetworkError,
@@ -196,19 +196,21 @@ class XiaobaohuVisualStateResolverTest {
                 MascotState.PrivacyBoundary,
                 MascotState.HomeworkFocus,
                 MascotState.Speaking,
+                MascotState.JumpingHappy,
                 MascotState.Thinking,
                 MascotState.Listening,
                 MascotState.Calm,
+                MascotState.Sleepy,
                 MascotState.Idle,
             ),
             XiaobaohuVisualStateResolver.mascotStatePrecedence,
         )
-        assertFalse(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.Sleepy))
-        assertFalse(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.JumpingHappy))
+        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.Sleepy))
+        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.JumpingHappy))
     }
 
     @Test
-    fun encouragingAndSleepySignalsAreNotRewardOrRetentionWiredByDefault() {
+    fun encouragingSignalMapsToJumpingHappyState() {
         val encouraging = XiaobaohuVisualStateResolver.resolve(
             FoxAgentUiState(
                 mood = FoxMood.Encouraging,
@@ -216,9 +218,12 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuEmotionalOverlay.Encouraging, encouraging.emotionalOverlay)
-        assertEquals(MascotState.Idle, encouraging.mascotState)
-        assertEquals("encouraging_overlay_no_jumping_happy_by_default", encouraging.reason)
+        assertEquals(MascotState.JumpingHappy, encouraging.mascotState)
+        assertEquals("encouraging_happy_state", encouraging.reason)
+    }
 
+    @Test
+    fun sleepySignalMapsToSleepyState() {
         val sleepy = XiaobaohuVisualStateResolver.resolve(
             FoxAgentUiState(
                 mood = FoxMood.Sleepy,
@@ -226,8 +231,9 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuEmotionalOverlay.Sleepy, sleepy.emotionalOverlay)
-        assertEquals(MascotState.Idle, sleepy.mascotState)
-        assertEquals("sleepy_overlay_not_auto_triggered", sleepy.reason)
+        assertEquals(MascotState.Sleepy, sleepy.mascotState)
+        assertEquals("bedtime_sleepy_state", sleepy.reason)
+        assertEquals(XiaobaohuVisualStateResolver.RESTING_MIN_HOLD_MS, sleepy.minHoldMs)
     }
 
     @Test

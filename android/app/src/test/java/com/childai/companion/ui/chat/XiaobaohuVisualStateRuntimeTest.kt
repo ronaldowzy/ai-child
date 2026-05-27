@@ -203,24 +203,36 @@ class XiaobaohuVisualStateRuntimeTest {
         assertNull(afterHold.pendingState)
     }
 
-    // --- Test 8: jumping_happy is not introduced by the runtime throttle ---
+    // --- Test 8: jumping_happy and sleepy are in the interrupt precedence list ---
 
     @Test
-    fun `jumping happy is not auto-triggered by throttle`() {
-        // jumping_happy has very low precedence and cannot interrupt anything
-        val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
+    fun `jumping happy can interrupt thinking but not speaking`() {
+        // JumpingHappy (rank 5) can interrupt Thinking (rank 6)
+        val canInterruptThinking = XiaobaohuVisualStateRuntime.canInterrupt(
             MascotState.Thinking, MascotState.JumpingHappy,
         )
-        // JumpingHappy is not in the interrupt precedence list, so rank = MAX_VALUE
-        // It should NOT be able to interrupt thinking
-        assertEquals(false, canInterrupt)
+        assertEquals(true, canInterruptThinking)
 
-        // Also verify it's not in the interrupt precedence list at all
-        // (by checking it can't interrupt even Idle)
-        val canInterruptIdle = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.Idle, MascotState.JumpingHappy,
+        // JumpingHappy (rank 5) cannot interrupt Speaking (rank 4)
+        val canInterruptSpeaking = XiaobaohuVisualStateRuntime.canInterrupt(
+            MascotState.Speaking, MascotState.JumpingHappy,
         )
-        assertEquals(false, canInterruptIdle)
+        assertEquals(false, canInterruptSpeaking)
+    }
+
+    @Test
+    fun `sleepy can interrupt idle`() {
+        // Sleepy (rank 9) can interrupt Idle (rank 10)
+        val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
+            MascotState.Idle, MascotState.Sleepy,
+        )
+        assertEquals(true, canInterrupt)
+
+        // Sleepy (rank 9) cannot interrupt Calm (rank 8)
+        val canInterruptCalm = XiaobaohuVisualStateRuntime.canInterrupt(
+            MascotState.Calm, MascotState.Sleepy,
+        )
+        assertEquals(false, canInterruptCalm)
     }
 
     // --- Test 9: debug override path remains deterministic ---

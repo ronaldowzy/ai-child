@@ -36,8 +36,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.io.File
 import java.util.UUID
+
+private const val TAG = "ChatViewModel"
 
 class ChatViewModel(
     private val conversationSender: ConversationMessageSender =
@@ -143,7 +146,10 @@ class ChatViewModel(
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
+            Log.d(TAG, "sendText: with image attachment=${imageContext.attachmentId}, text=${trimmedText.take(50)}")
             _uiState.update { it.copy(pendingImageContext = null) }
+        } else {
+            Log.d(TAG, "sendText: text=${trimmedText.take(50)}")
         }
         sendTextWithAttachments(
             trimmedText,
@@ -321,11 +327,13 @@ class ChatViewModel(
                     attachments = attachments,
                 )
             }.onSuccess { response ->
+                Log.d(TAG, "sendTextWithAttachments: success, replyLength=${response.reply.text.length}")
                 renderAgentReply(
                     response = response,
                     replaceMessageId = streamingAgentMessageId,
                 )
-            }.onFailure {
+            }.onFailure { error ->
+                Log.e(TAG, "sendTextWithAttachments: failed", error)
                 appendMessage(
                     ChatMessage(
                         id = nextMessageId("agent-error"),
@@ -373,6 +381,7 @@ class ChatViewModel(
         imagePurpose: String = IMAGE_PURPOSE_SHARE,
     ) {
         if (_uiState.value.isSending || payload.bytes.isEmpty()) return
+        Log.d(TAG, "submitCapturedPhoto: purpose=$imagePurpose, size=${payload.bytes.size}bytes, mime=${payload.mimeType}")
         stopCurrentTts(restoreBaseAgent = true)
         childInteractionStarted = true
         val childPhotoMessageId = nextMessageId("child-photo")
@@ -489,6 +498,7 @@ class ChatViewModel(
     private suspend fun handleAttachmentResponse(
         attachmentResponse: AttachmentCreateResponse,
     ) {
+        Log.d(TAG, "handleAttachmentResponse: id=${attachmentResponse.attachmentId}, type=${attachmentResponse.recognizedContent.type}, purpose=${attachmentResponse.recognizedContent.imagePurpose}")
         if (!attachmentResponse.hasReadyHomeworkText) {
             val reply = attachmentResponse.reply.withGeneratedAudioForAttachment()
             renderAgentReply(
@@ -559,6 +569,7 @@ class ChatViewModel(
 
     private fun continuePendingImageConversation(action: QuickActionUi) {
         val context = _uiState.value.pendingImageContext
+        Log.d(TAG, "continuePendingImageConversation: action=${action.id}, hasContext=${context != null}")
         if (context == null) {
             sendText(action.label)
             return

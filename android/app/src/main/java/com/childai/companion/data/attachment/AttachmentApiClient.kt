@@ -1,5 +1,6 @@
 package com.childai.companion.data.attachment
 
+import android.util.Log
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.auth.setBearerToken
 import java.io.IOException
@@ -8,6 +9,8 @@ import java.net.URL
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "AttachmentApi"
 
 class AttachmentApiClient(
     private val baseUrl: String = DevSettings.conversationApiBaseUrl,
@@ -24,6 +27,7 @@ class AttachmentApiClient(
         imagePurpose: String,
         childCaption: String,
     ): AttachmentCreateResponse = withContext(Dispatchers.IO) {
+        Log.d(TAG, "uploadImage: childId=$childId, purpose=$imagePurpose, size=${imageBytes.size}bytes, mime=$mimeType")
         val boundary = "XiaobaohuBoundary-${UUID.randomUUID()}"
         val connection = openMultipartConnection(boundary)
         try {
@@ -44,13 +48,16 @@ class AttachmentApiClient(
 
             val statusCode = connection.responseCode
             val responseBody = connection.readBody(statusCode)
+            Log.d(TAG, "uploadImage: status=$statusCode, bodyLength=${responseBody.length}")
             if (statusCode !in 200..299) {
+                Log.e(TAG, "uploadImage: error body=$responseBody")
                 throw AttachmentApiException(
                     "Image upload returned HTTP $statusCode: $responseBody",
                 )
             }
             AttachmentCreateResponse.fromJsonString(responseBody)
         } catch (exception: IOException) {
+            Log.e(TAG, "uploadImage: network error", exception)
             throw AttachmentApiException("Image upload request failed", exception)
         } finally {
             connection.disconnect()

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from app.domain.schemas.parent_policy import (
@@ -8,6 +9,8 @@ from app.repositories.parent_policy_repository import (
     ParentPolicyRepository,
     ParentPolicyRepositoryUnavailable,
 )
+
+logger = logging.getLogger("app.parent_policy")
 
 
 class ParentPolicyService:
@@ -27,18 +30,28 @@ class ParentPolicyService:
             try:
                 policy = self._repository.get(child_id)
                 if policy is not None:
+                    logger.info("get_policy: found for childId=%s", child_id)
                     self._policies[child_id] = policy
                     return policy
+                logger.info("get_policy: creating default for childId=%s", child_id)
                 policy = self._build_default_policy(child_id)
                 return self._persist_or_remember(policy)
             except ParentPolicyRepositoryUnavailable:
                 if not self._fallback_to_memory:
                     raise
+                logger.warning("get_policy: repository unavailable, using memory fallback")
                 self._repository_available = False
 
         return self._get_memory_policy(child_id)
 
     def update_policy(self, request: ParentPolicyUpdateRequest) -> ParentPolicy:
+        logger.info(
+            "update_policy: childId=%s, nickname=%s, age=%s, gender=%s",
+            request.child_id,
+            request.child_nickname,
+            request.communication_preferences.get("child_age") if request.communication_preferences else None,
+            request.communication_preferences.get("child_gender") if request.communication_preferences else None,
+        )
         current = self.get_policy(request.child_id)
         now = datetime.now(timezone.utc)
 

@@ -143,6 +143,22 @@ class XiaobaohuStateCoverageTest {
                 ),
                 expectedMascot = MascotState.NetworkError,
             ),
+            SceneCoverageCase(
+                name = "BedtimeSleepy",
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Sleepy,
+                    motion = FoxMotion.SleepyBlink,
+                ),
+                expectedMascot = MascotState.Sleepy,
+            ),
+            SceneCoverageCase(
+                name = "EncouragingHappy",
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Encouraging,
+                    motion = FoxMotion.CelebrateSmall,
+                ),
+                expectedMascot = MascotState.JumpingHappy,
+            ),
         )
 
         cases.forEach { case ->

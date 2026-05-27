@@ -73,8 +73,8 @@ def test_conversation_attachment_accepts_high_confidence_homework_photo() -> Non
     )
     assert body["recognized_content"]["confidence"] == 0.93
     assert body["session_state"]["active_scene"] == "learning.homework_help"
-    assert body["session_state"]["needs_input"] == "problem_understanding"
-    assert "这道题是在问什么" in body["reply"]["text"]
+    assert body["session_state"]["needs_input"] == "problem_statement_confirm"
+    assert "对一下题目" in body["reply"]["text"]
     assert "答案是" not in body["reply"]["text"]
 
 

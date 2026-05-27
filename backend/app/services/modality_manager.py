@@ -28,6 +28,10 @@ class ModalityManager:
     ) -> ModalityDecision:
         return self.decide_image_attachment(recognized_content)
 
+    _PROBLEM_NUMBER_PATTERN = re.compile(
+        r"(第?\s*\d+\s*题|[\d]+\s*[\.、]|[（(]\s*\d+\s*[)）])"
+    )
+
     def decide_image_attachment(
         self, recognized_content: RecognizedContent
     ) -> ModalityDecision:
@@ -88,21 +92,8 @@ class ModalityManager:
                 ],
             )
 
-        if (
-            recognized_content.text
-            and recognized_content.confidence >= self.HOMEWORK_OCR_CONFIDENCE_THRESHOLD
-        ):
-            return ModalityDecision(
-                status=AttachmentStatus.OCR_READY,
-                recognized_content=recognized_content,
-                reply_text=(
-                    "我看清楚了。我们先不急着算。"
-                    "你可以先说说：这道题是在问什么。"
-                ),
-                needs_input="problem_understanding",
-                sub_scene="ask_problem_understanding",
-                active_scene="learning.homework_help",
-            )
+        if recognized_content.text and recognized_content.confidence >= self.HOMEWORK_OCR_CONFIDENCE_THRESHOLD:
+            return self._homework_intake_decision(recognized_content)
 
         fallback_content = recognized_content.model_copy(
             update={"text": None, "fallback_action": "retake_or_speak_problem"}
@@ -122,6 +113,67 @@ class ModalityManager:
                 QuickAction(id="speak_problem", label="读题目"),
             ],
         )
+
+    def _homework_intake_decision(
+        self, recognized_content: RecognizedContent
+    ) -> ModalityDecision:
+        text = recognized_content.text or ""
+        problem_numbers = self._PROBLEM_NUMBER_PATTERN.findall(text)
+        has_multiple_problems = len(problem_numbers) >= 2
+
+        if has_multiple_problems:
+            return ModalityDecision(
+                status=AttachmentStatus.OCR_READY,
+                recognized_content=recognized_content,
+                reply_text=(
+                    "我看到这张图里好像有几道题。"
+                    "你告诉我题号，或者说这道题开头几个字，我先帮你把题目对准。"
+                ),
+                needs_input="homework_problem_locator",
+                sub_scene="homework_problem_locator",
+                active_scene="learning.homework_help",
+                quick_actions=[
+                    QuickAction(id="say_problem_number", label="说题号"),
+                    QuickAction(id="read_first_words", label="读开头几个字"),
+                ],
+            )
+
+        summary = self._extract_problem_summary(text)
+        if summary:
+            reply_text = (
+                f"我先帮你对一下题目：{summary}。"
+                "这道题先别急着算，我们先看它问的是什么。"
+            )
+        else:
+            reply_text = (
+                "我看到了这道题，但还想先和你对一下题目内容。"
+                "你能读一下题目开头那一句吗？"
+            )
+        return ModalityDecision(
+            status=AttachmentStatus.OCR_READY,
+            recognized_content=recognized_content,
+            reply_text=reply_text,
+            needs_input="problem_statement_confirm",
+            sub_scene="homework_statement_confirm",
+            active_scene="learning.homework_help",
+        )
+
+    @staticmethod
+    def _extract_problem_summary(text: str) -> str | None:
+        cleaned = text.strip()
+        if not cleaned:
+            return None
+        separators = ["。", "！", "？", "\n"]
+        first_sentence_end = len(cleaned)
+        for sep in separators:
+            idx = cleaned.find(sep)
+            if 0 <= idx < first_sentence_end:
+                first_sentence_end = idx
+        first_sentence = cleaned[:first_sentence_end].strip()
+        if len(first_sentence) > 40:
+            first_sentence = first_sentence[:40].rstrip("，,、；;：:")
+            first_sentence += "……"
+        return first_sentence if len(first_sentence) >= 4 else None
 
     def _child_visible_image_detail(
         self,

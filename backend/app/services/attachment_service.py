@@ -2,7 +2,9 @@ import base64
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -489,6 +491,52 @@ class AttachmentService:
                     attachment_id=attachment.id,
                     recognized_content=attachment.recognized_content,
                 )
+        return None
+
+    def get_latest_ready_homework_context(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        max_age_seconds: int = 1800,
+    ) -> HomeworkAttachmentContext | None:
+        now = time.time()
+        attachments = self._repository.list_by_session(session_id)
+        for attachment in reversed(attachments):
+            if attachment.child_id != child_id or attachment.session_id != session_id:
+                continue
+            if attachment.status != AttachmentStatus.OCR_READY:
+                continue
+            if attachment.recognized_content.type != "homework_problem":
+                continue
+            if attachment.recognized_content.image_purpose not in {
+                None, ImagePurpose.LEARNING_HOMEWORK,
+            }:
+                continue
+            if not attachment.recognized_content.text:
+                continue
+            age_seconds = (
+                now - attachment.created_at.timestamp()
+                if attachment.created_at
+                else 0
+            )
+            if age_seconds > max_age_seconds:
+                logger.info(
+                    "get_latest_ready_homework_context: expired, attachmentId=%s, age=%ds",
+                    attachment.id,
+                    int(age_seconds),
+                )
+                continue
+            logger.info(
+                "get_latest_ready_homework_context: found, attachmentId=%s, age=%ds",
+                attachment.id,
+                int(age_seconds),
+            )
+            return HomeworkAttachmentContext(
+                attachment_id=attachment.id,
+                recognized_content=attachment.recognized_content,
+            )
+        logger.info("get_latest_ready_homework_context: not_found")
         return None
 
     def get_image_context(

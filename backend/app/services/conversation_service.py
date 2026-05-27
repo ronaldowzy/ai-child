@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 from app.core.logging import hash_identifier
@@ -17,11 +18,12 @@ from app.domain.schemas.conversation import (
     SessionState,
     UiAction,
 )
-from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest
+from app.domain.scene import SceneId, SceneRouteDecision, SceneRouteRequest, SceneTransitionType
 from app.domain.time import TimeContext
 from app.middleware.request_id import get_request_id
 from app.services.attachment_service import (
     AttachmentService,
+    HomeworkAttachmentContext,
     get_attachment_service,
 )
 from app.services.child_agent_runtime import (
@@ -132,6 +134,63 @@ class ConversationService:
             child_id=request.child_id,
             session_id=request.session_id,
         )
+        if (
+            homework_context is None
+            and not request.input.attachments
+            and self._is_homework_followup_text(request.input.text)
+        ):
+            homework_context = self._attachment_service.get_latest_ready_homework_context(
+                child_id=request.child_id,
+                session_id=request.session_id,
+            )
+        if homework_context is not None and safety.risk_level == RiskLevel.NONE:
+            guard_reply = self._homework_followup_guard_reply(
+                child_text=request.input.text,
+                homework_context=homework_context,
+            )
+            if guard_reply:
+                response = ConversationMessageResponse(
+                    reply=Reply(text=guard_reply, emotion="warm"),
+                    ui_actions=[],
+                    session_state=SessionState(
+                        base_scene="conversation.open",
+                        active_scene="learning.homework_help",
+                        needs_input="problem_statement_confirm",
+                    ),
+                )
+                self._persist_turn_if_enabled(
+                    request=request,
+                    response=response,
+                    safety=safety,
+                    intent=IntentClassification(
+                        intent=IntentType.LEARNING_HELP,
+                        sub_intent="homework_followup_guard",
+                        risk_level=safety.risk_level,
+                        needs_modality=False,
+                        suggested_modalities=[],
+                        confidence=0.95,
+                        evidence=["deterministic_guard_reply"],
+                    ),
+                    route_decision=SceneRouteDecision(
+                        message_id="",
+                        session_id=request.session_id,
+                        primary_intent=IntentType.LEARNING_HELP,
+                        base_scene=SceneId.OPEN_CONVERSATION,
+                        active_scene=SceneId.LEARNING_HOMEWORK_HELP,
+                        transition=SceneTransitionType.REPLACE,
+                        scene_stack=[SceneId.OPEN_CONVERSATION],
+                        risk_level=RiskLevel.NONE,
+                        confidence=0.95,
+                        reason="homework_followup_guard",
+                        reply_text=guard_reply,
+                        reply_emotion="warm",
+                    ),
+                    time_context=self._time_context_service.build_context(
+                        device_time=request.client_context.device_time,
+                        timezone=request.client_context.timezone,
+                    ),
+                )
+                return response
         image_context = self._attachment_service.get_image_context(
             request.input.attachments,
             child_id=request.child_id,
@@ -564,6 +623,108 @@ class ConversationService:
                 "turn_total_ms": turn_total_ms,
             },
         )
+
+    _HOMEWORK_FOLLOWUP_KEYWORDS = (
+        "第", "题", "这道", "那道", "题目", "怎么做", "不会",
+        "三位数", "两位数", "开头", "刚才", "那题",
+    )
+
+    def _is_homework_followup_text(self, text: str) -> bool:
+        normalized = text.strip()
+        if not normalized:
+            return False
+        return any(kw in normalized for kw in self._HOMEWORK_FOLLOWUP_KEYWORDS)
+
+    _PROBLEM_NUMBER_EXTRACT = re.compile(r"第\s*([一二三四五六七八九十\d]+)\s*题")
+    _NUMBER_MAP = {
+        "一": "1", "二": "2", "三": "3", "四": "4", "五": "5",
+        "六": "6", "七": "7", "八": "8", "九": "9", "十": "10",
+    }
+    _CONFLICT_NUMBER_PATTERN = re.compile(
+        r"(?:和是|和为|等于)\s*(\d{5,})"
+    )
+
+    def _homework_followup_guard_reply(
+        self,
+        *,
+        child_text: str,
+        homework_context: HomeworkAttachmentContext,
+    ) -> str | None:
+        text = child_text.strip()
+        hw_text = homework_context.recognized_content.text or ""
+
+        match = self._PROBLEM_NUMBER_EXTRACT.search(text)
+        if match:
+            num_str = match.group(1)
+            if num_str in self._NUMBER_MAP:
+                num_str = self._NUMBER_MAP[num_str]
+            problem_section = self._extract_problem_section(hw_text, num_str)
+            if problem_section:
+                summary = problem_section[:40].strip("，,、；;：:")
+                if len(problem_section) > 40:
+                    summary += "……"
+                return (
+                    f"我先对一下，是第{num_str}题这个“{summary}”吗？"
+                    "如果是，我们先看它问的是什么。"
+                )
+            return (
+                f"我怕看串题了。你再读一下第{num_str}题开头几个字，我先把题目对准。"
+            )
+
+        if "这道题" in text or "那道题" in text:
+            problem_count = self._count_problems(hw_text)
+            if problem_count >= 2:
+                return (
+                    "我怕看串题了。你告诉我题号，或者读一下题目开头几个字，我先把题目对准。"
+                )
+
+        conflict_match = self._CONFLICT_NUMBER_PATTERN.search(text)
+        if conflict_match:
+            spoken_number = conflict_match.group(1)
+            correct_number = self._find_likely_correct_number(hw_text, spoken_number)
+            if correct_number:
+                return (
+                    f"我看图片里这一题像是 {correct_number}，不是你刚才读的那个数。"
+                    f"我们先按图片里的 {correct_number} 来看，好吗？"
+                )
+
+        return None
+
+    @staticmethod
+    def _extract_problem_section(hw_text: str, num: str) -> str | None:
+        patterns = [
+            rf"第\s*{num}\s*题\s*[：:]\s*",
+            rf"{num}\s*[\.、]\s*",
+            rf"[（(]\s*{num}\s*[)）]\s*",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, hw_text)
+            if match:
+                start = match.end()
+                remainder = hw_text[start:]
+                next_problem = re.search(
+                    r"(?:第\s*[\d一二三四五六七八九十]+\s*题|[\d]+\s*[\.、]|[（(]\s*[\d]+\s*[)）])",
+                    remainder,
+                )
+                if next_problem:
+                    return remainder[: next_problem.start()].strip()
+                return remainder.strip()
+        return None
+
+    @staticmethod
+    def _count_problems(hw_text: str) -> int:
+        return len(re.findall(
+            r"(?:第\s*[\d一二三四五六七八九十]+\s*题|[\d]+\s*[\.、]|[（(]\s*[\d]+\s*[)）])",
+            hw_text,
+        ))
+
+    @staticmethod
+    def _find_likely_correct_number(hw_text: str, spoken_number: str) -> str | None:
+        four_digit = re.findall(r"\d{4}", hw_text)
+        for num in four_digit:
+            if num in spoken_number and num != spoken_number:
+                return num
+        return None
 
     def _agent_motion_for(self, decision: SceneRouteDecision) -> str:
         active_scene = decision.active_scene.value

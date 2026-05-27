@@ -36,7 +36,7 @@ class ModalityManager:
                 status=AttachmentStatus.IMAGE_READY,
                 recognized_content=recognized_content,
                 reply_text=(
-                    "这张图里好像有家庭地址、电话、学校名字或类似隐私信息。"
+                    "这张图可能有家庭地址、电话、学校名字或类似隐私信息。"
                     "这些内容不要随便发给 AI 或陌生人，先请家长帮你确认。"
                 ),
                 needs_input="privacy_boundary_ack",
@@ -58,7 +58,7 @@ class ModalityManager:
             ):
                 reply_text = (
                     f"我看到像是{visible_detail}。"
-                    "你是想让我看看它哪里有趣吗？"
+                    "我先陪你看这个小细节，你也可以给它起个名字。"
                 )
             else:
                 reply_text = (
@@ -89,7 +89,7 @@ class ModalityManager:
                 recognized_content=recognized_content,
                 reply_text=(
                     "我看清楚了。我们先不急着算。"
-                    "你能告诉我：这道题是在问什么吗？"
+                    "你可以先说说：这道题是在问什么。"
                 ),
                 needs_input="problem_understanding",
                 sub_scene="ask_problem_understanding",

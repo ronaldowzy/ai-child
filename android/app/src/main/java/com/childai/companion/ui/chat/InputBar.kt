@@ -112,7 +112,7 @@ fun InputBar(
         AlertDialog(
             onDismissRequest = { showImageSourceDialog = false },
             title = {
-                Text(text = "拍给小白狐看")
+                Text(text = "给小白狐看看")
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -123,7 +123,7 @@ fun InputBar(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(text = "拍照")
+                        Text(text = "拍一张")
                     }
                     OutlinedButton(
                         onClick = {
@@ -132,14 +132,14 @@ fun InputBar(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(text = "从相册选")
+                        Text(text = "选一张")
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showImageSourceDialog = false }) {
-                    Text(text = "取消")
+                    Text(text = "先不要")
                 }
             },
         )

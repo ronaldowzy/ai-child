@@ -799,17 +799,17 @@ class ChildAgentRuntime:
         if recognized_type == "privacy_sensitive" or image_purpose == "privacy_sensitive":
             return "这张图可能有隐私内容，我们先不展开细节。可以请家长一起看一下。"
 
-        # Child drawing / art — notice one detail, invite child to tell
+        # Child drawing / art — notice one detail, invite child to tell or name
         if recognized_type in ("child_drawing", "art_feedback") or image_purpose in (
             "art_feedback",
             "child_drawing",
         ):
             detail = child_caption or summary
             if detail:
-                return f"我看到你画里有一个{detail}。这个地方很有意思，你可以给它起个名字。"
+                return f"我看到你画里有一个{detail}。这个地方很有意思，你可以给它起个名字，或者讲讲它的故事。"
             return "图片已经传上来了。你可以告诉我你画的是什么，或者你最想让我看哪里。"
 
-        # Toy / object / handmade / daily life — one detail + invitation
+        # Toy / object / handmade / daily life — one detail + creative entry
         if recognized_type in ("toy", "object", "handmade", "daily_life") or image_purpose in (
             "toy",
             "object",
@@ -818,8 +818,8 @@ class ChildAgentRuntime:
             "ask_what_is_this",
         ):
             if summary:
-                return f"我看到图里像是一个{summary}。我先陪你看这个小细节。"
-            return "图片已经传上来了。你可以告诉我最想让我看哪里。"
+                return f"我看到图里像是一个{summary}。你可以给它起个名字，或者告诉我发生了什么。"
+            return "图片已经传上来了。你可以告诉我最想让小白狐看哪里。"
 
         # Tell story — light imaginative bridge
         if image_purpose == "tell_story":
@@ -830,13 +830,13 @@ class ChildAgentRuntime:
         # Unclear / empty — do not pretend to see
         if recognized_type in ("unclear", "low_confidence", "unsafe_unknown") or not summary:
             if child_caption:
-                return f"图片已经传上来了，但这次我看不太清。你刚才说的「{child_caption}」很有意思，可以再告诉我一点。"
-            return "图片已经传上来了，但这次我看不太清。你可以告诉我最想让我看哪里。"
+                return f"图片已经传上来了，但这次看得不太清楚。你刚才说的「{child_caption}」很有意思，可以再告诉我一点。"
+            return "图片已经传上来了，但这次看得不太清楚。你可以告诉我它是什么，或者再拍一张更清楚的。"
 
-        # Default — generic share with one detail
+        # Default — generic share with one detail + creative entry
         if summary:
-            return f"我看到图里像是{summary}。我先陪你看这个小细节。"
-        return "图片已经传上来了。你可以告诉我最想让我看哪里。"
+            return f"我看到图里像是{summary}。你可以给它起个名字，或者告诉我发生了什么。"
+        return "图片已经传上来了。你可以告诉我最想让小白狐看哪里。"
 
     def _looks_like_image_refusal(self, text: str) -> bool:
         compact = text.replace(" ", "")

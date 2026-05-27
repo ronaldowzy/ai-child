@@ -18,7 +18,7 @@ class ModalityDecision(BaseModel):
 
 
 class ModalityManager:
-    """Quality gate for v0.1 multimodal homework intake."""
+    """Quality gate for image intake and routing."""
 
     HOMEWORK_OCR_CONFIDENCE_THRESHOLD = 0.75
     IMAGE_OBSERVATION_CONFIDENCE_THRESHOLD = 0.65
@@ -51,20 +51,28 @@ class ModalityManager:
 
         if recognized_content.image_purpose != ImagePurpose.LEARNING_HOMEWORK:
             visible_detail = self._child_visible_image_detail(recognized_content)
-            if (
-                recognized_content.type == "image_observation"
-                and recognized_content.confidence >= self.IMAGE_OBSERVATION_CONFIDENCE_THRESHOLD
-                and visible_detail
-            ):
+            if recognized_content.confidence < self.IMAGE_OBSERVATION_CONFIDENCE_THRESHOLD:
                 reply_text = (
-                    f"我看到像是{visible_detail}。"
-                    "我先陪你看这个小细节，你也可以给它起个名字。"
+                    "这次看得不太清楚，但我知道你是想拿给我看。"
+                    "你可以告诉我它是什么，或者再拍一张更清楚的。"
                 )
+                return ModalityDecision(
+                    status=AttachmentStatus.IMAGE_READY,
+                    recognized_content=recognized_content,
+                    reply_text=reply_text,
+                    needs_input=None,
+                    sub_scene="image_share",
+                    active_scene="conversation.open",
+                    reply_emotion="encourage",
+                    quick_actions=[
+                        QuickAction(id="tell_what_it_is", label="我来说说"),
+                        QuickAction(id="retake_photo", label="再拍一张"),
+                    ],
+                )
+            if visible_detail:
+                reply_text = f"我看到像是{visible_detail}。你可以给它起个名字，或者告诉我发生了什么。"
             else:
-                reply_text = (
-                    "我看得还不太清楚，但我知道你是想拿给我看。"
-                    "你可以只告诉我它叫什么。"
-                )
+                reply_text = "图片已经传上来啦。你可以告诉我你最想让小白狐看哪里。"
             return ModalityDecision(
                 status=AttachmentStatus.IMAGE_READY,
                 recognized_content=recognized_content,
@@ -74,9 +82,9 @@ class ModalityManager:
                 active_scene="conversation.open",
                 reply_emotion="encourage",
                 quick_actions=[
-                    QuickAction(id="talk_about_image", label="聊聊它"),
-                    QuickAction(id="make_story", label="编个故事"),
-                    QuickAction(id="ask_what_is_this", label="问这是什么"),
+                    QuickAction(id="give_name", label="起个名字"),
+                    QuickAction(id="tell_story", label="讲个故事"),
+                    QuickAction(id="say_what_happened", label="说说看"),
                 ],
             )
 

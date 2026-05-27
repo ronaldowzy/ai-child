@@ -95,7 +95,7 @@ private fun ChildTurnUiPhase.statusText(): String {
         ChildTurnUiPhase.Thinking -> "我先想一想。"
         ChildTurnUiPhase.SpeakingPending -> "我马上说给你听。"
         ChildTurnUiPhase.Speaking -> "我在说给你听。"
-        ChildTurnUiPhase.ImageProcessing -> "我在看这张图片。"
+        ChildTurnUiPhase.ImageProcessing -> "我在看这张图。"
         ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
         ChildTurnUiPhase.Resting -> "我们可以先歇一小会儿。"

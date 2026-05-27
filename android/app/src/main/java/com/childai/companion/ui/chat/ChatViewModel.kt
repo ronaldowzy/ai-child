@@ -151,10 +151,10 @@ class ChatViewModel(
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
-            Log.d(TAG, "sendText: with image attachment=${imageContext.attachmentId}, text=${trimmedText.take(50)}")
+            Log.d(TAG, "sendText: with image attachment=${imageContext.attachmentId}, textLength=${trimmedText.length}")
             _uiState.update { it.copy(pendingImageContext = null) }
         } else {
-            Log.d(TAG, "sendText: text=${trimmedText.take(50)}")
+            Log.d(TAG, "sendText: textLength=${trimmedText.length}")
         }
         sendTextWithAttachments(
             trimmedText,
@@ -584,9 +584,9 @@ class ChatViewModel(
         }
         _uiState.update { it.copy(pendingImageContext = null) }
         val text = when (action.id) {
-            "make_story" -> "请根据刚才那张图片编一个小故事。"
-            "ask_what_is_this" -> "我想问刚才那张图片里这是什么。"
-            else -> "我们继续聊刚才那张图片。"
+            "make_story" -> "给这张图编个小故事吧。"
+            "ask_what_is_this" -> "图里这个是什么呀？"
+            else -> "再聊聊这张图。"
         }
         sendTextWithAttachments(text, listOf(context.attachmentId))
     }

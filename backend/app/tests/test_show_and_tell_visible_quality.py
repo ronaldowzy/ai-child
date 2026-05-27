@@ -110,7 +110,7 @@ def test_drawing_refusal_repair_produces_concrete_detail_and_invitation() -> Non
 # --- Test 2: toy/object image refusal repair ---
 
 def test_toy_object_refusal_repair_not_homework() -> None:
-    """Toy/object repair should mention a detail and ask '你最想让我看哪里', not become homework help."""
+    """Toy/object repair should mention a detail and offer a creative entry, not become homework help."""
     runtime = _make_runtime()
     request = _make_request(
         child_text="你看这个",
@@ -124,7 +124,7 @@ def test_toy_object_refusal_repair_not_homework() -> None:
     assert result is not None
     assert "题" not in result
     assert "作业" not in result
-    assert "最想让我看哪里" in result or "你最想" in result
+    assert "起个名字" in result or "发生了什么" in result
     assert "积木" in result or "城堡" in result
 
 
@@ -191,7 +191,7 @@ def test_unclear_repair_does_not_pretend_to_see() -> None:
     assert "我看到" not in result
     assert "像是" not in result
     # Should acknowledge uncertainty
-    assert "不太清" in result or "告诉我" in result
+    assert "不太清楚" in result or "告诉我" in result
 
 
 # --- Test 6: PromptManager image_context rules ---
@@ -356,3 +356,144 @@ def test_prompt_manager_image_context_no_engineering_terms() -> None:
     assert "安全图片摘要" in result or "系统提供的" in result, (
         f"Should use soft wording: {result}"
     )
+
+
+# --- Test 9: Normal images (drawing, toy, book, block) do not default to homework mode ---
+
+def test_normal_image_types_do_not_route_to_homework() -> None:
+    """Normal image types (toy, object, daily_life, child_drawing) should stay in conversation.open."""
+    from app.services.modality_manager import ModalityManager
+    from app.domain.attachment import ImagePurpose, RecognizedContent
+
+    manager = ModalityManager()
+    normal_types = [
+        ("child_drawing", ImagePurpose.ART_FEEDBACK, "一只小猫在草地上"),
+        ("toy", ImagePurpose.SHARE, "一个红色的积木"),
+        ("object", ImagePurpose.ASK_WHAT_IS_THIS, "一个毛绒兔子"),
+        ("daily_life", ImagePurpose.SHARE, "窗外的天空"),
+        ("handmade", ImagePurpose.SHARE, "纸折的千纸鹤"),
+    ]
+    for recognized_type, purpose, text in normal_types:
+        content = RecognizedContent(
+            type=recognized_type,
+            text=text,
+            confidence=0.85,
+            provider_name="mock",
+            image_purpose=purpose,
+        )
+        decision = manager.decide_image_attachment(content)
+        assert decision.active_scene == "conversation.open", (
+            f"{recognized_type} should be conversation.open, got {decision.active_scene}"
+        )
+        assert decision.sub_scene == "image_share", (
+            f"{recognized_type} should be image_share, got {decision.sub_scene}"
+        )
+        # Should not mention homework
+        assert "题" not in decision.reply_text, (
+            f"{recognized_type} reply mentions 题: {decision.reply_text}"
+        )
+
+
+# --- Test 10: Blurry/unclear image acknowledges it can't see clearly ---
+
+def test_blurry_image_admits_cannot_see() -> None:
+    """Low-confidence image should say '看得不太清楚' and not invent details."""
+    from app.services.modality_manager import ModalityManager
+    from app.domain.attachment import ImagePurpose, RecognizedContent
+
+    manager = ModalityManager()
+    content = RecognizedContent(
+        type="image_observation",
+        text="模糊的图片内容",
+        confidence=0.3,
+        provider_name="mock",
+        image_purpose=ImagePurpose.SHARE,
+    )
+    decision = manager.decide_image_attachment(content)
+    assert "不太清楚" in decision.reply_text
+    assert decision.active_scene == "conversation.open"
+
+
+def test_blurry_image_repair_does_not_pretend() -> None:
+    """Unclear image repair should not invent content."""
+    runtime = _make_runtime()
+    request = _make_request(
+        child_text="你看这个",
+        image_context={
+            "recognized_type": "unclear",
+            "image_purpose": "unknown",
+            "recognized_text": "",
+            "child_caption": "我的画",
+        },
+    )
+    result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
+    assert result is not None
+    assert "我的画" in result
+    assert "不太清楚" in result
+    assert "我看到" not in result
+
+
+# --- Test 11: Image context continuation doesn't say "看不到图片" ---
+
+def test_image_context_continuation_no_refusal() -> None:
+    """When image context exists, repair reply should not say '看不到图片'."""
+    runtime = _make_runtime()
+    request = _make_request(
+        child_text="你看到什么了",
+        image_context={
+            "recognized_type": "image_observation",
+            "image_purpose": "share",
+            "recognized_text": "一只黄色的小鸭子玩具",
+        },
+    )
+    # Simulate model saying "我看不到图片"
+    result = runtime._image_context_repair_reply(request, "抱歉，我无法看到图片。")
+    assert result is not None
+    assert "看不到" not in result
+    assert "无法看到" not in result
+    assert "小鸭子" in result or "玩具" in result
+
+
+# --- Test 12: PromptManager creative entry for normal images ---
+
+def test_prompt_manager_normal_image_has_creative_entry() -> None:
+    """Normal image context should include creative entry guidance."""
+    pm = PromptManager()
+    result = pm._render_image_context({
+        "recognized_type": "toy",
+        "image_purpose": "share",
+        "recognized_text": "一个毛绒兔子",
+    })
+    assert "起个名字" in result or "创作入口" in result or "讲故事" in result
+
+
+def test_prompt_manager_homework_image_no_creative_entry() -> None:
+    """Homework image context should not include creative entry guidance."""
+    pm = PromptManager()
+    result = pm._render_image_context({
+        "recognized_type": "homework_problem",
+        "image_purpose": "learning_homework",
+        "recognized_text": "一道数学题",
+    })
+    assert "起个名字" not in result
+    assert "创作入口" not in result
+
+
+# --- Test 13: Drawing repair includes creative invitation ---
+
+def test_drawing_repair_includes_creative_invitation() -> None:
+    """Drawing/art repair should invite naming or storytelling."""
+    runtime = _make_runtime()
+    request = _make_request(
+        child_text="你看我画的",
+        image_context={
+            "recognized_type": "child_drawing",
+            "image_purpose": "art_feedback",
+            "recognized_text": "一朵红色的花",
+            "child_caption": "",
+        },
+    )
+    result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
+    assert result is not None
+    assert "名字" in result or "故事" in result
+    assert "花" in result

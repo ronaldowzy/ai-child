@@ -530,9 +530,9 @@ private fun LocalImagePreviewCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
     val statusText = when (preview.status) {
-        LocalImagePreviewStatus.Uploading -> "图片正在给小白狐看"
-        LocalImagePreviewStatus.Sent -> "图片已发送给小白狐"
-        LocalImagePreviewStatus.Failed -> "图片没有传好"
+        LocalImagePreviewStatus.Uploading -> "小白狐正在看…"
+        LocalImagePreviewStatus.Sent -> "小白狐看到啦"
+        LocalImagePreviewStatus.Failed -> "没有传好，再试一次？"
     }
     val cardColor = if (childBubble) {
         MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f)
@@ -565,7 +565,7 @@ private fun LocalImagePreviewCard(
             )
         }
         Text(
-            text = "$statusText · ${preview.displayMimeType} · ${preview.displaySize}",
+            text = statusText,
             style = MaterialTheme.typography.labelMedium,
             color = contentColor,
             maxLines = 1,

@@ -473,6 +473,11 @@ class PromptManager:
                 "如果图片可能包含隐私内容，不要描述私密细节。可以建议孩子请家长一起看一下。"
             )
         lines.append("如果孩子没有说这是作业题，请自然围绕图片继续聊，不要把它强行当成作业。")
+        if recognized_type not in ("homework_problem", "privacy_sensitive", "unclear", "low_confidence", "unsafe_unknown"):
+            lines.append(
+                "优先回应一个安全的具体细节，然后给孩子一个轻量创作入口："
+                "比如起个名字、讲个小故事、说说发生了什么。不要审问式追问。"
+            )
         return "\n".join(lines)
 
     def _render_turn_guidance(

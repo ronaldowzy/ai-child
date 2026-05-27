@@ -252,9 +252,18 @@ def test_conversation_attachment_accepts_generic_image_share() -> None:
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
     assert "积木城堡" in body["reply"]["text"]
-    assert "哪里有趣" in body["reply"]["text"]
+    assert "起个名字" in body["reply"]["text"] or "发生了什么" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "encourage"
     assert "这道题" not in body["reply"]["text"]
+    # Quick actions should be creative entry points
+    action_ids = {
+        action["id"]
+        for action_group in body["ui_actions"]
+        for action in action_group["actions"]
+    }
+    assert "give_name" in action_ids
+    assert "tell_story" in action_ids
+    assert "say_what_happened" in action_ids
 
 
 def test_generic_image_low_confidence_does_not_pretend_to_see_detail() -> None:
@@ -277,8 +286,16 @@ def test_generic_image_low_confidence_does_not_pretend_to_see_detail() -> None:
 
     assert body["recognized_content"]["type"] == "image_observation"
     assert body["session_state"]["active_scene"] == "conversation.open"
-    assert "看得还不太清楚" in body["reply"]["text"]
+    assert "不太清楚" in body["reply"]["text"]
     assert "积木城堡" not in body["reply"]["text"]
+    # Low confidence should offer tell-what-it-is and retake actions
+    action_ids = {
+        action["id"]
+        for action_group in body["ui_actions"]
+        for action in action_group["actions"]
+    }
+    assert "tell_what_it_is" in action_ids
+    assert "retake_photo" in action_ids
 
 
 def test_generic_photo_with_homework_like_text_stays_image_context() -> None:
@@ -303,7 +320,7 @@ def test_generic_photo_with_homework_like_text_stays_image_context() -> None:
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
     assert body["session_state"].get("needs_input") is None
-    assert "看得还不太清楚" in body["reply"]["text"]
+    # With share purpose and high confidence, treats as normal image share, not homework
     assert "这道题是在问什么" not in body["reply"]["text"]
 
 

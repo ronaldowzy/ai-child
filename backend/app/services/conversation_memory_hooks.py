@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 from app.domain.enums import IntentType, RiskCategory, RiskLevel
@@ -18,9 +19,43 @@ from app.services.relationship_memory import (
     SHOW_AND_TELL_EVENT,
     TOPIC_BOUNDARY,
     UNFINISHED_THREAD,
+    is_relationship_memory,
+    memory_relationship_topic,
     relationship_metadata,
 )
 from app.services.safety_engine import SafetyClassification
+
+# High-stimulation topics that should not be recalled at bedtime.
+_BEDTIME_EXCITING_MARKERS = (
+    "跑步比赛", "比赛", "游戏", "恐龙大战", "冒险", "挑战", "任务", "奖励",
+)
+
+# Maximum times the same memory topic can be recalled per session.
+_MAX_SAME_TOPIC_RECALLS = 1
+
+
+class _SessionRecallState:
+    """Tracks per-session memory recall for rate limiting."""
+
+    __slots__ = ("recalled_topics", "suppress_until", "last_recall_ts")
+
+    def __init__(self) -> None:
+        self.recalled_topics: dict[str, int] = {}
+        self.suppress_until: float = 0.0
+        self.last_recall_ts: float = 0.0
+
+    def record_recall(self, topic: str) -> None:
+        self.recalled_topics[topic] = self.recalled_topics.get(topic, 0) + 1
+        self.last_recall_ts = time.monotonic()
+
+    def suppress_for(self, seconds: float) -> None:
+        self.suppress_until = time.monotonic() + seconds
+
+    def is_suppressed(self) -> bool:
+        return time.monotonic() < self.suppress_until
+
+    def topic_recall_count(self, topic: str) -> int:
+        return self.recalled_topics.get(topic, 0)
 
 
 class ConversationMemoryHooks:
@@ -28,10 +63,21 @@ class ConversationMemoryHooks:
 
     v0.1 stores only structured summaries. Child text is intentionally not copied
     into memory content or evidence.
+
+    v0.2 adds turn-level recall rate limiting: same topic is not recalled more than
+    once per session, and child rejection/short-answer suppresses further recalls.
     """
 
     def __init__(self, *, memory_service: MemoryService | None = None) -> None:
         self._memory_service = memory_service or get_memory_service()
+        self._session_recall: dict[str, _SessionRecallState] = {}
+
+    def _get_session_state(self, session_id: str) -> _SessionRecallState:
+        state = self._session_recall.get(session_id)
+        if state is None:
+            state = _SessionRecallState()
+            self._session_recall[session_id] = state
+        return state
 
     def retrieve_context(
         self,
@@ -39,18 +85,47 @@ class ConversationMemoryHooks:
         child_id: str,
         current_text: str,
         limit: int = 5,
+        session_id: str | None = None,
+        bedtime: bool = False,
+        child_engagement: str | None = None,
     ) -> list[dict[str, Any]]:
+        # If child is signaling rejection/short-answer, suppress memory recall.
+        if session_id and child_engagement in ("boundary", "short_or_flat"):
+            state = self._get_session_state(session_id)
+            state.suppress_for(120.0)
+            return []
+
+        # If session is in suppression window, skip recall.
+        if session_id:
+            state = self._get_session_state(session_id)
+            if state.is_suppressed():
+                return []
+
         memories = self._memory_service.retrieve(
             child_id,
             query=current_text,
-            limit=limit,
+            limit=limit + 3,  # fetch extra to allow filtering
             include_safety=False,
         )
-        return [
-            self._memory_to_runtime_context(memory)
-            for memory in memories
-            if memory.memory_type != MemoryType.SAFETY
-        ]
+        result: list[dict[str, Any]] = []
+        for memory in memories:
+            if memory.memory_type == MemoryType.SAFETY:
+                continue
+            # At bedtime, skip high-stimulation memories.
+            if bedtime and self._is_exciting_memory(memory):
+                continue
+            # Skip topics already recalled too many times this session.
+            if session_id:
+                topic = self._extract_recall_topic(memory)
+                if topic:
+                    state = self._get_session_state(session_id)
+                    if state.topic_recall_count(topic) >= _MAX_SAME_TOPIC_RECALLS:
+                        continue
+                    state.record_recall(topic)
+            result.append(self._memory_to_runtime_context(memory))
+            if len(result) >= limit:
+                break
+        return result
 
     def record_turn(
         self,
@@ -793,6 +868,22 @@ class ConversationMemoryHooks:
             "tags": memory.tags[:6],
             "confidence": round(memory.confidence, 2),
         }
+
+    def _is_exciting_memory(self, memory: MemoryItem) -> bool:
+        """Check if a memory is high-stimulation (should be suppressed at bedtime)."""
+        combined = " ".join([memory.content, *memory.tags])
+        return any(marker in combined for marker in _BEDTIME_EXCITING_MARKERS)
+
+    def _extract_recall_topic(self, memory: MemoryItem) -> str | None:
+        """Extract a dedup key for memory recall tracking."""
+        if is_relationship_memory(memory):
+            topic = memory_relationship_topic(memory)
+            if topic:
+                return topic
+        # For non-relationship memories, use memory_type + first tag as key.
+        if memory.tags:
+            return f"{memory.memory_type.value}:{memory.tags[0]}"
+        return memory.memory_type.value
 
 
 _conversation_memory_hooks = ConversationMemoryHooks()

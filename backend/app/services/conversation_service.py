@@ -194,10 +194,18 @@ class ConversationService:
                 ),
             )
         )
+        # Lightweight pre-check for memory recall suppression.
+        # Full turn_guidance is built inside ChildAgentRuntime after memory retrieval,
+        # so we do a minimal boundary/engagement check here.
+        bedtime = str(time_context.time_period) == "bedtime"
+        child_engagement = self._pre_check_child_engagement(request.input.text)
         memory_context = self._memory_hooks.retrieve_context(
             child_id=request.child_id,
             current_text=request.input.text,
             limit=5,
+            session_id=request.session_id,
+            bedtime=bedtime,
+            child_engagement=child_engagement,
         )
         conversation_history = []
         if route_decision.active_scene == SceneId.OPEN_CONVERSATION:
@@ -330,6 +338,28 @@ class ConversationService:
             agent_text=response.reply.text,
         )
         return response
+
+    _TOPIC_CHANGE_MARKERS = (
+        "换个话题", "聊点别的", "别聊这个", "不说了", "算了", "今天不聊了",
+        "不聊了", "不想聊了", "不要聊了",
+    )
+    _BEDTIME_CLOSE_MARKERS = (
+        "明天再聊", "我要睡觉", "我得睡觉", "晚安", "困了",
+    )
+    _SHORT_FLAT_REPLIES = (
+        "嗯", "哦", "好吧", "不知道", "还行", "随便", "没有", "没了", "算了", "都行",
+    )
+
+    def _pre_check_child_engagement(self, child_text: str) -> str:
+        """Lightweight engagement check before full turn_guidance is built."""
+        normalized = child_text.strip().lower().replace(" ", "")
+        if any(m in normalized for m in self._TOPIC_CHANGE_MARKERS):
+            return "boundary"
+        if any(m in normalized for m in self._BEDTIME_CLOSE_MARKERS):
+            return "boundary"
+        if normalized in self._SHORT_FLAT_REPLIES or len(normalized) <= 4:
+            return "short_or_flat"
+        return "neutral"
 
     def _persist_turn_if_enabled(
         self,

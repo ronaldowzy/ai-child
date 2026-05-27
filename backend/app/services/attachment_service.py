@@ -502,7 +502,7 @@ class AttachmentService:
     ) -> HomeworkAttachmentContext | None:
         now = time.time()
         attachments = self._repository.list_by_session(session_id)
-        for attachment in reversed(attachments):
+        for attachment in attachments:
             if attachment.child_id != child_id or attachment.session_id != session_id:
                 continue
             if attachment.status != AttachmentStatus.OCR_READY:

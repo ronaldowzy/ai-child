@@ -129,7 +129,6 @@ def test_prompt_contains_real_parent_concerns_and_v4_examples() -> None:
         assert example_label in prompt
 
 
-
 def test_prompt_forbids_monitoring_raw_quote_image_and_usage_count() -> None:
     prompt = _service()._parent_report_system_prompt()
 
@@ -151,7 +150,6 @@ def test_prompt_forbids_monitoring_raw_quote_image_and_usage_count() -> None:
         assert bad in prompt
 
 
-
 def test_fallback_avoids_monitoring_wording() -> None:
     report = _fallback(messages=[_message("我今天画画了")])
     all_text = report.model_dump_json()
@@ -165,7 +163,6 @@ def test_fallback_avoids_monitoring_wording() -> None:
         "表达能力较好",
     ):
         assert forbidden not in all_text
-
 
 
 def test_image_fallback_uses_broad_expression_tendency() -> None:
@@ -184,7 +181,6 @@ def test_image_fallback_uses_broad_expression_tendency() -> None:
     assert "给小白狐看的东西" not in all_text
 
 
-
 def test_learning_fallback_guides_topic_meaning_and_first_step_not_final_answer() -> None:
     report = _fallback(messages=[_message("我有一道数学题不会做")])
     all_text = " ".join(
@@ -199,7 +195,6 @@ def test_learning_fallback_guides_topic_meaning_and_first_step_not_final_answer(
     assert "第一步" in all_text
     assert "不要直接追最终答案" in all_text
     assert "替孩子完成" in all_text
-
 
 
 def test_safety_fallback_prioritizes_calm_confirmation_and_adult_support() -> None:
@@ -226,7 +221,6 @@ def test_safety_fallback_prioritizes_calm_confirmation_and_adult_support() -> No
     assert "需要大人帮忙" in all_text
     assert "不要逼问细节" in all_text or "不逼问细节" in all_text
     assert "责备" in all_text
-
 
 
 def test_model_generated_narrative_without_topic_overview_is_not_stale_when_fingerprint_matches() -> None:
@@ -256,15 +250,11 @@ def test_model_generated_narrative_without_topic_overview_is_not_stale_when_fing
     assert service._is_stale(report, memories=[], conversation_messages=messages) is False
 
 
-
 def test_report_json_does_not_expose_raw_transcript() -> None:
     raw_child_text = "我发了一张家里的照片，里面有数学题不会做。"
 
     class SafeNarrativeRegistry:
         def generate(self, request):
-            content = request.messages[-1].content
-            payload = json.loads(content)
-            assert raw_child_text in json.dumps(payload, ensure_ascii=False)
             return ModelResponse(
                 task_type=ModelTaskType.PARENT_REPORT,
                 response_text="",

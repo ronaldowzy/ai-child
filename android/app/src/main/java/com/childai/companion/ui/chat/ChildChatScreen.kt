@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -33,7 +34,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -240,50 +245,121 @@ private fun ChildChatScreenContent(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
+            val isLandscape = maxWidth > maxHeight
             val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
-            val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
-            val verticalPadding = if (compactLandscape) 10.dp else 24.dp
-            val columnGap = if (compactLandscape) 14.dp else 28.dp
 
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AgentPanel(
-                    presentation = uiState.interactionPresentation,
-                    compactLandscape = compactLandscape,
+            if (isLandscape) {
+                // Landscape: fox on left, chat on right — fox is prominent
+                val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
+                val verticalPadding = if (compactLandscape) 10.dp else 24.dp
+                val columnGap = if (compactLandscape) 14.dp else 28.dp
+
+                Row(
                     modifier = Modifier
-                        .weight(0.41f)
-                        .fillMaxHeight(),
-                )
-                Spacer(modifier = Modifier.width(columnGap))
-                ChatPanel(
-                    uiState = uiState,
-                    compactLandscape = compactLandscape,
-                    parentEntryHint = parentEntryHint,
-                    presentation = uiState.interactionPresentation,
-                    onParentEntryTap = {
-                        parentEntryHint = parentEntryTapHint()
-                    },
-                    onParentEntryLongPress = {
-                        parentEntryHint = null
-                        showParentEntryChoices = true
-                    },
-                    onSend = onSend,
-                    onQuickAction = onQuickAction,
-                    onStopTts = onStopTts,
-                    onToggleTtsMuted = onToggleTtsMuted,
-                    onOpenTtsSettings = onOpenTtsSettings,
-                    onInstallTtsData = onInstallTtsData,
-                    onPhotoCaptured = onPhotoCaptured,
-                    onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        .fillMaxSize()
+                        .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AgentPanel(
+                        presentation = uiState.interactionPresentation,
+                        compactLandscape = compactLandscape,
+                        modifier = Modifier
+                            .weight(0.50f)
+                            .fillMaxHeight(),
+                    )
+                    Spacer(modifier = Modifier.width(columnGap))
+                    ChatPanel(
+                        uiState = uiState,
+                        compactLandscape = compactLandscape,
+                        parentEntryHint = parentEntryHint,
+                        presentation = uiState.interactionPresentation,
+                        onParentEntryTap = {
+                            parentEntryHint = parentEntryTapHint()
+                        },
+                        onParentEntryLongPress = {
+                            parentEntryHint = null
+                            showParentEntryChoices = true
+                        },
+                        onSend = onSend,
+                        onQuickAction = onQuickAction,
+                        onStopTts = onStopTts,
+                        onToggleTtsMuted = onToggleTtsMuted,
+                        onOpenTtsSettings = onOpenTtsSettings,
+                        onInstallTtsData = onInstallTtsData,
+                        onPhotoCaptured = onPhotoCaptured,
+                        onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        modifier = Modifier
+                            .weight(0.50f)
+                            .fillMaxHeight(),
+                    )
+                }
+            } else {
+                // Portrait: fox on top as hero, chat+input below
+                val horizontalPadding = 20.dp
+                val verticalPadding = 16.dp
+
+                Column(
                     modifier = Modifier
-                        .weight(0.59f)
-                        .fillMaxHeight(),
-                )
+                        .fillMaxSize()
+                        .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    ParentEntryHintBar(
+                        parentEntryHint = parentEntryHint,
+                        onParentEntryTap = {
+                            parentEntryHint = parentEntryTapHint()
+                        },
+                        onParentEntryLongPress = {
+                            parentEntryHint = null
+                            showParentEntryChoices = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Fox hero area — 55% of screen
+                    AgentPanel(
+                        presentation = uiState.interactionPresentation,
+                        compactLandscape = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.55f),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Chat + input area — 45% of screen
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.45f),
+                    ) {
+                        ChatConversationPanel(
+                            uiState = uiState,
+                            onQuickAction = onQuickAction,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        InputBar(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 112.dp)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .navigationBarsPadding()
+                                .windowInsetsPadding(WindowInsets.ime)
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            onSend = onSend,
+                            enabled = !uiState.isSending,
+                            voice = uiState.voice,
+                            tts = uiState.tts,
+                            presentation = uiState.interactionPresentation,
+                            onStopTts = onStopTts,
+                            onToggleTtsMuted = onToggleTtsMuted,
+                            onOpenTtsSettings = onOpenTtsSettings,
+                            onInstallTtsData = onInstallTtsData,
+                            onPhotoCaptured = onPhotoCaptured,
+                            onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        )
+                    }
+                }
             }
         }
     }
@@ -704,6 +780,35 @@ private fun ParentEntryButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ParentEntryHintBar(
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = parentEntryHint ?: parentEntryDefaultHint(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        ParentEntryButton(
+            label = PARENT_ENTRY_COMPACT_LABEL,
+            onTap = onParentEntryTap,
+            onLongPress = onParentEntryLongPress,
+        )
+    }
+}
+
 @Composable
 private fun ParentEntryTargetDialog(
     onOpenTarget: (ParentEntryTarget) -> Unit,
@@ -754,10 +859,11 @@ private fun AgentPanel(
             (maxHeight - statusReserve).coerceAtLeast(160.dp),
             if (compactLandscape) 340.dp else 470.dp,
         )
+        val foxGlowColor = foxGlowColorForPhase(presentation.phase)
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(16.dp),
         ) {
             Column(
                 modifier = Modifier
@@ -766,8 +872,44 @@ private fun AgentPanel(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                ChildStateChip(
+                FoxStateIndicator(
                     phase = presentation.phase,
+                    compactLandscape = compactLandscape,
+                )
+                Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
+                Box(
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Glow effect behind fox
+                    Box(
+                        modifier = Modifier
+                            .sizeIn(
+                                maxWidth = mascotMaxSize * 0.7f,
+                                maxHeight = mascotMaxSize * 0.7f,
+                            )
+                            .blur(radius = 32.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        foxGlowColor.copy(alpha = 0.35f),
+                                        foxGlowColor.copy(alpha = 0.0f),
+                                    ),
+                                ),
+                                shape = CircleShape,
+                            ),
+                    )
+                    CartoonAgentView(
+                        agent = presentation.agent,
+                        debugMascotState = debugMascotState,
+                        modifier = Modifier.sizeIn(
+                            maxWidth = mascotMaxSize,
+                            maxHeight = mascotMaxSize,
+                        ),
+                    )
+                }
+                Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
+                AgentReplyCarouselText(
+                    text = presentation.statusText,
                     compactLandscape = compactLandscape,
                 )
                 if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
@@ -775,25 +917,11 @@ private fun AgentPanel(
                     Text(
                         text = "可以聊一件小事，也可以拍给我看。",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
-                CartoonAgentView(
-                    agent = presentation.agent,
-                    debugMascotState = debugMascotState,
-                    modifier = Modifier.sizeIn(
-                        maxWidth = mascotMaxSize,
-                        maxHeight = mascotMaxSize,
-                    ),
-                )
-                Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 14.dp))
-                AgentReplyCarouselText(
-                    text = presentation.statusText,
-                    compactLandscape = compactLandscape,
-                )
                 if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
                     Spacer(modifier = Modifier.height(10.dp))
                     MascotDebugSwitcher(
@@ -807,27 +935,80 @@ private fun AgentPanel(
 }
 
 @Composable
-private fun ChildStateChip(
+private fun FoxStateIndicator(
     phase: ChildTurnUiPhase,
     compactLandscape: Boolean,
 ) {
+    val (label, emoji) = foxStateDisplayForPhase(phase)
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.small,
+        color = foxStateChipColor(phase),
+        shape = MaterialTheme.shapes.medium,
         tonalElevation = 1.dp,
     ) {
         Text(
-            text = childUiPolishStateLabel(phase),
+            text = "$emoji $label",
             style = if (compactLandscape) {
                 MaterialTheme.typography.labelMedium
             } else {
-                MaterialTheme.typography.labelLarge
+                MaterialTheme.typography.titleSmall
             },
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+    }
+}
+
+private fun foxStateDisplayForPhase(phase: ChildTurnUiPhase): Pair<String, String> {
+    return when (phase) {
+        ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.Resting -> "小白狐在这里" to "🦊"
+        ChildTurnUiPhase.Listening -> "在听你说" to "👀"
+        ChildTurnUiPhase.Recognizing -> "在听懂你的话" to "🤔"
+        ChildTurnUiPhase.Sending,
+        ChildTurnUiPhase.Thinking -> "在想一想" to "🤔"
+        ChildTurnUiPhase.SpeakingPending,
+        ChildTurnUiPhase.Speaking -> "在说给你听" to "🐻‍💬"
+        ChildTurnUiPhase.ImageProcessing -> "在看这张图" to "👁️"
+        ChildTurnUiPhase.NeedsRetry -> "可以再说一次" to "👂"
+        ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙" to "🙏"
+        ChildTurnUiPhase.ServiceError -> "先请大人看看" to "⚠️"
+    }
+}
+
+@Composable
+private fun foxStateChipColor(phase: ChildTurnUiPhase): Color {
+    return when (phase) {
+        ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.Resting -> MaterialTheme.colorScheme.primaryContainer
+        ChildTurnUiPhase.Listening -> MaterialTheme.colorScheme.tertiaryContainer
+        ChildTurnUiPhase.Recognizing,
+        ChildTurnUiPhase.Thinking,
+        ChildTurnUiPhase.Sending -> MaterialTheme.colorScheme.secondaryContainer
+        ChildTurnUiPhase.SpeakingPending,
+        ChildTurnUiPhase.Speaking -> MaterialTheme.colorScheme.primaryContainer
+        ChildTurnUiPhase.ImageProcessing -> MaterialTheme.colorScheme.secondaryContainer
+        ChildTurnUiPhase.NeedsRetry -> MaterialTheme.colorScheme.surfaceVariant
+        ChildTurnUiPhase.PermissionNeeded,
+        ChildTurnUiPhase.ServiceError -> MaterialTheme.colorScheme.errorContainer
+    }
+}
+
+private fun foxGlowColorForPhase(phase: ChildTurnUiPhase): Color {
+    return when (phase) {
+        ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.Resting -> Color(0xFF81C784)       // soft green
+        ChildTurnUiPhase.Listening -> Color(0xFF4FC3F7)     // sky blue
+        ChildTurnUiPhase.Recognizing,
+        ChildTurnUiPhase.Thinking,
+        ChildTurnUiPhase.Sending -> Color(0xFFFFB74D)       // warm amber
+        ChildTurnUiPhase.SpeakingPending,
+        ChildTurnUiPhase.Speaking -> Color(0xFFFF8A65)      // warm orange
+        ChildTurnUiPhase.ImageProcessing -> Color(0xFFBA68C8) // soft purple
+        ChildTurnUiPhase.NeedsRetry -> Color(0xFFFFF176)    // soft yellow
+        ChildTurnUiPhase.PermissionNeeded,
+        ChildTurnUiPhase.ServiceError -> Color(0xFFEF9A9A)  // soft red
     }
 }
 
@@ -952,9 +1133,72 @@ private fun MascotDebugSwitcher(
     }
 }
 
-@Preview(showBackground = true, widthDp = 900, heightDp = 700)
+@Preview(showBackground = true, widthDp = 400, heightDp = 800, name = "Portrait - Ready")
 @Composable
-private fun ChildChatScreenPreview() {
+private fun ChildChatScreenPortraitPreview() {
+    ChildAiCompanionTheme {
+        ChildChatScreenContent(
+            uiState = ChatUiState(
+                messages = initialChatMessages(),
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Warm,
+                    motion = FoxMotion.GentleIdle,
+                    statusText = "我准备好啦。",
+                ),
+            ),
+            onSend = {},
+            onQuickAction = {},
+            onStopTts = {},
+            onToggleTtsMuted = {},
+            onOpenTtsSettings = {},
+            onInstallTtsData = {},
+            onPhotoCaptured = { _, _ -> },
+            onPhotoCaptureFailed = {},
+            onOpenParentSettings = {},
+            onOpenParentReport = {},
+            requireParentCredential = false,
+            verifyParentCredential = { false },
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 400, heightDp = 800, name = "Portrait - Listening")
+@Composable
+private fun ChildChatScreenPortraitListeningPreview() {
+    ChildAiCompanionTheme {
+        ChildChatScreenContent(
+            uiState = ChatUiState(
+                messages = initialChatMessages() + ChatMessage(
+                    id = "preview-child",
+                    author = MessageAuthor.Child,
+                    text = "今天学校有一件好玩的事",
+                ),
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Listening,
+                    motion = FoxMotion.ListeningTail,
+                    statusText = "我在听你说。",
+                ),
+                childTurnPhaseHint = ChildTurnUiPhase.Listening,
+            ),
+            onSend = {},
+            onQuickAction = {},
+            onStopTts = {},
+            onToggleTtsMuted = {},
+            onOpenTtsSettings = {},
+            onInstallTtsData = {},
+            onPhotoCaptured = { _, _ -> },
+            onPhotoCaptureFailed = {},
+            onOpenParentSettings = {},
+            onOpenParentReport = {},
+            requireParentCredential = false,
+            verifyParentCredential = { false },
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 900, heightDp = 700, name = "Landscape - Listening")
+@Composable
+private fun ChildChatScreenLandscapePreview() {
     ChildAiCompanionTheme {
         ChildChatScreenContent(
             uiState = ChatUiState(

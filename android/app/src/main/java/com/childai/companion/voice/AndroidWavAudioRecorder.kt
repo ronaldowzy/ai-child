@@ -18,15 +18,19 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.sqrt
 
 class AndroidWavAudioRecorder(
     private val cacheDirectory: File,
     private val preferredSampleRateHz: Int = DEFAULT_SAMPLE_RATE_HZ,
     private val maxDurationMs: Long = MAX_DURATION_MS,
+    var onSilenceDetected: (() -> Unit)? = null,
 ) : VoiceRecorder {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
     private var activeRecording: ActiveRecording? = null
+    @Volatile
+    private var lastAutoStopResult: RecordedVoiceAudio? = null
 
     @SuppressLint("MissingPermission")
     override suspend fun start() = withContext(Dispatchers.IO) {
@@ -84,7 +88,14 @@ class AndroidWavAudioRecorder(
     override suspend fun stop(): RecordedVoiceAudio {
         val active = synchronized(lock) {
             activeRecording.also { activeRecording = null }
-        } ?: error("Voice recording is not active")
+        }
+        if (active == null) {
+            lastAutoStopResult?.let {
+                lastAutoStopResult = null
+                return it
+            }
+            error("Voice recording is not active")
+        }
 
         active.job?.cancelAndJoin()
         return withContext(Dispatchers.IO) {
@@ -126,6 +137,8 @@ class AndroidWavAudioRecorder(
 
     private suspend fun recordPcm(active: ActiveRecording, bufferSize: Int) {
         val buffer = ByteArray(bufferSize)
+        var speechDetected = false
+        var silenceStartMs = 0L
         try {
             while (
                 currentCoroutineContext().isActive &&
@@ -135,11 +148,55 @@ class AndroidWavAudioRecorder(
                 if (read > 0) {
                     active.output.write(buffer, 0, read)
                     active.pcmBytesWritten += read
+
+                    if (onSilenceDetected != null) {
+                        val rms = computeRms16(buffer, read)
+                        val now = SystemClock.elapsedRealtime()
+                        if (rms > SILENCE_THRESHOLD_RMS) {
+                            speechDetected = true
+                            silenceStartMs = 0L
+                        } else if (speechDetected) {
+                            if (silenceStartMs == 0L) {
+                                silenceStartMs = now
+                            } else if (now - silenceStartMs >= SILENCE_TIMEOUT_AFTER_SPEECH_MS) {
+                                runCatching { active.recorder.stop() }
+                                val result = finishRecordingResult(active)
+                                lastAutoStopResult = result
+                                onSilenceDetected?.invoke()
+                                return
+                            }
+                        }
+                    }
                 }
             }
         } finally {
             runCatching { active.recorder.stop() }
         }
+    }
+
+    private fun computeRms16(buffer: ByteArray, length: Int): Double {
+        var sum = 0.0
+        val sampleCount = length / 2
+        var i = 0
+        while (i < length - 1) {
+            val sample = (buffer[i].toInt() and 0xFF) or (buffer[i + 1].toInt() shl 8).toShort().toInt()
+            sum += sample.toDouble() * sample.toDouble()
+            i += 2
+        }
+        return if (sampleCount > 0) sqrt(sum / sampleCount) else 0.0
+    }
+
+    private fun finishRecordingResult(active: ActiveRecording): RecordedVoiceAudio {
+        finishRecording(active = active, deleteFile = false)
+        return RecordedVoiceAudio(
+            file = active.file,
+            sampleRateHz = active.sampleRateHz,
+            channelCount = 1,
+            durationMs = (
+                SystemClock.elapsedRealtime() - active.startedAtMs
+            ).coerceIn(1L, maxDurationMs),
+            stoppedBySilence = true,
+        )
     }
 
     private fun finishRecording(active: ActiveRecording, deleteFile: Boolean) {
@@ -197,6 +254,8 @@ class AndroidWavAudioRecorder(
         const val MAX_DURATION_MS = 30_000L
         private const val BYTES_PER_SAMPLE = 2
         private const val WAV_HEADER_BYTES = 44
+        private const val SILENCE_THRESHOLD_RMS = 500.0
+        private const val SILENCE_TIMEOUT_AFTER_SPEECH_MS = 1000L
 
         fun writeWavHeader(
             file: File,

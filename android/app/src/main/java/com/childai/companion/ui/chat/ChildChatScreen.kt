@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -135,6 +136,8 @@ fun ChildChatScreen(
         },
         onPhotoCaptured = viewModel::submitCapturedPhoto,
         onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
+        onImageRetry = viewModel::retryPhotoUpload,
+        onImageDismiss = viewModel::dismissFailedPhoto,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
         requireParentCredential = requireParentCredential,
@@ -154,6 +157,8 @@ private fun ChildChatScreenContent(
     onInstallTtsData: () -> Unit,
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
+    onImageRetry: (String) -> Unit = {},
+    onImageDismiss: (String) -> Unit = {},
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
     requireParentCredential: Boolean,
@@ -289,6 +294,8 @@ private fun ChildChatScreenContent(
                         onInstallTtsData = onInstallTtsData,
                         onPhotoCaptured = onPhotoCaptured,
                         onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        onImageRetry = onImageRetry,
+                        onImageDismiss = onImageDismiss,
                         modifier = Modifier
                             .weight(0.50f)
                             .fillMaxHeight(),
@@ -369,6 +376,8 @@ private fun ChildChatScreenContent(
 private fun ChatConversationPanel(
     uiState: ChatUiState,
     onQuickAction: (QuickActionUi) -> Unit,
+    onImageRetry: (String) -> Unit = {},
+    onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val visibleQuickActions = uiState.quickActions.filterNot { action ->
@@ -378,6 +387,8 @@ private fun ChatConversationPanel(
         ChatMessageListWithPreviews(
             messages = uiState.messages,
             imagePreviewCards = uiState.imagePreviewCards,
+            onImageRetry = onImageRetry,
+            onImageDismiss = onImageDismiss,
             modifier = Modifier.weight(1f),
         )
         if (visibleQuickActions.isNotEmpty()) {
@@ -409,6 +420,8 @@ private fun ChatConversationPanel(
 private fun ChatMessageListWithPreviews(
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    onImageRetry: (String) -> Unit = {},
+    onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -455,6 +468,8 @@ private fun ChatMessageListWithPreviews(
                 ChatMessageBubbleWithPreview(
                     message = message,
                     imagePreview = imagePreviewCards[message.id],
+                    onImageRetry = onImageRetry,
+                    onImageDismiss = onImageDismiss,
                 )
             }
         }
@@ -465,6 +480,8 @@ private fun ChatMessageListWithPreviews(
 private fun ChatMessageBubbleWithPreview(
     message: ChatMessage,
     imagePreview: LocalImagePreviewCardUiState?,
+    onImageRetry: (String) -> Unit = {},
+    onImageDismiss: (String) -> Unit = {},
 ) {
     val isChild = message.author == MessageAuthor.Child
     val bubbleColor = if (isChild) {
@@ -501,6 +518,8 @@ private fun ChatMessageBubbleWithPreview(
                     preview = preview,
                     childBubble = isChild,
                     modifier = Modifier.padding(top = 8.dp),
+                    onRetry = { onImageRetry(message.id) },
+                    onDismiss = { onImageDismiss(message.id) },
                 )
             }
             Text(
@@ -518,6 +537,8 @@ private fun LocalImagePreviewCard(
     preview: LocalImagePreviewCardUiState,
     childBubble: Boolean,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
 ) {
     val previewBitmap = remember(preview.previewBytes) {
         preview.previewBytes?.let { bytes ->
@@ -571,6 +592,30 @@ private fun LocalImagePreviewCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (preview.status == LocalImagePreviewStatus.Failed) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "再试一次",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onRetry?.invoke() }
+                        .padding(horizontal = 4.dp),
+                )
+                Text(
+                    text = "先不拍",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onDismiss?.invoke() }
+                        .padding(horizontal = 4.dp),
+                )
+            }
+        }
     }
 }
 
@@ -590,6 +635,8 @@ private fun ChatPanel(
     onInstallTtsData: () -> Unit,
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
+    onImageRetry: (String) -> Unit = {},
+    onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val panelGap = if (compactLandscape) 8.dp else 12.dp
@@ -608,6 +655,8 @@ private fun ChatPanel(
         ChatConversationPanel(
             uiState = uiState,
             onQuickAction = onQuickAction,
+            onImageRetry = onImageRetry,
+            onImageDismiss = onImageDismiss,
             modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.height(panelGap))
@@ -872,11 +921,6 @@ private fun AgentPanel(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                FoxStateIndicator(
-                    phase = presentation.phase,
-                    compactLandscape = compactLandscape,
-                )
-                Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
                 Box(
                     contentAlignment = Alignment.Center,
                 ) {
@@ -931,67 +975,6 @@ private fun AgentPanel(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun FoxStateIndicator(
-    phase: ChildTurnUiPhase,
-    compactLandscape: Boolean,
-) {
-    val (label, emoji) = foxStateDisplayForPhase(phase)
-    Surface(
-        color = foxStateChipColor(phase),
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 1.dp,
-    ) {
-        Text(
-            text = "$emoji $label",
-            style = if (compactLandscape) {
-                MaterialTheme.typography.labelMedium
-            } else {
-                MaterialTheme.typography.titleSmall
-            },
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
-}
-
-private fun foxStateDisplayForPhase(phase: ChildTurnUiPhase): Pair<String, String> {
-    return when (phase) {
-        ChildTurnUiPhase.Ready,
-        ChildTurnUiPhase.Resting -> "小白狐在这里" to "🦊"
-        ChildTurnUiPhase.Listening -> "在听你说" to "👀"
-        ChildTurnUiPhase.Recognizing -> "在听懂你的话" to "🤔"
-        ChildTurnUiPhase.Sending,
-        ChildTurnUiPhase.Thinking -> "在想一想" to "🤔"
-        ChildTurnUiPhase.SpeakingPending,
-        ChildTurnUiPhase.Speaking -> "在说给你听" to "🐻‍💬"
-        ChildTurnUiPhase.ImageProcessing -> "在看这张图" to "👁️"
-        ChildTurnUiPhase.NeedsRetry -> "可以再说一次" to "👂"
-        ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙" to "🙏"
-        ChildTurnUiPhase.ServiceError -> "先请大人看看" to "⚠️"
-    }
-}
-
-@Composable
-private fun foxStateChipColor(phase: ChildTurnUiPhase): Color {
-    return when (phase) {
-        ChildTurnUiPhase.Ready,
-        ChildTurnUiPhase.Resting -> MaterialTheme.colorScheme.primaryContainer
-        ChildTurnUiPhase.Listening -> MaterialTheme.colorScheme.tertiaryContainer
-        ChildTurnUiPhase.Recognizing,
-        ChildTurnUiPhase.Thinking,
-        ChildTurnUiPhase.Sending -> MaterialTheme.colorScheme.secondaryContainer
-        ChildTurnUiPhase.SpeakingPending,
-        ChildTurnUiPhase.Speaking -> MaterialTheme.colorScheme.primaryContainer
-        ChildTurnUiPhase.ImageProcessing -> MaterialTheme.colorScheme.secondaryContainer
-        ChildTurnUiPhase.NeedsRetry -> MaterialTheme.colorScheme.surfaceVariant
-        ChildTurnUiPhase.PermissionNeeded,
-        ChildTurnUiPhase.ServiceError -> MaterialTheme.colorScheme.errorContainer
     }
 }
 

@@ -24,7 +24,7 @@ interface SpeechInputController {
 }
 
 class BackendSpeechInputController(
-    private val recorder: VoiceRecorder,
+    internal val recorder: VoiceRecorder,
     private val transcriber: AsrTranscriber = AsrRepository(),
 ) : SpeechInputController {
     override suspend fun startRecording() {

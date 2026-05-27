@@ -8,6 +8,7 @@ data class RecordedVoiceAudio(
     val sampleRateHz: Int = 16_000,
     val channelCount: Int = 1,
     val durationMs: Long,
+    val stoppedBySilence: Boolean = false,
 ) {
     fun deleteTemporaryFile() {
         runCatching {

@@ -204,6 +204,14 @@ class ConversationStreamService:
                 segments=segments,
                 emotion=response.reply.emotion,
             )
+            # 记录第一段 TTS 完成时间
+            if tts_results:
+                first_result = tts_results[0]
+                logging.getLogger("app.tts_timing").info(
+                    "tts_first_segment_done: seg=0, elapsed=%.0fms, error=%s",
+                    first_result.elapsed_ms,
+                    first_result.error_code or "none",
+                )
             # 按段顺序返回音频事件
             for result in tts_results:
                 segment = segments[result.segment_index]
@@ -515,6 +523,91 @@ class ConversationStreamService:
             return [results_by_index[i] for i in sorted(results_by_index)]
         finally:
             # 不使用 cancel_futures=True，避免一个段超时导致其他段被取消
+            executor.shutdown(wait=False)
+
+    def _generate_tts_streaming(
+        self,
+        *,
+        segments: list[TextSegment],
+        emotion: str,
+    ) -> Iterator[_TtsSegmentResult]:
+        """并行生成 TTS，第一段完成后立即记录时间，结果仍按段索引顺序返回。"""
+        if not segments:
+            return
+
+        timeout_ms = self._settings.conversation_stream_tts_soft_timeout_ms
+        max_workers = min(len(segments), 4)
+        executor = ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="stream-tts-first",
+        )
+        try:
+            future_to_index: dict[Future, int] = {}
+            for segment in segments:
+                seg_context = copy_context()
+                future = executor.submit(
+                    seg_context.run,
+                    self._tts_service.generate_for_conversation,
+                    text=segment.text,
+                    emotion=emotion,
+                )
+                future_to_index[future] = segment.index
+
+            results_by_index: dict[int, _TtsSegmentResult] = {}
+            first_segment_done = False
+            for future in as_completed(future_to_index):
+                seg_index = future_to_index[future]
+                seg_started_at = time.perf_counter()
+                try:
+                    if timeout_ms > 0:
+                        audio_url = future.result(timeout=timeout_ms / 1000)
+                    else:
+                        audio_url = future.result()
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    if not audio_url:
+                        results_by_index[seg_index] = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=None,
+                            error_code="tts_unavailable",
+                            elapsed_ms=elapsed_ms,
+                        )
+                    else:
+                        results_by_index[seg_index] = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=audio_url,
+                            error_code=None,
+                            elapsed_ms=elapsed_ms,
+                        )
+                except FutureTimeoutError:
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    results_by_index[seg_index] = _TtsSegmentResult(
+                        segment_index=seg_index,
+                        audio_url=None,
+                        error_code="tts_timeout",
+                        elapsed_ms=elapsed_ms,
+                    )
+                except Exception:
+                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
+                    results_by_index[seg_index] = _TtsSegmentResult(
+                        segment_index=seg_index,
+                        audio_url=None,
+                        error_code="tts_failed",
+                        elapsed_ms=elapsed_ms,
+                    )
+                if not first_segment_done and seg_index == 0:
+                    first_segment_done = True
+                    logger.info(
+                        "tts_first_segment_ready: seg=0, elapsed=%.0fms",
+                        results_by_index[0].elapsed_ms,
+                    )
+
+            self._log_tts_parallel_summary(
+                results=results_by_index,
+                segment_count=len(segments),
+            )
+            for i in sorted(results_by_index):
+                yield results_by_index[i]
+        finally:
             executor.shutdown(wait=False)
 
     def _log_tts_parallel_summary(

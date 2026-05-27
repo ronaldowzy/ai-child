@@ -72,6 +72,8 @@ class ChatViewModel(
     private var openingRequested = false
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
+    private var lastRecorder: AndroidWavAudioRecorder? = null
+    private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
 
     private val _uiState = MutableStateFlow(
         run {
@@ -168,6 +170,7 @@ class ChatViewModel(
 
         childInteractionStarted = true
         lastCacheDirectory = cacheDirectory
+        lastRecorder?.onSilenceDetected = null
         cancelNaturalSpeakingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
         _uiState.update {
@@ -400,6 +403,7 @@ class ChatViewModel(
                 text = "我拍了一张图片给小白狐看。",
             ),
         )
+        pendingUploadPayloads[childPhotoMessageId] = payload to imagePurpose
         _uiState.update {
             it.copy(
                 isSending = true,
@@ -434,6 +438,7 @@ class ChatViewModel(
                     childCaption = "我拍了一张图片给小白狐看。",
                 )
             }.onSuccess { attachmentResponse ->
+                pendingUploadPayloads.remove(childPhotoMessageId)
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = childPhotoMessageId,
@@ -463,6 +468,75 @@ class ChatViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun retryPhotoUpload(messageId: String) {
+        val (payload, imagePurpose) = pendingUploadPayloads[messageId] ?: return
+        if (_uiState.value.isSending) return
+
+        _uiState.update { state ->
+            state.copy(
+                isSending = true,
+                childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
+                imagePreviewCards = state.imagePreviewCards + (
+                    messageId to (state.imagePreviewCards[messageId]?.copy(
+                        status = LocalImagePreviewStatus.Uploading,
+                    ) ?: return@update state)
+                    ),
+                agent = childInteractionPresentation(
+                    phaseHint = ChildTurnUiPhase.ImageProcessing,
+                ).agent,
+            )
+        }
+
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                attachmentRepository.createCapturedImage(
+                    childId = childId,
+                    sessionId = sessionId,
+                    imageBytes = payload.bytes,
+                    mimeType = payload.mimeType,
+                    fileName = childSafeUploadFileName(payload.fileName),
+                    imagePurpose = imagePurpose,
+                    childCaption = "我拍了一张图片给小白狐看。",
+                )
+            }.onSuccess { attachmentResponse ->
+                pendingUploadPayloads.remove(messageId)
+                handleAttachmentResponse(attachmentResponse)
+                updateImagePreviewStatus(
+                    messageId = messageId,
+                    status = LocalImagePreviewStatus.Sent,
+                )
+            }.onFailure {
+                appendAgentMessage(uploadFailureMessage(imagePurpose))
+                _uiState.update { state ->
+                    val existingCard = state.imagePreviewCards[messageId]
+                    if (existingCard != null) {
+                        state.copy(
+                            isSending = false,
+                            childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
+                            imagePreviewCards = state.imagePreviewCards + (
+                                messageId to existingCard.copy(status = LocalImagePreviewStatus.Failed)
+                                ),
+                            agent = FoxAgentUiState(
+                                mood = FoxMood.NetworkError,
+                                motion = FoxMotion.NetworkError,
+                                statusText = "这张图片没有传好。",
+                            ),
+                        )
+                    } else state
+                }
+            }
+        }
+    }
+
+    fun dismissFailedPhoto(messageId: String) {
+        pendingUploadPayloads.remove(messageId)
+        _uiState.update { state ->
+            state.copy(
+                imagePreviewCards = state.imagePreviewCards - messageId,
+            )
         }
     }
 
@@ -596,6 +670,9 @@ class ChatViewModel(
         if (existing != null) return existing
         return speechInputControllerFactory(cacheDirectory).also {
             speechInputController = it
+            if (it is BackendSpeechInputController && it.recorder is AndroidWavAudioRecorder) {
+                lastRecorder = it.recorder as AndroidWavAudioRecorder
+            }
         }
     }
 
@@ -1281,6 +1358,16 @@ class ChatViewModel(
         viewModelScope.launch(sendDispatcher) {
             runCatching {
                 activeSpeechInputController(cacheDir).startRecording()
+                lastRecorder?.onSilenceDetected = {
+                    viewModelScope.launch(sendDispatcher) {
+                        if (_uiState.value.voice.inputMode == VoiceInputMode.WaitingForChild ||
+                            _uiState.value.voice.inputMode == VoiceInputMode.Listening
+                        ) {
+                            Log.d(TAG, "silenceDetected: auto-stopping recording")
+                            stopVoiceRecordingAndUpload()
+                        }
+                    }
+                }
                 _uiState.update { state ->
                     state.copy(
                         childTurnPhaseHint = ChildTurnUiPhase.Listening,

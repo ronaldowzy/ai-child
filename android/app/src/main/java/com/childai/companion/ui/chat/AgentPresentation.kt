@@ -49,7 +49,8 @@ data class VoiceUiState(
         get() = inputMode == VoiceInputMode.PendingTranscript
 
     val isRecording: Boolean
-        get() = inputMode == VoiceInputMode.Listening
+        get() = inputMode == VoiceInputMode.Listening ||
+            inputMode == VoiceInputMode.WaitingForChild
 
     val isUploading: Boolean
         get() = inputMode == VoiceInputMode.Uploading
@@ -58,6 +59,7 @@ data class VoiceUiState(
         get() = when {
             errorMessage != null -> errorMessage
             inputMode == VoiceInputMode.Listening -> "小白狐正在听，点一下说完。"
+            inputMode == VoiceInputMode.WaitingForChild -> "小白狐在等你说话，点一下说完。"
             inputMode == VoiceInputMode.Uploading -> "我在听懂你刚才说的话。"
             inputMode == VoiceInputMode.PendingTranscript -> "可以先改文字，再发送。"
             inputMode == VoiceInputMode.NeedsRetry -> "我刚才没听清，可以再说一次。"
@@ -71,6 +73,7 @@ data class VoiceUiState(
 enum class VoiceInputMode {
     Idle,
     Listening,
+    WaitingForChild,
     Uploading,
     PendingTranscript,
     NeedsRetry,

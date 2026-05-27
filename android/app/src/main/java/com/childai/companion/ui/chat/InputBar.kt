@@ -381,6 +381,7 @@ internal fun inputBarShouldShowCancelAction(
     inputMode: VoiceInputMode,
 ): Boolean {
     return inputMode == VoiceInputMode.Listening ||
+        inputMode == VoiceInputMode.WaitingForChild ||
         (useChildVoiceFirstInput && inputMode == VoiceInputMode.PendingTranscript)
 }
 

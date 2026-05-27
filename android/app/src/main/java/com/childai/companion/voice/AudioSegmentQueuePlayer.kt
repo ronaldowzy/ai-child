@@ -38,11 +38,11 @@ class AudioSegmentQueuePlayer(
 
     fun enqueue(segment: AudioSegment) {
         if (isMuted()) {
-            logQueue("enqueue_skip_muted index=${segment.index} text=${segment.text.take(12)}")
+            logQueue("enqueue_skip_muted index=${segment.index} textLen=${segment.text.length}")
             return
         }
         queue.addLast(segment)
-        logQueue("enqueue index=${segment.index} queued=${queue.size} text=${segment.text.take(12)}")
+        logQueue("enqueue index=${segment.index} queued=${queue.size} textLen=${segment.text.length}")
         if (currentSegment == null) {
             playNext()
         }
@@ -73,7 +73,7 @@ class AudioSegmentQueuePlayer(
             return
         }
         currentSegment = next
-        logQueue("playNext_start index=${next.index} remaining=${queue.size} text=${next.text.take(12)}")
+        logQueue("playNext_start index=${next.index} remaining=${queue.size} textLen=${next.text.length}")
 
         val accepted = ttsController.speak(
             request = TtsRequest(

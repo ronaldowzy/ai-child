@@ -59,6 +59,8 @@ class ChatViewModel(
     requestOpeningOnInit: Boolean = false,
     private val voiceConfirmBeforeSend: Boolean = DevSettings.VOICE_CONFIRM_BEFORE_SEND,
     private val childId: String = DevSettings.CHILD_ID,
+    private val naturalSpeakingEnabled: Boolean = DevSettings.NATURAL_SPEAKING_ENABLED,
+    private val naturalSpeakingTimeoutMs: Long = DevSettings.NATURAL_SPEAKING_TIMEOUT_MS,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
     private var nextMessageIndex = 0
@@ -66,8 +68,10 @@ class ChatViewModel(
     private var ttsToken = 0
     private var streamingAgentMessageId: String? = null
     private var voiceRecordingAutoStopJob: Job? = null
+    private var naturalSpeakingTimeoutJob: Job? = null
     private var openingRequested = false
     private var childInteractionStarted = false
+    private var lastCacheDirectory: File? = null
 
     private val _uiState = MutableStateFlow(
         run {
@@ -116,6 +120,7 @@ class ChatViewModel(
                         ),
                     )
                 }
+                autoStartRecordingAfterTts()
             },
             onError = { message ->
                 _uiState.update { state ->
@@ -162,6 +167,8 @@ class ChatViewModel(
         if (state.isSending || state.voice.isUploading || state.voice.isRecording) return
 
         childInteractionStarted = true
+        lastCacheDirectory = cacheDirectory
+        cancelNaturalSpeakingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
         _uiState.update {
             it.copy(
@@ -279,6 +286,7 @@ class ChatViewModel(
     fun cancelVoiceInput() {
         val wasRecording = _uiState.value.voice.isRecording
         voiceRecordingAutoStopJob?.cancel()
+        cancelNaturalSpeakingTimeout()
         _uiState.update {
             it.copy(
                 childTurnPhaseHint = null,
@@ -737,6 +745,7 @@ class ChatViewModel(
 
     override fun onCleared() {
         voiceRecordingAutoStopJob?.cancel()
+        cancelNaturalSpeakingTimeout()
         shutdownTts()
         speechInputController?.shutdown()
         super.onCleared()
@@ -1120,6 +1129,7 @@ class ChatViewModel(
                                 ),
                             )
                         }
+                        autoStartRecordingAfterTts()
                     }
                 },
                 onError = { message ->
@@ -1254,6 +1264,50 @@ class ChatViewModel(
             delay(AndroidWavAudioRecorder.MAX_DURATION_MS)
             if (_uiState.value.voice.isRecording) {
                 stopVoiceRecordingAndUpload()
+            }
+        }
+    }
+
+    private fun cancelNaturalSpeakingTimeout() {
+        naturalSpeakingTimeoutJob?.cancel()
+        naturalSpeakingTimeoutJob = null
+    }
+
+    private fun autoStartRecordingAfterTts() {
+        if (!naturalSpeakingEnabled) return
+        val cacheDir = lastCacheDirectory ?: return
+        if (_uiState.value.voice.isRecording || _uiState.value.isSending) return
+
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                activeSpeechInputController(cacheDir).startRecording()
+                _uiState.update { state ->
+                    state.copy(
+                        childTurnPhaseHint = ChildTurnUiPhase.Listening,
+                        voice = state.voice.copy(
+                            inputMode = VoiceInputMode.WaitingForChild,
+                            pendingTranscript = "",
+                            errorMessage = null,
+                        ),
+                        agent = childInteractionPresentation(
+                            phaseHint = ChildTurnUiPhase.Listening,
+                        ).agent,
+                    )
+                }
+                scheduleNaturalSpeakingTimeout()
+            }.onFailure {
+                Log.w(TAG, "autoStartRecordingAfterTts: failed to start recording", it)
+            }
+        }
+    }
+
+    private fun scheduleNaturalSpeakingTimeout() {
+        naturalSpeakingTimeoutJob?.cancel()
+        naturalSpeakingTimeoutJob = viewModelScope.launch(sendDispatcher) {
+            delay(naturalSpeakingTimeoutMs)
+            if (_uiState.value.voice.inputMode == VoiceInputMode.WaitingForChild) {
+                cancelVoiceInput()
+                Log.d(TAG, "naturalSpeakingTimeout: no speech detected, returned to idle")
             }
         }
     }

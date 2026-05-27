@@ -71,7 +71,8 @@ internal fun childTurnUiPhase(
 ): ChildTurnUiPhase {
     return when {
         voice.inputMode == VoiceInputMode.PermissionDenied -> ChildTurnUiPhase.PermissionNeeded
-        voice.inputMode == VoiceInputMode.Listening -> ChildTurnUiPhase.Listening
+        voice.inputMode == VoiceInputMode.Listening ||
+            voice.inputMode == VoiceInputMode.WaitingForChild -> ChildTurnUiPhase.Listening
         voice.inputMode == VoiceInputMode.Uploading -> ChildTurnUiPhase.Recognizing
         voice.inputMode == VoiceInputMode.NeedsRetry -> ChildTurnUiPhase.NeedsRetry
         tts.isSpeaking -> ChildTurnUiPhase.Speaking

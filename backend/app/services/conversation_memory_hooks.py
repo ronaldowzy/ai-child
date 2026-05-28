@@ -37,16 +37,24 @@ _MAX_SAME_TOPIC_RECALLS = 1
 class _SessionRecallState:
     """Tracks per-session memory recall for rate limiting."""
 
-    __slots__ = ("recalled_topics", "suppress_until", "last_recall_ts")
+    __slots__ = ("recalled_topics", "suppress_until", "last_recall_ts", "blocked_topics")
 
     def __init__(self) -> None:
         self.recalled_topics: dict[str, int] = {}
         self.suppress_until: float = 0.0
         self.last_recall_ts: float = 0.0
+        self.blocked_topics: set[str] = set()
 
     def record_recall(self, topic: str) -> None:
         self.recalled_topics[topic] = self.recalled_topics.get(topic, 0) + 1
         self.last_recall_ts = time.monotonic()
+
+    def block_topic(self, topic: str) -> None:
+        """Permanently block a topic for this session (explicit rejection/change)."""
+        self.blocked_topics.add(topic)
+
+    def is_topic_blocked(self, topic: str) -> bool:
+        return topic in self.blocked_topics
 
     def suppress_for(self, seconds: float) -> None:
         self.suppress_until = time.monotonic() + seconds
@@ -88,10 +96,25 @@ class ConversationMemoryHooks:
         session_id: str | None = None,
         bedtime: bool = False,
         child_engagement: str | None = None,
+        active_scene: str | None = None,
     ) -> list[dict[str, Any]]:
-        # If child is signaling rejection/short-answer, suppress memory recall.
+        # If child explicitly refused, permanently block recalled topics this session.
+        if session_id and child_engagement == "refused":
+            state = self._get_session_state(session_id)
+            # Block all currently recalled topics permanently for this session.
+            for topic in list(state.recalled_topics.keys()):
+                state.block_topic(topic)
+            state.suppress_for(300.0)
+            return []
+
+        # If child signals boundary (topic change, bedtime, leave) or short/flat,
+        # suppress memory recall for 120 seconds.
         if session_id and child_engagement in ("boundary", "short_or_flat"):
             state = self._get_session_state(session_id)
+            # For explicit topic change / refusal signals, also block recalled topics.
+            if child_engagement == "boundary":
+                for topic in list(state.recalled_topics.keys()):
+                    state.block_topic(topic)
             state.suppress_for(120.0)
             return []
 
@@ -100,6 +123,15 @@ class ConversationMemoryHooks:
             state = self._get_session_state(session_id)
             if state.is_suppressed():
                 return []
+
+        # Learning scenes: do not trigger interest or show-and-tell recalls.
+        _LEARNING_SCENES = {"learning.homework_help"}
+        # Safety/privacy scenes: do not trigger any low-pressure recall.
+        _SAFETY_SCENES = {"safety.guardian", "safety.gentle_checkin", "privacy.boundary"}
+
+        if active_scene in _SAFETY_SCENES:
+            return []
+        skip_interest_in_scene = active_scene in _LEARNING_SCENES
 
         memories = self._memory_service.retrieve(
             child_id,
@@ -114,11 +146,23 @@ class ConversationMemoryHooks:
             # At bedtime, skip high-stimulation memories.
             if bedtime and self._is_exciting_memory(memory):
                 continue
+            # In learning scenes, skip interest and show-and-tell memories.
+            if skip_interest_in_scene and memory.memory_type in (
+                MemoryType.INTEREST,
+                MemoryType.EVENT,
+            ):
+                topic_key = self._extract_recall_topic(memory)
+                if topic_key and is_relationship_memory(memory):
+                    rel_type = memory_relationship_topic(memory)
+                    if rel_type or "show_and_tell" in str(memory.tags):
+                        continue
             # Skip topics already recalled too many times this session.
             if session_id:
                 topic = self._extract_recall_topic(memory)
                 if topic:
                     state = self._get_session_state(session_id)
+                    if state.is_topic_blocked(topic):
+                        continue
                     if state.topic_recall_count(topic) >= _MAX_SAME_TOPIC_RECALLS:
                         continue
                     state.record_recall(topic)

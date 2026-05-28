@@ -265,6 +265,7 @@ class ConversationService:
             session_id=request.session_id,
             bedtime=bedtime,
             child_engagement=child_engagement,
+            active_scene=route_decision.active_scene.value,
         )
         conversation_history = []
         if route_decision.active_scene == SceneId.OPEN_CONVERSATION:
@@ -402,6 +403,10 @@ class ConversationService:
         "换个话题", "聊点别的", "别聊这个", "不说了", "算了", "今天不聊了",
         "不聊了", "不想聊了", "不要聊了",
     )
+    _REFUSAL_MARKERS = (
+        "不想聊了", "别问了", "你别说这个", "不要问了", "别再说了",
+        "你别说了", "我不想说", "不告诉你", "就不说",
+    )
     _BEDTIME_CLOSE_MARKERS = (
         "明天再聊", "我要睡觉", "我得睡觉", "晚安", "困了",
     )
@@ -412,6 +417,9 @@ class ConversationService:
     def _pre_check_child_engagement(self, child_text: str) -> str:
         """Lightweight engagement check before full turn_guidance is built."""
         normalized = child_text.strip().lower().replace(" ", "")
+        # Explicit refusal: permanently block recalled topics this session.
+        if any(m in normalized for m in self._REFUSAL_MARKERS):
+            return "refused"
         if any(m in normalized for m in self._TOPIC_CHANGE_MARKERS):
             return "boundary"
         if any(m in normalized for m in self._BEDTIME_CLOSE_MARKERS):

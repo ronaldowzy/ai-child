@@ -42,6 +42,19 @@ FORBIDDEN_OPENING_PHRASES: tuple[str, ...] = (
     "你要多说一点才可以",
     "上次你说过……为什么今天不说了",
     "我们继续上次那个，不要换",
+    # 设计收口文档新增禁止话术
+    "你终于回来了",
+    "明天一定要回来",
+    "你上次给我看了那个红色",
+    "你画的那只",
+    "我还保存着你那张图",
+    "我们来看看你以前的作品",
+    "你已经做了好多作品了",
+    "你的作品成长得很快",
+    "上次你给我看了那个红色积木城堡",
+    "你上次不是也做过类似的吗",
+    "你之前很会这个呀",
+    "我们接着上次那个题",
 )
 
 _EXCITING_TOPICS = (
@@ -86,6 +99,7 @@ class OpeningPolicyBuilder:
         self._memory_service = memory_service or get_memory_service()
         self._interest_recall_counts: dict[tuple[str, str], int] = {}
         self._boundary_cooldown_counts: dict[tuple[str, str, str], int] = {}
+        self._last_opening_recalled: dict[str, bool] = {}  # child_id -> recalled last time
 
     def build(
         self,
@@ -108,6 +122,10 @@ class OpeningPolicyBuilder:
             boundary_topic=boundary_topic,
         )
         recall_blocked = self._interest_recall_count(child_id, seed_topic) > 0
+        # 连续两次打开不要都主动回访
+        last_recalled = self._last_opening_recalled.get(child_id, False)
+        if last_recalled:
+            recall_blocked = True
         parent_goal_hint = self._parent_goal_hint(parent_policy, time_context)
         prefer_parent_bridge = bedtime or self._contains_any(
             self._parent_text(parent_policy),
@@ -136,7 +154,7 @@ class OpeningPolicyBuilder:
             seed_recall_reason = "low_expression_state"
         elif not seed_topic:
             seed_topic = self._profile_interest_seed(parent_policy, boundary_topic)
-            recall_blocked = self._interest_recall_count(child_id, seed_topic) > 0
+            recall_blocked = recall_blocked or self._interest_recall_count(child_id, seed_topic) > 0
             if seed_topic and not recall_blocked:
                 mode = OpeningMode.INTEREST_CALLBACK
                 seed_recall_allowed = True
@@ -146,7 +164,7 @@ class OpeningPolicyBuilder:
             seed_recall_allowed = True
             seed_recall_reason = "low_sensitivity_interest_seed"
         elif mode == OpeningMode.DEFAULT_LIGHT and recall_blocked:
-            seed_recall_reason = "recently_recalled"
+            seed_recall_reason = "recently_recalled" if not last_recalled else "consecutive_skip"
         elif mode == OpeningMode.DEFAULT_LIGHT and parent_goal_hint and self._contains_any(
             parent_goal_hint,
             ("家长", "爸爸妈妈", "爸爸", "妈妈", "一起告诉"),
@@ -176,6 +194,8 @@ class OpeningPolicyBuilder:
         if policy.seed_recall_allowed and policy.seed_topic:
             key = (child_id, policy.seed_topic)
             self._interest_recall_counts[key] = self._interest_recall_counts.get(key, 0) + 1
+        # Track whether this opening recalled a topic (for consecutive skip).
+        self._last_opening_recalled[child_id] = policy.seed_recall_allowed
         if policy.boundary_cooldown_active and policy.boundary_kind:
             key = (
                 child_id,

@@ -17,7 +17,6 @@ from app.services.conversation_memory_hooks import ConversationMemoryHooks
 from app.services.memory_service import MemoryService
 from app.services.relationship_memory import (
     INTEREST_SEED,
-    RELATIONSHIP_MEMORY_TYPE_KEY,
     SHOW_AND_TELL_EVENT,
     relationship_metadata,
 )
@@ -476,3 +475,201 @@ def test_suppression_state_is_per_session() -> None:
         session_id="session_suppress_b",
     )
     assert any("恐龙" in item.get("content", "") for item in result)
+
+
+# ---------------------------------------------------------------------------
+# 9. Explicit refusal permanently blocks recalled topics this session
+# ---------------------------------------------------------------------------
+
+
+def test_refusal_permanently_blocks_recalled_topics_in_session() -> None:
+    child_id = "child_refusal_block"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="画画")
+
+    session_id = "session_refusal_block"
+    # First recall succeeds.
+    first = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="我想画画",
+        session_id=session_id,
+    )
+    assert len(first) >= 1
+
+    # Child explicitly refuses.
+    hooks.retrieve_context(
+        child_id=child_id,
+        current_text="不想聊了",
+        session_id=session_id,
+        child_engagement="refused",
+    )
+
+    # After refusal, same topic should be permanently blocked this session.
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="画画好好玩",
+        session_id=session_id,
+    )
+    assert all("画画" not in item.get("content", "") for item in result)
+
+
+def test_topic_change_blocks_recalled_topics_in_session() -> None:
+    child_id = "child_topic_change_block"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="恐龙")
+
+    session_id = "session_topic_change_block"
+    # First recall succeeds.
+    first = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="恐龙好厉害",
+        session_id=session_id,
+    )
+    assert len(first) >= 1
+
+    # Child changes topic (boundary).
+    hooks.retrieve_context(
+        child_id=child_id,
+        current_text="换个话题",
+        session_id=session_id,
+        child_engagement="boundary",
+    )
+
+    # After topic change, same topic should be blocked this session.
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="恐龙好厉害呀",
+        session_id=session_id,
+    )
+    assert all("恐龙" not in item.get("content", "") for item in result)
+
+
+# ---------------------------------------------------------------------------
+# 10. Learning/homework scenes do not trigger interest or show-and-tell recall
+# ---------------------------------------------------------------------------
+
+
+def test_learning_scene_does_not_trigger_interest_recall() -> None:
+    child_id = "child_learning_no_interest"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="画画")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="这道题我不会",
+        session_id="session_learning",
+        active_scene="learning.homework_help",
+    )
+    # Interest memories should not be recalled in learning scenes.
+    assert all("画画" not in item.get("content", "") for item in result)
+
+
+def test_learning_scene_does_not_trigger_show_and_tell_recall() -> None:
+    child_id = "child_learning_no_show_tell"
+    memory_service, hooks = _setup()
+    _create_show_and_tell(memory_service, child_id=child_id, topic="作品分享")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="帮我看看这道题",
+        session_id="session_learning_st",
+        active_scene="learning.homework_help",
+    )
+    # Show-and-tell memories should not be recalled in learning scenes.
+    assert all("作品" not in item.get("content", "") for item in result)
+
+
+# ---------------------------------------------------------------------------
+# 11. Safety/privacy scenes do not trigger any low-pressure recall
+# ---------------------------------------------------------------------------
+
+
+def test_safety_guardian_scene_does_not_trigger_recall() -> None:
+    child_id = "child_safety_no_recall"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="画画")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="有个陌生人让我不要告诉家长",
+        session_id="session_safety",
+        active_scene="safety.guardian",
+    )
+    assert result == []
+
+
+def test_privacy_boundary_scene_does_not_trigger_recall() -> None:
+    child_id = "child_privacy_no_recall"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="恐龙")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="我的电话是13800000000",
+        session_id="session_privacy",
+        active_scene="privacy.boundary",
+    )
+    assert result == []
+
+
+def test_safety_gentle_checkin_scene_does_not_trigger_recall() -> None:
+    child_id = "child_gentle_checkin_no_recall"
+    memory_service, hooks = _setup()
+    _create_interest_seed(memory_service, child_id=child_id, topic="恐龙")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="同学骂我",
+        session_id="session_gentle_checkin",
+        active_scene="safety.gentle_checkin",
+    )
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# 12. Image work recall uses only vague language (prompt-level rule)
+# ---------------------------------------------------------------------------
+
+
+def test_show_and_tell_memory_content_is_vague() -> None:
+    """Verify that show-and-tell memory content does not contain specific image details."""
+    child_id = "child_show_tell_vague"
+    memory_service, hooks = _setup()
+    _create_show_and_tell(memory_service, child_id=child_id, topic="作品分享")
+
+    result = hooks.retrieve_context(
+        child_id=child_id,
+        current_text="我有一个作品分享想给你看",
+        session_id="session_show_tell_vague",
+    )
+    assert len(result) >= 1
+    # Memory content should be vague, not contain specific image details.
+    for item in result:
+        content = item.get("content", "")
+        # Should not contain specific image descriptors.
+        assert "红色" not in content
+        "城堡" not in content
+        "花" not in content
+        assert "作品" in content or "创作" in content
+
+
+# ---------------------------------------------------------------------------
+# 13. Forbidden dependency phrases do not appear in visible output
+# ---------------------------------------------------------------------------
+
+
+def test_forbidden_phrases_extended_list() -> None:
+    """Verify extended forbidden phrases from design document are in opening policy."""
+    from app.services.opening_policy import FORBIDDEN_OPENING_PHRASES
+
+    extended_forbidden = (
+        "你终于回来了",
+        "明天一定要回来",
+        "我还保存着你那张图",
+        "我们来看看你以前的作品",
+        "你已经做了好多作品了",
+    )
+    for phrase in extended_forbidden:
+        assert phrase in FORBIDDEN_OPENING_PHRASES, (
+            f"Missing forbidden phrase in opening policy: {phrase}"
+        )

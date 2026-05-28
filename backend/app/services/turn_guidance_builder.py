@@ -109,6 +109,11 @@ class TurnGuidanceBuilder:
         "不要聊了",
         "不说了",
         "算了",
+        # 设计收口文档新增：轻微烦躁或抗拒
+        "你别说这个",
+        "不好玩",
+        "别问了",
+        "不要问了",
     )
     _BEDTIME_CLOSE_MARKERS = (
         "明天再聊",
@@ -385,6 +390,12 @@ class TurnGuidanceBuilder:
 
     def _child_engagement_signal(self, normalized: str, hints: list[str]) -> str:
         if "child_requests_topic_change" in hints:
+            # Distinguish explicit refusal from general topic change.
+            if self._contains_any(
+                normalized,
+                ("不想聊", "别问", "不要问", "别说", "你别说", "我不想说"),
+            ):
+                return "refused"
             return "boundary"
         flat_replies = (
             "嗯",
@@ -459,7 +470,7 @@ class TurnGuidanceBuilder:
         if "child_requests_topic_change" in hints:
             if self._contains_any(
                 normalized,
-                ("不聊", "不想聊", "不要聊", "不说", "算了"),
+                ("不聊", "不想聊", "不要聊", "不说", "算了", "别问", "不要问", "别说"),
             ):
                 return "no_chat"
             return "topic_change"

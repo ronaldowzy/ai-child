@@ -34,6 +34,11 @@ from app.services.conversation_memory_hooks import (
     ConversationMemoryHooks,
     get_conversation_memory_hooks,
 )
+from app.services.light_co_creation_service import (
+    CoCreationType,
+    LightCoCreationService,
+    get_light_co_creation_service,
+)
 from app.services.conversation_history_service import (
     ConversationHistoryService,
     get_conversation_history_service,
@@ -93,6 +98,7 @@ class ConversationService:
         conversation_persistence_service: ConversationPersistenceService | None = None,
         quick_action_service: QuickActionService | None = None,
         tts_service: TtsService | None = None,
+        light_co_creation_service: LightCoCreationService | None = None,
         debug_enabled: bool = True,
         persistence_enabled: bool = True,
     ) -> None:
@@ -114,6 +120,9 @@ class ConversationService:
         )
         self._quick_action_service = quick_action_service or get_quick_action_service()
         self._tts_service = tts_service or get_tts_service()
+        self._light_co_creation_service = (
+            light_co_creation_service or get_light_co_creation_service()
+        )
         self._debug_enabled = debug_enabled
         self._persistence_enabled = persistence_enabled
 
@@ -304,6 +313,25 @@ class ConversationService:
             )
         )
         model_ms = self._elapsed_ms(model_started_at)
+
+        # Update light co-creation state based on model response
+        co_creation_type = runtime_result.model_metadata.get("co_creation_type", "none")
+        if co_creation_type != "none":
+            co_creation_enum = CoCreationType(co_creation_type)
+            self._light_co_creation_service.record_co_creation_initiated(
+                session_id=request.session_id,
+                co_creation_type=co_creation_enum,
+            )
+            # Check if child rejected the co-creation
+            child_engagement = runtime_result.model_metadata.get(
+                "final_conversation_control", {}
+            ).get("child_engagement", "neutral")
+            if child_engagement in ("low", "short_or_flat"):
+                self._light_co_creation_service.record_child_response(
+                    session_id=request.session_id,
+                    is_rejection=True,
+                    is_low_interest=True,
+                )
         response = self._response_from_route_decision(
             route_decision,
             runtime_result,

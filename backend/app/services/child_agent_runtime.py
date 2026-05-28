@@ -18,6 +18,11 @@ from app.services.age_band_policy import (
     AgeBandReplyPolicy,
     derive_age_band_reply_policy,
 )
+from app.services.light_co_creation_service import (
+    CoCreationType,
+    LightCoCreationService,
+    get_light_co_creation_service,
+)
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.prompt_manager import PromptManager, get_prompt_manager
 from app.services.safety_engine import SafetyEngine, get_safety_engine
@@ -50,11 +55,15 @@ class ChildAgentRuntime:
         model_registry: ModelRegistry | None = None,
         safety_engine: SafetyEngine | None = None,
         turn_guidance_builder: TurnGuidanceBuilder | None = None,
+        light_co_creation_service: LightCoCreationService | None = None,
     ) -> None:
         self._prompt_manager = prompt_manager or get_prompt_manager()
         self._model_registry = model_registry or get_model_registry()
         self._safety_engine = safety_engine or get_safety_engine()
         self._turn_guidance_builder = turn_guidance_builder or TurnGuidanceBuilder()
+        self._light_co_creation_service = (
+            light_co_creation_service or get_light_co_creation_service()
+        )
 
     def run(self, request: AgentRuntimeRequest) -> AgentRuntimeResult:
         logger.info(
@@ -148,6 +157,19 @@ class ChildAgentRuntime:
         model_response.metadata.setdefault(
             "topic_shift_reason",
             turn_guidance_context.topic_shift_reason,
+        )
+        # Light co-creation metadata
+        model_response.metadata.setdefault(
+            "co_creation_type",
+            turn_guidance_context.co_creation_type,
+        )
+        model_response.metadata.setdefault(
+            "co_creation_suggested",
+            turn_guidance_context.co_creation_suggested,
+        )
+        model_response.metadata.setdefault(
+            "co_creation_reason",
+            turn_guidance_context.co_creation_reason,
         )
         raw_reply_text, model_control = self._reply_and_control_from_response(
             model_response.response_text,
@@ -328,6 +350,7 @@ class ChildAgentRuntime:
             child_text=request.child_text,
             conversation_history=request.conversation_history,
             parent_policy=request.parent_policy,
+            session_id=request.session_id,
         )
 
     def _model_context(

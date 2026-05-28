@@ -11,7 +11,10 @@
     "reason": "一句内部原因",
     "suggested_next_moves": [
       {"id": "shift_topic", "label": "换个轻松话题"}
-    ]
+    ],
+    "co_creation_type": "none|story_chain|image_naming|image_story",
+    "co_creation_round": 0,
+    "co_creation_child_rejected": false
   }
 }
 
@@ -43,3 +46,23 @@ conversation_control 判断：
 8. 当孩子低参与且同一话题已经持续 2-3 轮时，优先 soft_shift。
 9. 当孩子高参与且新增具体细节时，即使同一话题较久，也可以 continue。
 10. suggested_next_moves 最多 3 个，label 必须短、儿童可见、安全、不像任务。
+
+轻共创判断（co_creation_type）：
+1. co_creation_type=none：当前不需要轻共创。
+2. co_creation_type=story_chain：孩子说了想象性、轻松、可接一句的内容，适合故事接龙。
+3. co_creation_type=image_naming：孩子拍了创作型作品，适合邀请起名。
+4. co_creation_type=image_story：孩子拍了作品，适合邀请讲一句小故事。
+5. co_creation_round：当前轻共创轮数（0=未开始，1=第一轮，2=第二轮）。
+6. co_creation_child_rejected：孩子是否拒绝了轻共创邀请（true/false）。
+
+轻共创规则：
+1. 同一会话最多主动发起 1 次轻共创。
+2. 同一张图最多主动给 1 个共创入口：起名或讲一句小故事，不要连续都推。
+3. 孩子主动要求继续，可以再接 1 轮，但不进入长链路。
+4. 连续两次孩子不接，共创在本会话内停止主动出现。
+5. 孩子不接、沉默、取消、说"不知道""随便""不用""换个话题"，一轮内放下。
+6. "嗯""哦""还行""不知道""随便""没有""都可以"等低兴趣短答，降低互动强度。
+7. 睡前不发起故事接龙或拍图小故事。
+8. 学习、拍题、作业、成绩场景不触发共创。
+9. 安全/隐私场景不触发共创。
+10. 不要把轻共创做成游戏、任务、课程或奖励系统。

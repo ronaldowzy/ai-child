@@ -4,6 +4,10 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.domain.model_types import ModelMessage
+from app.services.light_co_creation_service import (
+    CoCreationType,
+    get_light_co_creation_service,
+)
 from app.services.topic_seed_service import TopicSeedService
 
 
@@ -34,13 +38,25 @@ class TurnGuidanceContext(BaseModel):
     topic_shift_reason: str | None = None
     suggested_topic_seeds: list[str] = Field(default_factory=list)
     arc_state: ConversationArcState = Field(default_factory=ConversationArcState)
+    # Light co-creation fields
+    co_creation_type: str = "none"
+    co_creation_suggested: bool = False
+    co_creation_reason: str | None = None
 
 
 class TurnGuidanceBuilder:
     """Builds lightweight prompt guidance for one child speech turn."""
 
-    def __init__(self, *, topic_seed_service: TopicSeedService | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        topic_seed_service: TopicSeedService | None = None,
+        light_co_creation_service: Any | None = None,
+    ) -> None:
         self._topic_seed_service = topic_seed_service or TopicSeedService()
+        self._light_co_creation_service = (
+            light_co_creation_service or get_light_co_creation_service()
+        )
 
     _OPERATION_ASIDE_MARKERS = (
         "按一下",
@@ -149,6 +165,7 @@ class TurnGuidanceBuilder:
         child_text: str,
         conversation_history: Sequence[ModelMessage] | None = None,
         parent_policy: Any | None = None,
+        session_id: str | None = None,
     ) -> TurnGuidanceContext:
         normalized = self._normalize(child_text)
         hints: list[str] = []
@@ -285,6 +302,44 @@ class TurnGuidanceBuilder:
             hints=hints,
         )
 
+        # Light co-creation detection
+        co_creation_type = "none"
+        co_creation_suggested = False
+        co_creation_reason = None
+        if self._light_co_creation_service and session_id:
+            # Check bedtime context
+            is_bedtime = "bedtime_close_requested" in hints
+            # Check learning context (simplified - full check happens in service)
+            is_learning = False
+            # Check safety context
+            is_safety = False
+
+            # Only check for story chain in open conversation (not images)
+            decision = self._light_co_creation_service.should_trigger_story_chain(
+                session_id=session_id,
+                child_text=child_text,
+                is_bedtime=is_bedtime,
+                is_learning=is_learning,
+                is_safety=is_safety,
+                child_engagement=child_engagement_signal,
+            )
+            if decision.should_trigger:
+                co_creation_type = decision.co_creation_type.value
+                co_creation_suggested = True
+                co_creation_reason = decision.reason
+                self._set_hint(
+                    hints=hints,
+                    guidance=guidance,
+                    hint="light_co_creation_story_chain",
+                    instruction=(
+                        "孩子说了想象性、轻松、可接一句的内容，可以轻轻发起故事接龙。"
+                        "用温和、好奇的语气邀请，例如：'这个听起来像一个小故事。你想接一句也可以。'"
+                        "如果孩子不接、短答或换题，立即放下，不追问。"
+                        "故事接龙最多推进 2 轮孩子输入，然后自然收住。"
+                        "不要说'挑战''任务''完成''奖励'等表达。"
+                    ),
+                )
+
         return TurnGuidanceContext(
             hints=hints,
             guidance=guidance,
@@ -298,6 +353,9 @@ class TurnGuidanceBuilder:
             topic_shift_reason=topic_shift_reason,
             suggested_topic_seeds=suggested_topic_seeds,
             arc_state=arc_state,
+            co_creation_type=co_creation_type,
+            co_creation_suggested=co_creation_suggested,
+            co_creation_reason=co_creation_reason,
         )
 
     def _recent_topic(

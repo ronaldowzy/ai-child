@@ -356,6 +356,37 @@ class ConversationMemoryHooks:
                 )
             )
 
+        # Light co-creation memory
+        if route_decision.active_scene == SceneId.OPEN_CONVERSATION:
+            # Check if this turn involved light co-creation
+            # This is a simplified check - in practice, we'd check the actual co-creation state
+            normalized = child_text.strip().lower().replace(" ", "")
+            co_creation_markers = (
+                "故事", "编", "想象", "如果", "要是", "小熊", "小猫",
+                "恐龙", "机器人", "外星人", "公主", "王子", "超人",
+                "飞", "跑", "冒险", "森林", "海洋", "太空",
+            )
+            if any(marker in normalized for marker in co_creation_markers):
+                requests.append(
+                    self._request(
+                        child_id=child_id,
+                        session_id=session_id,
+                        memory_type=MemoryType.INTEREST,
+                        content=(
+                            "孩子本次表达了想象性、轻松的内容，适合轻轻发起故事接龙。"
+                            "系统可以顺着孩子的话，轻轻邀请一人一句。"
+                        ),
+                        tags=["轻共创", "故事接龙", "想象", "轻松"],
+                        quote_summary=(
+                            "孩子表达了想象性内容，系统可以轻轻发起故事接龙。"
+                        ),
+                        sensitivity=MemorySensitivity.LOW,
+                        confidence=0.7,
+                        importance=0.4,
+                        route_decision=route_decision,
+                    )
+                )
+
         requests.extend(
             self._relationship_memory_requests_for_turn(
                 child_id=child_id,

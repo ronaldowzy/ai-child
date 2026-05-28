@@ -58,7 +58,7 @@ data class VoiceUiState(
     val statusText: String
         get() = when {
             errorMessage != null -> errorMessage
-            inputMode == VoiceInputMode.Listening -> "小白狐正在听，点一下说完。"
+            inputMode == VoiceInputMode.Listening -> "我在听。"
             inputMode == VoiceInputMode.WaitingForChild -> "我在听。"
             inputMode == VoiceInputMode.Uploading -> "我在听懂你刚才说的话。"
             inputMode == VoiceInputMode.PendingTranscript -> "可以先改文字，再发送。"
@@ -156,7 +156,7 @@ private fun agentStatusText(mood: FoxMood, motion: FoxMotion): String {
         motion == FoxMotion.SteadyBoundary || mood == FoxMood.PrivacyBoundary -> "这些信息要先保护好。"
         motion == FoxMotion.NetworkError || mood == FoxMood.NetworkError -> "我们先等大人检查网络。"
         motion == FoxMotion.ThinkingBlink || mood == FoxMood.Thinking -> "我先想一想。"
-        motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听你说。"
+        motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听。"
         motion == FoxMotion.CelebrateSmall || mood == FoxMood.Encouraging -> "你刚才说得很清楚。"
         motion == FoxMotion.CalmStill || mood == FoxMood.Calm -> "我们慢一点说。"
         else -> "慢慢说，一次说一件事就好。"
@@ -173,6 +173,6 @@ fun FoxAgentUiState.asSpeaking(): FoxAgentUiState {
 fun FoxAgentUiState.asSpeakingPending(): FoxAgentUiState {
     return copy(
         motion = FoxMotion.Speaking,
-        statusText = "小白狐正在准备朗读。",
+        statusText = "小白狐在准备说。",
     )
 }

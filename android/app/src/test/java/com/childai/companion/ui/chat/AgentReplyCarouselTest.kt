@@ -25,9 +25,9 @@ class AgentReplyCarouselTest {
     @Test
     fun stateChipLabelsStayShortAndChildFacing() {
         assertEquals("小白狐在这里", childUiPolishStateLabel(ChildTurnUiPhase.Ready))
-        assertEquals("在听你说", childUiPolishStateLabel(ChildTurnUiPhase.Listening))
+        assertEquals("我在听", childUiPolishStateLabel(ChildTurnUiPhase.Listening))
         assertEquals("在说给你听", childUiPolishStateLabel(ChildTurnUiPhase.Speaking))
-        assertEquals("在看这张图", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
+        assertEquals("小白狐正在看", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
         assertEquals("先请大人看看", childUiPolishStateLabel(ChildTurnUiPhase.ServiceError))
     }
 
@@ -63,5 +63,90 @@ class AgentReplyCarouselTest {
 
         assertTrue(topicShiftChipActions(withBackendActions).isEmpty())
         assertTrue(topicShiftChipActions(activeTurn).isEmpty())
+    }
+
+    @Test
+    fun portraitAndLandscapeKeepFoxAsPrimaryArea() {
+        val portrait = companionLayoutWeights(isLandscape = false)
+        val landscape = companionLayoutWeights(isLandscape = true)
+
+        assertTrue(portrait.agent > portrait.conversation)
+        assertTrue(landscape.agent > landscape.conversation)
+        assertTrue(landscape.agent >= 0.50f)
+    }
+
+    @Test
+    fun recentMessagesAreLightweightInsteadOfFullHistory() {
+        val messages = (1..5).map { index ->
+            ChatMessage(
+                id = "m$index",
+                author = if (index % 2 == 0) MessageAuthor.Child else MessageAuthor.Agent,
+                text = "消息$index",
+            )
+        }
+
+        val portraitMessages = companionVisibleMessages(messages, companionRecentMessageLimit(false))
+        val landscapeMessages = companionVisibleMessages(messages, companionRecentMessageLimit(true))
+
+        assertEquals(listOf("m4", "m5"), portraitMessages.map { it.id })
+        assertEquals(listOf("m3", "m4", "m5"), landscapeMessages.map { it.id })
+    }
+
+    @Test
+    fun imageContextShowsOnlyOneLowPressureCoCreationEntry() {
+        val state = ChatUiState(
+            pendingImageContext = PendingImageContextUiState(
+                attachmentId = "att_image",
+                summary = "一个作品",
+                imagePurpose = IMAGE_PURPOSE_SHARE,
+                recognizedType = "image_observation",
+            ),
+            quickActions = listOf(
+                QuickActionUi(id = "give_name", label = "起个名字"),
+                QuickActionUi(id = "tell_story", label = "讲个故事"),
+                QuickActionUi(id = "say_what_happened", label = "说说看"),
+            ),
+        )
+
+        val actions = childCompanionVisibleQuickActions(state)
+
+        assertEquals(1, actions.size)
+        assertEquals("起个名字", actions.single().label)
+    }
+
+    @Test
+    fun imageStoryActionUsesApprovedShortLabel() {
+        val state = ChatUiState(
+            pendingImageContext = PendingImageContextUiState(
+                attachmentId = "att_image",
+                summary = "一个作品",
+                imagePurpose = IMAGE_PURPOSE_SHARE,
+                recognizedType = "image_observation",
+            ),
+            quickActions = listOf(
+                QuickActionUi(id = "tell_story", label = "讲个故事"),
+                QuickActionUi(id = "say_what_happened", label = "说说看"),
+            ),
+        )
+
+        val actions = childCompanionVisibleQuickActions(state)
+
+        assertEquals(listOf("讲一句小故事"), actions.map { it.label })
+    }
+
+    @Test
+    fun imageContextActionsAreHiddenWhenImageContextIsGone() {
+        val state = ChatUiState(
+            pendingImageContext = null,
+            quickActions = listOf(
+                QuickActionUi(id = "give_name", label = "起个名字"),
+                QuickActionUi(id = "topic_choice_1", label = "小车"),
+            ),
+        )
+
+        assertEquals(
+            listOf("小车"),
+            childCompanionVisibleQuickActions(state).map { it.label },
+        )
     }
 }

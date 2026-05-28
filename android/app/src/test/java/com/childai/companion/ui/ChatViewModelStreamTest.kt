@@ -39,11 +39,11 @@ class ChatViewModelStreamTest {
     fun photoQuickActionsPromptRealPhotoUpload() {
         val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
 
-        viewModel.onQuickAction(QuickActionUi(id = "share_photo", label = "拍给小白狐看"))
+        viewModel.onQuickAction(QuickActionUi(id = "share_photo", label = "给小白狐看看"))
 
         val state = viewModel.uiState.value
         assertEquals(MessageAuthor.Agent, state.messages.last().author)
-        assertTrue(state.messages.last().text.contains("拍给小白狐看"))
+        assertTrue(state.messages.last().text.contains("给小白狐看看"))
         assertTrue(state.messages.last().text.contains("拍照或从相册选一张"))
     }
 

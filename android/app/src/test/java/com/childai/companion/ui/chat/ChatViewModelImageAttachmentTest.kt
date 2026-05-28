@@ -38,6 +38,7 @@ class ChatViewModelImageAttachmentTest {
         assertEquals(ChildTurnUiPhase.ImageProcessing, state.interactionPresentation.phase)
         assertNotNull(preview)
         assertEquals(LocalImagePreviewStatus.Uploading, preview!!.status)
+        assertEquals("小白狐正在看", localImagePreviewStatusText(preview.status))
         assertEquals("JPEG", preview.displayMimeType)
         assertEquals(4, preview.sizeBytes)
         assertArrayEquals(byteArrayOf(9, 8, 7), preview.previewBytes!!)
@@ -46,6 +47,12 @@ class ChatViewModelImageAttachmentTest {
         assertEquals(
             LocalImagePreviewStatus.Sent,
             viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id).status,
+        )
+        assertEquals(
+            "已经给小白狐看啦",
+            localImagePreviewStatusText(
+                viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id).status,
+            ),
         )
         assertFalse(viewModel.uiState.value.isSending)
     }
@@ -63,6 +70,10 @@ class ChatViewModelImageAttachmentTest {
         assertEquals(
             LocalImagePreviewStatus.Failed,
             state.imagePreviewCards.getValue(childMessage.id).status,
+        )
+        assertEquals(
+            "这张图片没有传好",
+            localImagePreviewStatusText(state.imagePreviewCards.getValue(childMessage.id).status),
         )
         assertEquals(ChildTurnUiPhase.ServiceError, state.interactionPresentation.phase)
         assertFalse(state.isSending)

@@ -248,13 +248,14 @@ private fun ChildChatScreenContent(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(companionPageBackgroundBrush()),
         ) {
             val isLandscape = maxWidth > maxHeight
             val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
 
             if (isLandscape) {
                 // Landscape: fox on left, chat on right — fox is prominent
+                val layoutWeights = companionLayoutWeights(isLandscape = true)
                 val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
                 val verticalPadding = if (compactLandscape) 10.dp else 24.dp
                 val columnGap = if (compactLandscape) 14.dp else 28.dp
@@ -270,7 +271,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         compactLandscape = compactLandscape,
                         modifier = Modifier
-                            .weight(0.50f)
+                            .weight(layoutWeights.agent)
                             .fillMaxHeight(),
                     )
                     Spacer(modifier = Modifier.width(columnGap))
@@ -297,12 +298,13 @@ private fun ChildChatScreenContent(
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
                         modifier = Modifier
-                            .weight(0.50f)
+                            .weight(layoutWeights.conversation)
                             .fillMaxHeight(),
                     )
                 }
             } else {
                 // Portrait: fox on top as hero, chat+input below
+                val layoutWeights = companionLayoutWeights(isLandscape = false)
                 val horizontalPadding = 20.dp
                 val verticalPadding = 16.dp
 
@@ -330,17 +332,18 @@ private fun ChildChatScreenContent(
                         compactLandscape = false,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(0.55f),
+                            .weight(layoutWeights.agent),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     // Chat + input area — 45% of screen
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(0.45f),
+                            .weight(layoutWeights.conversation),
                     ) {
                         ChatConversationPanel(
                             uiState = uiState,
+                            isLandscape = false,
                             onQuickAction = onQuickAction,
                             modifier = Modifier.weight(1f),
                         )
@@ -375,18 +378,18 @@ private fun ChildChatScreenContent(
 @Composable
 private fun ChatConversationPanel(
     uiState: ChatUiState,
+    isLandscape: Boolean,
     onQuickAction: (QuickActionUi) -> Unit,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val visibleQuickActions = uiState.quickActions.filterNot { action ->
-        action.id == "take_photo" || action.id == "share_photo"
-    }
+    val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
     Column(modifier = modifier) {
         ChatMessageListWithPreviews(
             messages = uiState.messages,
             imagePreviewCards = uiState.imagePreviewCards,
+            maxVisibleMessages = companionRecentMessageLimit(isLandscape),
             onImageRetry = onImageRetry,
             onImageDismiss = onImageDismiss,
             modifier = Modifier.weight(1f),
@@ -420,20 +423,24 @@ private fun ChatConversationPanel(
 private fun ChatMessageListWithPreviews(
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    maxVisibleMessages: Int,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val visibleMessages = remember(messages, maxVisibleMessages) {
+        companionVisibleMessages(messages, maxVisibleMessages)
+    }
     val listState = rememberLazyListState()
-    val lastPreviewStatus = messages.lastOrNull()
+    val lastPreviewStatus = visibleMessages.lastOrNull()
         ?.id
         ?.let { imagePreviewCards[it]?.status }
-    LaunchedEffect(messages.lastOrNull()?.id, messages.lastOrNull()?.text, lastPreviewStatus) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(visibleMessages.lastOrNull()?.id, visibleMessages.lastOrNull()?.text, lastPreviewStatus) {
+        if (visibleMessages.isNotEmpty()) {
+            listState.animateScrollToItem(visibleMessages.lastIndex)
         }
     }
-    if (messages.isEmpty()) {
+    if (visibleMessages.isEmpty()) {
         Box(
             modifier = modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center,
@@ -448,7 +455,7 @@ private fun ChatMessageListWithPreviews(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "想说什么都可以慢慢说。",
+                    text = "想说的时候再说。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
@@ -462,7 +469,7 @@ private fun ChatMessageListWithPreviews(
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
             items(
-                items = messages,
+                items = visibleMessages,
                 key = { message -> message.id },
             ) { message ->
                 ChatMessageBubbleWithPreview(
@@ -550,11 +557,7 @@ private fun LocalImagePreviewCard(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val statusText = when (preview.status) {
-        LocalImagePreviewStatus.Uploading -> "小白狐正在看…"
-        LocalImagePreviewStatus.Sent -> "小白狐看到啦"
-        LocalImagePreviewStatus.Failed -> "没有传好，再试一次？"
-    }
+    val statusText = localImagePreviewStatusText(preview.status)
     val cardColor = if (childBubble) {
         MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f)
     } else {
@@ -619,6 +622,14 @@ private fun LocalImagePreviewCard(
     }
 }
 
+internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): String {
+    return when (status) {
+        LocalImagePreviewStatus.Uploading -> "小白狐正在看"
+        LocalImagePreviewStatus.Sent -> "已经给小白狐看啦"
+        LocalImagePreviewStatus.Failed -> "这张图片没有传好"
+    }
+}
+
 @Composable
 private fun ChatPanel(
     uiState: ChatUiState,
@@ -654,6 +665,7 @@ private fun ChatPanel(
         Spacer(modifier = Modifier.height(panelGap))
         ChatConversationPanel(
             uiState = uiState,
+            isLandscape = true,
             onQuickAction = onQuickAction,
             onImageRetry = onImageRetry,
             onImageDismiss = onImageDismiss,
@@ -690,7 +702,7 @@ internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
 
 internal fun parentEntryTapHint(): String = "这里给大人用。请大人长按进入。"
 
-internal fun parentEntryDefaultHint(): String = "大人长按”大人”，输入家长账号密码后进入。"
+internal fun parentEntryDefaultHint(): String = "大人长按进入。"
 
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 
@@ -699,6 +711,81 @@ internal fun parentEntryLongPressTargets(): List<ParentEntryTarget> =
 
 internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
     return emptyList()
+}
+
+@Composable
+private fun companionPageBackgroundBrush(): Brush {
+    return Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.16f),
+        ),
+    )
+}
+
+internal data class CompanionLayoutWeights(
+    val agent: Float,
+    val conversation: Float,
+)
+
+internal fun companionLayoutWeights(isLandscape: Boolean): CompanionLayoutWeights {
+    return if (isLandscape) {
+        CompanionLayoutWeights(agent = 0.55f, conversation = 0.45f)
+    } else {
+        CompanionLayoutWeights(agent = 0.58f, conversation = 0.42f)
+    }
+}
+
+internal fun companionRecentMessageLimit(isLandscape: Boolean): Int {
+    return if (isLandscape) 3 else 2
+}
+
+internal fun companionVisibleMessages(
+    messages: List<ChatMessage>,
+    maxVisibleMessages: Int,
+): List<ChatMessage> {
+    return messages.takeLast(maxVisibleMessages.coerceAtLeast(1))
+}
+
+private val imageContextActionIds = setOf(
+    "give_name",
+    "image_naming",
+    "tell_story",
+    "make_story",
+    "image_story",
+    "say_what_happened",
+    "talk_about_image",
+    "ask_what_is_this",
+)
+
+private val primaryImageCoCreationActionIds = setOf(
+    "give_name",
+    "image_naming",
+    "tell_story",
+    "make_story",
+    "image_story",
+)
+
+internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<QuickActionUi> {
+    val baseActions = uiState.quickActions.filterNot { action ->
+        action.id == "take_photo" || action.id == "share_photo"
+    }
+    if (uiState.pendingImageContext == null) {
+        return baseActions.filterNot { it.id in imageContextActionIds }
+    }
+    return baseActions
+        .firstOrNull { it.id in primaryImageCoCreationActionIds }
+        ?.let { listOf(normalizeImageQuickAction(it)) }
+        ?: emptyList()
+}
+
+private fun normalizeImageQuickAction(action: QuickActionUi): QuickActionUi {
+    return when (action.id) {
+        "give_name", "image_naming" -> action.copy(label = "起个名字")
+        "tell_story", "make_story", "image_story" -> action.copy(label = "讲一句小故事")
+        else -> action
+    }
 }
 
 @Composable
@@ -816,12 +903,12 @@ private fun ParentEntryButton(
             onLongClickLabel = "进入家长页面",
         ),
         shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
@@ -959,7 +1046,7 @@ private fun AgentPanel(
                 if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
                     Spacer(modifier = Modifier.height(if (compactLandscape) 2.dp else 4.dp))
                     Text(
-                        text = "可以聊一件小事，也可以拍给我看。",
+                        text = "不说也没关系。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         maxLines = 1,
@@ -999,13 +1086,13 @@ internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
     return when (phase) {
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Resting -> "小白狐在这里"
-        ChildTurnUiPhase.Listening -> "在听你说"
+        ChildTurnUiPhase.Listening -> "我在听"
         ChildTurnUiPhase.Recognizing -> "在听懂你的话"
         ChildTurnUiPhase.Sending,
         ChildTurnUiPhase.Thinking -> "在想一想"
         ChildTurnUiPhase.SpeakingPending,
         ChildTurnUiPhase.Speaking -> "在说给你听"
-        ChildTurnUiPhase.ImageProcessing -> "在看这张图"
+        ChildTurnUiPhase.ImageProcessing -> "小白狐正在看"
         ChildTurnUiPhase.NeedsRetry -> "可以再说一次"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙"
         ChildTurnUiPhase.ServiceError -> "先请大人看看"
@@ -1159,7 +1246,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
                 agent = FoxAgentUiState(
                     mood = FoxMood.Listening,
                     motion = FoxMotion.ListeningTail,
-                    statusText = "我在听你说。",
+                    statusText = "我在听。",
                 ),
                 childTurnPhaseHint = ChildTurnUiPhase.Listening,
             ),
@@ -1203,7 +1290,7 @@ private fun ChildChatScreenLandscapePreview() {
                 agent = FoxAgentUiState(
                     mood = FoxMood.Listening,
                     motion = FoxMotion.ListeningTail,
-                    statusText = "我在听你说。",
+                    statusText = "我在听。",
                 ),
             ),
             onSend = {},

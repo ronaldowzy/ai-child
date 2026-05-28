@@ -57,8 +57,8 @@ internal fun childInteractionPresentation(
             ChildTurnUiPhase.Resting,
             ChildTurnUiPhase.ServiceError,
         ),
-        statusText = phase.statusText(),
-        agent = phase.agentFor(fallbackAgent),
+        statusText = phase.statusText(voice.inputMode),
+        agent = phase.agentFor(fallbackAgent, voice.inputMode),
     )
 }
 
@@ -86,19 +86,23 @@ internal fun childTurnUiPhase(
     }
 }
 
-private fun ChildTurnUiPhase.statusText(): String {
+private fun ChildTurnUiPhase.statusText(inputMode: VoiceInputMode = VoiceInputMode.Idle): String {
     return when (this) {
-        ChildTurnUiPhase.Ready -> "我准备好听你说。"
-        ChildTurnUiPhase.Listening -> "我在听你说。"
+        ChildTurnUiPhase.Ready -> "小白狐在这里。"
+        ChildTurnUiPhase.Listening -> if (inputMode == VoiceInputMode.WaitingForChild) {
+            "我在听。想说的时候再说。"
+        } else {
+            "我在听。"
+        }
         ChildTurnUiPhase.Recognizing -> "我在听懂刚才的话。"
         ChildTurnUiPhase.Sending -> "我先想一想。"
         ChildTurnUiPhase.Thinking -> "我先想一想。"
         ChildTurnUiPhase.SpeakingPending -> "小白狐在准备说。"
         ChildTurnUiPhase.Speaking -> "我在说给你听。"
-        ChildTurnUiPhase.ImageProcessing -> "我在看这张图。"
+        ChildTurnUiPhase.ImageProcessing -> "小白狐正在看。"
         ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
-        ChildTurnUiPhase.Resting -> "我们可以先歇一小会儿。"
+        ChildTurnUiPhase.Resting -> "不说也没关系。"
         ChildTurnUiPhase.ServiceError -> "我们先请大人检查一下。"
     }
 }
@@ -137,8 +141,11 @@ private fun ChildTurnUiPhase.primaryButtonEnabled(): Boolean {
     }
 }
 
-private fun ChildTurnUiPhase.agentFor(fallbackAgent: FoxAgentUiState): FoxAgentUiState {
-    val status = statusText()
+private fun ChildTurnUiPhase.agentFor(
+    fallbackAgent: FoxAgentUiState,
+    inputMode: VoiceInputMode,
+): FoxAgentUiState {
+    val status = statusText(inputMode)
     return when (this) {
         ChildTurnUiPhase.Ready -> fallbackAgent.copy(statusText = status)
         ChildTurnUiPhase.Listening,

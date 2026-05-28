@@ -401,10 +401,17 @@ class ChatViewModel(
             "take_photo", "share_photo" -> {
                 stopCurrentTts(restoreBaseAgent = true)
                 appendAgentMessage(
-                    "请点下方“拍给小白狐看”，直接拍照或从相册选一张。",
+                    "请点下方“给小白狐看看”，直接拍照或从相册选一张。",
                 )
             }
-            "talk_about_image", "make_story", "ask_what_is_this" ->
+            "talk_about_image",
+            "make_story",
+            "ask_what_is_this",
+            "give_name",
+            "image_naming",
+            "tell_story",
+            "image_story",
+            "say_what_happened" ->
                 continuePendingImageConversation(action)
             else -> sendText(action.label)
         }
@@ -681,9 +688,10 @@ class ChatViewModel(
         }
         _uiState.update { it.copy(pendingImageContext = null) }
         val text = when (action.id) {
-            "make_story" -> "给这张图编个小故事吧。"
-            "ask_what_is_this" -> "图里这个是什么呀？"
-            else -> "再聊聊这张图。"
+            "give_name", "image_naming" -> "起个名字。"
+            "tell_story", "make_story", "image_story" -> "讲一句小故事。"
+            "ask_what_is_this" -> "这是什么？"
+            else -> "给小白狐看看。"
         }
         sendTextWithAttachments(text, listOf(context.attachmentId))
     }

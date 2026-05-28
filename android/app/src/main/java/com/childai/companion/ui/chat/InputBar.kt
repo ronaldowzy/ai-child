@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -161,61 +163,63 @@ fun InputBar(
             )
         }
         if (useChildVoiceFirstInput) {
+            Button(
+                onClick = {
+                    if (voice.isRecording) {
+                        voice.actions.onStopRecordingAndUpload()
+                    } else {
+                        startVoiceRecordingWithPermission()
+                    }
+                },
+                enabled = enabled && interactionPresentation.primaryButtonEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp),
+            ) {
+                Text(
+                    text = inputBarPrimaryVoiceButtonText(interactionPresentation),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
-                    onClick = {
-                        if (voice.isRecording) {
-                            voice.actions.onStopRecordingAndUpload()
-                        } else {
-                            startVoiceRecordingWithPermission()
-                        }
-                    },
-                    enabled = enabled && interactionPresentation.primaryButtonEnabled,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 58.dp),
-                ) {
-                    Text(
-                        text = inputBarPrimaryVoiceButtonText(interactionPresentation),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                if (interactionPresentation.showStopSpeaking) {
-                    OutlinedButton(
-                        onClick = onStopTts,
-                        modifier = Modifier.heightIn(min = 58.dp),
-                    ) {
-                        Text(
-                            text = "停一下",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
-                if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
-                    OutlinedButton(
-                        onClick = onToggleTtsMuted,
-                        modifier = Modifier.heightIn(min = 58.dp),
-                    ) {
-                        Text(
-                            text = inputBarMuteToggleText(tts),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
                 if (interactionPresentation.showImageInput) {
                     OutlinedButton(
                         onClick = { showImageSourceDialog = true },
                         enabled = enabled && !voice.isRecording && !voice.isUploading,
-                        modifier = Modifier.heightIn(min = 58.dp),
+                        modifier = Modifier.heightIn(min = 44.dp),
                     ) {
-                        Text(
-                            text = "拍给小白狐看",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Text(text = "给小白狐看看")
+                    }
+                }
+                if (inputBarShouldShowTopicShift(useChildVoiceFirstInput, interactionPresentation)) {
+                    TextButton(
+                        onClick = { onSend("换个话题") },
+                        enabled = enabled && !voice.isRecording && !voice.isUploading,
+                        modifier = Modifier.heightIn(min = 44.dp),
+                    ) {
+                        Text(text = "换个话题")
+                    }
+                }
+                if (interactionPresentation.showStopSpeaking) {
+                    TextButton(
+                        onClick = onStopTts,
+                        modifier = Modifier.heightIn(min = 44.dp),
+                    ) {
+                        Text(text = "停一下")
+                    }
+                }
+                if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
+                    TextButton(
+                        onClick = onToggleTtsMuted,
+                        modifier = Modifier.heightIn(min = 44.dp),
+                    ) {
+                        Text(text = inputBarMuteToggleText(tts))
                     }
                 }
             }
@@ -390,6 +394,20 @@ internal fun inputBarShouldShowMuteToggle(
     presentation: ChildInteractionPresentation,
 ): Boolean {
     return presentation.showMuteToggle || !useChildVoiceFirstInput
+}
+
+internal fun inputBarShouldShowTopicShift(
+    useChildVoiceFirstInput: Boolean,
+    presentation: ChildInteractionPresentation,
+): Boolean {
+    if (!useChildVoiceFirstInput) return false
+    return presentation.phase in setOf(
+        ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.NeedsRetry,
+        ChildTurnUiPhase.PermissionNeeded,
+        ChildTurnUiPhase.Resting,
+        ChildTurnUiPhase.ServiceError,
+    )
 }
 
 internal fun inputBarMuteToggleText(tts: TtsUiState): String {

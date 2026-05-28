@@ -12,7 +12,7 @@ class ChildTurnUiPhaseTest {
         val presentation = childInteractionPresentation()
 
         assertEquals(ChildTurnUiPhase.Ready, presentation.phase)
-        assertEquals("我准备好听你说。", presentation.statusText)
+        assertEquals("小白狐在这里。", presentation.statusText)
         assertEquals("按一下开始说", presentation.primaryButtonText)
         assertTrue(presentation.primaryButtonEnabled)
     }
@@ -24,9 +24,24 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.Listening, presentation.phase)
-        assertEquals("我在听你说。", presentation.statusText)
+        assertEquals("我在听。", presentation.statusText)
         assertEquals("说完了", presentation.primaryButtonText)
         assertEquals(FoxMood.Listening, presentation.agent.mood)
+    }
+
+    @Test
+    fun mapsWaitingForChildToLowPressureListeningCopy() {
+        val presentation = childInteractionPresentation(
+            voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild),
+        )
+
+        assertEquals(ChildTurnUiPhase.Listening, presentation.phase)
+        assertTrue(presentation.statusText.contains("我在听"))
+        assertTrue(presentation.statusText.contains("想说的时候再说"))
+        assertFalse(presentation.statusText.contains("轮到你了"))
+        assertFalse(presentation.statusText.contains("快说"))
+        assertFalse(presentation.statusText.contains("起个名字"))
+        assertFalse(presentation.statusText.contains("小故事"))
     }
 
     @Test
@@ -79,6 +94,17 @@ class ChildTurnUiPhaseTest {
         assertTrue(presentation.showMuteToggle)
         assertEquals("按一下开始说", presentation.primaryButtonText)
         assertTrue(presentation.primaryButtonEnabled)
+    }
+
+    @Test
+    fun mapsImageProcessingPhaseToLookingStatus() {
+        val presentation = childInteractionPresentation(
+            phaseHint = ChildTurnUiPhase.ImageProcessing,
+        )
+
+        assertEquals(ChildTurnUiPhase.ImageProcessing, presentation.phase)
+        assertEquals("小白狐正在看。", presentation.statusText)
+        assertEquals(FoxMood.Thinking, presentation.agent.mood)
     }
 
     @Test

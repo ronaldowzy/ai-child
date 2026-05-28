@@ -112,4 +112,30 @@ class InputBarVoiceFirstTest {
 
         assertFalse(inputBarShouldShowMuteToggle(useChildVoiceFirstInput = true, presentation))
     }
+
+    @Test
+    fun voiceFirstReadyKeepsTopicShiftAsLowPriorityControl() {
+        val presentation = childInteractionPresentation()
+
+        assertTrue(inputBarShouldShowTopicShift(useChildVoiceFirstInput = true, presentation))
+        assertFalse(inputBarShouldShowTopicShift(useChildVoiceFirstInput = false, presentation))
+    }
+
+    @Test
+    fun activeThinkingAndImageProcessingDoNotShowTopicShiftControl() {
+        assertFalse(
+            inputBarShouldShowTopicShift(
+                useChildVoiceFirstInput = true,
+                presentation = childInteractionPresentation(isSending = true),
+            ),
+        )
+        assertFalse(
+            inputBarShouldShowTopicShift(
+                useChildVoiceFirstInput = true,
+                presentation = childInteractionPresentation(
+                    phaseHint = ChildTurnUiPhase.ImageProcessing,
+                ),
+            ),
+        )
+    }
 }

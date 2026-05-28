@@ -306,6 +306,33 @@ class SafetyEngine:
                 evidence=["unsafe_output_retention_pressure"],
                 safe_response_hint="use_scene_fallback",
             )
+        unsafe_pressure_guilt_markers = (
+            "快说呀",
+            "轮到你了",
+            "你怎么不说话",
+            "我在等你回答",
+            "再说一句吧",
+            "请等我说完",
+            "我还没讲完",
+            "你先不要打断",
+            "你再多说一点",
+            "为什么不知道",
+            "你是不是不想和我说话",
+            "我有点难过",
+            "你不理小白狐了吗",
+            "我一直等你",
+            "你终于回来了",
+            "明天一定要回来",
+        )
+        if self._contains_any(normalized, unsafe_pressure_guilt_markers):
+            return SafetyClassification(
+                risk_level=RiskLevel.HIGH,
+                primary_category=RiskCategory.ADULT_SECRET,
+                categories=[RiskCategory.ADULT_SECRET],
+                requires_parent_attention=False,
+                evidence=["unsafe_output_pressure_guilt"],
+                safe_response_hint="use_scene_fallback",
+            )
         return self.classify_input(text)
 
     def _safe_response_hint(

@@ -93,7 +93,7 @@ private fun ChildTurnUiPhase.statusText(): String {
         ChildTurnUiPhase.Recognizing -> "我在听懂刚才的话。"
         ChildTurnUiPhase.Sending -> "我先想一想。"
         ChildTurnUiPhase.Thinking -> "我先想一想。"
-        ChildTurnUiPhase.SpeakingPending -> "我马上说给你听。"
+        ChildTurnUiPhase.SpeakingPending -> "小白狐在准备说。"
         ChildTurnUiPhase.Speaking -> "我在说给你听。"
         ChildTurnUiPhase.ImageProcessing -> "我在看这张图。"
         ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
@@ -114,7 +114,7 @@ private fun ChildTurnUiPhase.primaryButtonText(): String {
         ChildTurnUiPhase.Thinking,
         ChildTurnUiPhase.ImageProcessing -> "等一下"
         ChildTurnUiPhase.SpeakingPending,
-        ChildTurnUiPhase.Speaking -> "小白狐在说"
+        ChildTurnUiPhase.Speaking -> "按一下开始说"
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Resting -> "按一下开始说"
     }
@@ -125,9 +125,9 @@ private fun ChildTurnUiPhase.primaryButtonEnabled(): Boolean {
         ChildTurnUiPhase.Recognizing,
         ChildTurnUiPhase.Sending,
         ChildTurnUiPhase.Thinking,
-        ChildTurnUiPhase.SpeakingPending,
-        ChildTurnUiPhase.Speaking,
         ChildTurnUiPhase.ImageProcessing -> false
+        ChildTurnUiPhase.SpeakingPending,
+        ChildTurnUiPhase.Speaking -> true
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Listening,
         ChildTurnUiPhase.NeedsRetry,

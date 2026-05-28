@@ -13,13 +13,27 @@ import com.childai.companion.voice.VoiceDiagnostics
 import com.childai.companion.voice.AudioUrlPlayer
 import com.childai.companion.voice.AudioUrlPlayerCallbacks
 import com.childai.companion.voice.RemoteAudioTtsController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.json.JSONObject
 
 class ChatTtsViewModelTest {
+    @Before
+    fun setup() {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
     @Test
     fun doesNotSpeakWhenReplyVoiceIsDisabled() {
         val fakeTts = FakeTtsController()

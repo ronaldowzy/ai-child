@@ -235,6 +235,20 @@ class TurnGuidanceBuilder:
                 hint="same_topic_too_long",
                 instruction="最近多轮可能持续围绕同一普通话题且孩子回答变短，提供换轨机会，不继续追问旧话题。",
             )
+        if (
+            child_engagement_signal == "short_or_flat"
+            and same_topic_score >= 2
+        ):
+            self._set_hint(
+                hints=hints,
+                guidance=guidance,
+                hint="consecutive_short_reply_stop_pushing",
+                instruction=(
+                    "孩子连续多轮短答，不再追问、不表现委屈、不继续拉旧话题；"
+                    "可以轻轻说一句'没关系，先放一放'或给一个换题机会，"
+                    "也可以自然收束，不补催促句。"
+                ),
+            )
         topic_shift_recommended = (
             same_topic_score >= 3
             and child_engagement_signal in {"short_or_flat", "boundary"}
@@ -409,7 +423,15 @@ class TurnGuidanceBuilder:
             "算了",
             "都行",
         )
-        if normalized in flat_replies or len(normalized) <= 4:
+        # Exact match: only these standalone words count as flat
+        if normalized in flat_replies:
+            return "short_or_flat"
+        # Short replies with substantive content are not flat
+        # e.g. "嗯，是我画的" "对，还有一个" "嗯嗯好的"
+        context_markers = ("是", "有", "对", "好", "画", "做", "写", "看", "玩", "吃", "说")
+        if len(normalized) <= 8 and self._contains_any(normalized, context_markers):
+            return "neutral"
+        if len(normalized) <= 4:
             return "short_or_flat"
         if len(normalized) <= 8 and not self._contains_any(normalized, ("？", "?")):
             return "short_or_flat"

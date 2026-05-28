@@ -152,7 +152,7 @@ class ChatViewModelNaturalSpeakingTest {
     @Test
     fun waitingForChildShowsCorrectStatusText() {
         val voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild)
-        assertEquals("小白狐在等你说话，点一下说完。", voice.statusText)
+        assertEquals("我在听。", voice.statusText)
     }
 
     @Test

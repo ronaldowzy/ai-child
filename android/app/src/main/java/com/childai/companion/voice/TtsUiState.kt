@@ -26,7 +26,7 @@ data class TtsUiState(
         get() = when {
             errorMessage != null -> errorMessage
             isSpeaking -> "小白狐正在说话。"
-            isSpeakingPending -> "小白狐正在准备朗读。"
+            isSpeakingPending -> "小白狐在准备说。"
             isInitializing -> "小白狐正在准备朗读。"
             isMuted -> "朗读已静音，文字还会显示。"
             !isAutoReadEnabled -> "自动朗读已关闭。"

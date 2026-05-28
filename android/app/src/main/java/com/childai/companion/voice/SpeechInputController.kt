@@ -90,7 +90,7 @@ class BackendSpeechInputController(
     companion object {
         const val NEEDS_RETRY_MESSAGE = "我刚才没听清，可以再说一次。"
         const val AUDIO_TOO_LONG_MESSAGE = "这次说得有点长，可以短一点重说。"
-        const val PROVIDER_TIMEOUT_MESSAGE = "这次听懂声音等太久了，可以再说一遍。"
+        const val PROVIDER_TIMEOUT_MESSAGE = "刚才没有传好，我们可以再试一次。"
         const val POLICY_BLOCKED_MESSAGE = "我现在还不能听懂声音，我们先请大人检查一下。"
         const val TEXT_FALLBACK_MESSAGE = "这次没有听懂声音，我们先请大人检查一下。"
     }

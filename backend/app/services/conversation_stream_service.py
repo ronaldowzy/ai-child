@@ -142,7 +142,7 @@ class ConversationStreamService:
                     "stage": "conversation",
                     "code": "conversation_failed",
                     "recoverable": False,
-                    "safe_message": "小白狐这次没有接上，我们先停一下，等会儿再试。",
+                    "safe_message": "刚才没有传好，我们可以再试一次。",
                 },
             )
             yield builder.event(
@@ -424,7 +424,7 @@ class ConversationStreamService:
             "text_chars": len(segment.text),
             "text_range": {"start": segment.start, "end": segment.end},
             "fallback": "audio_unavailable_text_preserved",
-            "safe_message": "这段声音没有放出来，但文字还在这里。",
+            "safe_message": "这次声音没出来，你可以先看字。",
         }
 
     def _generate_tts_with_soft_timeout(self, *, text: str, emotion: str) -> str | None:

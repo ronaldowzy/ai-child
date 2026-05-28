@@ -304,3 +304,62 @@ def test_running_without_pain_does_not_require_parent_attention() -> None:
 
     assert safety.risk_level == RiskLevel.NONE
     assert safety.requires_parent_attention is False
+
+
+# --- Round 2: Short answer detection improvements ---
+
+
+def test_short_flat_reply_detected() -> None:
+    """Standalone flat replies should be detected as short_or_flat."""
+    guidance = TurnGuidanceBuilder().build(
+        child_text="嗯",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_history=[
+            ModelMessage(role="assistant", content="你画的是什么呀？"),
+        ],
+    )
+    assert guidance.child_engagement_signal == "short_or_flat"
+
+
+def test_short_reply_with_content_not_flat() -> None:
+    """Short replies with substantive content should NOT be flat."""
+    for text in ("嗯，是我画的", "对，还有一个", "不知道，但我想猜一下"):
+        guidance = TurnGuidanceBuilder().build(
+            child_text=text,
+            parent_policy={"communication_preferences": {"child_age": 8}},
+            conversation_history=[
+                ModelMessage(role="assistant", content="你画的是什么呀？"),
+            ],
+        )
+        assert guidance.child_engagement_signal == "neutral", f"Expected neutral for '{text}', got {guidance.child_engagement_signal}"
+
+
+def test_consecutive_short_reply_stop_pushing_hint() -> None:
+    """When child gives short replies on same topic 2+ times, stop pushing."""
+    guidance = TurnGuidanceBuilder().build(
+        child_text="嗯",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_history=[
+            ModelMessage(role="user", content="我想聊 CS。"),
+            ModelMessage(role="assistant", content="你喜欢哪个地图？"),
+            ModelMessage(role="user", content="还行。"),
+            ModelMessage(role="assistant", content="队友配合怎么样？"),
+        ],
+    )
+    assert guidance.child_engagement_signal == "short_or_flat"
+    assert "consecutive_short_reply_stop_pushing" in guidance.hints
+    assert "不再追问" in guidance.guidance["consecutive_short_reply_stop_pushing"]
+
+
+def test_engaged_short_reply_no_stop_pushing() -> None:
+    """Engaged replies should not trigger stop pushing hint."""
+    guidance = TurnGuidanceBuilder().build(
+        child_text="我最喜欢霸王龙，因为它牙齿特别大，还能跑很快！",
+        parent_policy={"communication_preferences": {"child_age": 8}},
+        conversation_history=[
+            ModelMessage(role="user", content="我想聊恐龙。"),
+            ModelMessage(role="assistant", content="你最喜欢哪种恐龙？"),
+        ],
+    )
+    assert guidance.child_engagement_signal == "engaged"
+    assert "consecutive_short_reply_stop_pushing" not in guidance.hints

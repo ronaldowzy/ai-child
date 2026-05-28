@@ -69,3 +69,43 @@ def test_output_retention_pressure_is_blocked() -> None:
     assert result.requires_parent_attention is True
     assert result.primary_category == RiskCategory.ADULT_SECRET
     assert result.evidence == ["unsafe_output_retention_pressure"]
+
+
+def test_output_pressure_guilt_is_blocked() -> None:
+    """催促和委屈话术应被拦截。"""
+    blocked_phrases = [
+        "快说呀",
+        "轮到你了",
+        "你怎么不说话",
+        "我在等你回答",
+        "请等我说完",
+        "你再多说一点",
+        "我有点难过",
+        "你不理小白狐了吗",
+        "你终于回来了",
+        "明天一定要回来",
+    ]
+    for phrase in blocked_phrases:
+        result = SafetyEngine().classify_output(phrase)
+        assert result.risk_level == RiskLevel.HIGH, f"Expected HIGH for '{phrase}', got {result.risk_level}"
+
+
+def test_output_retention_overlap_also_blocked() -> None:
+    """已在 retention 列表中的话术也应被拦截。"""
+    overlap_phrases = ["我一直等你"]
+    for phrase in overlap_phrases:
+        result = SafetyEngine().classify_output(phrase)
+        assert result.risk_level == RiskLevel.HIGH, f"Expected HIGH for '{phrase}', got {result.risk_level}"
+
+
+def test_normal_reply_not_blocked_as_pressure() -> None:
+    """普通回复不应被误判为催促。"""
+    safe_phrases = [
+        "好的，我们换个话题。",
+        "我听见了，你说得对。",
+        "没关系，先不说也可以。",
+        "小白狐在准备说。",
+    ]
+    for phrase in safe_phrases:
+        result = SafetyEngine().classify_output(phrase)
+        assert result.risk_level != RiskLevel.HIGH or "unsafe_output_pressure_guilt" not in result.evidence, f"Safe phrase '{phrase}' was incorrectly blocked"

@@ -42,6 +42,14 @@ import java.util.UUID
 
 private const val TAG = "ChatViewModel"
 
+private val SCENES_NO_WAITING = setOf(
+    "daily.bedtime_reflection",
+    "learning.homework_help",
+    "safety.guardian",
+    "safety.gentle_checkin",
+    "privacy.boundary",
+)
+
 class ChatViewModel(
     private val conversationSender: ConversationMessageSender =
         ConversationRepositoryMessageSender(),
@@ -69,6 +77,8 @@ class ChatViewModel(
     private var streamingAgentMessageId: String? = null
     private var voiceRecordingAutoStopJob: Job? = null
     private var naturalSpeakingTimeoutJob: Job? = null
+    private var waitingAttemptedThisTurn = false
+    private var ttsSlowHintJob: Job? = null
     private var openingRequested = false
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
@@ -168,11 +178,17 @@ class ChatViewModel(
         val state = _uiState.value
         if (state.isSending || state.voice.isUploading || state.voice.isRecording) return
 
+        val wasSpeaking = state.tts.isSpeaking || state.tts.isSpeakingPending
         childInteractionStarted = true
         lastCacheDirectory = cacheDirectory
         lastRecorder?.onSilenceDetected = null
         cancelNaturalSpeakingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
+        if (wasSpeaking) {
+            _uiState.update {
+                it.copy(agent = baseAgentState.copy(statusText = "我听见啦。"))
+            }
+        }
         _uiState.update {
             it.copy(
                 quickActions = emptyList(),
@@ -199,7 +215,7 @@ class ChatViewModel(
                         childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
                         voice = current.voice.copy(
                             inputMode = VoiceInputMode.Failed,
-                            errorMessage = "这次麦克风没有准备好，可以请大人检查一下。",
+                            errorMessage = "没太听清，可以再说一次。",
                         ),
                         agent = childInteractionPresentation(
                             phaseHint = ChildTurnUiPhase.ServiceError,
@@ -311,8 +327,15 @@ class ChatViewModel(
     private fun sendTextWithAttachments(text: String, attachments: List<String>) {
         if (_uiState.value.isSending) return
 
+        val wasSpeaking = _uiState.value.tts.isSpeaking || _uiState.value.tts.isSpeakingPending
         childInteractionStarted = true
+        waitingAttemptedThisTurn = false
         stopCurrentTts(restoreBaseAgent = true)
+        if (wasSpeaking) {
+            _uiState.update {
+                it.copy(agent = baseAgentState.copy(statusText = "好，我先停下。"))
+            }
+        }
         recordChildMessage(text)
         _uiState.update {
             it.copy(
@@ -925,7 +948,10 @@ class ChatViewModel(
                 }
             }
             "route_decision" -> applyStreamRoute(event)
-            "text_delta" -> appendToStreamingAgentBubble(event.delta)
+            "text_delta" -> {
+                if (streamingAgentMessageId == null) scheduleTtsSlowHint()
+                appendToStreamingAgentBubble(event.delta)
+            }
             "sentence_ready" -> Unit
             "audio_ready" -> enqueueStreamAudio(event)
             "text_final" -> event.finalText?.let(::replaceStreamingAgentText)
@@ -1010,6 +1036,7 @@ class ChatViewModel(
     private fun enqueueStreamAudio(event: ConversationStreamEvent) {
         val audioUrl = event.audioUrl ?: return
         if (!_uiState.value.tts.isAutoReadEnabled || _uiState.value.tts.isMuted) return
+        ttsSlowHintJob?.cancel()
         _uiState.update { state ->
             state.copy(
                 tts = state.tts.copy(
@@ -1032,7 +1059,7 @@ class ChatViewModel(
 
     private fun applyStreamError(event: ConversationStreamEvent) {
         val message = event.safeMessage
-            ?: "小白狐这次没有接稳，但已经显示的文字还在这里。"
+            ?: "刚才没有传好，文字还在这里。"
         val hasPartialText = streamingAgentMessageId != null
         if (!hasPartialText) {
             appendAgentMessage(message)
@@ -1352,8 +1379,12 @@ class ChatViewModel(
 
     private fun autoStartRecordingAfterTts() {
         if (!naturalSpeakingEnabled) return
+        if (waitingAttemptedThisTurn) return
         val cacheDir = lastCacheDirectory ?: return
         if (_uiState.value.voice.isRecording || _uiState.value.isSending) return
+        val activeScene = _uiState.value.sessionState?.activeScene
+        if (activeScene in SCENES_NO_WAITING) return
+        waitingAttemptedThisTurn = true
 
         viewModelScope.launch(sendDispatcher) {
             runCatching {
@@ -1393,8 +1424,28 @@ class ChatViewModel(
         naturalSpeakingTimeoutJob = viewModelScope.launch(sendDispatcher) {
             delay(naturalSpeakingTimeoutMs)
             if (_uiState.value.voice.inputMode == VoiceInputMode.WaitingForChild) {
+                _uiState.update { state ->
+                    state.copy(
+                        agent = baseAgentState.copy(statusText = "想说的时候再说。"),
+                    )
+                }
+                delay(1500)
                 cancelVoiceInput()
                 Log.d(TAG, "naturalSpeakingTimeout: no speech detected, returned to idle")
+            }
+        }
+    }
+
+    private fun scheduleTtsSlowHint() {
+        ttsSlowHintJob?.cancel()
+        ttsSlowHintJob = viewModelScope.launch(sendDispatcher) {
+            delay(3000)
+            if (_uiState.value.tts.isSpeakingPending && !_uiState.value.tts.isSpeaking) {
+                _uiState.update { state ->
+                    state.copy(
+                        agent = state.agent.copy(statusText = "声音有点慢，你可以先看字。"),
+                    )
+                }
             }
         }
     }

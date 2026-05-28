@@ -100,7 +100,7 @@ class InputBarVoiceFirstTest {
 
         assertTrue(presentation.showStopSpeaking)
         assertTrue(presentation.showMuteToggle)
-        assertEquals("小白狐在说", inputBarPrimaryVoiceButtonText(presentation))
+        assertEquals("按一下开始说", inputBarPrimaryVoiceButtonText(presentation))
         assertTrue(inputBarShouldShowMuteToggle(useChildVoiceFirstInput = true, presentation))
         assertEquals("静音", inputBarMuteToggleText(TtsUiState(isSpeaking = true)))
         assertEquals("打开朗读", inputBarMuteToggleText(TtsUiState(isMuted = true)))

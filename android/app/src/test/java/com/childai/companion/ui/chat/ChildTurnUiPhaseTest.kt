@@ -74,11 +74,11 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.SpeakingPending, presentation.phase)
-        assertEquals("我马上说给你听。", presentation.statusText)
+        assertEquals("小白狐在准备说。", presentation.statusText)
         assertTrue(presentation.showStopSpeaking)
         assertTrue(presentation.showMuteToggle)
-        assertEquals("小白狐在说", presentation.primaryButtonText)
-        assertFalse(presentation.primaryButtonEnabled)
+        assertEquals("按一下开始说", presentation.primaryButtonText)
+        assertTrue(presentation.primaryButtonEnabled)
     }
 
     @Test

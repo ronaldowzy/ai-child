@@ -15,13 +15,26 @@ import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
 import com.childai.companion.voice.TtsUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.json.JSONObject
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class ChatViewModelStreamTest {
+    @Before
+    fun setup() {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
     @Test
     fun photoQuickActionsPromptRealPhotoUpload() {
         val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
@@ -133,7 +146,7 @@ class ChatViewModelStreamTest {
 
         assertTrue(ttsController.requests.isEmpty())
         assertEquals(
-            "小白狐这次没有接稳，但已经显示的文字还在这里。",
+            "刚才没有传好，文字还在这里。",
             viewModel.uiState.value.tts.errorMessage,
         )
     }

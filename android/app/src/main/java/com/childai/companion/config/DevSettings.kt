@@ -19,8 +19,8 @@ object DevSettings {
     const val CHILD_VOICE_FIRST_MODE = true
     const val VOICE_CONFIRM_BEFORE_SEND = false
     const val SHOW_TEXT_INPUT_FOR_CHILD = false
-    const val NATURAL_SPEAKING_ENABLED = false
-    const val NATURAL_SPEAKING_TIMEOUT_MS = 5_000L
+    const val NATURAL_WAITING_ENABLED = true
+    const val NATURAL_WAITING_TIMEOUT_MS = 5_000L
 
     val conversationApiBaseUrl: String = BuildConfig.CONVERSATION_API_BASE_URL
 }

@@ -19,23 +19,17 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ChatViewModelNaturalSpeakingTest {
+class ChatViewModelNaturalWaitingTest {
     @Test
-    fun ttsQueueDrainAutoStartsRecordingInWaitingMode() {
-        val sender = NaturalSpeakingSender()
-        val speech = NaturalSpeakingSpeechController()
-        val tts = NaturalSpeakingTtsController(autoComplete = true)
+    fun ttsQueueDrainEntersWaitingVisualState() {
+        val sender = NaturalWaitingSender()
+        val speech = NaturalWaitingSpeechController()
+        val tts = NaturalWaitingTtsController(autoComplete = true)
         val viewModel = viewModel(
             sender = sender,
             speech = speech,
             ttsController = tts,
         )
-        val dir = tempDir()
-
-        // First establish cache directory via a manual recording
-        viewModel.startVoiceRecording(dir)
-        viewModel.cancelVoiceInput()
-        speech.started = false
 
         // Simulate agent reply with audio
         viewModel.renderAgentReply(
@@ -58,34 +52,32 @@ class ChatViewModelNaturalSpeakingTest {
             ),
         )
 
-        assertTrue("Recording should start after TTS queue drains", speech.started)
+        // Should enter waiting visual state
         assertEquals(
             VoiceInputMode.WaitingForChild,
             viewModel.uiState.value.voice.inputMode,
         )
-        assertTrue("isRecording should be true", viewModel.uiState.value.voice.isRecording)
+        // WaitingForChild is NOT recording
+        assertFalse("WaitingForChild should not be recording", viewModel.uiState.value.voice.isRecording)
         assertEquals(
             ChildTurnUiPhase.WaitingChild,
             viewModel.uiState.value.interactionPresentation.phase,
         )
+        // Should NOT have started actual recording
+        assertFalse("Should not start recording for visual waiting", speech.started)
     }
 
     @Test
-    fun naturalSpeakingDisabledDoesNotAutoStartRecording() {
-        val sender = NaturalSpeakingSender()
-        val speech = NaturalSpeakingSpeechController()
-        val tts = NaturalSpeakingTtsController(autoComplete = true)
+    fun naturalWaitingDisabledDoesNotEnterWaitingState() {
+        val sender = NaturalWaitingSender()
+        val speech = NaturalWaitingSpeechController()
+        val tts = NaturalWaitingTtsController(autoComplete = true)
         val viewModel = viewModel(
             sender = sender,
             speech = speech,
             ttsController = tts,
-            naturalSpeakingEnabled = false,
+            naturalWaitingEnabled = false,
         )
-        val dir = tempDir()
-
-        viewModel.startVoiceRecording(dir)
-        viewModel.cancelVoiceInput()
-        speech.started = false
 
         viewModel.renderAgentReply(
             response = ConversationMessageResponse(
@@ -116,26 +108,20 @@ class ChatViewModelNaturalSpeakingTest {
 
     @Test
     fun cancelVoiceInputDuringWaitingReturnsToIdle() {
-        val sender = NaturalSpeakingSender()
-        val speech = NaturalSpeakingSpeechController()
-        val tts = NaturalSpeakingTtsController(autoComplete = true)
+        val sender = NaturalWaitingSender()
+        val speech = NaturalWaitingSpeechController()
+        val tts = NaturalWaitingTtsController(autoComplete = true)
         val viewModel = viewModel(
             sender = sender,
             speech = speech,
             ttsController = tts,
         )
-        val dir = tempDir()
-
-        viewModel.startVoiceRecording(dir)
-        viewModel.cancelVoiceInput()
-        speech.started = false
 
         viewModel.renderAgentReply(
             response = agentReplyWithAudio(),
         )
 
         assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
-        assertTrue(speech.started)
 
         viewModel.cancelVoiceInput()
 
@@ -144,19 +130,25 @@ class ChatViewModelNaturalSpeakingTest {
     }
 
     @Test
-    fun waitingForChildIsConsideredRecording() {
+    fun waitingForChildIsNotRecording() {
         val voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild)
-        assertTrue(voice.isRecording)
+        assertFalse("WaitingForChild should not be considered recording", voice.isRecording)
+    }
+
+    @Test
+    fun listeningIsRecording() {
+        val voice = VoiceUiState(inputMode = VoiceInputMode.Listening)
+        assertTrue("Listening should be considered recording", voice.isRecording)
     }
 
     @Test
     fun waitingForChildShowsCorrectStatusText() {
         val voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild)
-        assertEquals("我在听。", voice.statusText)
+        assertEquals("想说的时候再说。", voice.statusText)
     }
 
     @Test
-    fun waitingForChildPhaseResolvesToListening() {
+    fun waitingForChildPhaseResolvesToWaitingChild() {
         val presentation = childInteractionPresentation(
             voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild),
             tts = TtsUiState(),
@@ -167,49 +159,42 @@ class ChatViewModelNaturalSpeakingTest {
     }
 
     @Test
-    fun startVoiceRecordingDuringWaitingIsBlockedByIsRecording() {
-        val sender = NaturalSpeakingSender()
-        val speech = NaturalSpeakingSpeechController()
-        val tts = NaturalSpeakingTtsController(autoComplete = true)
+    fun waitingForChildClickStartsRecording() {
+        val sender = NaturalWaitingSender()
+        val speech = NaturalWaitingSpeechController()
+        val tts = NaturalWaitingTtsController(autoComplete = true)
         val viewModel = viewModel(
             sender = sender,
             speech = speech,
             ttsController = tts,
         )
         val dir = tempDir()
-
-        viewModel.startVoiceRecording(dir)
-        viewModel.cancelVoiceInput()
-        speech.started = false
 
         viewModel.renderAgentReply(
             response = agentReplyWithAudio(),
         )
 
         assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
+        assertFalse("WaitingForChild is not recording", viewModel.uiState.value.voice.isRecording)
 
-        // isRecording is true, so startVoiceRecording should be blocked
+        // Click start button should enter Listening
         viewModel.startVoiceRecording(dir)
 
-        // Should still be in WaitingForChild
-        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
+        assertEquals(VoiceInputMode.Listening, viewModel.uiState.value.voice.inputMode)
+        assertTrue("Listening should be recording", viewModel.uiState.value.voice.isRecording)
+        assertTrue("Should have started actual recording", speech.started)
     }
 
     @Test
     fun noAudioReplyDoesNotTriggerWaiting() {
-        val sender = NaturalSpeakingSender()
-        val speech = NaturalSpeakingSpeechController()
-        val tts = NaturalSpeakingTtsController(autoComplete = true)
+        val sender = NaturalWaitingSender()
+        val speech = NaturalWaitingSpeechController()
+        val tts = NaturalWaitingTtsController(autoComplete = true)
         val viewModel = viewModel(
             sender = sender,
             speech = speech,
             ttsController = tts,
         )
-        val dir = tempDir()
-
-        viewModel.startVoiceRecording(dir)
-        viewModel.cancelVoiceInput()
-        speech.started = false
 
         // Reply without audio - should NOT trigger waiting
         viewModel.renderAgentReply(
@@ -246,11 +231,11 @@ class ChatViewModelNaturalSpeakingTest {
     }
 
     private fun viewModel(
-        sender: NaturalSpeakingSender,
-        speech: SpeechInputController = NaturalSpeakingSpeechController(),
-        ttsController: TtsController = NaturalSpeakingTtsController(autoComplete = true),
-        feedbackTts: XiaobaohuTtsAudioGenerator = NaturalSpeakingFeedbackTts(),
-        naturalSpeakingEnabled: Boolean = true,
+        sender: NaturalWaitingSender,
+        speech: SpeechInputController = NaturalWaitingSpeechController(),
+        ttsController: TtsController = NaturalWaitingTtsController(autoComplete = true),
+        feedbackTts: XiaobaohuTtsAudioGenerator = NaturalWaitingFeedbackTts(),
+        naturalWaitingEnabled: Boolean = true,
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = sender,
@@ -258,13 +243,13 @@ class ChatViewModelNaturalSpeakingTest {
             feedbackTtsAudioGenerator = feedbackTts,
             ttsController = ttsController,
             sendDispatcher = Dispatchers.Unconfined,
-            naturalSpeakingEnabled = naturalSpeakingEnabled,
-            naturalSpeakingTimeoutMs = 5_000L,
+            naturalWaitingEnabled = naturalWaitingEnabled,
+            naturalWaitingTimeoutMs = 5_000L,
         )
     }
 
     private fun tempDir(): File {
-        return Files.createTempDirectory("natural-speaking-test").toFile()
+        return Files.createTempDirectory("natural-waiting-test").toFile()
     }
 
     private fun agentReplyWithAudio(): ConversationMessageResponse {
@@ -288,7 +273,7 @@ class ChatViewModelNaturalSpeakingTest {
     }
 }
 
-private class NaturalSpeakingSpeechController(
+private class NaturalWaitingSpeechController(
     private val result: SpeechInputResult = SpeechInputResult.Transcript("测试语音。"),
 ) : SpeechInputController {
     var started = false
@@ -313,7 +298,7 @@ private class NaturalSpeakingSpeechController(
     override fun shutdown() = Unit
 }
 
-private class NaturalSpeakingTtsController(
+private class NaturalWaitingTtsController(
     private val autoComplete: Boolean,
 ) : TtsController {
     override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
@@ -328,7 +313,7 @@ private class NaturalSpeakingTtsController(
     override fun shutdown() = Unit
 }
 
-private class NaturalSpeakingSender : ConversationMessageSender {
+private class NaturalWaitingSender : ConversationMessageSender {
     val sentTexts = mutableListOf<String>()
 
     override suspend fun sendTextMessage(
@@ -369,7 +354,7 @@ private class NaturalSpeakingSender : ConversationMessageSender {
     ) = Unit
 }
 
-private class NaturalSpeakingFeedbackTts : XiaobaohuTtsAudioGenerator {
+private class NaturalWaitingFeedbackTts : XiaobaohuTtsAudioGenerator {
     override suspend fun generateAudioUrl(text: String, emotion: String): String? {
         return "/media/tts/feedback.wav"
     }

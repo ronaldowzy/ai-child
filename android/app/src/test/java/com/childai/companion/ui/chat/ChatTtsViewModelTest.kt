@@ -165,7 +165,10 @@ class ChatTtsViewModelTest {
     @Test
     fun finishRestoresBaseFoxState() {
         val fakeTts = FakeTtsController()
-        val viewModel = ChatViewModel(ttsController = fakeTts)
+        val viewModel = ChatViewModel(
+            ttsController = fakeTts,
+            naturalWaitingEnabled = false,
+        )
 
         viewModel.renderAgentReply(
             response(

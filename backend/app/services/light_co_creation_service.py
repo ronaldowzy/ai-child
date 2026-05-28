@@ -254,53 +254,36 @@ class LightCoCreationService:
         if not self._is_creative_image(image_type):
             return CoCreationDecision(reason="image_not_creative")
 
-        # Check if this specific image has already been offered co-creation
-        # This check should happen before the general session check
+        # Check if this specific image has already been offered any co-creation
+        # Same image can only have ONE co-creation entry (naming OR story, not both)
         if image_hash and image_hash == state.image_hash:
-            if state.image_naming_offered and state.image_story_offered:
-                return CoCreationDecision(reason="image_already_offered_both")
-            if co_creation_preference == "naming" and state.image_naming_offered:
-                return CoCreationDecision(reason="image_naming_already_offered")
-            if co_creation_preference == "story" and state.image_story_offered:
-                return CoCreationDecision(reason="image_story_already_offered")
+            if state.image_naming_offered or state.image_story_offered:
+                return CoCreationDecision(reason="image_already_offered_once")
 
         # Check if already initiated this session (but not for the same image)
         if state.fox_initiated and (not image_hash or image_hash != state.image_hash):
             return CoCreationDecision(reason="already_initiated_this_session")
 
-        # Decide which type to offer
+        # Decide which type to offer based on preference
         if co_creation_preference == "naming":
-            if state.image_naming_offered:
-                return CoCreationDecision(reason="image_naming_already_offered")
             return CoCreationDecision(
                 should_trigger=True,
                 co_creation_type=CoCreationType.IMAGE_NAMING,
                 reason="creative_image_naming",
             )
         elif co_creation_preference == "story":
-            if state.image_story_offered:
-                return CoCreationDecision(reason="image_story_already_offered")
             return CoCreationDecision(
                 should_trigger=True,
                 co_creation_type=CoCreationType.IMAGE_STORY,
                 reason="creative_image_story",
             )
         else:
-            # Auto: prefer naming first, then story
-            if not state.image_naming_offered:
-                return CoCreationDecision(
-                    should_trigger=True,
-                    co_creation_type=CoCreationType.IMAGE_NAMING,
-                    reason="creative_image_naming",
-                )
-            elif not state.image_story_offered:
-                return CoCreationDecision(
-                    should_trigger=True,
-                    co_creation_type=CoCreationType.IMAGE_STORY,
-                    reason="creative_image_story",
-                )
-            else:
-                return CoCreationDecision(reason="image_already_offered_both")
+            # Auto: prefer naming first
+            return CoCreationDecision(
+                should_trigger=True,
+                co_creation_type=CoCreationType.IMAGE_NAMING,
+                reason="creative_image_naming",
+            )
 
     def record_co_creation_initiated(
         self,

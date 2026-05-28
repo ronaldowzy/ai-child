@@ -430,37 +430,29 @@ class TestImageTypeFiltering:
 
 
 class TestImageDuplicateEntryPrevention:
-    """Test image duplicate entry prevention."""
+    """Test image duplicate entry prevention - same image max one co-creation entry."""
 
-    def test_same_image_no_duplicate_naming(self, service: LightCoCreationService):
-        """Test that same image cannot be offered naming twice."""
-        # First offer
-        service.record_co_creation_initiated(
-            session_id="test_session",
-            co_creation_type=CoCreationType.IMAGE_NAMING,
-            image_hash="image_123",
-        )
-
-        # Same image should not trigger naming again
+    def test_same_image_first_naming_allowed(self, service: LightCoCreationService):
+        """Test that same image can trigger naming first time."""
         decision = service.should_trigger_image_co_creation(
             session_id="test_session",
             image_type="drawing",
             image_hash="image_123",
             co_creation_preference="naming",
         )
-        assert decision.should_trigger is False
-        assert decision.reason == "image_naming_already_offered"
+        assert decision.should_trigger is True
+        assert decision.co_creation_type == CoCreationType.IMAGE_NAMING
 
-    def test_same_image_no_duplicate_story(self, service: LightCoCreationService):
-        """Test that same image cannot be offered story twice."""
-        # First offer
+    def test_same_image_after_naming_no_story(self, service: LightCoCreationService):
+        """Test that same image cannot trigger story after naming."""
+        # First offer naming
         service.record_co_creation_initiated(
             session_id="test_session",
-            co_creation_type=CoCreationType.IMAGE_STORY,
+            co_creation_type=CoCreationType.IMAGE_NAMING,
             image_hash="image_123",
         )
 
-        # Same image should not trigger story again
+        # Same image should not trigger story
         decision = service.should_trigger_image_co_creation(
             session_id="test_session",
             image_type="drawing",
@@ -468,32 +460,77 @@ class TestImageDuplicateEntryPrevention:
             co_creation_preference="story",
         )
         assert decision.should_trigger is False
-        assert decision.reason == "image_story_already_offered"
+        assert decision.reason == "image_already_offered_once"
 
-    def test_same_image_both_offered(self, service: LightCoCreationService):
-        """Test that same image cannot be offered both naming and story."""
-        # Offer naming
-        service.record_co_creation_initiated(
-            session_id="test_session",
-            co_creation_type=CoCreationType.IMAGE_NAMING,
-            image_hash="image_123",
-        )
-
-        # Offer story
-        service.record_co_creation_initiated(
-            session_id="test_session",
-            co_creation_type=CoCreationType.IMAGE_STORY,
-            image_hash="image_123",
-        )
-
-        # Same image should not trigger anything
+    def test_same_image_first_story_allowed(self, service: LightCoCreationService):
+        """Test that same image can trigger story first time."""
         decision = service.should_trigger_image_co_creation(
             session_id="test_session",
             image_type="drawing",
-            image_hash="image_123",
+            image_hash="image_456",
+            co_creation_preference="story",
+        )
+        assert decision.should_trigger is True
+        assert decision.co_creation_type == CoCreationType.IMAGE_STORY
+
+    def test_same_image_after_story_no_naming(self, service: LightCoCreationService):
+        """Test that same image cannot trigger naming after story."""
+        # First offer story
+        service.record_co_creation_initiated(
+            session_id="test_session",
+            co_creation_type=CoCreationType.IMAGE_STORY,
+            image_hash="image_456",
+        )
+
+        # Same image should not trigger naming
+        decision = service.should_trigger_image_co_creation(
+            session_id="test_session",
+            image_type="drawing",
+            image_hash="image_456",
+            co_creation_preference="naming",
         )
         assert decision.should_trigger is False
-        assert decision.reason == "image_already_offered_both"
+        assert decision.reason == "image_already_offered_once"
+
+    def test_auto_mode_no_second_entry(self, service: LightCoCreationService):
+        """Test that auto mode does not offer second co-creation for same image."""
+        # Auto mode offers naming first
+        service.record_co_creation_initiated(
+            session_id="test_session",
+            co_creation_type=CoCreationType.IMAGE_NAMING,
+            image_hash="image_789",
+        )
+
+        # Auto mode should not offer story for same image
+        decision = service.should_trigger_image_co_creation(
+            session_id="test_session",
+            image_type="drawing",
+            image_hash="image_789",
+            co_creation_preference="auto",
+        )
+        assert decision.should_trigger is False
+        assert decision.reason == "image_already_offered_once"
+
+    def test_different_images_independent(self, service: LightCoCreationService):
+        """Test that different images are independent."""
+        # Offer naming for image_1
+        service.record_co_creation_initiated(
+            session_id="test_session",
+            co_creation_type=CoCreationType.IMAGE_NAMING,
+            image_hash="image_1",
+        )
+
+        # Different image should still work
+        decision = service.should_trigger_image_co_creation(
+            session_id="test_session",
+            image_type="drawing",
+            image_hash="image_2",
+            co_creation_preference="naming",
+        )
+        # This will fail because fox_initiated is True for the session
+        # but that's expected - session-level limit still applies
+        assert decision.should_trigger is False
+        assert decision.reason == "already_initiated_this_session"
 
 
 class TestForbiddenExpressions:

@@ -197,6 +197,7 @@ object XiaobaohuVisualStateResolver {
         return when (this) {
             ChildTurnUiPhase.Ready -> XiaobaohuBaseAttentionState.Idle
             ChildTurnUiPhase.Listening,
+            ChildTurnUiPhase.WaitingChild,
             ChildTurnUiPhase.NeedsRetry -> XiaobaohuBaseAttentionState.Listening
             ChildTurnUiPhase.Recognizing,
             ChildTurnUiPhase.Sending,
@@ -214,6 +215,7 @@ object XiaobaohuVisualStateResolver {
         return when (this) {
             ChildTurnUiPhase.Ready -> "ready_idle"
             ChildTurnUiPhase.Listening -> "voice_listening"
+            ChildTurnUiPhase.WaitingChild -> "waiting_child"
             ChildTurnUiPhase.Recognizing -> "recognizing_uses_thinking_asset"
             ChildTurnUiPhase.Sending -> "sending_uses_thinking_asset"
             ChildTurnUiPhase.Thinking -> "thinking"

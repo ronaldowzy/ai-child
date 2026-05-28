@@ -35,9 +35,9 @@ class ChildTurnUiPhaseTest {
             voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild),
         )
 
-        assertEquals(ChildTurnUiPhase.Listening, presentation.phase)
-        assertTrue(presentation.statusText.contains("我在听"))
+        assertEquals(ChildTurnUiPhase.WaitingChild, presentation.phase)
         assertTrue(presentation.statusText.contains("想说的时候再说"))
+        assertEquals("按一下开始说", presentation.primaryButtonText)
         assertFalse(presentation.statusText.contains("轮到你了"))
         assertFalse(presentation.statusText.contains("快说"))
         assertFalse(presentation.statusText.contains("起个名字"))
@@ -64,7 +64,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.Thinking, presentation.phase)
-        assertEquals("我先想一想。", presentation.statusText)
+        assertEquals("小白狐在想一想。", presentation.statusText)
         assertFalse(presentation.primaryButtonEnabled)
         assertEquals(FoxMood.Thinking, presentation.agent.mood)
     }
@@ -103,7 +103,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.ImageProcessing, presentation.phase)
-        assertEquals("小白狐正在看。", presentation.statusText)
+        assertEquals("正在给小白狐看看。", presentation.statusText)
         assertEquals(FoxMood.Thinking, presentation.agent.mood)
     }
 

@@ -65,7 +65,7 @@ class ChatViewModelNaturalSpeakingTest {
         )
         assertTrue("isRecording should be true", viewModel.uiState.value.voice.isRecording)
         assertEquals(
-            ChildTurnUiPhase.Listening,
+            ChildTurnUiPhase.WaitingChild,
             viewModel.uiState.value.interactionPresentation.phase,
         )
     }
@@ -161,8 +161,8 @@ class ChatViewModelNaturalSpeakingTest {
             voice = VoiceUiState(inputMode = VoiceInputMode.WaitingForChild),
             tts = TtsUiState(),
         )
-        assertEquals(ChildTurnUiPhase.Listening, presentation.phase)
-        assertEquals("说完了", presentation.primaryButtonText)
+        assertEquals(ChildTurnUiPhase.WaitingChild, presentation.phase)
+        assertEquals("按一下开始说", presentation.primaryButtonText)
         assertTrue(presentation.primaryButtonEnabled)
     }
 

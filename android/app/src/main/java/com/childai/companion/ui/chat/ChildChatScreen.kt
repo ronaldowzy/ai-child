@@ -600,7 +600,7 @@ private fun LocalImagePreviewCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "再试一次",
+                    text = "我们可以再试一次",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
@@ -609,7 +609,7 @@ private fun LocalImagePreviewCard(
                         .padding(horizontal = 4.dp),
                 )
                 Text(
-                    text = "先不拍",
+                    text = "先不看也可以",
                     style = MaterialTheme.typography.labelMedium,
                     color = contentColor.copy(alpha = 0.6f),
                     modifier = Modifier
@@ -624,9 +624,9 @@ private fun LocalImagePreviewCard(
 
 internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): String {
     return when (status) {
-        LocalImagePreviewStatus.Uploading -> "小白狐正在看"
+        LocalImagePreviewStatus.Uploading -> "正在给小白狐看看"
         LocalImagePreviewStatus.Sent -> "已经给小白狐看啦"
-        LocalImagePreviewStatus.Failed -> "这张图片没有传好"
+        LocalImagePreviewStatus.Failed -> "这张图还没给小白狐看到"
     }
 }
 
@@ -1069,7 +1069,8 @@ private fun foxGlowColorForPhase(phase: ChildTurnUiPhase): Color {
     return when (phase) {
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Resting -> Color(0xFF81C784)       // soft green
-        ChildTurnUiPhase.Listening -> Color(0xFF4FC3F7)     // sky blue
+        ChildTurnUiPhase.Listening,
+        ChildTurnUiPhase.WaitingChild -> Color(0xFF4FC3F7)  // sky blue
         ChildTurnUiPhase.Recognizing,
         ChildTurnUiPhase.Thinking,
         ChildTurnUiPhase.Sending -> Color(0xFFFFB74D)       // warm amber
@@ -1087,6 +1088,7 @@ internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Resting -> "小白狐在这里"
         ChildTurnUiPhase.Listening -> "我在听"
+        ChildTurnUiPhase.WaitingChild -> "想说的时候再说"
         ChildTurnUiPhase.Recognizing -> "在听懂你的话"
         ChildTurnUiPhase.Sending,
         ChildTurnUiPhase.Thinking -> "在想一想"
@@ -1213,7 +1215,7 @@ private fun ChildChatScreenPortraitPreview() {
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
-                    statusText = "我准备好啦。",
+                    statusText = "小白狐在这里。",
                 ),
             ),
             onSend = {},

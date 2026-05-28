@@ -183,12 +183,16 @@ class ChatViewModel(
         lastCacheDirectory = cacheDirectory
         lastRecorder?.onSilenceDetected = null
         cancelNaturalSpeakingTimeout()
+        if (wasSpeaking) {
+            Log.d(TAG, "[LatencyTrace] stage=child_interrupt")
+        }
         stopCurrentTts(restoreBaseAgent = true)
         if (wasSpeaking) {
             _uiState.update {
                 it.copy(agent = baseAgentState.copy(statusText = "我听见啦。"))
             }
         }
+        Log.d(TAG, "[LatencyTrace] stage=asr_start")
         _uiState.update {
             it.copy(
                 quickActions = emptyList(),
@@ -256,6 +260,7 @@ class ChatViewModel(
             }.getOrElse {
                 SpeechInputResult.Failed("这次没有听懂声音，我们先请大人检查一下。")
             }
+            Log.d(TAG, "[LatencyTrace] stage=asr_done result=${result::class.simpleName}")
             applySpeechInputResult(result)
         }
     }
@@ -327,6 +332,7 @@ class ChatViewModel(
     private fun sendTextWithAttachments(text: String, attachments: List<String>) {
         if (_uiState.value.isSending) return
 
+        Log.d(TAG, "[LatencyTrace] stage=request_send textLen=${text.length}")
         val wasSpeaking = _uiState.value.tts.isSpeaking || _uiState.value.tts.isSpeakingPending
         childInteractionStarted = true
         waitingAttemptedThisTurn = false
@@ -422,6 +428,7 @@ class ChatViewModel(
         imagePurpose: String = IMAGE_PURPOSE_SHARE,
     ) {
         if (_uiState.value.isSending || payload.bytes.isEmpty()) return
+        Log.d(TAG, "[LatencyTrace] stage=image_local_selected purpose=$imagePurpose size=${payload.bytes.size}")
         Log.d(TAG, "submitCapturedPhoto: purpose=$imagePurpose, size=${payload.bytes.size}bytes, mime=${payload.mimeType}")
         stopCurrentTts(restoreBaseAgent = true)
         childInteractionStarted = true
@@ -457,6 +464,7 @@ class ChatViewModel(
         }
 
         viewModelScope.launch(sendDispatcher) {
+            Log.d(TAG, "[LatencyTrace] stage=image_upload_start")
             runCatching {
                 attachmentRepository.createCapturedImage(
                     childId = childId,
@@ -468,13 +476,15 @@ class ChatViewModel(
                     childCaption = "我拍了一张图片给小白狐看。",
                 )
             }.onSuccess { attachmentResponse ->
+                Log.d(TAG, "[LatencyTrace] stage=image_upload_done status=ok")
                 pendingUploadPayloads.remove(childPhotoMessageId)
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = childPhotoMessageId,
                     status = LocalImagePreviewStatus.Sent,
                 )
-            }.onFailure {
+            }.onFailure { error ->
+                Log.d(TAG, "[LatencyTrace] stage=image_upload_failed error=${error::class.simpleName}")
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
                 _uiState.update {
                     it.copy(
@@ -493,7 +503,7 @@ class ChatViewModel(
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
                             motion = FoxMotion.NetworkError,
-                            statusText = "这张图片没有传好。",
+                            statusText = "这张图还没给小白狐看到。",
                         ),
                     )
                 }
@@ -552,7 +562,7 @@ class ChatViewModel(
                             agent = FoxAgentUiState(
                                 mood = FoxMood.NetworkError,
                                 motion = FoxMotion.NetworkError,
-                                statusText = "这张图片没有传好。",
+                                statusText = "这张图还没给小白狐看到。",
                             ),
                         )
                     } else state
@@ -941,9 +951,13 @@ class ChatViewModel(
         return doneReceived
     }
 
+    private var slowHint5sJob: Job? = null
+    private var slowHint8sJob: Job? = null
+
     internal fun applyStreamEvent(event: ConversationStreamEvent) {
         when (event.type) {
             "session_started" -> {
+                Log.d(TAG, "[LatencyTrace] stage=session_started request=${event.requestId}")
                 stopCurrentTts(restoreBaseAgent = false)
                 _uiState.update { state ->
                     state.copy(
@@ -954,16 +968,27 @@ class ChatViewModel(
                         ).agent,
                     )
                 }
+                // SLA: T0-5s 若仍无模型文本，显示 "小白狐还在想怎么说清楚"
+                scheduleSlowHint5s()
             }
             "route_decision" -> applyStreamRoute(event)
             "text_delta" -> {
-                if (streamingAgentMessageId == null) scheduleTtsSlowHint()
+                cancelSlowHints()
+                if (streamingAgentMessageId == null) {
+                    Log.d(TAG, "[LatencyTrace] stage=text_visible")
+                    scheduleTtsSlowHint()
+                }
                 appendToStreamingAgentBubble(event.delta)
             }
             "sentence_ready" -> Unit
-            "audio_ready" -> enqueueStreamAudio(event)
+            "audio_ready" -> {
+                Log.d(TAG, "[LatencyTrace] stage=audio_ready index=${event.payload.optInt("index", 0)}")
+                enqueueStreamAudio(event)
+            }
             "text_final" -> event.finalText?.let(::replaceStreamingAgentText)
             "done" -> {
+                cancelSlowHints()
+                Log.d(TAG, "[LatencyTrace] stage=stream_done")
                 streamingAgentMessageId = null
                 _uiState.update { state ->
                     state.copy(
@@ -1333,15 +1358,31 @@ class ChatViewModel(
     fun requestOpeningGreeting() {
         if (openingRequested) return
         openingRequested = true
+        Log.d(TAG, "[LatencyTrace] stage=opening_start")
+        // 0-1 秒：立即显示本地确定性状态 "小白狐在这里"
         _uiState.update { state ->
             state.copy(
                 childTurnPhaseHint = null,
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
-                    statusText = "我准备好啦。",
+                    statusText = "小白狐在这里。",
                 ),
             )
+        }
+        // 1-3 秒降级：若个性化 opening 未返回，显示本地短句
+        val openingFallbackJob = viewModelScope.launch(sendDispatcher) {
+            delay(1500)
+            if (!childInteractionStarted && !_uiState.value.messages.any { it.author == MessageAuthor.Child }) {
+                // 个性化 opening 尚未返回，且孩子未开始输入
+                if (_uiState.value.agent.statusText == "小白狐在这里。") {
+                    _uiState.update { state ->
+                        state.copy(
+                            agent = state.agent.copy(statusText = "你想说什么都可以。"),
+                        )
+                    }
+                }
+            }
         }
         viewModelScope.launch(sendDispatcher) {
             runCatching {
@@ -1351,7 +1392,11 @@ class ChatViewModel(
                     timezone = DevSettings.TIMEZONE,
                 )
             }.onSuccess { response ->
+                openingFallbackJob.cancel()
+                Log.d(TAG, "[LatencyTrace] stage=opening_model_done")
+                // 只有孩子尚未输入、仍处于 opening 状态时才展示个性化 opening
                 if (childInteractionStarted || _uiState.value.messages.any { it.author == MessageAuthor.Child }) {
+                    Log.d(TAG, "[LatencyTrace] stage=opening_discarded reason=child_already_interacted")
                     return@onSuccess
                 }
                 renderAgentReply(
@@ -1359,6 +1404,9 @@ class ChatViewModel(
                     replaceMessageId = "agent-welcome",
                 )
             }.onFailure {
+                openingFallbackJob.cancel()
+                Log.d(TAG, "[LatencyTrace] stage=opening_failed")
+                // opening 失败：进入普通 ready 状态，不显示错误
                 _uiState.update { state ->
                     state.copy(
                         agent = baseAgentState,
@@ -1409,14 +1457,14 @@ class ChatViewModel(
                 }
                 _uiState.update { state ->
                     state.copy(
-                        childTurnPhaseHint = ChildTurnUiPhase.Listening,
+                        childTurnPhaseHint = ChildTurnUiPhase.WaitingChild,
                         voice = state.voice.copy(
                             inputMode = VoiceInputMode.WaitingForChild,
                             pendingTranscript = "",
                             errorMessage = null,
                         ),
                         agent = childInteractionPresentation(
-                            phaseHint = ChildTurnUiPhase.Listening,
+                            phaseHint = ChildTurnUiPhase.WaitingChild,
                         ).agent,
                     )
                 }
@@ -1449,6 +1497,7 @@ class ChatViewModel(
         ttsSlowHintJob = viewModelScope.launch(sendDispatcher) {
             delay(3000)
             if (_uiState.value.tts.isSpeakingPending && !_uiState.value.tts.isSpeaking) {
+                Log.d(TAG, "[LatencyTrace] stage=tts_slow_hint_3s")
                 _uiState.update { state ->
                     state.copy(
                         agent = state.agent.copy(statusText = "声音有点慢，你可以先看字。"),
@@ -1456,6 +1505,42 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    // SLA: T0-5s 若仍无模型文本，显示 "小白狐还在想怎么说清楚"
+    private fun scheduleSlowHint5s() {
+        slowHint5sJob?.cancel()
+        slowHint8sJob?.cancel()
+        slowHint5sJob = viewModelScope.launch(sendDispatcher) {
+            delay(5000)
+            if (_uiState.value.isSending && streamingAgentMessageId == null) {
+                Log.d(TAG, "[LatencyTrace] stage=slow_hint_5s")
+                _uiState.update { state ->
+                    state.copy(
+                        agent = state.agent.copy(statusText = "小白狐还在想怎么说清楚。"),
+                    )
+                }
+                // SLA: T0-8s 允许显示低压出口
+                slowHint8sJob = viewModelScope.launch(sendDispatcher) {
+                    delay(3000)
+                    if (_uiState.value.isSending && streamingAgentMessageId == null) {
+                        Log.d(TAG, "[LatencyTrace] stage=slow_hint_8s")
+                        _uiState.update { state ->
+                            state.copy(
+                                agent = state.agent.copy(statusText = "你也可以先换个话题，或等一下。"),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelSlowHints() {
+        slowHint5sJob?.cancel()
+        slowHint5sJob = null
+        slowHint8sJob?.cancel()
+        slowHint8sJob = null
     }
 
     private fun createVoiceUiState(): VoiceUiState {

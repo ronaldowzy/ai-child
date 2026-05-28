@@ -154,7 +154,7 @@ private fun agentStatusText(mood: FoxMood, motion: FoxMotion): String {
         motion == FoxMotion.SleepyBlink || mood == FoxMood.Sleepy -> "我们轻轻收个尾。"
         motion == FoxMotion.ConcernedStill || mood == FoxMood.SafetyConcern -> "这件事要告诉可信任的大人。"
         motion == FoxMotion.SteadyBoundary || mood == FoxMood.PrivacyBoundary -> "这些信息要先保护好。"
-        motion == FoxMotion.NetworkError || mood == FoxMood.NetworkError -> "我们先等大人检查网络。"
+        motion == FoxMotion.NetworkError || mood == FoxMood.NetworkError -> "这张图还没给小白狐看到。"
         motion == FoxMotion.ThinkingBlink || mood == FoxMood.Thinking -> "我先想一想。"
         motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听。"
         motion == FoxMotion.CelebrateSmall || mood == FoxMood.Encouraging -> "你刚才说得很清楚。"

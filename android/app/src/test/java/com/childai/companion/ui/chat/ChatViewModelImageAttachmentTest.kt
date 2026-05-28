@@ -38,7 +38,7 @@ class ChatViewModelImageAttachmentTest {
         assertEquals(ChildTurnUiPhase.ImageProcessing, state.interactionPresentation.phase)
         assertNotNull(preview)
         assertEquals(LocalImagePreviewStatus.Uploading, preview!!.status)
-        assertEquals("小白狐正在看", localImagePreviewStatusText(preview.status))
+        assertEquals("正在给小白狐看看", localImagePreviewStatusText(preview.status))
         assertEquals("JPEG", preview.displayMimeType)
         assertEquals(4, preview.sizeBytes)
         assertArrayEquals(byteArrayOf(9, 8, 7), preview.previewBytes!!)
@@ -72,7 +72,7 @@ class ChatViewModelImageAttachmentTest {
             state.imagePreviewCards.getValue(childMessage.id).status,
         )
         assertEquals(
-            "这张图片没有传好",
+            "这张图还没给小白狐看到",
             localImagePreviewStatusText(state.imagePreviewCards.getValue(childMessage.id).status),
         )
         assertEquals(ChildTurnUiPhase.ServiceError, state.interactionPresentation.phase)

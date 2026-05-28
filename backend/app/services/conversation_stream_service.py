@@ -1,5 +1,11 @@
 from collections.abc import Iterator
-from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+import concurrent.futures
+from concurrent.futures import (
+    Future,
+    ThreadPoolExecutor,
+    TimeoutError as FutureTimeoutError,
+    as_completed,
+)
 from contextvars import copy_context
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +29,9 @@ from app.services.conversation_persistence_service import (
 from app.services.conversation_service import ConversationService
 from app.services.text_segmenter import TextSegment, TextSegmenter
 from app.services.tts_service import TtsService, get_tts_service
+
+# Latency trace logger — 记录端到端阶段耗时，不记录敏感内容
+latency_logger = logging.getLogger("app.latency_trace")
 
 
 @dataclass
@@ -131,11 +140,14 @@ class ConversationStreamService:
         )
 
         try:
+            self._trace("model_start", request)
             model_started_at = time.perf_counter()
             response = self._conversation_service.handle_message(request)
             model_ms = round((time.perf_counter() - model_started_at) * 1000, 1)
+            self._trace("model_done", request, extra={"model_ms": model_ms})
         except Exception as exc:
             error_type = exc.__class__.__name__
+            self._trace("model_error", request, extra={"error_type": error_type})
             yield builder.event(
                 "error",
                 {
@@ -186,34 +198,31 @@ class ConversationStreamService:
             request=request,
             response=response,
         )
+        self._trace("first_text_or_full_reply", request, extra={
+            "text_len": len(final_text),
+            "segment_count": len(segments),
+        })
 
         # 阶段1: 先发送所有文字事件，让孩子立刻看到文字
         for segment in segments:
             if first_text_ms is None:
                 first_text_ms = self._elapsed_ms(started_at)
+                self._trace("text_delta_start", request, extra={"first_text_ms": first_text_ms})
             yield builder.event("text_delta", self._text_delta_payload(segment))
             yield builder.event("sentence_ready", self._sentence_ready_payload(segment))
 
-        # 阶段2: 并行生成所有段的 TTS
+        # 阶段2: 并行生成 TTS，首段完成立即下发 audio_ready（不等后续段）
         tts_results: list[_TtsSegmentResult] = []
         if should_generate_tts and segments:
             first_tts_start_ms = self._elapsed_ms(started_at)
+            self._trace("tts_batch_start", request, extra={"segment_count": len(segments)})
             for segment in segments:
                 yield builder.event("tts_started", self._tts_started_payload(segment))
-            tts_results = self._generate_tts_parallel(
+            # 使用流式 TTS 生成：首段完成即 yield，不等所有段
+            for result in self._generate_tts_streaming(
                 segments=segments,
                 emotion=response.reply.emotion,
-            )
-            # 记录第一段 TTS 完成时间
-            if tts_results:
-                first_result = tts_results[0]
-                logging.getLogger("app.tts_timing").info(
-                    "tts_first_segment_done: seg=0, elapsed=%.0fms, error=%s",
-                    first_result.elapsed_ms,
-                    first_result.error_code or "none",
-                )
-            # 按段顺序返回音频事件
-            for result in tts_results:
+            ):
                 segment = segments[result.segment_index]
                 tts_segment_count += 1
                 if result.error_code:
@@ -226,6 +235,10 @@ class ConversationStreamService:
                     audio_segment_count += 1
                     if first_audio_ms is None:
                         first_audio_ms = self._elapsed_ms(started_at)
+                        self._trace("first_audio_ready", request, extra={
+                            "first_audio_ms": first_audio_ms,
+                            "segment_index": result.segment_index,
+                        })
                     if first_audio_url is None:
                         first_audio_url = result.audio_url
                     yield builder.event(
@@ -531,7 +544,11 @@ class ConversationStreamService:
         segments: list[TextSegment],
         emotion: str,
     ) -> Iterator[_TtsSegmentResult]:
-        """并行生成 TTS，第一段完成后立即记录时间，结果仍按段索引顺序返回。"""
+        """并行生成 TTS，首段完成后立即 yield，后续段按索引顺序 yield。
+
+        核心改进：不再等待所有段完成，第一段 ready 即下发给客户端。
+        超时段会产出 error 事件，不阻塞后续段。
+        """
         if not segments:
             return
 
@@ -539,10 +556,11 @@ class ConversationStreamService:
         max_workers = min(len(segments), 4)
         executor = ThreadPoolExecutor(
             max_workers=max_workers,
-            thread_name_prefix="stream-tts-first",
+            thread_name_prefix="stream-tts-streaming",
         )
         try:
             future_to_index: dict[Future, int] = {}
+            future_submit_times: dict[Future, float] = {}
             for segment in segments:
                 seg_context = copy_context()
                 future = executor.submit(
@@ -552,61 +570,109 @@ class ConversationStreamService:
                     emotion=emotion,
                 )
                 future_to_index[future] = segment.index
+                future_submit_times[future] = time.perf_counter()
 
-            results_by_index: dict[int, _TtsSegmentResult] = {}
-            first_segment_done = False
-            for future in as_completed(future_to_index):
-                seg_index = future_to_index[future]
-                seg_started_at = time.perf_counter()
-                try:
-                    if timeout_ms > 0:
-                        audio_url = future.result(timeout=timeout_ms / 1000)
-                    else:
-                        audio_url = future.result()
-                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
-                    if not audio_url:
-                        results_by_index[seg_index] = _TtsSegmentResult(
-                            segment_index=seg_index,
-                            audio_url=None,
-                            error_code="tts_unavailable",
-                            elapsed_ms=elapsed_ms,
-                        )
-                    else:
-                        results_by_index[seg_index] = _TtsSegmentResult(
+            # 按索引顺序 yield 的缓冲区
+            buffer: dict[int, _TtsSegmentResult] = {}
+            all_results: dict[int, _TtsSegmentResult] = {}
+            next_yield_index = 0
+            completed_futures: set[Future] = set()
+            timeout_seconds = timeout_ms / 1000 if timeout_ms > 0 else 0
+
+            # 循环处理：先用 wait 获取已完成的 future，再处理超时
+            pending_futures = set(future_to_index.keys())
+            while pending_futures:
+                # 等待至少一个 future 完成，或者超时
+                if timeout_seconds > 0:
+                    done, _ = concurrent.futures.wait(
+                        pending_futures,
+                        timeout=timeout_seconds,
+                        return_when=concurrent.futures.FIRST_COMPLETED,
+                    )
+                else:
+                    # 无超时：等待所有完成
+                    done, _ = concurrent.futures.wait(
+                        pending_futures,
+                        return_when=concurrent.futures.ALL_COMPLETED,
+                    )
+
+                # 处理已完成的 future
+                for future in done:
+                    if future in completed_futures:
+                        continue
+                    completed_futures.add(future)
+                    seg_index = future_to_index[future]
+                    submit_time = future_submit_times[future]
+                    elapsed_ms = round((time.perf_counter() - submit_time) * 1000, 1)
+                    try:
+                        audio_url = future.result(timeout=0)  # 已完成，不会阻塞
+                        result = _TtsSegmentResult(
                             segment_index=seg_index,
                             audio_url=audio_url,
-                            error_code=None,
+                            error_code=None if audio_url else "tts_unavailable",
                             elapsed_ms=elapsed_ms,
                         )
-                except FutureTimeoutError:
-                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
-                    results_by_index[seg_index] = _TtsSegmentResult(
-                        segment_index=seg_index,
-                        audio_url=None,
-                        error_code="tts_timeout",
-                        elapsed_ms=elapsed_ms,
-                    )
-                except Exception:
-                    elapsed_ms = round((time.perf_counter() - seg_started_at) * 1000, 1)
-                    results_by_index[seg_index] = _TtsSegmentResult(
-                        segment_index=seg_index,
-                        audio_url=None,
-                        error_code="tts_failed",
-                        elapsed_ms=elapsed_ms,
-                    )
-                if not first_segment_done and seg_index == 0:
-                    first_segment_done = True
-                    logger.info(
-                        "tts_first_segment_ready: seg=0, elapsed=%.0fms",
-                        results_by_index[0].elapsed_ms,
-                    )
+                    except Exception:
+                        result = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=None,
+                            error_code="tts_failed",
+                            elapsed_ms=elapsed_ms,
+                        )
+
+                    all_results[seg_index] = result
+
+                    # 首段完成时记录 trace
+                    if seg_index == 0:
+                        latency_logger.info(
+                            "tts_first_segment_ready",
+                            extra={
+                                "event": "tts_first_segment_ready",
+                                "request_id": get_request_id(),
+                                "elapsed_ms": result.elapsed_ms,
+                                "error_code": result.error_code or "none",
+                            },
+                        )
+
+                    # 按索引顺序 yield
+                    buffer[seg_index] = result
+                    while next_yield_index in buffer:
+                        yield buffer.pop(next_yield_index)
+                        next_yield_index += 1
+
+                # 检查超时的 future（仍在 pending 中且已超过超时时间）
+                if timeout_seconds > 0:
+                    now = time.perf_counter()
+                    timed_out = []
+                    for future in pending_futures:
+                        if future in completed_futures:
+                            continue
+                        submit_time = future_submit_times[future]
+                        if now - submit_time >= timeout_seconds:
+                            timed_out.append(future)
+
+                    for future in timed_out:
+                        completed_futures.add(future)
+                        seg_index = future_to_index[future]
+                        elapsed_ms = round((now - future_submit_times[future]) * 1000, 1)
+                        result = _TtsSegmentResult(
+                            segment_index=seg_index,
+                            audio_url=None,
+                            error_code="tts_timeout",
+                            elapsed_ms=elapsed_ms,
+                        )
+                        all_results[seg_index] = result
+                        buffer[seg_index] = result
+                        while next_yield_index in buffer:
+                            yield buffer.pop(next_yield_index)
+                            next_yield_index += 1
+
+                pending_futures -= completed_futures
 
             self._log_tts_parallel_summary(
-                results=results_by_index,
+                results=all_results,
                 segment_count=len(segments),
             )
-            for i in sorted(results_by_index):
-                yield results_by_index[i]
         finally:
             executor.shutdown(wait=False)
 
@@ -653,6 +719,25 @@ class ConversationStreamService:
 
     def _text_hash(self, text: str) -> str:
         return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+
+    def _trace(
+        self,
+        stage: str,
+        request: ConversationStreamRequest,
+        *,
+        extra: dict[str, object] | None = None,
+    ) -> None:
+        """记录 latency trace，只含耗时/状态/阶段名，不含敏感内容。"""
+        payload: dict[str, object] = {
+            "event": "latency_trace",
+            "request_id": get_request_id(),
+            "session_id": request.session_id,
+            "stage": stage,
+            "timestamp": time.time(),
+        }
+        if extra:
+            payload.update(extra)
+        latency_logger.info("latency_trace: %s", stage, extra=payload)
 
     def _elapsed_ms(self, started_at: float) -> float:
         return round((time.perf_counter() - started_at) * 1000, 1)

@@ -5,6 +5,7 @@ import com.childai.companion.voice.TtsUiState
 enum class ChildTurnUiPhase {
     Ready,
     Listening,
+    WaitingChild,       // 新增：等待孩子说话（小白狐轻轻等，但手机没开始录音）
     Recognizing,
     Sending,
     Thinking,
@@ -52,6 +53,7 @@ internal fun childInteractionPresentation(
             phase == ChildTurnUiPhase.Speaking,
         showImageInput = phase in setOf(
             ChildTurnUiPhase.Ready,
+            ChildTurnUiPhase.WaitingChild,
             ChildTurnUiPhase.NeedsRetry,
             ChildTurnUiPhase.PermissionNeeded,
             ChildTurnUiPhase.Resting,
@@ -71,8 +73,8 @@ internal fun childTurnUiPhase(
 ): ChildTurnUiPhase {
     return when {
         voice.inputMode == VoiceInputMode.PermissionDenied -> ChildTurnUiPhase.PermissionNeeded
-        voice.inputMode == VoiceInputMode.Listening ||
-            voice.inputMode == VoiceInputMode.WaitingForChild -> ChildTurnUiPhase.Listening
+        voice.inputMode == VoiceInputMode.Listening -> ChildTurnUiPhase.Listening
+        voice.inputMode == VoiceInputMode.WaitingForChild -> ChildTurnUiPhase.WaitingChild
         voice.inputMode == VoiceInputMode.Uploading -> ChildTurnUiPhase.Recognizing
         voice.inputMode == VoiceInputMode.NeedsRetry -> ChildTurnUiPhase.NeedsRetry
         tts.isSpeaking -> ChildTurnUiPhase.Speaking
@@ -89,17 +91,14 @@ internal fun childTurnUiPhase(
 private fun ChildTurnUiPhase.statusText(inputMode: VoiceInputMode = VoiceInputMode.Idle): String {
     return when (this) {
         ChildTurnUiPhase.Ready -> "小白狐在这里。"
-        ChildTurnUiPhase.Listening -> if (inputMode == VoiceInputMode.WaitingForChild) {
-            "我在听。想说的时候再说。"
-        } else {
-            "我在听。"
-        }
+        ChildTurnUiPhase.Listening -> "我在听。"
+        ChildTurnUiPhase.WaitingChild -> "想说的时候再说。"
         ChildTurnUiPhase.Recognizing -> "我在听懂刚才的话。"
-        ChildTurnUiPhase.Sending -> "我先想一想。"
-        ChildTurnUiPhase.Thinking -> "我先想一想。"
+        ChildTurnUiPhase.Sending -> "小白狐在想一想。"
+        ChildTurnUiPhase.Thinking -> "小白狐在想一想。"
         ChildTurnUiPhase.SpeakingPending -> "小白狐在准备说。"
         ChildTurnUiPhase.Speaking -> "我在说给你听。"
-        ChildTurnUiPhase.ImageProcessing -> "小白狐正在看。"
+        ChildTurnUiPhase.ImageProcessing -> "正在给小白狐看看。"
         ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
         ChildTurnUiPhase.Resting -> "不说也没关系。"
@@ -110,6 +109,7 @@ private fun ChildTurnUiPhase.statusText(inputMode: VoiceInputMode = VoiceInputMo
 private fun ChildTurnUiPhase.primaryButtonText(): String {
     return when (this) {
         ChildTurnUiPhase.Listening -> "说完了"
+        ChildTurnUiPhase.WaitingChild -> "按一下开始说"
         ChildTurnUiPhase.Recognizing -> "正在听懂"
         ChildTurnUiPhase.NeedsRetry -> "再说一次"
         ChildTurnUiPhase.PermissionNeeded -> "请大人帮忙看看"
@@ -134,6 +134,7 @@ private fun ChildTurnUiPhase.primaryButtonEnabled(): Boolean {
         ChildTurnUiPhase.Speaking -> true
         ChildTurnUiPhase.Ready,
         ChildTurnUiPhase.Listening,
+        ChildTurnUiPhase.WaitingChild,
         ChildTurnUiPhase.NeedsRetry,
         ChildTurnUiPhase.PermissionNeeded,
         ChildTurnUiPhase.Resting,
@@ -149,6 +150,7 @@ private fun ChildTurnUiPhase.agentFor(
     return when (this) {
         ChildTurnUiPhase.Ready -> fallbackAgent.copy(statusText = status)
         ChildTurnUiPhase.Listening,
+        ChildTurnUiPhase.WaitingChild,
         ChildTurnUiPhase.NeedsRetry -> FoxAgentUiState(
             mood = FoxMood.Listening,
             motion = FoxMotion.ListeningTail,

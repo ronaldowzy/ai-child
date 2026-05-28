@@ -403,6 +403,7 @@ internal fun inputBarShouldShowTopicShift(
     if (!useChildVoiceFirstInput) return false
     return presentation.phase in setOf(
         ChildTurnUiPhase.Ready,
+        ChildTurnUiPhase.WaitingChild,
         ChildTurnUiPhase.NeedsRetry,
         ChildTurnUiPhase.PermissionNeeded,
         ChildTurnUiPhase.Resting,

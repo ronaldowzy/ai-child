@@ -18,7 +18,15 @@
 
 ## 1. 当前状态
 
-当前项目已经从第一轮后端和 Android MVP，推进到家庭内测前体验加固阶段。
+当前项目已经从第一轮后端和 Android MVP，推进到家庭内测前体验加固阶段，并已完成五轮孩子可感知体验收尾。
+
+当前下一阶段产品主方向为：
+
+```text
+小白狐连续陪伴与亲近感收敛
+```
+
+下一阶段不是继续开笼统的“第六轮体验大改”，而是围绕连续陪伴、主动回应、常驻轻共创、等待感优化和 App 界面重设计，形成孩子能直接感受到的陪伴体验。
 
 当前主线能力：
 
@@ -44,6 +52,7 @@
 4. 图片上传、vision 续聊、Android timeout 和本地预览。
 5. stream / TTS segment queue / 停止 / 静音 / 迟到 opening 的真实表现。
 6. 家长日报 v3 真实素材下的自然度和无监控感。
+7. 连续陪伴、主动回应、常驻轻共创和界面重设计是否真正提升孩子亲近感。
 ```
 
 ---
@@ -72,11 +81,18 @@
 AGENTS.md
 README.md
 
+docs/下一阶段产品进化计划_V0_1.md
 docs/项目现状与后续路线图_V0_2.md
 docs/PRODUCT_DECISIONS_V0_1.md
 docs/CODEX_PROGRESS_BOARD_V0_1.md
 docs/session_process/README.md
 docs/session_process/SHARED_CONTEXT_V0_1.md
+```
+
+下一阶段产品规划、协作机制和执行顺序以以下文件为准：
+
+```text
+docs/下一阶段产品进化计划_V0_1.md
 ```
 
 长期设计文档按需阅读：
@@ -115,7 +131,7 @@ docs/提示词与文案归属规则_V0_1.md
 7. 不引入广告、陌生人社交、排行榜、积分、连续打卡、抽卡、宠物饥饿或 FOMO。
 ```
 
-完整规则以 `AGENTS.md` 和 `docs/PRODUCT_DECISIONS_V0_1.md` 为准。
+完整规则以 `AGENTS.md`、`docs/PRODUCT_DECISIONS_V0_1.md` 和 `docs/下一阶段产品进化计划_V0_1.md` 为准。
 
 ---
 

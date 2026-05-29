@@ -86,6 +86,7 @@ fun InputBar(
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit = { _, _ -> },
     onPhotoCaptureFailed: (String) -> Unit = {},
     playfulControls: Boolean = false,
+    playfulCompactControls: Boolean = false,
 ) {
     val context = LocalContext.current
     var draft by rememberSaveable { mutableStateOf("") }
@@ -238,6 +239,7 @@ fun InputBar(
                         visible = inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation),
                         onClick = onToggleTtsMuted,
                     ),
+                    forceCompact = playfulCompactControls,
                 )
             } else {
                 Button(
@@ -455,6 +457,7 @@ private fun PlayfulVoiceFirstControls(
     topicAction: InputBarPlayfulAction,
     stopAction: InputBarPlayfulAction,
     muteAction: InputBarPlayfulAction,
+    forceCompact: Boolean = false,
 ) {
     val visibleImage = imageAction.takeIf { it.visible }
     val visibleTopic = topicAction.takeIf { it.visible }
@@ -467,13 +470,38 @@ private fun PlayfulVoiceFirstControls(
         ?: visibleMute.takeUnless { it == leftAction }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 350.dp
-        val primarySize = if (compact) 102.dp else 116.dp
-        val secondarySize = if (compact) 84.dp else 96.dp
-        val secondaryIconSize = if (compact) 36.dp else 42.dp
-        val cameraMinWidth = if (compact) 142.dp else 168.dp
-        val cameraIconSize = if (compact) 40.dp else 46.dp
-        val rowGap = if (compact) 8.dp else 12.dp
+        val compact = forceCompact || maxWidth < 350.dp
+        val extraCompact = maxWidth < 330.dp || (forceCompact && maxWidth < 380.dp)
+        val primarySize = when {
+            extraCompact -> 92.dp
+            compact -> 102.dp
+            else -> 116.dp
+        }
+        val secondarySize = when {
+            extraCompact -> 76.dp
+            compact -> 84.dp
+            else -> 96.dp
+        }
+        val secondaryIconSize = when {
+            extraCompact -> 32.dp
+            compact -> 36.dp
+            else -> 42.dp
+        }
+        val cameraMinWidth = when {
+            extraCompact -> 128.dp
+            compact -> 142.dp
+            else -> 168.dp
+        }
+        val cameraIconSize = when {
+            extraCompact -> 36.dp
+            compact -> 40.dp
+            else -> 46.dp
+        }
+        val rowGap = when {
+            extraCompact -> 6.dp
+            compact -> 8.dp
+            else -> 12.dp
+        }
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -508,7 +536,11 @@ private fun PlayfulVoiceFirstControls(
                     text = primaryText,
                     enabled = primaryEnabled,
                     size = primarySize,
-                    iconSize = if (compact) 48.dp else 54.dp,
+                    iconSize = when {
+                        extraCompact -> 44.dp
+                        compact -> 48.dp
+                        else -> 54.dp
+                    },
                     onClick = onPrimaryClick,
                 )
                 Spacer(modifier = Modifier.width(rowGap))

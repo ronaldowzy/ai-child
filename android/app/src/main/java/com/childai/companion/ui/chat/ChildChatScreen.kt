@@ -49,6 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -70,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -329,6 +331,7 @@ private fun ChildChatScreenContent(
                         onInstallTtsData = onInstallTtsData,
                         onPhotoCaptured = onPhotoCaptured,
                         onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        viewportClass = viewportClass,
                         modifier = Modifier
                             .weight(layoutWeights.conversation)
                             .fillMaxHeight(),
@@ -403,6 +406,7 @@ private fun ChildChatScreenContent(
                         onPhotoCaptured = onPhotoCaptured,
                         onPhotoCaptureFailed = onPhotoCaptureFailed,
                         playfulControls = true,
+                        playfulCompactControls = viewportClass == CompanionRoomViewportClass.PortraitExpanded,
                     )
                 }
             }
@@ -820,11 +824,24 @@ private fun LandscapeOperationPanel(
     onInstallTtsData: () -> Unit,
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
+    viewportClass: CompanionRoomViewportClass,
     modifier: Modifier = Modifier,
 ) {
-    val panelGap = if (compactLandscape) 8.dp else 12.dp
-    val inputHorizontalPadding = if (compactLandscape) 12.dp else 18.dp
-    val inputVerticalPadding = if (compactLandscape) 10.dp else 14.dp
+    val tabletLandscape = viewportClass == CompanionRoomViewportClass.LandscapeTablet
+    val panelGap = when {
+        compactLandscape || tabletLandscape -> 8.dp
+        else -> 12.dp
+    }
+    val inputHorizontalPadding = when {
+        compactLandscape -> 12.dp
+        tabletLandscape -> 0.dp
+        else -> 18.dp
+    }
+    val inputVerticalPadding = when {
+        compactLandscape -> 10.dp
+        tabletLandscape -> 6.dp
+        else -> 14.dp
+    }
     val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
 
     BoxWithConstraints(modifier = modifier) {
@@ -834,7 +851,7 @@ private fun LandscapeOperationPanel(
                 .align(Alignment.CenterEnd)
                 .width(panelWidth)
                 .fillMaxHeight()
-                .padding(if (compactLandscape) 4.dp else 8.dp),
+                .padding(if (compactLandscape || tabletLandscape) 4.dp else 8.dp),
             horizontalAlignment = Alignment.End,
         ) {
             ParentEntryHintBar(
@@ -873,6 +890,7 @@ private fun LandscapeOperationPanel(
                 onPhotoCaptured = onPhotoCaptured,
                 onPhotoCaptureFailed = onPhotoCaptureFailed,
                 playfulControls = true,
+                playfulCompactControls = viewportClass == CompanionRoomViewportClass.LandscapeTablet,
             )
         }
     }
@@ -906,40 +924,48 @@ private fun CompanionRoomBackground(viewportClass: CompanionRoomViewportClass) {
             )
         }
 
-        CompanionRoomViewportClass.LandscapeTablet,
+        CompanionRoomViewportClass.LandscapeTablet -> {
+            Image(
+                painter = painterResource(id = R.drawable.companion_room_background_land),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
         CompanionRoomViewportClass.LandscapeSquare -> {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Image(
-                    painter = painterResource(id = R.drawable.companion_room_background_land),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(22.dp),
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White.copy(alpha = 0.38f)),
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.companion_room_background_land),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomCenter,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            Image(
+                painter = painterResource(id = R.drawable.companion_room_background_land),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
 
         CompanionRoomViewportClass.Portrait,
         CompanionRoomViewportClass.PortraitExpanded -> {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val portraitBackgroundExtraHeight = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
-                    96.dp
+                    180.dp
                 } else {
                     160.dp
+                }
+                val portraitBackgroundOffsetY = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
+                    (-44).dp
+                } else {
+                    0.dp
+                }
+                val portraitBackgroundWidth = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
+                    maxWidth * 1.06f
+                } else {
+                    maxWidth
+                }
+                val portraitBackgroundScaleY = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
+                    1.08f
+                } else {
+                    1f
                 }
                 Image(
                     painter = painterResource(id = R.drawable.companion_room_background_portrait),
@@ -948,8 +974,13 @@ private fun CompanionRoomBackground(viewportClass: CompanionRoomViewportClass) {
                     alignment = Alignment.TopCenter,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .width(maxWidth)
-                        .height(maxHeight + portraitBackgroundExtraHeight),
+                        .offset(y = portraitBackgroundOffsetY)
+                        .width(portraitBackgroundWidth)
+                        .height(maxHeight + portraitBackgroundExtraHeight)
+                        .graphicsLayer {
+                            scaleY = portraitBackgroundScaleY
+                            transformOrigin = TransformOrigin(0.5f, 0f)
+                        },
                 )
             }
         }
@@ -1088,8 +1119,8 @@ internal fun companionLayoutWeights(viewportClass: CompanionRoomViewportClass): 
         )
 
         CompanionRoomViewportClass.LandscapeTablet -> CompanionLayoutWeights(
-            agent = 0.66f,
-            conversation = 0.34f,
+            agent = 0.56f,
+            conversation = 0.44f,
         )
 
         CompanionRoomViewportClass.LandscapeSquare -> CompanionLayoutWeights(

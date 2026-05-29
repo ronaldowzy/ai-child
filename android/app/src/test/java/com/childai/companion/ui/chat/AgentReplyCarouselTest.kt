@@ -94,10 +94,14 @@ class AgentReplyCarouselTest {
             CompanionRoomViewportClass.Portrait,
             companionRoomViewportClass(maxWidth = 390.dp, maxHeight = 844.dp),
         )
+        assertEquals(
+            CompanionRoomViewportClass.PortraitExpanded,
+            companionRoomViewportClass(maxWidth = 533.dp, maxHeight = 853.dp),
+        )
     }
 
     @Test
-    fun tabletLandscapeGivesMoreRoomToMascotAndCapsOperationPanel() {
+    fun tabletLandscapeKeepsMascotPrimaryWhileGivingButtonsMoreRoom() {
         val wide = companionLayoutWeights(CompanionRoomViewportClass.LandscapeWide)
         val tablet = companionLayoutWeights(CompanionRoomViewportClass.LandscapeTablet)
         val tabletMetrics = companionLandscapeLayoutMetrics(
@@ -105,8 +109,9 @@ class AgentReplyCarouselTest {
             compactLandscape = false,
         )
 
-        assertTrue(tablet.agent > wide.agent)
-        assertEquals(680.dp, tabletMetrics.operationPanelMaxWidth)
+        assertTrue(tablet.agent > tablet.conversation)
+        assertTrue(tablet.conversation > wide.conversation)
+        assertEquals(720.dp, tabletMetrics.operationPanelMaxWidth)
     }
 
     @Test

@@ -25,7 +25,7 @@ internal fun companionRoomViewportClass(
     maxHeight: Dp,
 ): CompanionRoomViewportClass {
     if (maxWidth <= maxHeight) {
-        return if (maxWidth >= 600.dp) {
+        return if (maxWidth >= 600.dp || (maxWidth >= 500.dp && maxHeight >= 800.dp)) {
             CompanionRoomViewportClass.PortraitExpanded
         } else {
             CompanionRoomViewportClass.Portrait
@@ -101,10 +101,10 @@ internal fun companionLandscapeLayoutMetrics(
         )
 
         CompanionRoomViewportClass.LandscapeTablet -> CompanionLandscapeLayoutMetrics(
-            horizontalPadding = 36.dp,
-            verticalPadding = 28.dp,
-            columnGap = 24.dp,
-            operationPanelMaxWidth = 680.dp,
+            horizontalPadding = 20.dp,
+            verticalPadding = 18.dp,
+            columnGap = 12.dp,
+            operationPanelMaxWidth = 720.dp,
         )
 
         CompanionRoomViewportClass.LandscapeSquare -> CompanionLandscapeLayoutMetrics(

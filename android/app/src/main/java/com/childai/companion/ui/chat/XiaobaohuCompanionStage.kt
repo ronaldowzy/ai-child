@@ -71,7 +71,12 @@ internal fun XiaobaohuCompanionStage(
             maxHeight = maxHeight,
             viewportClass = viewportClass,
         )
-        val mascotOffsetY = mascotOffsetYForViewport(viewportClass)
+        val baseMascotOffsetY = mascotOffsetYForViewport(viewportClass)
+        val stateGroundOffsetY = mascotGroundOffsetYForViewport(
+            viewportClass = viewportClass,
+            mascotState = mascotState,
+        )
+        val mascotOffsetY = baseMascotOffsetY + stateGroundOffsetY
         val visualScaleMultiplier = mascotVisualScaleMultiplier(viewportClass)
         val bubbleOffset = mascotStateBubbleOffset(viewportClass)
 
@@ -129,7 +134,7 @@ internal fun XiaobaohuCompanionStage(
                     .align(Alignment.CenterEnd)
                     .offset(
                         x = bubbleOffset.x,
-                        y = bubbleOffset.y,
+                        y = bubbleOffset.y + stateGroundOffsetY,
                     ),
             ) {
                 renderedBubbleText?.let { text ->
@@ -179,9 +184,9 @@ private fun mascotMaxSizeForViewport(
         )
 
         CompanionRoomViewportClass.PortraitExpanded -> minOf(
-            maxWidth * 0.86f,
-            (maxHeight * 0.74f).coerceAtLeast(260.dp),
-            650.dp,
+            maxWidth * 0.78f,
+            (maxHeight * 0.68f).coerceAtLeast(250.dp),
+            560.dp,
         )
     }
 }
@@ -192,7 +197,29 @@ private fun mascotOffsetYForViewport(viewportClass: CompanionRoomViewportClass):
         CompanionRoomViewportClass.LandscapeTablet -> 6.dp
         CompanionRoomViewportClass.LandscapeSquare -> 12.dp
         CompanionRoomViewportClass.Portrait -> 28.dp
-        CompanionRoomViewportClass.PortraitExpanded -> 18.dp
+        CompanionRoomViewportClass.PortraitExpanded -> 106.dp
+    }
+}
+
+private fun mascotGroundOffsetYForViewport(
+    viewportClass: CompanionRoomViewportClass,
+    mascotState: MascotState,
+): Dp {
+    if (viewportClass != CompanionRoomViewportClass.PortraitExpanded) {
+        return 0.dp
+    }
+
+    return when (mascotState) {
+        MascotState.Speaking -> 0.dp
+        MascotState.Listening,
+        MascotState.Thinking,
+        MascotState.PreparingSpeech,
+        MascotState.CoCreate,
+        MascotState.Paused,
+        MascotState.Retry -> 38.dp
+        MascotState.ImageViewing -> 66.dp
+        MascotState.Idle,
+        MascotState.WaitingSoft -> 82.dp
     }
 }
 
@@ -202,7 +229,7 @@ private fun mascotVisualScaleMultiplier(viewportClass: CompanionRoomViewportClas
         CompanionRoomViewportClass.LandscapeTablet -> 1.16f
         CompanionRoomViewportClass.LandscapeSquare -> 1.08f
         CompanionRoomViewportClass.Portrait -> 1.18f
-        CompanionRoomViewportClass.PortraitExpanded -> 1.10f
+        CompanionRoomViewportClass.PortraitExpanded -> 1.02f
     }
 }
 
@@ -212,7 +239,7 @@ private fun mascotStateBubbleOffset(viewportClass: CompanionRoomViewportClass): 
         CompanionRoomViewportClass.LandscapeTablet -> MascotBubbleOffset(x = (-28).dp, y = (-78).dp)
         CompanionRoomViewportClass.LandscapeSquare -> MascotBubbleOffset(x = (-20).dp, y = (-68).dp)
         CompanionRoomViewportClass.Portrait -> MascotBubbleOffset(x = (-20).dp, y = (-72).dp)
-        CompanionRoomViewportClass.PortraitExpanded -> MascotBubbleOffset(x = (-24).dp, y = (-78).dp)
+        CompanionRoomViewportClass.PortraitExpanded -> MascotBubbleOffset(x = (-24).dp, y = (-16).dp)
     }
 }
 

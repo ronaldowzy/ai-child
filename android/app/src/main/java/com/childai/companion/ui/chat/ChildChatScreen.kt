@@ -441,26 +441,9 @@ private fun ChatMessageListWithPreviews(
         }
     }
     if (visibleMessages.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "小白狐在这里。",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "想说的时候再说。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                )
-            }
-        }
+        // Empty state: stage bubble already shows status text,
+        // so just leave a minimal spacer to maintain layout structure.
+        Box(modifier = modifier.fillMaxWidth())
     } else {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
@@ -492,7 +475,7 @@ private fun ChatMessageBubbleWithPreview(
 ) {
     val isChild = message.author == MessageAuthor.Child
     val bubbleColor = if (isChild) {
-        MaterialTheme.colorScheme.primary
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
@@ -502,6 +485,7 @@ private fun ChatMessageBubbleWithPreview(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
     val alignment = if (isChild) Alignment.CenterEnd else Alignment.CenterStart
+    val bubbleWidth = if (isChild) 0.70f else 0.82f
 
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -509,16 +493,19 @@ private fun ChatMessageBubbleWithPreview(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.82f)
+                .fillMaxWidth(bubbleWidth)
                 .clip(RoundedCornerShape(8.dp))
                 .background(bubbleColor)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(
+                    horizontal = if (isChild) 12.dp else 16.dp,
+                    vertical = if (isChild) 8.dp else 12.dp,
+                ),
         ) {
             Text(
                 text = if (isChild) "我" else "小白狐",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor.copy(alpha = 0.78f),
+                style = if (isChild) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                fontWeight = if (isChild) FontWeight.Normal else FontWeight.SemiBold,
+                color = textColor.copy(alpha = if (isChild) 0.6f else 0.78f),
             )
             imagePreview?.let { preview ->
                 LocalImagePreviewCard(
@@ -731,14 +718,14 @@ internal data class CompanionLayoutWeights(
 
 internal fun companionLayoutWeights(isLandscape: Boolean): CompanionLayoutWeights {
     return if (isLandscape) {
-        CompanionLayoutWeights(agent = 0.55f, conversation = 0.45f)
+        CompanionLayoutWeights(agent = 0.60f, conversation = 0.40f)
     } else {
-        CompanionLayoutWeights(agent = 0.58f, conversation = 0.42f)
+        CompanionLayoutWeights(agent = 0.62f, conversation = 0.38f)
     }
 }
 
 internal fun companionRecentMessageLimit(isLandscape: Boolean): Int {
-    return if (isLandscape) 3 else 2
+    return if (isLandscape) 2 else 1
 }
 
 internal fun companionVisibleMessages(

@@ -88,8 +88,8 @@ class AgentReplyCarouselTest {
         val portraitMessages = companionVisibleMessages(messages, companionRecentMessageLimit(false))
         val landscapeMessages = companionVisibleMessages(messages, companionRecentMessageLimit(true))
 
-        assertEquals(listOf("m4", "m5"), portraitMessages.map { it.id })
-        assertEquals(listOf("m3", "m4", "m5"), landscapeMessages.map { it.id })
+        assertEquals(listOf("m5"), portraitMessages.map { it.id })
+        assertEquals(listOf("m4", "m5"), landscapeMessages.map { it.id })
     }
 
     @Test

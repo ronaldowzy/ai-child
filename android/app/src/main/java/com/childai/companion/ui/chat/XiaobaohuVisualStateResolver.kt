@@ -141,8 +141,8 @@ object XiaobaohuVisualStateResolver {
             XiaobaohuBoundaryOverlay.HomeworkFocus -> MascotState.Thinking
             XiaobaohuBoundaryOverlay.None -> when (baseAttention) {
                 XiaobaohuBaseAttentionState.Speaking -> MascotState.Speaking
-                XiaobaohuBaseAttentionState.Thinking,
-                XiaobaohuBaseAttentionState.LookingAtImage -> MascotState.Thinking
+                XiaobaohuBaseAttentionState.Thinking -> MascotState.Thinking
+                XiaobaohuBaseAttentionState.LookingAtImage -> MascotState.ImageViewing
                 XiaobaohuBaseAttentionState.Listening -> MascotState.Listening
                 XiaobaohuBaseAttentionState.Resting -> MascotState.WaitingSoft
                 XiaobaohuBaseAttentionState.Idle -> when (emotionalOverlay) {
@@ -163,7 +163,7 @@ object XiaobaohuVisualStateResolver {
     ): String {
         return when {
             baseAttention == XiaobaohuBaseAttentionState.LookingAtImage &&
-                mascotState == MascotState.Thinking -> "looking_at_image_uses_thinking_asset"
+                mascotState == MascotState.ImageViewing -> "looking_at_image"
             emotionalOverlay == XiaobaohuEmotionalOverlay.Sleepy &&
                 mascotState == MascotState.Paused -> "bedtime_paused_state"
             emotionalOverlay == XiaobaohuEmotionalOverlay.Encouraging &&
@@ -215,7 +215,7 @@ object XiaobaohuVisualStateResolver {
             ChildTurnUiPhase.Thinking -> "thinking"
             ChildTurnUiPhase.SpeakingPending -> "speaking_pending"
             ChildTurnUiPhase.Speaking -> "speaking"
-            ChildTurnUiPhase.ImageProcessing -> "looking_at_image_uses_thinking_asset"
+            ChildTurnUiPhase.ImageProcessing -> "looking_at_image"
             ChildTurnUiPhase.NeedsRetry -> "needs_retry_uses_listening_asset"
             ChildTurnUiPhase.PermissionNeeded -> "permission_needed_uses_safety_concern"
             ChildTurnUiPhase.Resting -> "resting_uses_calm_asset"

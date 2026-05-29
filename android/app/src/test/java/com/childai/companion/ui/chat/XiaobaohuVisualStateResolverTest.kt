@@ -86,9 +86,9 @@ class XiaobaohuVisualStateResolverTest {
                 baseAttention = XiaobaohuBaseAttentionState.LookingAtImage,
                 emotionalOverlay = XiaobaohuEmotionalOverlay.Curious,
                 boundaryOverlay = XiaobaohuBoundaryOverlay.None,
-                mascotState = MascotState.Thinking,
-                minHoldMs = XiaobaohuVisualStateResolver.THINKING_MIN_HOLD_MS,
-                reason = "looking_at_image_uses_thinking_asset",
+                mascotState = MascotState.ImageViewing,
+                minHoldMs = 0L,
+                reason = "looking_at_image",
             ),
             VisualStateCase(
                 name = "PermissionNeeded",

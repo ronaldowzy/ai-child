@@ -561,8 +561,8 @@ private fun LocalImagePreviewCard(
                 color = contentColor.copy(alpha = 0.18f),
                 shape = RoundedCornerShape(8.dp),
             )
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (previewBitmap != null) {
             Image(
@@ -571,7 +571,7 @@ private fun LocalImagePreviewCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp)
+                    .height(80.dp)
                     .clip(RoundedCornerShape(6.dp)),
             )
         }
@@ -612,7 +612,7 @@ private fun LocalImagePreviewCard(
 internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): String {
     return when (status) {
         LocalImagePreviewStatus.Uploading -> "正在给小白狐看看"
-        LocalImagePreviewStatus.Sent -> "已经给小白狐看啦"
+        LocalImagePreviewStatus.Sent -> "小白狐正在看"
         LocalImagePreviewStatus.Failed -> "这张图还没给小白狐看到"
     }
 }

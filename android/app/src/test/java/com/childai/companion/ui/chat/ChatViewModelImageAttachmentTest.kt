@@ -49,7 +49,7 @@ class ChatViewModelImageAttachmentTest {
             viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id).status,
         )
         assertEquals(
-            "已经给小白狐看啦",
+            "小白狐正在看",
             localImagePreviewStatusText(
                 viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id).status,
             ),

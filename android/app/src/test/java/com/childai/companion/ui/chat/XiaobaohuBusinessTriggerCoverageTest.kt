@@ -64,8 +64,8 @@ class XiaobaohuBusinessTriggerCoverageTest {
             name = "ImageProcessing -> looking_at_image using thinking asset",
             phase = ChildTurnUiPhase.ImageProcessing,
             expectedBase = XiaobaohuBaseAttentionState.LookingAtImage,
-            expectedMascot = MascotState.Thinking,
-            expectedReason = "looking_at_image_uses_thinking_asset",
+            expectedMascot = MascotState.ImageViewing,
+            expectedReason = "looking_at_image",
         )
     }
 

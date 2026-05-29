@@ -183,8 +183,8 @@ def _run(request: AgentRuntimeRequest) -> tuple:
 # --- Fast path enabled cases ---
 
 def test_fast_path_enabled_for_running_chat() -> None:
-    # "跑" is in _IMAGINATIVE_MARKERS, so use text without imaginative markers
-    result, _ = _run(_request(child_text="我一会要去打球了。"))
+    """普通跑步聊天应走 fast path，不被轻共创误拦截。"""
+    result, _ = _run(_request(child_text="我一会要去跑步了。"))
     assert result.fast_path_used is True
     assert result.fast_path_reason == "low_risk_open_chat"
     assert result.fast_path_blocked_reason is None
@@ -192,8 +192,8 @@ def test_fast_path_enabled_for_running_chat() -> None:
 
 
 def test_fast_path_enabled_for_jump_rope() -> None:
-    # "跳" is in _IMAGINATIVE_MARKERS, use non-triggering text
-    result, _ = _run(_request(child_text="一块做运动了，做了很多。"))
+    """跳绳是普通运动，不应触发轻共创，应走 fast path。"""
+    result, _ = _run(_request(child_text="一块跳绳了，我们跳了很多。"))
     assert result.fast_path_used is True
     assert result.prompt_template_mode == "fast"
 
@@ -396,3 +396,43 @@ def test_fast_path_blocked_for_co_creation_type_in_metadata() -> None:
     ))
     assert result.fast_path_used is False
     assert result.fast_path_blocked_reason == "co_creation_active"
+
+
+def test_fast_path_enabled_for_playing_ball() -> None:
+    """打球是普通运动，应走 fast path。"""
+    result, _ = _run(_request(child_text="我一会要去打球了。"))
+    assert result.fast_path_used is True
+    assert result.prompt_template_mode == "fast"
+
+
+def test_co_creation_triggered_for_story_with_character() -> None:
+    """小兔跳到月亮上：角色+场景+运动词，可触发轻共创。"""
+    from app.services.light_co_creation_service import LightCoCreationService
+    svc = LightCoCreationService()
+    decision = svc.should_trigger_story_chain(
+        session_id="test_co_creation",
+        child_text="小兔跳到月亮上。",
+    )
+    assert decision.should_trigger is True
+
+
+def test_co_creation_not_triggered_for_running() -> None:
+    """普通跑步不应触发轻共创。"""
+    from app.services.light_co_creation_service import LightCoCreationService
+    svc = LightCoCreationService()
+    decision = svc.should_trigger_story_chain(
+        session_id="test_co_creation_running",
+        child_text="我一会要去跑步了。",
+    )
+    assert decision.should_trigger is False
+
+
+def test_co_creation_not_triggered_for_jump_rope() -> None:
+    """普通跳绳不应触发轻共创。"""
+    from app.services.light_co_creation_service import LightCoCreationService
+    svc = LightCoCreationService()
+    decision = svc.should_trigger_story_chain(
+        session_id="test_co_creation_jump_rope",
+        child_text="一块跳绳了，我们跳了很多。",
+    )
+    assert decision.should_trigger is False

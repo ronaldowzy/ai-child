@@ -119,17 +119,33 @@ class LightCoCreationService:
         "privacy_sensitive",
     }
 
-    # Markers indicating imaginative, light, continuation-friendly content
-    _IMAGINATIVE_MARKERS = (
+    # Strong imagination signals: characters, story triggers, fantasy settings.
+    # These alone are enough to suggest co-creation.
+    _STRONG_IMAGINATION_MARKERS = (
         "小熊", "小猫", "小狗", "小兔", "恐龙", "机器人", "外星人",
         "公主", "王子", "超人", "奥特曼", "怪兽", "精灵", "魔法",
-        "飞", "跑", "跳", "游", "爬", "冒险", "探险",
+        "冒险", "探险",
         "森林", "海洋", "太空", "月亮", "星球", "城堡",
-        "画", "故事", "编", "想象", "如果", "要是",
-        "玩具", "积木", "泥塑", "折纸", "手工",
-        "云朵", "星星", "彩虹", "花", "树", "山",
+        "故事", "编", "想象", "如果", "要是",
+        "云朵", "星星", "彩虹",
         "小车", "小船", "飞机", "火箭",
     )
+
+    # Weak movement words: common in everyday speech (跑步, 跳绳, 打球).
+    # Only trigger co-creation when combined with a character or story context.
+    _WEAK_MOVEMENT_MARKERS = (
+        "飞", "跑", "跳", "游", "爬",
+    )
+
+    # Character/context markers that make movement words imaginative.
+    _CHARACTER_MARKERS = (
+        "小熊", "小猫", "小狗", "小兔", "恐龙", "机器人", "外星人",
+        "公主", "王子", "超人", "奥特曼", "怪兽", "精灵",
+        "城堡", "星球", "月亮", "太空", "森林", "海洋",
+    )
+
+    # Combined set for backward compatibility (used by _is_imaginative_content)
+    _IMAGINATIVE_MARKERS = _STRONG_IMAGINATION_MARKERS
 
     # Low interest short reply markers
     _LOW_INTEREST_MARKERS = (
@@ -421,8 +437,20 @@ class LightCoCreationService:
         return True
 
     def _is_imaginative_content(self, normalized: str) -> bool:
-        """Check if content is imaginative and suitable for story chain."""
-        return any(marker in normalized for marker in self._IMAGINATIVE_MARKERS)
+        """Check if content is imaginative and suitable for story chain.
+
+        Strong imagination markers (characters, story triggers, fantasy settings)
+        alone are sufficient. Weak movement words (飞/跑/跳/游/爬) only trigger
+        when combined with a character or story context, to avoid false positives
+        on everyday speech like "跑步" or "跳绳".
+        """
+        # Strong markers alone are enough
+        if any(marker in normalized for marker in self._STRONG_IMAGINATION_MARKERS):
+            return True
+        # Weak movement words require a character/context marker
+        has_movement = any(m in normalized for m in self._WEAK_MOVEMENT_MARKERS)
+        has_character = any(m in normalized for m in self._CHARACTER_MARKERS)
+        return has_movement and has_character
 
     def _is_creative_image(self, image_type: str) -> bool:
         """Check if image type is creative and suitable for co-creation."""

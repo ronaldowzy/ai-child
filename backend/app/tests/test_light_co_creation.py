@@ -53,9 +53,11 @@ class TestStoryChainTriggering:
 
     def test_short_content_no_trigger(self, service: LightCoCreationService):
         """Test that very short content does not trigger story chain."""
+        # "飞" alone is a weak movement marker without character context,
+        # so it's not imaginative. Use a strong marker that's too short instead.
         decision = service.should_trigger_story_chain(
             session_id="test_session",
-            child_text="飞",
+            child_text="恐龙",
         )
         assert decision.should_trigger is False
         assert decision.reason == "content_too_short"

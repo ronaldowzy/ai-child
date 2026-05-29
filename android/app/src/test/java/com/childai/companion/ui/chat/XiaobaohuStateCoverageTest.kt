@@ -71,21 +71,21 @@ class XiaobaohuStateCoverageTest {
                 phase = ChildTurnUiPhase.PermissionNeeded,
                 expectedMood = FoxMood.SafetyConcern,
                 expectedMotion = FoxMotion.ConcernedStill,
-                expectedMascot = MascotState.SafetyConcern,
+                expectedMascot = MascotState.Paused,
             ),
             PhaseCoverageCase(
                 name = "Resting",
                 phase = ChildTurnUiPhase.Resting,
                 expectedMood = FoxMood.Calm,
                 expectedMotion = FoxMotion.CalmStill,
-                expectedMascot = MascotState.Calm,
+                expectedMascot = MascotState.Idle,
             ),
             PhaseCoverageCase(
                 name = "ServiceError",
                 phase = ChildTurnUiPhase.ServiceError,
                 expectedMood = FoxMood.NetworkError,
                 expectedMotion = FoxMotion.NetworkError,
-                expectedMascot = MascotState.NetworkError,
+                expectedMascot = MascotState.Retry,
             ),
         )
 
@@ -117,7 +117,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.PrivacyBoundary,
                     motion = FoxMotion.SteadyBoundary,
                 ),
-                expectedMascot = MascotState.PrivacyBoundary,
+                expectedMascot = MascotState.Paused,
             ),
             SceneCoverageCase(
                 name = "SafetyConcern",
@@ -125,7 +125,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.SafetyConcern,
                     motion = FoxMotion.ConcernedStill,
                 ),
-                expectedMascot = MascotState.SafetyConcern,
+                expectedMascot = MascotState.Paused,
             ),
             SceneCoverageCase(
                 name = "HomeworkFocus",
@@ -133,7 +133,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.HomeworkFocus,
                     motion = FoxMotion.HomeworkFocus,
                 ),
-                expectedMascot = MascotState.HomeworkFocus,
+                expectedMascot = MascotState.Thinking,
             ),
             SceneCoverageCase(
                 name = "NetworkError",
@@ -141,7 +141,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
                 ),
-                expectedMascot = MascotState.NetworkError,
+                expectedMascot = MascotState.Retry,
             ),
             SceneCoverageCase(
                 name = "BedtimeSleepy",
@@ -149,7 +149,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.Sleepy,
                     motion = FoxMotion.SleepyBlink,
                 ),
-                expectedMascot = MascotState.Sleepy,
+                expectedMascot = MascotState.Paused,
             ),
             SceneCoverageCase(
                 name = "EncouragingHappy",
@@ -157,7 +157,7 @@ class XiaobaohuStateCoverageTest {
                     mood = FoxMood.Encouraging,
                     motion = FoxMotion.CelebrateSmall,
                 ),
-                expectedMascot = MascotState.JumpingHappy,
+                expectedMascot = MascotState.CoCreate,
             ),
         )
 
@@ -177,9 +177,9 @@ class XiaobaohuStateCoverageTest {
         assertEquals(MascotState.Idle, controller.stateFor(FoxAgentUiState()))
         assertEquals(MascotState.Idle, MascotState.fromId("missing_state"))
         assertEquals(
-            MascotState.JumpingHappy,
+            MascotState.CoCreate,
             controller.stateAfterCompletion(
-                completed = MascotState.JumpingHappy,
+                completed = MascotState.CoCreate,
                 baseState = MascotState.Idle,
             ),
         )

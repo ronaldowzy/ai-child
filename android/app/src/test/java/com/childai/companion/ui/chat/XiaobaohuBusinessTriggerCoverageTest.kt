@@ -73,7 +73,7 @@ class XiaobaohuBusinessTriggerCoverageTest {
     fun boundaryAndFailureBusinessTriggersResolveToHighPriorityOverlays() {
         val permissionNeeded = XiaobaohuVisualStateResolver.resolve(ChildTurnUiPhase.PermissionNeeded)
         assertEquals(XiaobaohuBoundaryOverlay.SafetyConcern, permissionNeeded.boundaryOverlay)
-        assertEquals(MascotState.SafetyConcern, permissionNeeded.mascotState)
+        assertEquals(MascotState.Paused, permissionNeeded.mascotState)
         assertEquals(
             XiaobaohuVisualStateResolver.SAFETY_CONCERN_MIN_HOLD_MS,
             permissionNeeded.minHoldMs,
@@ -81,7 +81,7 @@ class XiaobaohuBusinessTriggerCoverageTest {
 
         val serviceError = XiaobaohuVisualStateResolver.resolve(ChildTurnUiPhase.ServiceError)
         assertEquals(XiaobaohuBoundaryOverlay.NetworkError, serviceError.boundaryOverlay)
-        assertEquals(MascotState.NetworkError, serviceError.mascotState)
+        assertEquals(MascotState.Retry, serviceError.mascotState)
         assertEquals(
             XiaobaohuVisualStateResolver.NETWORK_ERROR_MIN_HOLD_MS,
             serviceError.minHoldMs,
@@ -98,7 +98,7 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "backend_privacy_signal",
         )
         assertEquals(XiaobaohuBoundaryOverlay.PrivacyBoundary, privacy.boundaryOverlay)
-        assertEquals(MascotState.PrivacyBoundary, privacy.mascotState)
+        assertEquals(MascotState.Paused, privacy.mascotState)
         assertEquals("backend_privacy_signal", privacy.reason)
 
         val homework = XiaobaohuVisualStateResolver.resolve(
@@ -109,7 +109,7 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "backend_homework_signal",
         )
         assertEquals(XiaobaohuBoundaryOverlay.HomeworkFocus, homework.boundaryOverlay)
-        assertEquals(MascotState.HomeworkFocus, homework.mascotState)
+        assertEquals(MascotState.Thinking, homework.mascotState)
         assertEquals("backend_homework_signal", homework.reason)
 
         val safety = XiaobaohuVisualStateResolver.resolve(
@@ -120,7 +120,7 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "backend_safety_signal",
         )
         assertEquals(XiaobaohuBoundaryOverlay.SafetyConcern, safety.boundaryOverlay)
-        assertEquals(MascotState.SafetyConcern, safety.mascotState)
+        assertEquals(MascotState.Paused, safety.mascotState)
         assertEquals("backend_safety_signal", safety.reason)
     }
 
@@ -134,8 +134,8 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "generic_encouragement_signal",
         )
         assertEquals(XiaobaohuEmotionalOverlay.Encouraging, encouraging.emotionalOverlay)
-        assertEquals(MascotState.JumpingHappy, encouraging.mascotState)
-        assertEquals("encouraging_happy_state", encouraging.reason)
+        assertEquals(MascotState.CoCreate, encouraging.mascotState)
+        assertEquals("encouraging_co_create_state", encouraging.reason)
 
         val sleepy = XiaobaohuVisualStateResolver.resolve(
             agent = FoxAgentUiState(
@@ -145,8 +145,8 @@ class XiaobaohuBusinessTriggerCoverageTest {
             reason = "generic_sleepy_signal",
         )
         assertEquals(XiaobaohuEmotionalOverlay.Sleepy, sleepy.emotionalOverlay)
-        assertEquals(MascotState.Sleepy, sleepy.mascotState)
-        assertEquals("bedtime_sleepy_state", sleepy.reason)
+        assertEquals(MascotState.Paused, sleepy.mascotState)
+        assertEquals("bedtime_paused_state", sleepy.reason)
     }
 
     private fun assertBusinessTrigger(

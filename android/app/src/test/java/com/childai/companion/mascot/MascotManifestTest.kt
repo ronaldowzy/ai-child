@@ -12,11 +12,11 @@ class MascotManifestTest {
 
         assertEquals("Little White Fox", manifest.mascot)
         assertEquals(MascotState.Idle, manifest.defaultState)
-        assertEquals(11, manifest.states.size)
+        assertEquals(10, manifest.states.size)
         assertTrue(manifest.states.containsKey(MascotState.Speaking))
-        assertTrue(manifest.states.containsKey(MascotState.NetworkError))
+        assertTrue(manifest.states.containsKey(MascotState.Retry))
         assertEquals(12, manifest.defaultFps)
-        assertEquals("0.1.1-runtime-webp", manifest.assetPackageVersion)
+        assertEquals("0.2.0-v2-full", manifest.assetPackageVersion)
     }
 
     @Test
@@ -25,30 +25,30 @@ class MascotManifestTest {
         val spec = manifest.states.getValue(MascotState.Speaking)
 
         val paths = AssetManifestLoader.buildFramePaths(
-            rootPath = "mascot/xiaobaohu/v1/",
+            rootPath = "mascot/xiaobaohu/v2/",
             statePath = spec.path,
             framePattern = spec.framePattern,
             frameCount = spec.frameCount,
         )
 
-        assertEquals(24, paths.size)
+        assertEquals(48, paths.size)
         assertEquals(
-            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames_webp/fox_speaking_0001.webp",
+            "mascot/xiaobaohu/v2/speaking/v2.0.0/frames_webp/fox_speaking_0001.webp",
             paths.first(),
         )
         assertEquals(
-            "mascot/xiaobaohu/v1/speaking/v0.1.0/frames_webp/fox_speaking_0024.webp",
+            "mascot/xiaobaohu/v2/speaking/v2.0.0/frames_webp/fox_speaking_0048.webp",
             paths.last(),
         )
         assertEquals(512, spec.width)
-        assertEquals(341, spec.height)
+        assertEquals(512, spec.height)
     }
 
     @Test
     fun runtimeAssetsUseWebpFramesOnly() {
         val files = TEST_ASSET_ROOT.walkTopDown().filter { it.isFile }.toList()
 
-        assertEquals(264, files.count { it.extension == "webp" })
+        assertEquals(480, files.count { it.extension == "webp" })
         assertEquals(0, files.count { it.extension == "png" })
         assertTrue(files.none { it.path.contains("/frames/") })
         assertTrue(files.all { !it.name.endsWith(".gif") && !it.name.endsWith(".html") })
@@ -63,19 +63,15 @@ class MascotManifestTest {
     }
 
     @Test
-    fun statePriorityKeepsSafetyAboveSpeaking() {
+    fun statePriorityKeepsRetryAbovePaused() {
         val manifest = parseTestManifest()
 
         assertTrue(
-            MascotStatePriority.rank(MascotState.SafetyConcern, manifest) <
-                MascotStatePriority.rank(MascotState.PrivacyBoundary, manifest),
+            MascotStatePriority.rank(MascotState.Retry, manifest) <
+                MascotStatePriority.rank(MascotState.Paused, manifest),
         )
         assertTrue(
-            MascotStatePriority.rank(MascotState.PrivacyBoundary, manifest) <
-                MascotStatePriority.rank(MascotState.NetworkError, manifest),
-        )
-        assertTrue(
-            MascotStatePriority.rank(MascotState.NetworkError, manifest) <
+            MascotStatePriority.rank(MascotState.Paused, manifest) <
                 MascotStatePriority.rank(MascotState.Speaking, manifest),
         )
         assertTrue(
@@ -85,14 +81,14 @@ class MascotManifestTest {
     }
 
     @Test
-    fun controllerKeepsPrivacyBoundaryAboveSpeaking() {
+    fun controllerKeepsPausedAboveSpeaking() {
         val controller = MascotController(parseTestManifest())
 
         assertEquals(
-            MascotState.PrivacyBoundary,
-            controller.higherPriority(MascotState.Speaking, MascotState.PrivacyBoundary),
+            MascotState.Paused,
+            controller.higherPriority(MascotState.Speaking, MascotState.Paused),
         )
-        assertTrue(controller.shouldReplace(MascotState.Speaking, MascotState.PrivacyBoundary))
+        assertTrue(controller.shouldReplace(MascotState.Speaking, MascotState.Paused))
     }
 
     @Test
@@ -102,7 +98,7 @@ class MascotManifestTest {
         assertEquals(
             MascotState.Idle,
             controller.stateAfterCompletion(
-                completed = MascotState.JumpingHappy,
+                completed = MascotState.CoCreate,
                 baseState = MascotState.Idle,
             ),
         )
@@ -120,7 +116,7 @@ class MascotManifestTest {
     }
 
     private companion object {
-        val TEST_ASSET_ROOT = File("src/main/assets/mascot/xiaobaohu/v1")
+        val TEST_ASSET_ROOT = File("src/main/assets/mascot/xiaobaohu/v2")
         val STATIC_FALLBACK_ROOT = File("src/main/res/drawable-nodpi")
     }
 }

@@ -63,16 +63,15 @@ object XiaobaohuVisualStateResolver {
      * Neither is wired into reward, streak, or retention paths.
      */
     val mascotStatePrecedence: List<MascotState> = listOf(
-        MascotState.NetworkError,
-        MascotState.SafetyConcern,
-        MascotState.PrivacyBoundary,
-        MascotState.HomeworkFocus,
-        MascotState.Speaking,
-        MascotState.JumpingHappy,
-        MascotState.Thinking,
+        MascotState.Retry,
+        MascotState.Paused,
         MascotState.Listening,
-        MascotState.Calm,
-        MascotState.Sleepy,
+        MascotState.Speaking,
+        MascotState.PreparingSpeech,
+        MascotState.Thinking,
+        MascotState.ImageViewing,
+        MascotState.CoCreate,
+        MascotState.WaitingSoft,
         MascotState.Idle,
     )
 
@@ -136,20 +135,20 @@ object XiaobaohuVisualStateResolver {
         boundaryOverlay: XiaobaohuBoundaryOverlay,
     ): MascotState {
         return when (boundaryOverlay) {
-            XiaobaohuBoundaryOverlay.NetworkError -> MascotState.NetworkError
-            XiaobaohuBoundaryOverlay.SafetyConcern -> MascotState.SafetyConcern
-            XiaobaohuBoundaryOverlay.PrivacyBoundary -> MascotState.PrivacyBoundary
-            XiaobaohuBoundaryOverlay.HomeworkFocus -> MascotState.HomeworkFocus
+            XiaobaohuBoundaryOverlay.NetworkError -> MascotState.Retry
+            XiaobaohuBoundaryOverlay.SafetyConcern -> MascotState.Paused
+            XiaobaohuBoundaryOverlay.PrivacyBoundary -> MascotState.Paused
+            XiaobaohuBoundaryOverlay.HomeworkFocus -> MascotState.Thinking
             XiaobaohuBoundaryOverlay.None -> when (baseAttention) {
                 XiaobaohuBaseAttentionState.Speaking -> MascotState.Speaking
                 XiaobaohuBaseAttentionState.Thinking,
                 XiaobaohuBaseAttentionState.LookingAtImage -> MascotState.Thinking
                 XiaobaohuBaseAttentionState.Listening -> MascotState.Listening
-                XiaobaohuBaseAttentionState.Resting -> MascotState.Calm
+                XiaobaohuBaseAttentionState.Resting -> MascotState.WaitingSoft
                 XiaobaohuBaseAttentionState.Idle -> when (emotionalOverlay) {
-                    XiaobaohuEmotionalOverlay.Sleepy -> MascotState.Sleepy
-                    XiaobaohuEmotionalOverlay.Encouraging -> MascotState.JumpingHappy
-                    XiaobaohuEmotionalOverlay.Calm -> MascotState.Calm
+                    XiaobaohuEmotionalOverlay.Sleepy -> MascotState.Paused
+                    XiaobaohuEmotionalOverlay.Encouraging -> MascotState.CoCreate
+                    XiaobaohuEmotionalOverlay.Calm -> MascotState.Idle
                     else -> MascotState.Idle
                 }
             }
@@ -166,30 +165,25 @@ object XiaobaohuVisualStateResolver {
             baseAttention == XiaobaohuBaseAttentionState.LookingAtImage &&
                 mascotState == MascotState.Thinking -> "looking_at_image_uses_thinking_asset"
             emotionalOverlay == XiaobaohuEmotionalOverlay.Sleepy &&
-                mascotState == MascotState.Sleepy -> "bedtime_sleepy_state"
+                mascotState == MascotState.Paused -> "bedtime_paused_state"
             emotionalOverlay == XiaobaohuEmotionalOverlay.Encouraging &&
-                mascotState == MascotState.JumpingHappy -> "encouraging_happy_state"
+                mascotState == MascotState.CoCreate -> "encouraging_co_create_state"
             else -> requestedReason
         }
     }
 
     private fun MascotState.minHoldMs(baseAttention: XiaobaohuBaseAttentionState): Long {
         return when (this) {
-            MascotState.NetworkError -> NETWORK_ERROR_MIN_HOLD_MS
-            MascotState.SafetyConcern -> SAFETY_CONCERN_MIN_HOLD_MS
-            MascotState.PrivacyBoundary -> PRIVACY_BOUNDARY_MIN_HOLD_MS
-            MascotState.HomeworkFocus -> HOMEWORK_FOCUS_MIN_HOLD_MS
+            MascotState.Retry -> NETWORK_ERROR_MIN_HOLD_MS
+            MascotState.Paused -> SAFETY_CONCERN_MIN_HOLD_MS
             MascotState.Thinking -> THINKING_MIN_HOLD_MS
-            MascotState.Calm -> if (baseAttention == XiaobaohuBaseAttentionState.Resting) {
-                RESTING_MIN_HOLD_MS
-            } else {
-                0L
-            }
-            MascotState.Sleepy -> RESTING_MIN_HOLD_MS
+            MascotState.WaitingSoft -> RESTING_MIN_HOLD_MS
             MascotState.Speaking,
             MascotState.Listening,
             MascotState.Idle,
-            MascotState.JumpingHappy -> 0L
+            MascotState.CoCreate,
+            MascotState.PreparingSpeech,
+            MascotState.ImageViewing -> 0L
         }
     }
 

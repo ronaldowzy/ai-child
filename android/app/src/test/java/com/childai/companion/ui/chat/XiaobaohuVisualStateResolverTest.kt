@@ -96,7 +96,7 @@ class XiaobaohuVisualStateResolverTest {
                 baseAttention = XiaobaohuBaseAttentionState.Idle,
                 emotionalOverlay = XiaobaohuEmotionalOverlay.Concerned,
                 boundaryOverlay = XiaobaohuBoundaryOverlay.SafetyConcern,
-                mascotState = MascotState.SafetyConcern,
+                mascotState = MascotState.Paused,
                 minHoldMs = XiaobaohuVisualStateResolver.SAFETY_CONCERN_MIN_HOLD_MS,
                 reason = "permission_needed_uses_safety_concern",
             ),
@@ -106,7 +106,7 @@ class XiaobaohuVisualStateResolverTest {
                 baseAttention = XiaobaohuBaseAttentionState.Idle,
                 emotionalOverlay = XiaobaohuEmotionalOverlay.Concerned,
                 boundaryOverlay = XiaobaohuBoundaryOverlay.NetworkError,
-                mascotState = MascotState.NetworkError,
+                mascotState = MascotState.Retry,
                 minHoldMs = XiaobaohuVisualStateResolver.NETWORK_ERROR_MIN_HOLD_MS,
                 reason = "service_error_network_error",
             ),
@@ -116,7 +116,7 @@ class XiaobaohuVisualStateResolverTest {
                 baseAttention = XiaobaohuBaseAttentionState.Resting,
                 emotionalOverlay = XiaobaohuEmotionalOverlay.Calm,
                 boundaryOverlay = XiaobaohuBoundaryOverlay.None,
-                mascotState = MascotState.Calm,
+                mascotState = MascotState.WaitingSoft,
                 minHoldMs = XiaobaohuVisualStateResolver.RESTING_MIN_HOLD_MS,
                 reason = "resting_uses_calm_asset",
             ),
@@ -137,7 +137,7 @@ class XiaobaohuVisualStateResolverTest {
     @Test
     fun backendSignalsResolveToBoundaryOverlaysWithExplicitPrecedence() {
         assertEquals(
-            MascotState.PrivacyBoundary,
+            MascotState.Paused,
             XiaobaohuVisualStateResolver.resolve(
                 FoxAgentUiState(
                     mood = FoxMood.PrivacyBoundary,
@@ -146,7 +146,7 @@ class XiaobaohuVisualStateResolverTest {
             ).mascotState,
         )
         assertEquals(
-            MascotState.HomeworkFocus,
+            MascotState.Thinking,
             XiaobaohuVisualStateResolver.resolve(
                 FoxAgentUiState(
                     mood = FoxMood.HomeworkFocus,
@@ -155,7 +155,7 @@ class XiaobaohuVisualStateResolverTest {
             ).mascotState,
         )
         assertEquals(
-            MascotState.SafetyConcern,
+            MascotState.Paused,
             XiaobaohuVisualStateResolver.resolve(
                 FoxAgentUiState(
                     mood = FoxMood.SafetyConcern,
@@ -171,7 +171,7 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuBoundaryOverlay.NetworkError, networkBeatsSafety.boundaryOverlay)
-        assertEquals(MascotState.NetworkError, networkBeatsSafety.mascotState)
+        assertEquals(MascotState.Retry, networkBeatsSafety.mascotState)
         assertEquals(
             XiaobaohuVisualStateResolver.NETWORK_ERROR_MIN_HOLD_MS,
             networkBeatsSafety.minHoldMs,
@@ -184,29 +184,28 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuBoundaryOverlay.HomeworkFocus, homeworkBeatsSpeaking.boundaryOverlay)
-        assertEquals(MascotState.HomeworkFocus, homeworkBeatsSpeaking.mascotState)
+        assertEquals(MascotState.Thinking, homeworkBeatsSpeaking.mascotState)
     }
 
     @Test
-    fun precedenceListIncludesSleepyAndJumpingHappy() {
+    fun precedenceListIncludesAllV2States() {
         assertEquals(
             listOf(
-                MascotState.NetworkError,
-                MascotState.SafetyConcern,
-                MascotState.PrivacyBoundary,
-                MascotState.HomeworkFocus,
-                MascotState.Speaking,
-                MascotState.JumpingHappy,
-                MascotState.Thinking,
+                MascotState.Retry,
+                MascotState.Paused,
                 MascotState.Listening,
-                MascotState.Calm,
-                MascotState.Sleepy,
+                MascotState.Speaking,
+                MascotState.PreparingSpeech,
+                MascotState.Thinking,
+                MascotState.ImageViewing,
+                MascotState.CoCreate,
+                MascotState.WaitingSoft,
                 MascotState.Idle,
             ),
             XiaobaohuVisualStateResolver.mascotStatePrecedence,
         )
-        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.Sleepy))
-        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.JumpingHappy))
+        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.Paused))
+        assertTrue(XiaobaohuVisualStateResolver.mascotStatePrecedence.contains(MascotState.CoCreate))
     }
 
     @Test
@@ -218,8 +217,8 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuEmotionalOverlay.Encouraging, encouraging.emotionalOverlay)
-        assertEquals(MascotState.JumpingHappy, encouraging.mascotState)
-        assertEquals("encouraging_happy_state", encouraging.reason)
+        assertEquals(MascotState.CoCreate, encouraging.mascotState)
+        assertEquals("encouraging_co_create_state", encouraging.reason)
     }
 
     @Test
@@ -231,9 +230,9 @@ class XiaobaohuVisualStateResolverTest {
             ),
         )
         assertEquals(XiaobaohuEmotionalOverlay.Sleepy, sleepy.emotionalOverlay)
-        assertEquals(MascotState.Sleepy, sleepy.mascotState)
-        assertEquals("bedtime_sleepy_state", sleepy.reason)
-        assertEquals(XiaobaohuVisualStateResolver.RESTING_MIN_HOLD_MS, sleepy.minHoldMs)
+        assertEquals(MascotState.Paused, sleepy.mascotState)
+        assertEquals("bedtime_paused_state", sleepy.reason)
+        assertEquals(XiaobaohuVisualStateResolver.SAFETY_CONCERN_MIN_HOLD_MS, sleepy.minHoldMs)
     }
 
     @Test

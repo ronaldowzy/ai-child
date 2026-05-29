@@ -66,7 +66,7 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `safety concern holds for min hold before returning to idle`() {
         val current = XiaobaohuDisplayedVisualState(
-            mascotState = MascotState.SafetyConcern,
+            mascotState = MascotState.Paused,
             displaySinceMs = 1000L,
             minHoldMs = 1500L,
         )
@@ -78,7 +78,7 @@ class XiaobaohuVisualStateRuntimeTest {
             requestedMinHoldMs = 0L,
             nowMs = 2000L,
         )
-        assertEquals(MascotState.SafetyConcern, tooEarly.mascotState)
+        assertEquals(MascotState.Paused, tooEarly.mascotState)
         assertEquals(MascotState.Idle, tooEarly.pendingState)
 
         // At 2500ms — exactly 1500ms elapsed, hold expired
@@ -96,7 +96,7 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `privacy boundary holds for min hold`() {
         val current = XiaobaohuDisplayedVisualState(
-            mascotState = MascotState.PrivacyBoundary,
+            mascotState = MascotState.Paused,
             displaySinceMs = 1000L,
             minHoldMs = 1200L,
         )
@@ -108,7 +108,7 @@ class XiaobaohuVisualStateRuntimeTest {
             requestedMinHoldMs = 0L,
             nowMs = 1800L,
         )
-        assertEquals(MascotState.PrivacyBoundary, tooEarly.mascotState)
+        assertEquals(MascotState.Paused, tooEarly.mascotState)
 
         // At 2200ms — 1200ms elapsed, hold expired
         val holdExpired = XiaobaohuVisualStateRuntime.reduce(
@@ -125,7 +125,7 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `network error holds for min hold`() {
         val current = XiaobaohuDisplayedVisualState(
-            mascotState = MascotState.NetworkError,
+            mascotState = MascotState.Retry,
             displaySinceMs = 1000L,
             minHoldMs = 1200L,
         )
@@ -137,7 +137,7 @@ class XiaobaohuVisualStateRuntimeTest {
             requestedMinHoldMs = 0L,
             nowMs = 1500L,
         )
-        assertEquals(MascotState.NetworkError, tooEarly.mascotState)
+        assertEquals(MascotState.Retry, tooEarly.mascotState)
 
         // At 2200ms — 1200ms elapsed, hold expired
         val holdExpired = XiaobaohuVisualStateRuntime.reduce(
@@ -206,33 +206,33 @@ class XiaobaohuVisualStateRuntimeTest {
     // --- Test 8: jumping_happy and sleepy are in the interrupt precedence list ---
 
     @Test
-    fun `jumping happy can interrupt thinking but not speaking`() {
-        // JumpingHappy (rank 5) can interrupt Thinking (rank 6)
+    fun `co_create cannot interrupt thinking or speaking`() {
+        // CoCreate (rank 7) cannot interrupt Thinking (rank 5)
         val canInterruptThinking = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.Thinking, MascotState.JumpingHappy,
+            MascotState.Thinking, MascotState.CoCreate,
         )
-        assertEquals(true, canInterruptThinking)
+        assertEquals(false, canInterruptThinking)
 
-        // JumpingHappy (rank 5) cannot interrupt Speaking (rank 4)
+        // CoCreate (rank 7) cannot interrupt Speaking (rank 3)
         val canInterruptSpeaking = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.Speaking, MascotState.JumpingHappy,
+            MascotState.Speaking, MascotState.CoCreate,
         )
         assertEquals(false, canInterruptSpeaking)
     }
 
     @Test
-    fun `sleepy can interrupt idle`() {
-        // Sleepy (rank 9) can interrupt Idle (rank 10)
-        val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.Idle, MascotState.Sleepy,
+    fun `paused can interrupt idle but not retry`() {
+        // Paused (rank 1) can interrupt Idle (rank 9)
+        val canInterruptIdle = XiaobaohuVisualStateRuntime.canInterrupt(
+            MascotState.Idle, MascotState.Paused,
         )
-        assertEquals(true, canInterrupt)
+        assertEquals(true, canInterruptIdle)
 
-        // Sleepy (rank 9) cannot interrupt Calm (rank 8)
-        val canInterruptCalm = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.Calm, MascotState.Sleepy,
+        // Paused (rank 1) cannot interrupt Retry (rank 0)
+        val canInterruptRetry = XiaobaohuVisualStateRuntime.canInterrupt(
+            MascotState.Retry, MascotState.Paused,
         )
-        assertEquals(false, canInterruptCalm)
+        assertEquals(false, canInterruptRetry)
     }
 
     // --- Test 9: debug override path remains deterministic ---
@@ -245,9 +245,9 @@ class XiaobaohuVisualStateRuntimeTest {
         val states = listOf(
             MascotState.Idle,
             MascotState.Thinking,
-            MascotState.SafetyConcern,
-            MascotState.JumpingHappy,
-            MascotState.Sleepy,
+            MascotState.Paused,
+            MascotState.CoCreate,
+            MascotState.Paused,
         )
         for (state in states) {
             val result = XiaobaohuVisualStateRuntime.reduce(
@@ -307,14 +307,13 @@ class XiaobaohuVisualStateRuntimeTest {
     // --- Additional: listening does NOT interrupt thinking ---
 
     @Test
-    fun `listening cannot interrupt thinking`() {
-        // Thinking has higher precedence than Listening in the resolver list.
-        // Thinking's 500ms hold prevents Recognizing → Thinking → Speaking flicker.
-        // Listening (0ms hold) does not need to interrupt thinking.
+    fun `listening can interrupt thinking`() {
+        // Listening (rank 2) has higher precedence than Thinking (rank 5).
+        // Real listening should interrupt thinking state.
         val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
             MascotState.Thinking, MascotState.Listening,
         )
-        assertEquals(false, canInterrupt)
+        assertEquals(true, canInterrupt)
     }
 
     // --- Additional: safety states interrupt each other by precedence ---
@@ -322,23 +321,23 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `network error can interrupt safety concern`() {
         val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.SafetyConcern, MascotState.NetworkError,
+            MascotState.Paused, MascotState.Retry,
         )
         assertEquals(true, canInterrupt)
     }
 
     @Test
-    fun `safety concern can interrupt privacy boundary`() {
+    fun `paused cannot interrupt paused (same rank)`() {
         val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.PrivacyBoundary, MascotState.SafetyConcern,
+            MascotState.Paused, MascotState.Paused,
         )
-        assertEquals(true, canInterrupt)
+        assertEquals(false, canInterrupt)
     }
 
     @Test
     fun `thinking cannot interrupt safety concern`() {
         val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.SafetyConcern, MascotState.Thinking,
+            MascotState.Paused, MascotState.Thinking,
         )
         assertEquals(false, canInterrupt)
     }
@@ -346,7 +345,7 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `idle cannot interrupt safety concern`() {
         val canInterrupt = XiaobaohuVisualStateRuntime.canInterrupt(
-            MascotState.SafetyConcern, MascotState.Idle,
+            MascotState.Paused, MascotState.Idle,
         )
         assertEquals(false, canInterrupt)
     }
@@ -375,20 +374,18 @@ class XiaobaohuVisualStateRuntimeTest {
         assertEquals(MascotState.Idle, withPending.pendingState)
         assertEquals(0L, withPending.pendingMinHoldMs)
 
-        // Thinking → Listening at 1200ms (hold active, Listening can't interrupt Thinking)
+        // Thinking → Listening at 1200ms (Listening has higher precedence, interrupts immediately)
         val withPendingListening = XiaobaohuVisualStateRuntime.reduce(
             current = thinking,
             requested = MascotState.Listening,
             requestedMinHoldMs = 0L,
             nowMs = 1200L,
         )
-        assertEquals(MascotState.Thinking, withPendingListening.mascotState)
-        assertEquals(MascotState.Listening, withPendingListening.pendingState)
-        assertEquals(0L, withPendingListening.pendingMinHoldMs)
+        assertEquals(MascotState.Listening, withPendingListening.mascotState)
 
         // SafetyConcern → Idle at 200ms (hold active, 1500ms hold, Idle can't interrupt)
         val safety = XiaobaohuDisplayedVisualState(
-            mascotState = MascotState.SafetyConcern,
+            mascotState = MascotState.Paused,
             displaySinceMs = 1000L,
             minHoldMs = 1500L,
         )
@@ -398,7 +395,7 @@ class XiaobaohuVisualStateRuntimeTest {
             requestedMinHoldMs = 0L,
             nowMs = 1200L,
         )
-        assertEquals(MascotState.SafetyConcern, safetyPending.mascotState)
+        assertEquals(MascotState.Paused, safetyPending.mascotState)
         assertEquals(MascotState.Idle, safetyPending.pendingState)
         assertEquals(0L, safetyPending.pendingMinHoldMs)
 
@@ -419,7 +416,7 @@ class XiaobaohuVisualStateRuntimeTest {
     @Test
     fun `homework focus holds for min hold`() {
         val current = XiaobaohuDisplayedVisualState(
-            mascotState = MascotState.HomeworkFocus,
+            mascotState = MascotState.Thinking,
             displaySinceMs = 1000L,
             minHoldMs = 800L,
         )
@@ -431,7 +428,7 @@ class XiaobaohuVisualStateRuntimeTest {
             requestedMinHoldMs = 0L,
             nowMs = 1500L,
         )
-        assertEquals(MascotState.HomeworkFocus, tooEarly.mascotState)
+        assertEquals(MascotState.Thinking, tooEarly.mascotState)
 
         // At 1800ms — 800ms elapsed
         val holdExpired = XiaobaohuVisualStateRuntime.reduce(

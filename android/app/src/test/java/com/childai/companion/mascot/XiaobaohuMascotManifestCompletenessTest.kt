@@ -32,9 +32,9 @@ class XiaobaohuMascotManifestCompletenessTest {
 
         assertEquals(MascotState.entries.size, manifest.statePriority.size)
         assertEquals(MascotState.entries.toSet(), manifest.statePriority.toSet())
-        assertEquals(MascotState.NetworkError, manifest.statePriority[2])
-        assertTrue(manifest.statePriority.indexOf(MascotState.NetworkError) < manifest.statePriority.indexOf(MascotState.Speaking))
-        assertTrue(manifest.statePriority.indexOf(MascotState.SafetyConcern) < manifest.statePriority.indexOf(MascotState.Speaking))
+        assertEquals(MascotState.Retry, manifest.statePriority[0])
+        assertTrue(manifest.statePriority.indexOf(MascotState.Retry) < manifest.statePriority.indexOf(MascotState.Speaking))
+        assertTrue(manifest.statePriority.indexOf(MascotState.Paused) < manifest.statePriority.indexOf(MascotState.Speaking))
     }
 
     @Test
@@ -63,7 +63,7 @@ class XiaobaohuMascotManifestCompletenessTest {
         private const val MASCOT_MANIFEST_JSON = """
             {
               "mascot": "Little White Fox",
-              "assetPackageVersion": "0.1.1-runtime-webp",
+              "assetPackageVersion": "0.2.0-v2-full",
               "format": "webp_frame_sequence_runtime",
               "defaultFps": 12,
               "defaultState": "idle",
@@ -71,149 +71,133 @@ class XiaobaohuMascotManifestCompletenessTest {
                 {
                   "width": 512,
                   "height": 512
-                },
-                {
-                  "width": 512,
-                  "height": 341
                 }
               ],
               "states": {
-                "safety_concern": {
-                  "version": "v0.1.0",
-                  "type": "oneshot_hold",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "safety_concern/v0.1.0/",
-                  "manifest": "safety_concern/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_safety_concern_%04d.webp"
-                },
-                "privacy_boundary": {
-                  "version": "v0.1.0",
-                  "type": "oneshot_hold",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "privacy_boundary/v0.1.0/",
-                  "manifest": "privacy_boundary/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_privacy_boundary_%04d.webp"
-                },
-                "network_error": {
-                  "version": "v0.1.0",
-                  "type": "oneshot_hold",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "network_error/v0.1.0/",
-                  "manifest": "network_error/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_network_error_%04d.webp"
-                },
-                "speaking": {
-                  "version": "v0.1.0",
+                "idle": {
+                  "version": "v2.0.0",
                   "type": "loop",
                   "fps": 12,
-                  "frameCount": 24,
+                  "frameCount": 48,
                   "width": 512,
-                  "height": 341,
-                  "path": "speaking/v0.1.0/",
-                  "manifest": "speaking/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_speaking_%04d.webp"
-                },
-                "thinking": {
-                  "version": "v0.1.0",
-                  "type": "loop",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "thinking/v0.1.0/",
-                  "manifest": "thinking/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_thinking_%04d.webp"
+                  "height": 512,
+                  "path": "idle/v2.0.0/",
+                  "manifest": "idle/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_idle_%04d.webp"
                 },
                 "listening": {
-                  "version": "v0.1.0",
+                  "version": "v2.0.0",
                   "type": "loop",
                   "fps": 12,
-                  "frameCount": 24,
+                  "frameCount": 48,
                   "width": 512,
-                  "height": 341,
-                  "path": "listening/v0.1.0/",
-                  "manifest": "listening/v0.1.0/manifest.json",
+                  "height": 512,
+                  "path": "listening/v2.0.0/",
+                  "manifest": "listening/v2.0.0/manifest.json",
                   "framePattern": "frames_webp/fox_listening_%04d.webp"
                 },
-                "homework_focus": {
-                  "version": "v0.1.0",
+                "thinking": {
+                  "version": "v2.0.0",
                   "type": "loop",
                   "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "homework_focus/v0.1.0/",
-                  "manifest": "homework_focus/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_homework_focus_%04d.webp"
-                },
-                "calm": {
-                  "version": "v0.1.0",
-                  "type": "loop",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "calm/v0.1.0/",
-                  "manifest": "calm/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_calm_%04d.webp"
-                },
-                "sleepy": {
-                  "version": "v0.1.0",
-                  "type": "loop",
-                  "fps": 12,
-                  "frameCount": 24,
-                  "width": 512,
-                  "height": 341,
-                  "path": "sleepy/v0.1.0/",
-                  "manifest": "sleepy/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_sleepy_%04d.webp"
-                },
-                "jumping_happy": {
-                  "version": "v0.1.0",
-                  "type": "short_loop",
-                  "fps": 12,
-                  "frameCount": 24,
+                  "frameCount": 48,
                   "width": 512,
                   "height": 512,
-                  "path": "jumping_happy/v0.1.0/",
-                  "manifest": "jumping_happy/v0.1.0/manifest.json",
-                  "framePattern": "frames_webp/fox_jumping_happy_%04d.webp"
+                  "path": "thinking/v2.0.0/",
+                  "manifest": "thinking/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_thinking_%04d.webp"
                 },
-                "idle": {
-                  "version": "v0.2.0",
+                "speaking": {
+                  "version": "v2.0.0",
                   "type": "loop",
                   "fps": 12,
-                  "frameCount": 24,
+                  "frameCount": 48,
                   "width": 512,
                   "height": 512,
-                  "path": "idle/v0.2.0/",
-                  "manifest": "idle/v0.2.0/manifest.json",
-                  "framePattern": "frames_webp/fox_idle_%04d.webp"
+                  "path": "speaking/v2.0.0/",
+                  "manifest": "speaking/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_speaking_%04d.webp"
+                },
+                "waiting_soft": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "waiting_soft/v2.0.0/",
+                  "manifest": "waiting_soft/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_waiting_soft_%04d.webp"
+                },
+                "preparing_speech": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "preparing_speech/v2.0.0/",
+                  "manifest": "preparing_speech/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_preparing_speech_%04d.webp"
+                },
+                "image_viewing": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "image_viewing/v2.0.0/",
+                  "manifest": "image_viewing/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_image_viewing_%04d.webp"
+                },
+                "co_create": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "co_create/v2.0.0/",
+                  "manifest": "co_create/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_co_create_%04d.webp"
+                },
+                "paused": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "paused/v2.0.0/",
+                  "manifest": "paused/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_paused_%04d.webp"
+                },
+                "retry": {
+                  "version": "v2.0.0",
+                  "type": "loop",
+                  "fps": 12,
+                  "frameCount": 48,
+                  "width": 512,
+                  "height": 512,
+                  "path": "retry/v2.0.0/",
+                  "manifest": "retry/v2.0.0/manifest.json",
+                  "framePattern": "frames_webp/fox_retry_%04d.webp"
                 }
               },
               "statePriority": [
-                "safety_concern",
-                "privacy_boundary",
-                "network_error",
-                "speaking",
-                "thinking",
+                "retry",
+                "paused",
                 "listening",
-                "homework_focus",
-                "calm",
-                "sleepy",
-                "jumping_happy",
+                "speaking",
+                "preparing_speech",
+                "thinking",
+                "image_viewing",
+                "co_create",
+                "waiting_soft",
                 "idle"
               ],
-              "notes": "Runtime-only Little White Fox mascot package: 512px WebP frame sequences, one asset format per state."
+              "notes": "v2 mascot package: 512px WebP frame sequences, 10 states full mapping."
             }
         """
     }

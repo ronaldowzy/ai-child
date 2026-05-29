@@ -9,13 +9,12 @@ enum class MascotState(val id: String) {
     Listening("listening"),
     Thinking("thinking"),
     Speaking("speaking"),
-    HomeworkFocus("homework_focus"),
-    Calm("calm"),
-    Sleepy("sleepy"),
-    PrivacyBoundary("privacy_boundary"),
-    SafetyConcern("safety_concern"),
-    NetworkError("network_error"),
-    JumpingHappy("jumping_happy"),
+    WaitingSoft("waiting_soft"),
+    PreparingSpeech("preparing_speech"),
+    ImageViewing("image_viewing"),
+    CoCreate("co_create"),
+    Paused("paused"),
+    Retry("retry"),
     ;
 
     companion object {
@@ -25,22 +24,22 @@ enum class MascotState(val id: String) {
 
         fun fromAgent(agent: FoxAgentUiState): MascotState {
             return when {
+                agent.motion == FoxMotion.NetworkError ||
+                    agent.mood == FoxMood.NetworkError -> Retry
+
                 agent.motion == FoxMotion.ConcernedStill ||
-                    agent.mood == FoxMood.SafetyConcern -> SafetyConcern
+                    agent.mood == FoxMood.SafetyConcern -> Paused
 
                 agent.motion == FoxMotion.SteadyBoundary ||
-                    agent.mood == FoxMood.PrivacyBoundary -> PrivacyBoundary
-
-                agent.motion == FoxMotion.NetworkError ||
-                    agent.mood == FoxMood.NetworkError -> NetworkError
+                    agent.mood == FoxMood.PrivacyBoundary -> Paused
 
                 agent.motion == FoxMotion.Speaking -> Speaking
 
                 agent.motion == FoxMotion.HomeworkFocus ||
-                    agent.mood == FoxMood.HomeworkFocus -> HomeworkFocus
+                    agent.mood == FoxMood.HomeworkFocus -> Thinking
 
                 agent.motion == FoxMotion.SleepyBlink ||
-                    agent.mood == FoxMood.Sleepy -> Sleepy
+                    agent.mood == FoxMood.Sleepy -> Paused
 
                 agent.motion == FoxMotion.ThinkingBlink ||
                     agent.mood == FoxMood.Thinking -> Thinking
@@ -49,10 +48,10 @@ enum class MascotState(val id: String) {
                     agent.mood == FoxMood.Listening -> Listening
 
                 agent.motion == FoxMotion.CelebrateSmall ||
-                    agent.mood == FoxMood.Encouraging -> JumpingHappy
+                    agent.mood == FoxMood.Encouraging -> CoCreate
 
                 agent.motion == FoxMotion.CalmStill ||
-                    agent.mood == FoxMood.Calm -> Calm
+                    agent.mood == FoxMood.Calm -> Idle
 
                 else -> Idle
             }
@@ -79,16 +78,15 @@ enum class MascotAnimationType {
 
 object MascotStatePriority {
     val fallbackOrder = listOf(
-        MascotState.SafetyConcern,
-        MascotState.PrivacyBoundary,
-        MascotState.NetworkError,
-        MascotState.Speaking,
-        MascotState.Thinking,
+        MascotState.Retry,
+        MascotState.Paused,
         MascotState.Listening,
-        MascotState.HomeworkFocus,
-        MascotState.Calm,
-        MascotState.Sleepy,
-        MascotState.JumpingHappy,
+        MascotState.Speaking,
+        MascotState.PreparingSpeech,
+        MascotState.Thinking,
+        MascotState.ImageViewing,
+        MascotState.CoCreate,
+        MascotState.WaitingSoft,
         MascotState.Idle,
     )
 

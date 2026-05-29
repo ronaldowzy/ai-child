@@ -1,0 +1,16 @@
+{
+  "state": "co_create",
+  "displayName": "fox_co_create",
+  "version": "v2.0.0",
+  "type": "short_loop",
+  "fps": 12,
+  "frameCount": 48,
+  "loop": true,
+  "width": 512,
+  "height": 512,
+  "path": "co_create/v2.0.0/",
+  "manifest": "co_create/v2.0.0/manifest.json",
+  "framePattern": "frames_webp/fox_co_create_%04d.webp",
+  "format": "webp",
+  "runtimeOnly": true
+}

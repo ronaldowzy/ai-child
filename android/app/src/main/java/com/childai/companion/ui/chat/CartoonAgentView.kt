@@ -201,7 +201,7 @@ fun CartoonAgentView(
 private fun mascotVisualScale(state: MascotState): Float {
     return when (state) {
         MascotState.Idle -> 1.0f
-        MascotState.Calm -> 1.04f
+        MascotState.WaitingSoft -> 1.04f
         else -> 1.12f
     }
 }

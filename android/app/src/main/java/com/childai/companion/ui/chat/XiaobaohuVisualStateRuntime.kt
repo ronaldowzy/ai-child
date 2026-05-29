@@ -33,16 +33,15 @@ object XiaobaohuVisualStateRuntime {
      * JumpingHappy is placed below Speaking (brief celebration).
      */
     private val INTERRUPT_PRECEDENCE: List<MascotState> = listOf(
-        MascotState.NetworkError,
-        MascotState.SafetyConcern,
-        MascotState.PrivacyBoundary,
-        MascotState.HomeworkFocus,
-        MascotState.Speaking,
-        MascotState.JumpingHappy,
-        MascotState.Thinking,
+        MascotState.Retry,
+        MascotState.Paused,
         MascotState.Listening,
-        MascotState.Calm,
-        MascotState.Sleepy,
+        MascotState.Speaking,
+        MascotState.PreparingSpeech,
+        MascotState.Thinking,
+        MascotState.ImageViewing,
+        MascotState.CoCreate,
+        MascotState.WaitingSoft,
         MascotState.Idle,
     )
 

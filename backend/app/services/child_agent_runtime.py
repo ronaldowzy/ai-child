@@ -426,17 +426,19 @@ class ChildAgentRuntime:
         if decision.risk_level != RiskLevel.NONE:
             return False, None, f"risk_level={decision.risk_level.value}"
 
-        # 3. No image
-        image_ctx = request.conversation_metadata.get("image_context")
-        if image_ctx:
-            return False, None, "has_image"
-
-        # 4. No homework context
-        if request.conversation_metadata.get("contains_image") and request.conversation_metadata.get("image_context"):
-            # contains_image can be true from homework too; check actual context
-            pass
-        if request.conversation_metadata.get("homework_context"):
-            return False, None, "has_homework"
+        # 3. No image or attachment of any kind
+        meta = request.conversation_metadata
+        if meta.get("contains_image"):
+            return False, None, "has_image_or_attachment"
+        if meta.get("image_context"):
+            return False, None, "has_image_context"
+        if meta.get("homework_context"):
+            return False, None, "has_homework_context"
+        # Also block on pending upload / attachment markers
+        if meta.get("pending_image") or meta.get("image_uploading"):
+            return False, None, "has_pending_image"
+        if meta.get("attachment_count") and int(meta.get("attachment_count", 0)) > 0:
+            return False, None, "has_image_or_attachment"
 
         # 5-8. Intent must not be sensitive types
         intent = request.intent or ""
@@ -460,9 +462,14 @@ class ChildAgentRuntime:
             if has_content:
                 return False, None, "has_memory"
 
-        # 11. Co-creation is a hint to the model, not a prompt structure change.
-        # The fast path prompt can handle imaginative content fine.
-        # Only block if co-creation has actually been initiated (tracked in conversation service).
+        # 11. Co-creation: if the service layer has suggested or initiated co-creation,
+        # the full prompt is needed for co-creation rules (no gamification, no persistence, etc.)
+        if turn_guidance_context.co_creation_suggested:
+            return False, None, "co_creation_suggested"
+        if turn_guidance_context.co_creation_type != "none":
+            return False, None, f"co_creation_type={turn_guidance_context.co_creation_type}"
+        if meta.get("co_creation_active"):
+            return False, None, "co_creation_active"
 
         # 12. Child text not matching sensitive keywords
         normalized = request.child_text.replace(" ", "")

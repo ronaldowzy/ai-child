@@ -3,32 +3,32 @@ package com.childai.companion.ui.chat
 import com.childai.companion.ui.parent.ParentEntryTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ParentEntryDeemphasisTest {
     @Test
-    fun topBarDefaultsToOneCompactAdultEntry() {
-        assertEquals(listOf("大人"), parentEntryDefaultLabels())
+    fun topBarDefaultsToOneCompactParentEntry() {
+        assertEquals(listOf("家长入口"), parentEntryDefaultLabels())
+        assertFalse(parentEntryDefaultLabels().contains("大人"))
         assertFalse(parentEntryDefaultLabels().contains(ParentEntryTarget.Report.label))
         assertFalse(parentEntryDefaultLabels().contains(ParentEntryTarget.Settings.label))
     }
 
     @Test
-    fun normalTapOnlyShowsFamilyFriendlyHint() {
+    fun normalTapDoesNotAddExtraTopCopy() {
         val hint = parentEntryTapHint()
 
-        assertEquals("这里给大人用。请大人长按进入。", hint)
-        assertTrue(hint.contains("大人"))
-        assertTrue(hint.contains("长按"))
+        assertEquals("", hint)
+        assertFalse(hint.contains("大人"))
+        assertFalse(hint.contains("长按"))
     }
 
     @Test
-    fun defaultHintIsShortAndDeemphasized() {
+    fun defaultHintDoesNotLookLikePageTitle() {
         val hint = parentEntryDefaultHint()
 
-        assertEquals("大人长按进入。", hint)
-        assertTrue(hint.contains("长按"))
+        assertEquals("", hint)
+        assertFalse(hint.contains("大人长按进入"))
         assertFalse(hint.contains("日报"))
         assertFalse(hint.contains("设置"))
     }

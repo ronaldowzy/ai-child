@@ -1,7 +1,15 @@
 package com.childai.companion.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +27,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -122,14 +134,33 @@ fun XiaobaohuCompanionStage(
                     )
                 }
 
-                // State bubble
-                val bubbleText = mascotState.bubbleText()
-                if (bubbleText != null) {
-                    Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
-                    XiaobaohuStateBubble(
-                        text = bubbleText,
-                        compactLandscape = compactLandscape,
-                    )
+                val bubbleText = mascotStateBubbleText(mascotState)
+                var renderedBubbleText by remember { mutableStateOf(bubbleText) }
+                LaunchedEffect(bubbleText) {
+                    if (bubbleText != null) {
+                        renderedBubbleText = bubbleText
+                    }
+                }
+                AnimatedVisibility(
+                    visible = bubbleText != null,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 220)) +
+                        slideInVertically(animationSpec = tween(durationMillis = 220)) { it / 5 } +
+                        scaleIn(animationSpec = tween(durationMillis = 220), initialScale = 0.96f),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 180)) +
+                        slideOutVertically(animationSpec = tween(durationMillis = 180)) { it / 5 } +
+                        scaleOut(animationSpec = tween(durationMillis = 180), targetScale = 0.96f),
+                ) {
+                    renderedBubbleText?.let { text ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
+                            XiaobaohuStateBubble(
+                                text = text,
+                                compactLandscape = compactLandscape,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -148,9 +179,13 @@ private fun XiaobaohuStateBubble(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.82f),
-        shadowElevation = 0.dp,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.84f),
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.54f),
+        ),
     ) {
         Text(
             text = text,
@@ -186,17 +221,17 @@ private fun MascotState.glowColor(): Color {
 
 // --- State-to-bubble-text mapping ---
 
-private fun MascotState.bubbleText(): String? {
-    return when (this) {
-        MascotState.Idle -> "小白狐在这里。"
+internal fun mascotStateBubbleText(state: MascotState): String? {
+    return when (state) {
+        MascotState.Idle -> "我在这里。"
         MascotState.WaitingSoft -> "想说的时候再说。"
-        MascotState.Listening -> "正在听你说。"
-        MascotState.Thinking -> "小白狐在想一想。"
-        MascotState.PreparingSpeech -> "小白狐在准备说。"
-        MascotState.Speaking -> null // no bubble during speech
-        MascotState.ImageViewing -> "小白狐正在看。"
-        MascotState.CoCreate -> "可以一起想一想。"
+        MascotState.Listening -> "我在听。"
+        MascotState.Thinking -> "我想一想。"
+        MascotState.PreparingSpeech -> "我准备说。"
+        MascotState.Speaking -> null
+        MascotState.ImageViewing -> "我正在看。"
+        MascotState.CoCreate -> "我们一起想想。"
         MascotState.Paused -> "好，我们先停一下。"
-        MascotState.Retry -> "这次没弄好，我们可以再试一次。"
+        MascotState.Retry -> "这次没弄好，可以再试一次。"
     }
 }

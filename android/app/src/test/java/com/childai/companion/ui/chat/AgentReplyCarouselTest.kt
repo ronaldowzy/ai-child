@@ -24,7 +24,7 @@ class AgentReplyCarouselTest {
 
     @Test
     fun stateChipLabelsStayShortAndChildFacing() {
-        assertEquals("小白狐在这里", childUiPolishStateLabel(ChildTurnUiPhase.Ready))
+        assertEquals("我在这里", childUiPolishStateLabel(ChildTurnUiPhase.Ready))
         assertEquals("我在听", childUiPolishStateLabel(ChildTurnUiPhase.Listening))
         assertEquals("在说给你听", childUiPolishStateLabel(ChildTurnUiPhase.Speaking))
         assertEquals("小白狐正在看", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
@@ -93,6 +93,23 @@ class AgentReplyCarouselTest {
     }
 
     @Test
+    fun defaultStageStatusMessageDoesNotEnterRecentMessageCards() {
+        assertEquals(
+            emptyList<ChatMessage>(),
+            companionVisibleMessages(initialChatMessages(), companionRecentMessageLimit(false)),
+        )
+
+        val realOpening = initialChatMessages().map { message ->
+            message.copy(text = "今天想说点什么呀？")
+        }
+
+        assertEquals(
+            listOf("今天想说点什么呀？"),
+            companionVisibleMessages(realOpening, companionRecentMessageLimit(false)).map { it.text },
+        )
+    }
+
+    @Test
     fun imageContextShowsOnlyOneLowPressureCoCreationEntry() {
         val state = ChatUiState(
             pendingImageContext = PendingImageContextUiState(
@@ -146,6 +163,21 @@ class AgentReplyCarouselTest {
 
         assertEquals(
             listOf("小车"),
+            childCompanionVisibleQuickActions(state).map { it.label },
+        )
+    }
+
+    @Test
+    fun startVoiceQuickActionIsHiddenBecauseVoiceButtonIsPrimary() {
+        val state = ChatUiState(
+            quickActions = listOf(
+                QuickActionUi(id = "start_voice", label = "我想说话"),
+                QuickActionUi(id = "topic_choice_1", label = "恐龙"),
+            ),
+        )
+
+        assertEquals(
+            listOf("恐龙"),
             childCompanionVisibleQuickActions(state).map { it.label },
         )
     }

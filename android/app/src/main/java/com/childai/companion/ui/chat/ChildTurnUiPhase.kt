@@ -90,18 +90,18 @@ internal fun childTurnUiPhase(
 
 private fun ChildTurnUiPhase.statusText(inputMode: VoiceInputMode = VoiceInputMode.Idle): String {
     return when (this) {
-        ChildTurnUiPhase.Ready -> "小白狐在这里。"
+        ChildTurnUiPhase.Ready -> "我在这里。"
         ChildTurnUiPhase.Listening -> "我在听。"
         ChildTurnUiPhase.WaitingChild -> "想说的时候再说。"
         ChildTurnUiPhase.Recognizing -> "我在听懂刚才的话。"
-        ChildTurnUiPhase.Sending -> "小白狐在想一想。"
-        ChildTurnUiPhase.Thinking -> "小白狐在想一想。"
-        ChildTurnUiPhase.SpeakingPending -> "小白狐在准备说。"
+        ChildTurnUiPhase.Sending -> "我想一想。"
+        ChildTurnUiPhase.Thinking -> "我想一想。"
+        ChildTurnUiPhase.SpeakingPending -> "我准备说。"
         ChildTurnUiPhase.Speaking -> "我在说给你听。"
-        ChildTurnUiPhase.ImageProcessing -> "正在给小白狐看看。"
-        ChildTurnUiPhase.NeedsRetry -> "我刚才没听清，可以再说一次。"
+        ChildTurnUiPhase.ImageProcessing -> "我正在看。"
+        ChildTurnUiPhase.NeedsRetry -> "这次没弄好，可以再试一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
-        ChildTurnUiPhase.Resting -> "不说也没关系。"
+        ChildTurnUiPhase.Resting -> "想说的时候再说。"
         ChildTurnUiPhase.ServiceError -> "我们先请大人检查一下。"
     }
 }

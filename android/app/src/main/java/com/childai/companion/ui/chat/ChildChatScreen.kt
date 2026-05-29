@@ -683,7 +683,6 @@ private fun ChatPanel(
     ) {
         AgentTopBar(
             parentEntryHint = parentEntryHint,
-            statusText = presentation.statusText,
             compactLandscape = compactLandscape,
             onParentEntryTap = onParentEntryTap,
             onParentEntryLongPress = onParentEntryLongPress,
@@ -731,11 +730,11 @@ private fun ChatPanel(
     }
 }
 
-internal const val PARENT_ENTRY_COMPACT_LABEL = "大人"
+internal const val PARENT_ENTRY_COMPACT_LABEL = "家长入口"
 
-internal fun parentEntryTapHint(): String = "这里给大人用。请大人长按进入。"
+internal fun parentEntryTapHint(): String = ""
 
-internal fun parentEntryDefaultHint(): String = "大人长按进入。"
+internal fun parentEntryDefaultHint(): String = ""
 
 internal fun parentEntryDefaultLabels(): List<String> = listOf(PARENT_ENTRY_COMPACT_LABEL)
 
@@ -851,7 +850,16 @@ internal fun companionVisibleMessages(
     messages: List<ChatMessage>,
     maxVisibleMessages: Int,
 ): List<ChatMessage> {
-    return messages.takeLast(maxVisibleMessages.coerceAtLeast(1))
+    return messages
+        .filterNot(::isStageOnlyStatusMessage)
+        .takeLast(maxVisibleMessages.coerceAtLeast(1))
+}
+
+internal fun isStageOnlyStatusMessage(message: ChatMessage): Boolean {
+    return message.id == "agent-welcome" && message.text in setOf(
+        "小白狐在这里。",
+        "我在这里。",
+    )
 }
 
 private val imageContextActionIds = setOf(
@@ -875,7 +883,10 @@ private val primaryImageCoCreationActionIds = setOf(
 
 internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<QuickActionUi> {
     val baseActions = uiState.quickActions.filterNot { action ->
-        action.id == "take_photo" || action.id == "share_photo"
+        action.id == "take_photo" ||
+            action.id == "share_photo" ||
+            action.id == "start_voice" ||
+            action.label == "我想说话"
     }
     if (uiState.pendingImageContext == null) {
         return baseActions.filterNot { it.id in imageContextActionIds }
@@ -936,7 +947,6 @@ private fun SessionStateStrip(sessionState: ConversationSessionState) {
 @Composable
 private fun AgentTopBar(
     parentEntryHint: String?,
-    statusText: String,
     compactLandscape: Boolean,
     onParentEntryTap: () -> Unit,
     onParentEntryLongPress: () -> Unit,
@@ -974,13 +984,6 @@ private fun AgentTopBar(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 }
                 ParentEntryButton(
                     label = PARENT_ENTRY_COMPACT_LABEL,
@@ -988,16 +991,20 @@ private fun AgentTopBar(
                     onLongPress = onParentEntryLongPress,
                 )
             }
-            Text(
-                text = parentEntryHint ?: parentEntryDefaultHint(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(
-                    start = horizontalPadding,
-                    end = horizontalPadding,
-                    bottom = if (compactLandscape) 8.dp else 10.dp,
-                ),
-            )
+            if (!parentEntryHint.isNullOrBlank()) {
+                Text(
+                    text = parentEntryHint,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        bottom = if (compactLandscape) 8.dp else 10.dp,
+                    ),
+                )
+            }
         }
     }
 }
@@ -1040,16 +1047,22 @@ private fun ParentEntryHintBar(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
     ) {
-        Text(
-            text = parentEntryHint ?: parentEntryDefaultHint(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        if (!parentEntryHint.isNullOrBlank()) {
+            Text(
+                text = parentEntryHint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.52f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
         ParentEntryButton(
             label = PARENT_ENTRY_COMPACT_LABEL,
             onTap = onParentEntryTap,
@@ -1113,16 +1126,6 @@ private fun AgentPanel(
                 debugMascotState = debugMascotState,
                 modifier = Modifier.weight(1f),
             )
-            if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
-                Spacer(modifier = Modifier.height(if (compactLandscape) 2.dp else 4.dp))
-                Text(
-                    text = "不说也没关系。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
                 Spacer(modifier = Modifier.height(10.dp))
                 MascotDebugSwitcher(
@@ -1155,7 +1158,7 @@ private fun foxGlowColorForPhase(phase: ChildTurnUiPhase): Color {
 internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
     return when (phase) {
         ChildTurnUiPhase.Ready,
-        ChildTurnUiPhase.Resting -> "小白狐在这里"
+        ChildTurnUiPhase.Resting -> "我在这里"
         ChildTurnUiPhase.Listening -> "我在听"
         ChildTurnUiPhase.WaitingChild -> "想说的时候再说"
         ChildTurnUiPhase.Recognizing -> "在听懂你的话"
@@ -1284,7 +1287,7 @@ private fun ChildChatScreenPortraitPreview() {
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
-                    statusText = "小白狐在这里。",
+                    statusText = "我在这里。",
                 ),
             ),
             onSend = {},

@@ -12,7 +12,7 @@ class ChildTurnUiPhaseTest {
         val presentation = childInteractionPresentation()
 
         assertEquals(ChildTurnUiPhase.Ready, presentation.phase)
-        assertEquals("小白狐在这里。", presentation.statusText)
+        assertEquals("我在这里。", presentation.statusText)
         assertEquals("按一下开始说", presentation.primaryButtonText)
         assertTrue(presentation.primaryButtonEnabled)
     }
@@ -64,7 +64,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.Thinking, presentation.phase)
-        assertEquals("小白狐在想一想。", presentation.statusText)
+        assertEquals("我想一想。", presentation.statusText)
         assertFalse(presentation.primaryButtonEnabled)
         assertEquals(FoxMood.Thinking, presentation.agent.mood)
     }
@@ -89,7 +89,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.SpeakingPending, presentation.phase)
-        assertEquals("小白狐在准备说。", presentation.statusText)
+        assertEquals("我准备说。", presentation.statusText)
         assertTrue(presentation.showStopSpeaking)
         assertTrue(presentation.showMuteToggle)
         assertEquals("按一下开始说", presentation.primaryButtonText)
@@ -103,7 +103,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.ImageProcessing, presentation.phase)
-        assertEquals("正在给小白狐看看。", presentation.statusText)
+        assertEquals("我正在看。", presentation.statusText)
         assertEquals(FoxMood.Thinking, presentation.agent.mood)
     }
 
@@ -114,7 +114,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.NeedsRetry, presentation.phase)
-        assertEquals("我刚才没听清，可以再说一次。", presentation.statusText)
+        assertEquals("这次没弄好，可以再试一次。", presentation.statusText)
         assertEquals("再说一次", presentation.primaryButtonText)
     }
 

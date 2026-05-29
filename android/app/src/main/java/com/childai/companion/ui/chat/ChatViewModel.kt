@@ -1359,14 +1359,14 @@ class ChatViewModel(
         if (openingRequested) return
         openingRequested = true
         Log.d(TAG, "[LatencyTrace] stage=opening_start")
-        // 0-1 秒：立即显示本地确定性状态 "小白狐在这里"
+        // 0-1 秒：立即显示本地确定性状态 "我在这里"
         _uiState.update { state ->
             state.copy(
                 childTurnPhaseHint = null,
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
-                    statusText = "小白狐在这里。",
+                    statusText = "我在这里。",
                 ),
             )
         }
@@ -1375,7 +1375,7 @@ class ChatViewModel(
             delay(1500)
             if (!childInteractionStarted && !_uiState.value.messages.any { it.author == MessageAuthor.Child }) {
                 // 个性化 opening 尚未返回，且孩子未开始输入
-                if (_uiState.value.agent.statusText == "小白狐在这里。") {
+                if (_uiState.value.agent.statusText == "我在这里。") {
                     _uiState.update { state ->
                         state.copy(
                             agent = state.agent.copy(statusText = "你想说什么都可以。"),

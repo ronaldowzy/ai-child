@@ -1,8 +1,10 @@
 package com.childai.companion.ui.chat
 
 import androidx.compose.ui.graphics.Color
+import com.childai.companion.mascot.MascotState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChildCompanionPageRulesTest {
@@ -58,5 +60,35 @@ class ChildCompanionPageRulesTest {
             ),
             companionPageBackgroundColors(),
         )
+    }
+
+    @Test
+    fun mascotStateBubbleCopyUsesSingleApprovedStatusLine() {
+        assertEquals("我在这里。", mascotStateBubbleText(MascotState.Idle))
+        assertEquals("想说的时候再说。", mascotStateBubbleText(MascotState.WaitingSoft))
+        assertEquals("我在听。", mascotStateBubbleText(MascotState.Listening))
+        assertEquals("我想一想。", mascotStateBubbleText(MascotState.Thinking))
+        assertEquals("我准备说。", mascotStateBubbleText(MascotState.PreparingSpeech))
+        assertNull(mascotStateBubbleText(MascotState.Speaking))
+        assertEquals("我正在看。", mascotStateBubbleText(MascotState.ImageViewing))
+        assertEquals("我们一起想想。", mascotStateBubbleText(MascotState.CoCreate))
+        assertEquals("好，我们先停一下。", mascotStateBubbleText(MascotState.Paused))
+        assertEquals("这次没弄好，可以再试一次。", mascotStateBubbleText(MascotState.Retry))
+    }
+
+    @Test
+    fun waitingBubbleDoesNotContainPressureCountdownOrCoCreationPrompt() {
+        val waitingCopy = mascotStateBubbleText(MascotState.WaitingSoft).orEmpty()
+
+        listOf(
+            "倒计时",
+            "轮到你了",
+            "快说",
+            "起个名字",
+            "小故事",
+            "不说也没关系",
+        ).forEach { marker ->
+            assertFalse(waitingCopy.contains(marker))
+        }
     }
 }

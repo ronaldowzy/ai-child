@@ -70,26 +70,46 @@ class PromptManager:
         memory_context: Sequence[Any] | Mapping[str, Any] | str | None = None,
         persona_template_id: str | None = None,
         output_contract_template_id: str | None = None,
+        fast_path: bool = False,
     ) -> ComposedPrompt:
-        sections = [
-            self._load_template_section(self._global_system_template_id),
-            self._load_template_section(
-                persona_template_id or self._persona_template_id
-            ),
-            self._build_child_profile_section(parent_policy),
-            self._build_parent_message_section(parent_policy),
-            self._build_parent_policy_section(parent_policy),
-            self._build_time_context_section(time_context),
-            self._build_image_context_section(image_context),
-            self._load_scene_section(scene_id),
-            self._build_turn_guidance_section(turn_guidance_context),
-            self._build_memory_context_section(memory_context),
-            self._load_template_section(
-                output_contract_template_id or self._output_contract_template_id
-            ),
-        ]
+        if fast_path:
+            sections = [
+                self._load_template_section(self._global_system_template_id),
+                self._load_template_section(
+                    persona_template_id or self._persona_template_id
+                ),
+                self._build_child_profile_section(parent_policy),
+                self._build_parent_message_section(parent_policy),
+                self._build_parent_policy_section(parent_policy),
+                self._build_time_context_section(time_context),
+                self._load_scene_section("conversation.open.fast"),
+                self._load_template_section("output_contract_child_chat_fast_v0_1"),
+            ]
+            template_mode = "fast"
+        else:
+            sections = [
+                self._load_template_section(self._global_system_template_id),
+                self._load_template_section(
+                    persona_template_id or self._persona_template_id
+                ),
+                self._build_child_profile_section(parent_policy),
+                self._build_parent_message_section(parent_policy),
+                self._build_parent_policy_section(parent_policy),
+                self._build_time_context_section(time_context),
+                self._build_image_context_section(image_context),
+                self._load_scene_section(scene_id),
+                self._build_turn_guidance_section(turn_guidance_context),
+                self._build_memory_context_section(memory_context),
+                self._load_template_section(
+                    output_contract_template_id or self._output_contract_template_id
+                ),
+            ]
+            template_mode = "full"
 
         prompt = "\n\n".join(self._format_section(section) for section in sections)
+        section_chars_by_layer = {
+            section.layer.value: len(section.content) for section in sections
+        }
         return ComposedPrompt(
             scene_id=scene_id,
             prompt=prompt,
@@ -103,6 +123,9 @@ class PromptManager:
                 )
                 for section in sections
             },
+            prompt_total_chars=len(prompt),
+            section_chars_by_layer=section_chars_by_layer,
+            prompt_template_mode=template_mode,
         )
 
     def _load_scene_section(self, scene_id: str) -> PromptSection:
@@ -670,11 +693,24 @@ class PromptManager:
                 version="v0.1",
                 filename="output_contracts/child_chat_v0_1.txt",
             ),
+            "scene_conversation_open_fast_v0_1": PromptTemplateSpec(
+                id="scene_conversation_open_fast_v0_1",
+                layer=PromptLayer.SCENE,
+                version="v0.1",
+                filename="scenes/conversation_open_fast_v0_1.txt",
+            ),
+            "output_contract_child_chat_fast_v0_1": PromptTemplateSpec(
+                id="output_contract_child_chat_fast_v0_1",
+                layer=PromptLayer.OUTPUT_CONTRACT,
+                version="v0.1",
+                filename="output_contracts/child_chat_fast_v0_1.txt",
+            ),
         }
 
     def _default_scene_templates(self) -> dict[str, str]:
         return {
             "conversation.open": "scene_conversation_open_v0_1",
+            "conversation.open.fast": "scene_conversation_open_fast_v0_1",
             "daily.after_school_checkin": "scene_daily_after_school_checkin_v0_1",
             "learning.homework_help": "scene_learning_homework_help_v0_1",
             "daily.bedtime_reflection": "scene_daily_bedtime_reflection_v0_1",

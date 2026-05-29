@@ -14,6 +14,13 @@ from app.domain.enums import RiskLevel
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
 from app.domain.prompt import PromptVersion
 from app.domain.scene import SceneAction, SceneId
+
+_FAST_PATH_BLOCKED_INTENTS = frozenset({
+    "learning_help",
+    "homework_problem",
+    "safety_risk",
+    "privacy_question",
+})
 from app.services.age_band_policy import (
     AgeBandReplyPolicy,
     derive_age_band_reply_policy,
@@ -78,6 +85,11 @@ class ChildAgentRuntime:
         prompt_versions: dict[str, PromptVersion] = {}
         turn_guidance_context = self._build_turn_guidance_context(request)
         age_policy = derive_age_band_reply_policy(request.parent_policy)
+
+        use_fast_path, fast_reason, blocked_reason = (
+            self._evaluate_fast_path_eligibility(request, turn_guidance_context)
+        )
+
         try:
             composed_prompt = self._prompt_manager.compose(
                 request.route_decision.active_scene.value,
@@ -86,6 +98,7 @@ class ChildAgentRuntime:
                 image_context=request.conversation_metadata.get("image_context"),
                 turn_guidance_context=turn_guidance_context,
                 memory_context=request.memory_context,
+                fast_path=use_fast_path,
             )
             prompt_versions = composed_prompt.prompt_versions
         except Exception:
@@ -93,7 +106,19 @@ class ChildAgentRuntime:
                 request,
                 fallback_reason="prompt_compose_failed",
                 prompt_versions=prompt_versions,
+                fast_path_used=False,
+                fast_path_reason=None,
+                fast_path_blocked_reason="prompt_compose_exception",
             )
+
+        _fp = dict(
+            fast_path_used=use_fast_path,
+            fast_path_reason=fast_reason,
+            fast_path_blocked_reason=blocked_reason,
+            prompt_total_chars=composed_prompt.prompt_total_chars,
+            section_chars_by_layer=composed_prompt.section_chars_by_layer,
+            prompt_template_mode=composed_prompt.prompt_template_mode,
+        )
 
         model_request = ModelRequest(
             task_type=ModelTaskType.CHILD_CHAT,
@@ -111,6 +136,12 @@ class ChildAgentRuntime:
                 age_policy,
             ),
         )
+        model_request.metadata["fast_path_used"] = use_fast_path
+        model_request.metadata["fast_path_reason"] = fast_reason
+        model_request.metadata["fast_path_blocked_reason"] = blocked_reason
+        model_request.metadata["prompt_template_mode"] = composed_prompt.prompt_template_mode
+        model_request.metadata["prompt_total_chars"] = composed_prompt.prompt_total_chars
+        model_request.metadata["section_chars_by_layer"] = composed_prompt.section_chars_by_layer
 
         try:
             model_response = self._model_registry.generate(model_request)
@@ -129,6 +160,7 @@ class ChildAgentRuntime:
                 request,
                 fallback_reason="model_generate_failed",
                 prompt_versions=prompt_versions,
+                **_fp,
             )
 
         registry_fallback_reason = self._registry_fallback_reason(
@@ -142,6 +174,7 @@ class ChildAgentRuntime:
                 provider_name=model_response.provider_name,
                 model_name=model_response.model_name,
                 model_metadata=model_response.metadata,
+                **_fp,
             )
 
         model_response.metadata.setdefault("age_band", age_policy.age_band)
@@ -222,6 +255,7 @@ class ChildAgentRuntime:
                 model_metadata=model_response.metadata,
                 turn_guidance_context=turn_guidance_context,
                 age_policy=age_policy,
+                **_fp,
             )
         if self._requires_deterministic_self_harm_reply(request):
             return self._fallback_result(
@@ -233,6 +267,7 @@ class ChildAgentRuntime:
                 model_metadata=model_response.metadata,
                 turn_guidance_context=turn_guidance_context,
                 age_policy=age_policy,
+                **_fp,
             )
 
         output_safety = self._safety_engine.classify_output(reply_text)
@@ -247,6 +282,7 @@ class ChildAgentRuntime:
                 output_risk_level=output_safety.risk_level,
                 turn_guidance_context=turn_guidance_context,
                 age_policy=age_policy,
+                **_fp,
             )
         if self._looks_like_direct_homework_answer(request, reply_text):
             return self._fallback_result(
@@ -259,6 +295,7 @@ class ChildAgentRuntime:
                 output_risk_level=output_safety.risk_level,
                 turn_guidance_context=turn_guidance_context,
                 age_policy=age_policy,
+                **_fp,
             )
 
         self._attach_healthy_engagement_metrics(
@@ -279,6 +316,13 @@ class ChildAgentRuntime:
             prompt_versions=prompt_versions,
             model_metadata=model_response.metadata,
             output_risk_level=output_safety.risk_level,
+            fast_path_used=use_fast_path,
+            fast_path_reason=fast_reason,
+            fast_path_blocked_reason=blocked_reason,
+            prompt_total_chars=composed_prompt.prompt_total_chars,
+            system_prompt_chars=len(composed_prompt.prompt),
+            section_chars_by_layer=composed_prompt.section_chars_by_layer,
+            prompt_template_mode=composed_prompt.prompt_template_mode,
         )
 
     def _fallback_result(
@@ -293,6 +337,12 @@ class ChildAgentRuntime:
         output_risk_level: RiskLevel | None = None,
         turn_guidance_context: TurnGuidanceContext | None = None,
         age_policy: AgeBandReplyPolicy | None = None,
+        fast_path_used: bool = False,
+        fast_path_reason: str | None = None,
+        fast_path_blocked_reason: str | None = None,
+        prompt_total_chars: int = 0,
+        section_chars_by_layer: dict[str, int] | None = None,
+        prompt_template_mode: str = "full",
     ) -> AgentRuntimeResult:
         reply_text = request.route_decision.reply_text
         if self._requires_deterministic_self_harm_reply(request):
@@ -340,6 +390,13 @@ class ChildAgentRuntime:
             prompt_versions=prompt_versions,
             model_metadata=metadata,
             output_risk_level=output_risk_level,
+            fast_path_used=fast_path_used,
+            fast_path_reason=fast_path_reason,
+            fast_path_blocked_reason=fast_path_blocked_reason,
+            prompt_total_chars=prompt_total_chars,
+            system_prompt_chars=prompt_total_chars,
+            section_chars_by_layer=section_chars_by_layer or {},
+            prompt_template_mode=prompt_template_mode,
         )
 
     def _build_turn_guidance_context(
@@ -352,6 +409,74 @@ class ChildAgentRuntime:
             parent_policy=request.parent_policy,
             session_id=request.session_id,
         )
+
+    def _evaluate_fast_path_eligibility(
+        self,
+        request: AgentRuntimeRequest,
+        turn_guidance_context: TurnGuidanceContext,
+    ) -> tuple[bool, str | None, str | None]:
+        """Return (use_fast_path, fast_reason, blocked_reason)."""
+        decision = request.route_decision
+
+        # 1. Must be conversation.open
+        if decision.active_scene != SceneId.OPEN_CONVERSATION:
+            return False, None, f"scene={decision.active_scene.value}"
+
+        # 2. Risk level must be none
+        if decision.risk_level != RiskLevel.NONE:
+            return False, None, f"risk_level={decision.risk_level.value}"
+
+        # 3. No image
+        image_ctx = request.conversation_metadata.get("image_context")
+        if image_ctx:
+            return False, None, "has_image"
+
+        # 4. No homework context
+        if request.conversation_metadata.get("contains_image") and request.conversation_metadata.get("image_context"):
+            # contains_image can be true from homework too; check actual context
+            pass
+        if request.conversation_metadata.get("homework_context"):
+            return False, None, "has_homework"
+
+        # 5-8. Intent must not be sensitive types
+        intent = request.intent or ""
+        if intent in _FAST_PATH_BLOCKED_INTENTS:
+            return False, None, f"intent={intent}"
+
+        # 9. Not bedtime
+        if turn_guidance_context.boundary_signal == "bedtime":
+            return False, None, "bedtime"
+
+        # 10. No memory recall content
+        memory = request.memory_context
+        if memory:
+            has_content = False
+            if isinstance(memory, str) and memory.strip():
+                has_content = True
+            elif isinstance(memory, list) and any(m for m in memory):
+                has_content = True
+            elif isinstance(memory, dict) and memory:
+                has_content = True
+            if has_content:
+                return False, None, "has_memory"
+
+        # 11. Co-creation is a hint to the model, not a prompt structure change.
+        # The fast path prompt can handle imaginative content fine.
+        # Only block if co-creation has actually been initiated (tracked in conversation service).
+
+        # 12. Child text not matching sensitive keywords
+        normalized = request.child_text.replace(" ", "")
+        _sensitive_markers = (
+            "不想活", "想死", "自杀", "伤害自己",
+            "陌生人", "保密", "秘密",
+            "身体不舒服", "肚子疼", "头疼", "发烧",
+            "爸爸妈妈打", "家庭冲突",
+        )
+        for marker in _sensitive_markers:
+            if marker in normalized:
+                return False, None, f"sensitive_keyword={marker}"
+
+        return True, "low_risk_open_chat", None
 
     def _model_context(
         self,

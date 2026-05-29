@@ -44,6 +44,9 @@ class ComposedPrompt(BaseModel):
     prompt: str
     sections: list[PromptSection] = Field(default_factory=list)
     prompt_versions: dict[str, PromptVersion] = Field(default_factory=dict)
+    prompt_total_chars: int = 0
+    section_chars_by_layer: dict[str, int] = Field(default_factory=dict)
+    prompt_template_mode: str = "full"
 
     @property
     def content(self) -> str:

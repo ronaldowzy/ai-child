@@ -57,6 +57,8 @@ class AgentRuntimeRequest(BaseModel):
     memory_context: list[Any] | dict[str, Any] | str | None = None
     conversation_history: list[ModelMessage] = Field(default_factory=list)
     conversation_metadata: dict[str, Any] = Field(default_factory=dict)
+    intent: str | None = None
+    sub_intent: str | None = None
 
 
 class AgentRuntimeResult(BaseModel):
@@ -68,3 +70,10 @@ class AgentRuntimeResult(BaseModel):
     prompt_versions: dict[str, PromptVersion] = Field(default_factory=dict)
     model_metadata: dict[str, Any] = Field(default_factory=dict)
     output_risk_level: RiskLevel | None = None
+    fast_path_used: bool = False
+    fast_path_reason: str | None = None
+    fast_path_blocked_reason: str | None = None
+    prompt_total_chars: int = 0
+    system_prompt_chars: int = 0
+    section_chars_by_layer: dict[str, int] = Field(default_factory=dict)
+    prompt_template_mode: str = "full"

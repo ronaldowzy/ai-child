@@ -201,6 +201,7 @@ def test_child_agent_runtime_includes_turn_guidance_in_prompt_and_metadata() -> 
             for text in SPORT_CONVERSATION[1:8]
         ],
         conversation_metadata={},
+        intent="learning_help",
     )
 
     runtime.run(request)

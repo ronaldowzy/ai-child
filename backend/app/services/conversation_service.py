@@ -310,6 +310,8 @@ class ConversationService:
                     or homework_context is not None,
                     "image_context": prompt_image_context,
                 },
+                intent=intent.intent.value if hasattr(intent.intent, "value") else str(intent.intent),
+                sub_intent=intent.sub_intent,
             )
         )
         model_ms = self._elapsed_ms(model_started_at)

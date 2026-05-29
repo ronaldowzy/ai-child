@@ -957,7 +957,7 @@ def test_child_agent_runtime_guides_photo_upload_without_claiming_no_image_featu
     )
 
     assert "没有看图功能" not in result.reply_text
-    assert "拍给小白狐看" in result.reply_text
+    assert "给小白狐看看" in result.reply_text
 
 
 def test_child_agent_runtime_falls_back_when_prompt_scene_is_missing() -> None:

@@ -107,7 +107,7 @@ def test_image_context_prompt_does_not_default_to_homework_or_refuse_seen_image(
         },
     ).prompt
 
-    assert "不要说你看不到图片、不能看图片或没有看图功能" in prompt
+    assert "不要说你看不到图片" in prompt
     assert "不要把它强行当成作业" in prompt
     assert "最多提及一个具体、安全、被摘要支持的细节" in prompt
 

@@ -69,11 +69,10 @@ def _route_decision() -> SceneRouteDecision:
 def test_static_prompt_contains_child_speech_understanding_rules() -> None:
     prompt = PromptManager().compose("conversation.open")
 
-    assert "儿童表达理解" in prompt.prompt
-    assert "旁人提示、按钮操作说明或 ASR 误听" in prompt.prompt
-    assert "每天十五公里" in prompt.prompt
-    assert "不要围绕“按按钮、说完再按”等旁白展开" in prompt.prompt
-    assert "话题推进与换轨" in prompt.prompt
+    assert "对话节奏" in prompt.prompt
+    assert "嗯/还行/不知道/随便" in prompt.prompt
+    assert "不要继续追问细节" in prompt.prompt
+    assert "短答后停止主动推进" in prompt.prompt
     assert "立即尊重，不再追问原话题" in prompt.prompt
 
 

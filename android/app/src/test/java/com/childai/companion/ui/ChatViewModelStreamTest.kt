@@ -44,7 +44,7 @@ class ChatViewModelStreamTest {
         val state = viewModel.uiState.value
         assertEquals(MessageAuthor.Agent, state.messages.last().author)
         assertTrue(state.messages.last().text.contains("给小白狐看看"))
-        assertTrue(state.messages.last().text.contains("拍照或从相册选一张"))
+        assertTrue(state.messages.last().text.contains("拍一张或选一张都可以"))
     }
 
     @Test
@@ -146,7 +146,7 @@ class ChatViewModelStreamTest {
 
         assertTrue(ttsController.requests.isEmpty())
         assertEquals(
-            "刚才没有传好，文字还在这里。",
+            "刚才有点卡住，字还在",
             viewModel.uiState.value.tts.errorMessage,
         )
     }

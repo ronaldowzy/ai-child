@@ -235,7 +235,7 @@ def test_show_and_tell_creates_share_photo_action() -> None:
     )
 
     labels = [action.label for action in actions]
-    assert "拍给小白狐看" in labels, f"Should have share_photo: {labels}"
+    assert "给小白狐看看" in labels, f"Should have share_photo: {labels}"
 
 
 def test_profile_interests_priority_over_keyword_fallback() -> None:

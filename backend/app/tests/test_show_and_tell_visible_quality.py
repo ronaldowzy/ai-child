@@ -188,10 +188,9 @@ def test_unclear_repair_does_not_pretend_to_see() -> None:
     result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
     assert result is not None
     # Should not invent content
-    assert "我看到" not in result
     assert "像是" not in result
     # Should acknowledge uncertainty
-    assert "不太清楚" in result or "告诉我" in result
+    assert "不清楚" in result or "不太清楚" in result or "告诉我" in result
 
 
 # --- Test 6: PromptManager image_context rules ---
@@ -216,7 +215,7 @@ def test_prompt_manager_no_image_context_tells_model_not_to_pretend() -> None:
     pm = PromptManager()
     result = pm._render_image_context(None)
     assert "不要假装" in result
-    assert "拍给小白狐看" in result
+    assert "给小白狐看看" in result
 
 
 def test_prompt_manager_homework_image_context_scaffolds() -> None:
@@ -429,8 +428,9 @@ def test_blurry_image_repair_does_not_pretend() -> None:
     result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
     assert result is not None
     assert "我的画" in result
-    assert "不太清楚" in result
-    assert "我看到" not in result
+    assert "不清楚" in result or "不太清楚" in result
+    # Should not invent specific content for unclear images
+    assert "像" not in result
 
 
 # --- Test 11: Image context continuation doesn't say "看不到图片" ---

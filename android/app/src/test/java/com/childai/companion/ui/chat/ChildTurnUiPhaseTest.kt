@@ -125,7 +125,7 @@ class ChildTurnUiPhaseTest {
         )
 
         assertEquals(ChildTurnUiPhase.ServiceError, presentation.phase)
-        assertEquals("我们先请大人检查一下。", presentation.statusText)
+        assertEquals("请家长帮忙看看", presentation.statusText)
         assertEquals(FoxMood.NetworkError, presentation.agent.mood)
     }
 }

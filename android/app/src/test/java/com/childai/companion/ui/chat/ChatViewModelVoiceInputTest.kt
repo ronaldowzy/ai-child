@@ -147,7 +147,7 @@ class ChatViewModelVoiceInputTest {
             ChildTurnUiPhase.PermissionNeeded,
             viewModel.uiState.value.interactionPresentation.phase,
         )
-        assertEquals("没有麦克风权限，我们可以请大人打开。", viewModel.uiState.value.voice.statusText)
+        assertEquals("还不能用麦克风，请家长帮忙打开", viewModel.uiState.value.voice.statusText)
     }
 
     @Test

@@ -110,7 +110,7 @@ def test_bedtime_opening_is_low_stimulation() -> None:
     )
 
     body = response.json()
-    assert "一小句" in body["reply"]["text"]
+    assert "一小会儿" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "sleepy"
 
 
@@ -149,7 +149,7 @@ def test_opening_falls_back_when_model_opening_unavailable() -> None:
     response = service.create_opening(request)
 
     assert response.reply.text.startswith("豆豆，")
-    assert "一小句" in response.reply.text
+    assert "一小会儿" in response.reply.text
     assert model_registry.requests == 1
 
 

@@ -799,7 +799,7 @@ internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): Strin
     return when (status) {
         LocalImagePreviewStatus.Uploading -> "正在给小白狐看看"
         LocalImagePreviewStatus.Sent -> "小白狐正在看"
-        LocalImagePreviewStatus.Failed -> "这张图还没给小白狐看到"
+        LocalImagePreviewStatus.Failed -> "这张图还没看到"
     }
 }
 
@@ -1475,7 +1475,7 @@ internal fun childUiPolishStateLabel(phase: ChildTurnUiPhase): String {
         ChildTurnUiPhase.ImageProcessing -> "小白狐正在看"
         ChildTurnUiPhase.NeedsRetry -> "可以再说一次"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙"
-        ChildTurnUiPhase.ServiceError -> "先请大人看看"
+        ChildTurnUiPhase.ServiceError -> "请家长帮忙看看"
     }
 }
 

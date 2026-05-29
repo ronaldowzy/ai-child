@@ -29,7 +29,7 @@ class AgentReplyCarouselTest {
         assertEquals("我在听", childUiPolishStateLabel(ChildTurnUiPhase.Listening))
         assertEquals("在说给你听", childUiPolishStateLabel(ChildTurnUiPhase.Speaking))
         assertEquals("小白狐正在看", childUiPolishStateLabel(ChildTurnUiPhase.ImageProcessing))
-        assertEquals("先请大人看看", childUiPolishStateLabel(ChildTurnUiPhase.ServiceError))
+        assertEquals("请家长帮忙看看", childUiPolishStateLabel(ChildTurnUiPhase.ServiceError))
     }
 
     @Test

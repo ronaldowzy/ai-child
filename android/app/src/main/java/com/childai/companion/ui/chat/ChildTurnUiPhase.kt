@@ -102,7 +102,7 @@ private fun ChildTurnUiPhase.statusText(inputMode: VoiceInputMode = VoiceInputMo
         ChildTurnUiPhase.NeedsRetry -> "这次没弄好，可以再试一次。"
         ChildTurnUiPhase.PermissionNeeded -> "需要大人帮忙打开麦克风。"
         ChildTurnUiPhase.Resting -> "想说的时候再说。"
-        ChildTurnUiPhase.ServiceError -> "我们先请大人检查一下。"
+        ChildTurnUiPhase.ServiceError -> "请家长帮忙看看"
     }
 }
 
@@ -112,7 +112,7 @@ private fun ChildTurnUiPhase.primaryButtonText(): String {
         ChildTurnUiPhase.WaitingChild -> "按一下开始说"
         ChildTurnUiPhase.Recognizing -> "正在听懂"
         ChildTurnUiPhase.NeedsRetry -> "再说一次"
-        ChildTurnUiPhase.PermissionNeeded -> "请大人帮忙看看"
+        ChildTurnUiPhase.PermissionNeeded -> "请家长帮忙看看"
         ChildTurnUiPhase.ServiceError -> "按一下开始说"
         ChildTurnUiPhase.Sending,
         ChildTurnUiPhase.Thinking,

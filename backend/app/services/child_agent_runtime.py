@@ -971,7 +971,7 @@ class ChildAgentRuntime:
             if self._child_is_asking_to_share_image(request.child_text) and (
                 not reply_text or self._looks_like_image_refusal(reply_text)
             ):
-                return "可以的。请点“拍给小白狐看”拍照或选图，上传后我再跟你一起看。"
+                return "可以呀。点「给小白狐看看」，拍一张或选一张，我再和你一起看。"
             return None
         if not self._looks_like_image_refusal(reply_text):
             return None
@@ -992,12 +992,12 @@ class ChildAgentRuntime:
             "homework_problem",
         ):
             if summary:
-                return f"我看到这张图像是一道题，里面大概是：{summary}。我们先看看题目在问什么，你可以读一小句给我听。"
-            return "我看到这张图像是一道题。我们先看看题目在问什么，你可以读一小句给我听。"
+                return f"我看到这张图像是一道题，里面大概是：{summary}。我们先看看题目在问什么，你可以读一小段给我听。"
+            return "我看到这张图像是一道题。我们先看看题目在问什么，你可以读一小段给我听。"
 
         # Privacy — do not expose details
         if recognized_type == "privacy_sensitive" or image_purpose == "privacy_sensitive":
-            return "这张图可能有隐私内容，我们先不展开细节。可以请家长一起看一下。"
+            return "这张图可能有隐私内容，我们先不说细节。可以请家长一起看一下。"
 
         # Child drawing / art — notice one detail, invite child to tell or name
         if recognized_type in ("child_drawing", "art_feedback") or image_purpose in (
@@ -1006,8 +1006,8 @@ class ChildAgentRuntime:
         ):
             detail = child_caption or summary
             if detail:
-                return f"我看到你画里有一个{detail}。这个地方很有意思，你可以给它起个名字，或者讲讲它的故事。"
-            return "图片已经传上来了。你可以告诉我你画的是什么，或者你最想让我看哪里。"
+                return f"我看到你画里有一个{detail}。这个地方很有意思，你想给它起个名字，还是编个小故事？"
+            return "这张图我看到了。你可以跟我说说画的是什么，或者最想让我看哪里。"
 
         # Toy / object / handmade / daily life — one detail + creative entry
         if recognized_type in ("toy", "object", "handmade", "daily_life") or image_purpose in (
@@ -1019,24 +1019,24 @@ class ChildAgentRuntime:
         ):
             if summary:
                 return f"我看到图里像是一个{summary}。你可以给它起个名字，或者告诉我发生了什么。"
-            return "图片已经传上来了。你可以告诉我最想让小白狐看哪里。"
+            return "这张图我看到了。你可以跟我说说最想让我看哪里。"
 
         # Tell story — light imaginative bridge
         if image_purpose == "tell_story":
             if summary:
-                return f"我看到图里像是{summary}。可以从这个小地方开始编一个故事。"
-            return "图片已经传上来了。你可以给我讲讲这里面的故事。"
+                return f"我看到图里像是{summary}。我们可以从这里编个小故事。"
+            return "这张图我看到了。你可以跟我讲讲里面的故事。"
 
         # Unclear / empty — do not pretend to see
         if recognized_type in ("unclear", "low_confidence", "unsafe_unknown") or not summary:
             if child_caption:
-                return f"图片已经传上来了，但这次看得不太清楚。你刚才说的「{child_caption}」很有意思，可以再告诉我一点。"
-            return "图片已经传上来了，但这次看得不太清楚。你可以告诉我它是什么，或者再拍一张更清楚的。"
+                return f"这张图我看到了，但有点不清楚。你刚才说的「{child_caption}」很有意思，可以再跟我说说。"
+            return "这张图我看到了，但有点不清楚。你可以跟我说说它是什么，或者再拍一张更清楚的。"
 
         # Default — generic share with one detail + creative entry
         if summary:
             return f"我看到图里像是{summary}。你可以给它起个名字，或者告诉我发生了什么。"
-        return "图片已经传上来了。你可以告诉我最想让小白狐看哪里。"
+        return "这张图我看到了。你可以跟我说说最想让我看哪里。"
 
     def _looks_like_image_refusal(self, text: str) -> bool:
         compact = text.replace(" ", "")

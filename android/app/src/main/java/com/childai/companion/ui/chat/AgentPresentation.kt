@@ -6,7 +6,7 @@ import java.io.File
 data class FoxAgentUiState(
     val mood: FoxMood = FoxMood.Warm,
     val motion: FoxMotion = FoxMotion.GentleIdle,
-    val statusText: String = "慢慢说，一次说一件事就好。",
+    val statusText: String = "慢慢说就好",
 )
 
 enum class FoxMood {
@@ -57,15 +57,15 @@ data class VoiceUiState(
     val statusText: String
         get() = when {
             errorMessage != null -> errorMessage
-            inputMode == VoiceInputMode.Listening -> "我在听。"
-            inputMode == VoiceInputMode.WaitingForChild -> "想说的时候再说。"
-            inputMode == VoiceInputMode.Uploading -> "我在听懂你刚才说的话。"
-            inputMode == VoiceInputMode.PendingTranscript -> "可以先改文字，再发送。"
-            inputMode == VoiceInputMode.NeedsRetry -> "我刚才没听清，可以再说一次。"
-            inputMode == VoiceInputMode.PermissionDenied -> "没有麦克风权限，我们可以请大人打开。"
-            isTtsAvailable -> "朗读稍后接上"
-            isVoiceInputReserved -> "按一下语音开始说"
-            else -> "文字交流"
+            inputMode == VoiceInputMode.Listening -> "我在听"
+            inputMode == VoiceInputMode.WaitingForChild -> "想说再说"
+            inputMode == VoiceInputMode.Uploading -> "我在想你刚才说的话"
+            inputMode == VoiceInputMode.PendingTranscript -> "可以改一下再发"
+            inputMode == VoiceInputMode.NeedsRetry -> "刚才没听清，可以再说一遍"
+            inputMode == VoiceInputMode.PermissionDenied -> "还不能用麦克风，请家长帮忙打开"
+            isTtsAvailable -> "声音马上来"
+            isVoiceInputReserved -> "按一下开始说"
+            else -> "打字也可以"
         }
 }
 
@@ -148,30 +148,30 @@ private fun String.toFoxMotion(): FoxMotion {
 
 private fun agentStatusText(mood: FoxMood, motion: FoxMotion): String {
     return when {
-        motion == FoxMotion.Speaking -> "我在说给你听。"
-        motion == FoxMotion.HomeworkFocus || mood == FoxMood.HomeworkFocus -> "我们一步一步看题目。"
-        motion == FoxMotion.SleepyBlink || mood == FoxMood.Sleepy -> "我们轻轻收个尾。"
-        motion == FoxMotion.ConcernedStill || mood == FoxMood.SafetyConcern -> "这件事要告诉可信任的大人。"
-        motion == FoxMotion.SteadyBoundary || mood == FoxMood.PrivacyBoundary -> "这些信息要先保护好。"
-        motion == FoxMotion.NetworkError || mood == FoxMood.NetworkError -> "这张图还没给小白狐看到。"
-        motion == FoxMotion.ThinkingBlink || mood == FoxMood.Thinking -> "我先想一想。"
-        motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听。"
-        motion == FoxMotion.CelebrateSmall || mood == FoxMood.Encouraging -> "你刚才说得很清楚。"
-        motion == FoxMotion.CalmStill || mood == FoxMood.Calm -> "我们慢一点说。"
-        else -> "慢慢说，一次说一件事就好。"
+        motion == FoxMotion.Speaking -> ""
+        motion == FoxMotion.HomeworkFocus || mood == FoxMood.HomeworkFocus -> "我们一步一步看"
+        motion == FoxMotion.SleepyBlink || mood == FoxMood.Sleepy -> "我们慢慢收个尾"
+        motion == FoxMotion.ConcernedStill || mood == FoxMood.SafetyConcern -> "这件事要告诉家长或老师"
+        motion == FoxMotion.SteadyBoundary || mood == FoxMood.PrivacyBoundary -> "这些信息先别说出来"
+        motion == FoxMotion.NetworkError || mood == FoxMood.NetworkError -> "这张图还没看到"
+        motion == FoxMotion.ThinkingBlink || mood == FoxMood.Thinking -> "我想想"
+        motion == FoxMotion.ListeningTail || mood == FoxMood.Listening -> "我在听"
+        motion == FoxMotion.CelebrateSmall || mood == FoxMood.Encouraging -> "我听清楚啦"
+        motion == FoxMotion.CalmStill || mood == FoxMood.Calm -> "我们慢慢说"
+        else -> "慢慢说就好"
     }
 }
 
 fun FoxAgentUiState.asSpeaking(): FoxAgentUiState {
     return copy(
         motion = FoxMotion.Speaking,
-        statusText = "我在说给你听。",
+        statusText = "",
     )
 }
 
 fun FoxAgentUiState.asSpeakingPending(): FoxAgentUiState {
     return copy(
         motion = FoxMotion.Speaking,
-        statusText = "小白狐在准备说。",
+        statusText = "我准备说",
     )
 }

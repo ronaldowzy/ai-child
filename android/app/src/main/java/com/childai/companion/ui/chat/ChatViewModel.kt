@@ -189,7 +189,7 @@ class ChatViewModel(
         stopCurrentTts(restoreBaseAgent = true)
         if (wasSpeaking) {
             _uiState.update {
-                it.copy(agent = baseAgentState.copy(statusText = "我听见啦。"))
+                it.copy(agent = baseAgentState.copy(statusText = "我听到啦"))
             }
         }
         Log.d(TAG, "[LatencyTrace] stage=asr_start")
@@ -258,7 +258,7 @@ class ChatViewModel(
                     timezone = DevSettings.TIMEZONE,
                 )
             }.getOrElse {
-                SpeechInputResult.Failed("这次没有听懂声音，我们先请大人检查一下。")
+                SpeechInputResult.Failed("刚才没听清。请家长帮忙看一下麦克风")
             }
             Log.d(TAG, "[LatencyTrace] stage=asr_done result=${result::class.simpleName}")
             applySpeechInputResult(result)
@@ -297,7 +297,7 @@ class ChatViewModel(
             _uiState.update {
                 it.copy(
                     voice = it.voice.copy(
-                        errorMessage = "先留下一句文字，再发送给小白狐。",
+                        errorMessage = "先写一句话，再发给小白狐",
                     ),
                 )
             }
@@ -339,7 +339,7 @@ class ChatViewModel(
         stopCurrentTts(restoreBaseAgent = true)
         if (wasSpeaking) {
             _uiState.update {
-                it.copy(agent = baseAgentState.copy(statusText = "好，我先停下。"))
+                it.copy(agent = baseAgentState.copy(statusText = "好，我先停下"))
             }
         }
         recordChildMessage(text)
@@ -388,7 +388,7 @@ class ChatViewModel(
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
                             motion = FoxMotion.NetworkError,
-                            statusText = "我们先等大人检查网络。",
+                            statusText = "请家长帮忙看看网络",
                         ),
                         voice = it.voice.copy(
                             inputMode = VoiceInputMode.Idle,
@@ -407,7 +407,7 @@ class ChatViewModel(
             "take_photo", "share_photo" -> {
                 stopCurrentTts(restoreBaseAgent = true)
                 appendAgentMessage(
-                    "请点下方“给小白狐看看”，直接拍照或从相册选一张。",
+                    "点“给小白狐看看”，拍一张或选一张都可以",
                 )
             }
             "talk_about_image",
@@ -437,7 +437,7 @@ class ChatViewModel(
             ChatMessage(
                 id = childPhotoMessageId,
                 author = MessageAuthor.Child,
-                text = "我拍了一张图片给小白狐看。",
+                text = "我给小白狐看了一张图",
             ),
         )
         pendingUploadPayloads[childPhotoMessageId] = payload to imagePurpose
@@ -473,7 +473,7 @@ class ChatViewModel(
                     mimeType = payload.mimeType,
                     fileName = childSafeUploadFileName(payload.fileName),
                     imagePurpose = imagePurpose,
-                    childCaption = "我拍了一张图片给小白狐看。",
+                    childCaption = "我给小白狐看了一张图",
                 )
             }.onSuccess { attachmentResponse ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_done status=ok")
@@ -503,7 +503,7 @@ class ChatViewModel(
                         agent = FoxAgentUiState(
                             mood = FoxMood.NetworkError,
                             motion = FoxMotion.NetworkError,
-                            statusText = "这张图还没给小白狐看到。",
+                            statusText = "这张图还没看到",
                         ),
                     )
                 }
@@ -539,7 +539,7 @@ class ChatViewModel(
                     mimeType = payload.mimeType,
                     fileName = childSafeUploadFileName(payload.fileName),
                     imagePurpose = imagePurpose,
-                    childCaption = "我拍了一张图片给小白狐看。",
+                    childCaption = "我给小白狐看了一张图",
                 )
             }.onSuccess { attachmentResponse ->
                 pendingUploadPayloads.remove(messageId)
@@ -562,7 +562,7 @@ class ChatViewModel(
                             agent = FoxAgentUiState(
                                 mood = FoxMood.NetworkError,
                                 motion = FoxMotion.NetworkError,
-                                statusText = "这张图还没给小白狐看到。",
+                                statusText = "这张图还没看到",
                             ),
                         )
                     } else state
@@ -611,7 +611,7 @@ class ChatViewModel(
                 agent = FoxAgentUiState(
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
-                    statusText = "我们再拍一次。",
+                    statusText = "可以再拍一次",
                 ),
             )
         }
@@ -643,7 +643,7 @@ class ChatViewModel(
             renderAgentReply(response)
         }.onFailure {
             appendAgentMessage(
-                "题目已经看到了，但这次没有接稳。请大人稍后再试。",
+                "题目我看到了，但刚才有点卡住。请家长稍后再试",
             )
             _uiState.update {
                 it.copy(
@@ -653,7 +653,7 @@ class ChatViewModel(
                     agent = FoxAgentUiState(
                         mood = FoxMood.NetworkError,
                         motion = FoxMotion.NetworkError,
-                        statusText = "题目已经看到了，我们等一下再试。",
+                        statusText = "题目我看到了，我们等一下再试",
                     ),
                     voice = it.voice.copy(
                         inputMode = VoiceInputMode.Idle,
@@ -698,10 +698,10 @@ class ChatViewModel(
         }
         _uiState.update { it.copy(pendingImageContext = null) }
         val text = when (action.id) {
-            "give_name", "image_naming" -> "起个名字。"
-            "tell_story", "make_story", "image_story" -> "讲一句小故事。"
+            "give_name", "image_naming" -> "起个名字"
+            "tell_story", "make_story", "image_story" -> "编个小故事"
             "ask_what_is_this" -> "这是什么？"
-            else -> "给小白狐看看。"
+            else -> "给小白狐看看"
         }
         sendTextWithAttachments(text, listOf(context.attachmentId))
     }
@@ -753,7 +753,7 @@ class ChatViewModel(
                         agent = FoxAgentUiState(
                             mood = FoxMood.Listening,
                             motion = FoxMotion.ListeningTail,
-                            statusText = "我听到了这句，你可以先改一改。",
+                            statusText = "我听到了，可以改一下再发",
                         ),
                     )
                 }
@@ -1092,7 +1092,7 @@ class ChatViewModel(
 
     private fun applyStreamError(event: ConversationStreamEvent) {
         val message = event.safeMessage
-            ?: "刚才没有传好，文字还在这里。"
+            ?: "刚才有点卡住，字还在"
         val hasPartialText = streamingAgentMessageId != null
         if (!hasPartialText) {
             appendAgentMessage(message)
@@ -1108,7 +1108,7 @@ class ChatViewModel(
                 agent = if (hasPartialText) state.agent else FoxAgentUiState(
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
-                    statusText = "我们先等大人检查网络。",
+                    statusText = "请家长帮忙看一下网络",
                 ),
             )
         }
@@ -1116,21 +1116,21 @@ class ChatViewModel(
 
     private fun uploadFailureMessage(imagePurpose: String): String {
         return if (imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
-            "这道题目暂时没有处理好。我们先停一下，请大人稍后再试。"
+            "这道题刚才没弄好。我们先停一下，请家长稍后再试"
         } else {
-            "这张图片暂时没有处理好。我们先停一下，请大人稍后再试。"
+            "这张图刚才没弄好。我们先停一下，请家长稍后再试"
         }
     }
 
     private fun followupFailureMessage(attachments: List<String>): String {
         val context = _uiState.value.pendingImageContext
         if (attachments.isEmpty() || context == null) {
-            return "小白狐这边没有接稳。我们先停一下，请大人检查网络后再试。"
+            return "小白狐刚才有点卡住。我们先停一下，请家长检查网络后再试"
         }
         return if (context.imagePurpose == IMAGE_PURPOSE_HOMEWORK) {
-            "题目已经看到了，但这次没有接稳。请大人稍后再试。"
+            "题目我看到了，但刚才有点卡住。请家长稍后再试"
         } else {
-            "图片已经看到了，但这次没有接稳。请大人稍后再试。"
+            "图片我看到了，但刚才有点卡住。请家长稍后再试"
         }
     }
 
@@ -1359,14 +1359,14 @@ class ChatViewModel(
         if (openingRequested) return
         openingRequested = true
         Log.d(TAG, "[LatencyTrace] stage=opening_start")
-        // 0-1 秒：立即显示本地确定性状态 "我在这里"
+        // 0-1 秒：立即显示本地确定性状态 "我在这儿"
         _uiState.update { state ->
             state.copy(
                 childTurnPhaseHint = null,
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
-                    statusText = "我在这里。",
+                    statusText = "我在这儿",
                 ),
             )
         }
@@ -1375,10 +1375,10 @@ class ChatViewModel(
             delay(1500)
             if (!childInteractionStarted && !_uiState.value.messages.any { it.author == MessageAuthor.Child }) {
                 // 个性化 opening 尚未返回，且孩子未开始输入
-                if (_uiState.value.agent.statusText == "我在这里。") {
+                if (_uiState.value.agent.statusText == "我在这儿") {
                     _uiState.update { state ->
                         state.copy(
-                            agent = state.agent.copy(statusText = "你想说什么都可以。"),
+                            agent = state.agent.copy(statusText = "想聊什么都可以"),
                         )
                     }
                 }
@@ -1465,7 +1465,7 @@ class ChatViewModel(
             if (_uiState.value.voice.inputMode == VoiceInputMode.WaitingForChild) {
                 _uiState.update { state ->
                     state.copy(
-                        agent = baseAgentState.copy(statusText = "想说的时候再说。"),
+                        agent = baseAgentState.copy(statusText = "想说再说"),
                     )
                 }
                 delay(1500)
@@ -1483,14 +1483,14 @@ class ChatViewModel(
                 Log.d(TAG, "[LatencyTrace] stage=tts_slow_hint_3s")
                 _uiState.update { state ->
                     state.copy(
-                        agent = state.agent.copy(statusText = "声音有点慢，你可以先看字。"),
+                        agent = state.agent.copy(statusText = "声音有点慢，你先看字"),
                     )
                 }
             }
         }
     }
 
-    // SLA: T0-5s 若仍无模型文本，显示 "小白狐还在想怎么说清楚"
+    // SLA: T0-5s 若仍无模型文本，显示 "我还在想怎么说"
     private fun scheduleSlowHint5s() {
         slowHint5sJob?.cancel()
         slowHint8sJob?.cancel()
@@ -1500,7 +1500,7 @@ class ChatViewModel(
                 Log.d(TAG, "[LatencyTrace] stage=slow_hint_5s")
                 _uiState.update { state ->
                     state.copy(
-                        agent = state.agent.copy(statusText = "小白狐还在想怎么说清楚。"),
+                        agent = state.agent.copy(statusText = "我还在想怎么说"),
                     )
                 }
                 // SLA: T0-8s 允许显示低压出口
@@ -1510,7 +1510,7 @@ class ChatViewModel(
                         Log.d(TAG, "[LatencyTrace] stage=slow_hint_8s")
                         _uiState.update { state ->
                             state.copy(
-                                agent = state.agent.copy(statusText = "你也可以先换个话题，或等一下。"),
+                                agent = state.agent.copy(statusText = "也可以换个话题，或者等我一下"),
                             )
                         }
                     }

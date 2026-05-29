@@ -134,7 +134,7 @@ class QuickActionService:
         parent_policy: object | None,
         conversation_control: dict[str, object] | None,
     ) -> list[SceneAction]:
-        actions = [SceneAction(id="share_photo", label="拍给小白狐看")]
+        actions = [SceneAction(id="share_photo", label="给小白狐看看")]
         # Add one profile-aware topic choice if available
         topic_actions = self._topic_choice_actions(
             parent_policy=parent_policy,

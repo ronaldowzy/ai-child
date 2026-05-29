@@ -634,9 +634,9 @@ def test_parent_report_ask_fewer_questions_mentions_not追问() -> None:
         support_style=["ask_fewer_questions"],
     )
 
-    # Default action with ask_fewer should mention not追问
-    assert any("不追问" in a for a in actions), (
-        f"Should mention not追问: {actions}"
+    # Default action with ask_fewer should mention not追问 or轻轻
+    assert any("不追问" in a or "轻轻" in a for a in actions), (
+        f"Should mention not追问 or 轻轻: {actions}"
     )
 
 

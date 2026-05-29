@@ -38,7 +38,7 @@ internal fun rememberImageInputLaunchers(
         }.onSuccess { payload ->
             onCaptured(payload, imagePurpose)
         }.onFailure {
-            onFailed("这张照片没有处理好，我们再拍一次。")
+            onFailed("这张照片没弄好，我们再拍一次。")
         }
         photoFile.delete()
     }
@@ -56,7 +56,7 @@ internal fun rememberImageInputLaunchers(
         }.onSuccess { payload ->
             onCaptured(payload, imagePurpose)
         }.onFailure {
-            onFailed("这张图片没有处理好，我们再选一次。")
+            onFailed("这张图片没弄好，我们再选一次。")
         }
     }
 
@@ -79,7 +79,7 @@ internal fun rememberImageInputLaunchers(
                 pendingPhotoFile?.let(::File)?.delete()
                 pendingPhotoFile = null
                 pendingImagePurpose = IMAGE_PURPOSE_SHARE
-                onFailed("现在没有打开相机，我们请大人检查一下。")
+                onFailed("现在没有打开相机，请家长帮忙看看。")
             }
         },
         pickFromGallery = { imagePurpose ->

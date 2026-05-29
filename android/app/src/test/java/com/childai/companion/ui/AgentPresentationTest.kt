@@ -30,7 +30,7 @@ class AgentPresentationTest {
 
         assertEquals(FoxMood.Thinking, agent.mood)
         assertEquals(FoxMotion.ThinkingBlink, agent.motion)
-        assertEquals("我先想一想。", agent.statusText)
+        assertEquals("我想想", agent.statusText)
     }
 
     @Test
@@ -48,7 +48,7 @@ class AgentPresentationTest {
 
         assertTrue(voice.isVoiceInputReserved)
         assertFalse(voice.isTtsAvailable)
-        assertEquals("按一下语音开始说", voice.statusText)
+        assertEquals("按一下开始说", voice.statusText)
     }
 
     @Test
@@ -66,7 +66,7 @@ class AgentPresentationTest {
 
         assertTrue(voice.isTtsAvailable)
         assertEquals("https://example.test/audio.mp3", voice.audioUrl)
-        assertEquals("朗读稍后接上", voice.statusText)
+        assertEquals("声音马上来", voice.statusText)
     }
 
     @Test

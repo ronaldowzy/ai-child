@@ -34,7 +34,7 @@ class ChatViewModelImageAttachmentTest {
         val childMessage = state.messages.last()
         val preview = state.imagePreviewCards[childMessage.id]
         assertEquals(MessageAuthor.Child, childMessage.author)
-        assertEquals("我拍了一张图片给小白狐看。", childMessage.text)
+        assertEquals("我给小白狐看了一张图", childMessage.text)
         assertEquals(ChildTurnUiPhase.ImageProcessing, state.interactionPresentation.phase)
         assertNotNull(preview)
         assertEquals(LocalImagePreviewStatus.Uploading, preview!!.status)
@@ -66,13 +66,13 @@ class ChatViewModelImageAttachmentTest {
 
         val state = viewModel.uiState.value
         val childMessage = state.messages.first { it.author == MessageAuthor.Child }
-        assertTrue(state.messages.any { it.text.contains("这张图片暂时没有处理好") })
+        assertTrue(state.messages.any { it.text.contains("这张图刚才没弄好") })
         assertEquals(
             LocalImagePreviewStatus.Failed,
             state.imagePreviewCards.getValue(childMessage.id).status,
         )
         assertEquals(
-            "这张图还没给小白狐看到",
+            "这张图还没看到",
             localImagePreviewStatusText(state.imagePreviewCards.getValue(childMessage.id).status),
         )
         assertEquals(ChildTurnUiPhase.ServiceError, state.interactionPresentation.phase)

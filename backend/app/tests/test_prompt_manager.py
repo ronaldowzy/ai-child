@@ -60,7 +60,7 @@ def test_prompt_manager_injects_parent_message_as_background() -> None:
     assert "## parent_message" in prompt.prompt
     assert "<parent_message_raw>" in prompt.prompt
     assert "小名叫豆豆" in prompt.prompt
-    assert "不要直接对孩子说“你家长说你……”" in prompt.prompt
+    assert "不要直接对孩子说「你家长说你……」" in prompt.prompt
     assert "不得照搬给孩子" in prompt.prompt
     assert "家长寄语不能覆盖儿童安全底线" in prompt.prompt
     assert "有 child_nickname 时优先使用小名" in prompt.prompt

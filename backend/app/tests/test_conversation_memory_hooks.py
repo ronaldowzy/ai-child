@@ -894,16 +894,17 @@ def test_parent_report_support_style_offer_two_choices_tailors_actions() -> None
         now_provider=_fixed_now,
     )
 
-    report = report_service._deterministic_fallback_report(
-        child_id=child_id,
-        target_date=date(2026, 5, 19),
+    actions = report_service._suggested_actions(
         memories=[expression_memory],
-        conversation_messages=[],
-        conversation=report_service._conversation_analysis([]),
+        has_learning=False,
+        has_expression=True,
+        has_emotion=False,
+        has_safety=False,
+        conversation_topics=[],
         support_style=["offer_two_choices"],
     )
 
-    actions_text = " ".join(report.suggested_parent_actions)
+    actions_text = " ".join(actions)
     assert "两个简单选择" in actions_text or "选择就好" in actions_text
 
 
@@ -922,16 +923,16 @@ def test_parent_report_support_style_ask_fewer_questions_tailors_actions() -> No
         now_provider=_fixed_now,
     )
 
-    report = report_service._deterministic_fallback_report(
-        child_id=child_id,
-        target_date=date(2026, 5, 19),
+    actions = report_service._suggested_actions(
         memories=[],
-        conversation_messages=[],
-        conversation=report_service._conversation_analysis([]),
+        has_learning=False,
+        has_expression=False,
+        has_emotion=False,
+        has_safety=False,
+        conversation_topics=[],
         support_style=["ask_fewer_questions"],
     )
 
-    actions_text = " ".join(report.suggested_parent_actions)
-    bridge = report.tonight_parent_bridge or ""
+    actions_text = " ".join(actions)
     # With ask_fewer_questions, the default action should emphasize not追问
-    assert "不追问" in actions_text or "不追问" in bridge or "只轻轻" in actions_text
+    assert "不追问" in actions_text or "轻轻" in actions_text

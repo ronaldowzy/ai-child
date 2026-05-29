@@ -449,7 +449,7 @@ class OpeningService:
             else:
                 text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
-            text = f"{prefix}这句话也可以告诉家长。小白狐先听你说一点点。"
+            text = f"{prefix}这句话也可以告诉家长。小白狐先听你说。"
         else:
             templates = self._default_greeting_templates(prefix, opening_policy)
             text = self._select_by_variation(templates, parent_policy)
@@ -553,7 +553,7 @@ class OpeningService:
             topic = interest.content or ""
             safe_topic = self._safe_memory_hook(topic)
             if safe_topic:
-                text = f"{prefix}小白狐记得你聊过{safe_topic}。今天想慢慢说一点，还是先换个轻松的？"
+                text = f"{prefix}小白狐记得你聊过{safe_topic}。今天想慢慢聊，还是先换个轻松的？"
                 sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
                 if sanitized:
                     return sanitized
@@ -609,7 +609,7 @@ class OpeningService:
     ) -> list[str]:
         return [
             f"{prefix}我在这里。你可以慢慢说一句，也可以先听小白狐说一句。",
-            f"{prefix}小白狐在这里。今天可以先说一件小事，也可以拍给我看。",
+            f"{prefix}小白狐在这里。今天可以先聊一件小事，也可以给小白狐看看。",
             f"{prefix}回来啦。想聊什么都可以，不想说也没关系。",
         ]
 

@@ -154,7 +154,7 @@ fun InputBar(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(text = "拍一张")
+                        Text(text = "拍一张照片")
                     }
                     OutlinedButton(
                         onClick = {
@@ -163,14 +163,14 @@ fun InputBar(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(text = "选一张")
+                        Text(text = "从相册选")
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showImageSourceDialog = false }) {
-                    Text(text = "先不要")
+                    Text(text = "先不看")
                 }
             },
         )
@@ -314,7 +314,7 @@ fun InputBar(
                     enabled = enabled && !voice.hasPendingTranscript,
                     modifier = Modifier.weight(1f),
                     placeholder = {
-                        Text(text = "说点什么")
+                        Text(text = "想说什么都可以")
                     },
                     textStyle = MaterialTheme.typography.bodyLarge,
                     singleLine = true,
@@ -332,14 +332,14 @@ fun InputBar(
                     enabled = enabled && !voice.isUploading,
                     modifier = Modifier.widthIn(min = 64.dp),
                 ) {
-                    Text(text = if (voice.isRecording) "说完了" else "语音")
+                    Text(text = if (voice.isRecording) "说完了" else "语音说")
                 }
                 Button(
                     onClick = { sendDraft() },
                     enabled = enabled && !voice.hasPendingTranscript && trimmedDraft.isNotEmpty(),
                     modifier = Modifier.widthIn(min = 88.dp),
                 ) {
-                    Text(text = if (enabled) "发送" else "发送中")
+                    Text(text = if (enabled) "发送" else "发送中…")
                 }
             }
         }
@@ -365,12 +365,12 @@ fun InputBar(
                         onClick = { startVoiceRecordingWithPermission() },
                         enabled = enabled && !voice.isUploading,
                     ) {
-                        Text(text = "重说")
+                        Text(text = "重新说")
                     }
                 }
                 if (inputBarShouldShowCancelAction(useChildVoiceFirstInput, voice.inputMode)) {
                     TextButton(onClick = voice.actions.onCancelVoiceInput) {
-                        Text(text = "取消语音")
+                        Text(text = "先不发")
                     }
                 }
                 if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
@@ -386,10 +386,10 @@ fun InputBar(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onOpenTtsSettings) {
-                        Text(text = "检查朗读设置")
+                        Text(text = "检查声音设置")
                     }
                     TextButton(onClick = onInstallTtsData) {
-                        Text(text = "安装语音数据")
+                        Text(text = "安装声音数据")
                     }
                 }
             }

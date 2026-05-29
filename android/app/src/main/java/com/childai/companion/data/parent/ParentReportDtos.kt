@@ -30,6 +30,9 @@ data class ParentReport(
     val isGeneratedSuccessfully: Boolean
         get() = generationStatus == "model_generated"
 
+    val isMaterialInsufficient: Boolean
+        get() = generationStatus == "material_insufficient"
+
     val bridgeText: String
         get() = tonightParentBridge
             ?: suggestedParentActions.firstOrNull { it.isNotBlank() }

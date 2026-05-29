@@ -20,7 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,7 +32,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.data.parent.ParentReport
-import com.childai.companion.data.parent.ParentReportTopicOverview
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 
 @Composable
@@ -99,7 +97,7 @@ private fun ParentReportScreenContent(
                     onClick = onLoad,
                     enabled = !uiState.isLoading,
                 ) {
-                    Text(text = if (uiState.isLoading) "读取中" else "读取日报")
+                    Text(text = if (uiState.isLoading) "正在整理" else "查看今天小结")
                 }
                 if (uiState.isLoading) {
                     CircularProgressIndicator()
@@ -113,10 +111,10 @@ private fun ParentReportScreenContent(
                 )
             }
             uiState.report?.let { report ->
-                if (report.isGeneratedSuccessfully) {
-                    ReportBody(report = report)
-                } else {
-                    ReportGenerationStatus(report = report)
+                when {
+                    report.isGeneratedSuccessfully -> ReportBody(report = report)
+                    report.isMaterialInsufficient -> ReportMaterialInsufficient()
+                    else -> ReportFailed(onRetry = onLoad)
                 }
             }
         }
@@ -124,139 +122,56 @@ private fun ParentReportScreenContent(
 }
 
 @Composable
-private fun ReportGenerationStatus(report: ParentReport) {
-    ReportSection(title = "日报生成状态") {
+private fun ReportMaterialInsufficient() {
+    ReportSection(title = "今天的小结") {
         Text(
-            text = PARENT_REPORT_LOAD_FAILURE_MESSAGE,
+            text = PARENT_REPORT_INSUFFICIENT_MESSAGE,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
         )
+    }
+}
+
+@Composable
+private fun ReportFailed(onRetry: () -> Unit) {
+    ReportSection(title = "今天的小结") {
+        Text(
+            text = PARENT_REPORT_FAILED_MESSAGE,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Button(onClick = onRetry) {
+            Text(text = "再试一次")
+        }
     }
 }
 
 @Composable
 private fun ReportBody(report: ParentReport) {
-    ReportSection(title = PARENT_REPORT_BRIDGE_SECTION_TITLE) {
-        Text(
-            text = report.bridgeText,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
-    ReportSection(title = PARENT_REPORT_TOPIC_SECTION_TITLE) {
-        report.conversationSummary?.let { summary ->
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        if (report.topicOverview.isEmpty()) {
-            Text(
-                text = "今天还没有足够的结构化话题摘要。",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                report.topicOverview.forEach { topic ->
-                    TopicOverviewCard(topic = topic)
-                }
-            }
-        }
-    }
-    ReportSection(title = "今日整体摘要") {
+    ReportSection(title = "今天一句话") {
         Text(
             text = report.summary,
             style = MaterialTheme.typography.bodyLarge,
         )
     }
-    ReportSection(
-        title = "学习观察",
-        items = report.learningObservations,
-    )
-    ReportSection(
-        title = "表达观察",
-        items = report.expressionObservations,
-    )
-    ReportSection(
-        title = "情绪/社交观察",
-        items = report.emotionObservations,
-    )
-    ReportSection(
-        title = "家长可以怎么做",
-        items = report.suggestedParentActions,
-    )
-    ReportSection(
-        title = "今晚尽量别这样问",
-        items = report.avoidFollowup,
-        emptyText = "避免连续追问，先轻松陪孩子做一件现实里的小事。",
-    )
-    ReportSection(
-        title = "需要关注事项",
-        items = report.safetyAlerts,
-        emptyText = "暂无需要关注事项。",
-    )
-}
-
-@Composable
-private fun TopicOverviewCard(topic: ParentReportTopicOverview) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = topic.topic,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (topic.summary.isNotBlank()) {
-                Text(
-                    text = topic.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (topic.parentBridge.isNotBlank()) {
-                Text(
-                    text = topic.parentBridge,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    if (report.topicOverview.isNotEmpty()) {
+        ReportSection(title = "孩子今天提到的内容") {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                report.topicOverview.forEach { topic ->
+                    Text(
+                        text = "· ${topic.topic}",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-private fun ReportSection(
-    title: String,
-    items: List<String>,
-    emptyText: String = "暂无结构化观察。",
-) {
-    ReportSection(title = title) {
-        if (items.isEmpty()) {
-            Text(
-                text = emptyText,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
+    if (report.safetyAlerts.isNotEmpty()) {
+        ReportSection(title = "需要留意的地方") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items.forEach { item ->
-                    Row {
-                        Text(text = "·", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = item,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                report.safetyAlerts.forEach { alert ->
+                    Text(
+                        text = "· $alert",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
                 }
             }
         }
@@ -291,26 +206,16 @@ private fun ParentReportScreenPreview() {
                 report = ParentReport(
                     childId = "child_demo_001",
                     date = "2026-05-18",
-                    summary = "今天暂无可汇总的结构化会话素材。建议保持轻量观察，不做额外判断。",
+                    summary = "今天聊了跳绳和游戏，孩子主动分享了运动后的感受，整体情绪比较轻松。",
+                    topicOverview = emptyList(),
+                    conversationSummary = null,
                     learningObservations = emptyList(),
                     expressionObservations = emptyList(),
                     emotionObservations = emptyList(),
                     safetyAlerts = emptyList(),
-                    suggestedParentActions = listOf(
-                        "今晚用一个具体问题轻轻收尾，不要追问过多。",
-                    ),
-                    topicOverview = listOf(
-                        ParentReportTopicOverview(
-                            topic = "图片分享",
-                            childIntent = "想分享给小白狐看",
-                            summary = "孩子今天把图片作为表达入口，适合先问最想看哪里。",
-                            emotionTone = "好奇",
-                            parentBridge = "今晚可以轻轻问那张图最想让我看哪里。",
-                        ),
-                    ),
-                    conversationSummary = "今天主要聊了图片分享，没有输出逐字聊天记录。",
-                    tonightParentBridge = "今晚可以轻轻问：“今天有没有一件还不错的小事？”如果孩子不想说，就换轻松方式。",
-                    avoidFollowup = listOf("不要追问孩子在小白狐里逐字聊了什么。"),
+                    suggestedParentActions = emptyList(),
+                    tonightParentBridge = null,
+                    avoidFollowup = emptyList(),
                     generationStatus = "model_generated",
                     generatedBy = "model",
                 ),
@@ -321,6 +226,3 @@ private fun ParentReportScreenPreview() {
         )
     }
 }
-
-internal const val PARENT_REPORT_BRIDGE_SECTION_TITLE = "今晚可以这样聊"
-internal const val PARENT_REPORT_TOPIC_SECTION_TITLE = "今天聊了什么"

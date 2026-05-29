@@ -9,6 +9,7 @@ class ParentReportGenerationStatus(StrEnum):
     MODEL_BLOCKED = "model_blocked"
     MODEL_FAILED = "model_failed"
     DETERMINISTIC_FALLBACK = "deterministic_fallback"
+    MATERIAL_INSUFFICIENT = "material_insufficient"
     LEGACY = "legacy"
 
 

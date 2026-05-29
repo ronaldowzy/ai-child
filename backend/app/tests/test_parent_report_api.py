@@ -14,7 +14,8 @@ def setup_function() -> None:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    # Use local date to match memory created_at which uses local time
+    return datetime.now().date().isoformat()
 
 
 def _memory_payload(
@@ -86,9 +87,10 @@ def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
     )
     assert create_response.status_code == 201
 
+    # Use date endpoint with local date to match memory created_at
     report_response = client.get(
-        "/api/v1/parent/report/today",
-        params={"child_id": "child_parent_report_high_risk_api_test"},
+        f"/api/v1/parent/reports/child_parent_report_high_risk_api_test",
+        params={"date": _today()},
     )
 
     assert report_response.status_code == 200

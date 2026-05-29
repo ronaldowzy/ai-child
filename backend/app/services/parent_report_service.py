@@ -168,6 +168,19 @@ class ParentReportService:
             return [str(item) for item in boundaries if str(item).strip()]
         return []
 
+    def _has_sufficient_material(
+        self,
+        *,
+        memories: list[MemoryItem],
+        conversation_messages: list[ConversationReportMessage],
+    ) -> bool:
+        if memories:
+            return True
+        child_messages = [
+            msg for msg in conversation_messages if msg.actor == "child"
+        ]
+        return len(child_messages) >= 1
+
     def _generate_daily_report_from_materials(
         self,
         *,
@@ -176,6 +189,14 @@ class ParentReportService:
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
     ) -> ParentReport:
+        if not self._has_sufficient_material(
+            memories=memories,
+            conversation_messages=conversation_messages,
+        ):
+            return self._material_insufficient_report(
+                child_id=child_id,
+                target_date=target_date,
+            )
         support_style = self._lookup_support_style(child_id)
         topic_boundaries = self._lookup_topic_boundaries(child_id)
         conversation = self._conversation_analysis(conversation_messages)
@@ -458,6 +479,32 @@ class ParentReportService:
             generated_by="model",
             generation_error_code=error_code,
             material_fingerprint=material_fingerprint,
+        )
+
+    def _material_insufficient_report(
+        self,
+        *,
+        child_id: str,
+        target_date: date,
+    ) -> ParentReport:
+        return ParentReport(
+            child_id=child_id,
+            date=target_date,
+            summary="今天聊得还不多，小结会短一点。",
+            topic_overview=[],
+            conversation_summary=None,
+            learning_observations=[],
+            expression_observations=[],
+            emotion_observations=[],
+            safety_alerts=[],
+            suggested_parent_actions=[],
+            tonight_parent_bridge=None,
+            avoid_followup=[],
+            created_at=self._now(),
+            generation_status=ParentReportGenerationStatus.MATERIAL_INSUFFICIENT,
+            generated_by="system",
+            generation_error_code=None,
+            material_fingerprint=None,
         )
 
     def _request_model_report(

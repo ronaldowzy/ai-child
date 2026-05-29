@@ -643,7 +643,14 @@ def test_parent_report_failure_is_not_persisted_as_success() -> None:
     report_service = ParentReportService(
         memory_service=memory_service,
         repository=report_repository,
-        conversation_repository=FakeConversationRepository(),
+        conversation_repository=FakeConversationRepository(
+            [
+                _conversation_message(
+                    message_id="msg_child_for_failure_test",
+                    text="今天没什么特别的。",
+                ),
+            ]
+        ),
         model_registry=EmptyModelRegistry(),
         now_provider=_fixed_now,
     )

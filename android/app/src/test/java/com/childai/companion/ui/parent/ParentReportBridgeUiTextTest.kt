@@ -6,26 +6,38 @@ import org.junit.Test
 
 class ParentReportBridgeUiTextTest {
     @Test
-    fun bridgeSectionTitleIsTopLevelFamilyCopy() {
-        assertEquals("今晚可以这样聊", PARENT_REPORT_BRIDGE_SECTION_TITLE)
+    fun timeoutMessageIsFamilyFriendly() {
+        assertEquals("今天的小结还没整理好，可以稍后再看。", PARENT_REPORT_TIMEOUT_MESSAGE)
     }
 
     @Test
-    fun topicSectionTitleFocusesOnConversationContent() {
-        assertEquals("今天聊了什么", PARENT_REPORT_TOPIC_SECTION_TITLE)
+    fun failedMessageIsFamilyFriendly() {
+        assertEquals("这次没有整理成功，可以再试一次。", PARENT_REPORT_FAILED_MESSAGE)
     }
 
     @Test
-    fun failureMessageDoesNotExposeEngineeringWords() {
-        val message = PARENT_REPORT_LOAD_FAILURE_MESSAGE
+    fun insufficientMessageIsFamilyFriendly() {
+        assertEquals("今天聊得还不多，小结会短一点。", PARENT_REPORT_INSUFFICIENT_MESSAGE)
+    }
 
-        assertEquals("今天的小结还没准备好，请稍后再试。", message)
-        assertFalse(message.contains("backend", ignoreCase = true))
-        assertFalse(message.contains("model", ignoreCase = true))
-        assertFalse(message.contains("provider", ignoreCase = true))
-        assertFalse(message.contains("config", ignoreCase = true))
-        assertFalse(message.contains("后端"))
-        assertFalse(message.contains("模型"))
-        assertFalse(message.contains("配置"))
+    @Test
+    fun noMessageExposesEngineeringWords() {
+        val messages = listOf(
+            PARENT_REPORT_TIMEOUT_MESSAGE,
+            PARENT_REPORT_FAILED_MESSAGE,
+            PARENT_REPORT_INSUFFICIENT_MESSAGE,
+        )
+        for (message in messages) {
+            assertFalse(message.contains("backend", ignoreCase = true))
+            assertFalse(message.contains("model", ignoreCase = true))
+            assertFalse(message.contains("provider", ignoreCase = true))
+            assertFalse(message.contains("config", ignoreCase = true))
+            assertFalse(message.contains("后端"))
+            assertFalse(message.contains("模型"))
+            assertFalse(message.contains("配置"))
+            assertFalse(message.contains("接口"))
+            assertFalse(message.contains("超时"))
+            assertFalse(message.contains("生成失败"))
+        }
     }
 }

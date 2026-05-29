@@ -4,6 +4,14 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -65,10 +73,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.childai.companion.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.PhotoUploadPayload
@@ -254,13 +264,14 @@ private fun ChildChatScreenContent(
             val isLandscape = maxWidth > maxHeight
             val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
 
+            CompanionRoomBackground(isLandscape = isLandscape)
             CompanionAmbientGlows(
                 isLandscape = isLandscape,
                 compactLandscape = compactLandscape,
             )
 
             if (isLandscape) {
-                // Landscape: fox on left, chat on right — fox is prominent
+                // Landscape: keep the room and mascot as the scene, with controls only as a light rail.
                 val layoutWeights = companionLayoutWeights(isLandscape = true)
                 val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
                 val verticalPadding = if (compactLandscape) 10.dp else 24.dp
@@ -275,13 +286,18 @@ private fun ChildChatScreenContent(
                 ) {
                     AgentPanel(
                         presentation = uiState.interactionPresentation,
+                        messages = uiState.messages,
+                        imagePreviewCards = uiState.imagePreviewCards,
+                        isLandscape = true,
                         compactLandscape = compactLandscape,
+                        onImageRetry = onImageRetry,
+                        onImageDismiss = onImageDismiss,
                         modifier = Modifier
                             .weight(layoutWeights.agent)
                             .fillMaxHeight(),
                     )
                     Spacer(modifier = Modifier.width(columnGap))
-                    ChatPanel(
+                    LandscapeOperationPanel(
                         uiState = uiState,
                         compactLandscape = compactLandscape,
                         parentEntryHint = parentEntryHint,
@@ -301,18 +317,16 @@ private fun ChildChatScreenContent(
                         onInstallTtsData = onInstallTtsData,
                         onPhotoCaptured = onPhotoCaptured,
                         onPhotoCaptureFailed = onPhotoCaptureFailed,
-                        onImageRetry = onImageRetry,
-                        onImageDismiss = onImageDismiss,
                         modifier = Modifier
                             .weight(layoutWeights.conversation)
                             .fillMaxHeight(),
                     )
                 }
             } else {
-                // Portrait: fox on top as hero, chat+input below
-                val layoutWeights = companionLayoutWeights(isLandscape = false)
+                // Portrait: fox lives in the room; dialogue floats around it instead of sitting in a chat card.
                 val horizontalPadding = 20.dp
                 val verticalPadding = 16.dp
+                val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
 
                 Column(
                     modifier = Modifier
@@ -335,53 +349,52 @@ private fun ChildChatScreenContent(
                     // Fox hero area — 55% of screen
                     AgentPanel(
                         presentation = uiState.interactionPresentation,
+                        messages = uiState.messages,
+                        imagePreviewCards = uiState.imagePreviewCards,
+                        isLandscape = false,
                         compactLandscape = false,
+                        onImageRetry = onImageRetry,
+                        onImageDismiss = onImageDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(layoutWeights.agent),
+                            .weight(1f),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // Chat + input area — 45% of screen
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(layoutWeights.conversation),
-                    ) {
-                        ChatConversationPanel(
-                            uiState = uiState,
-                            isLandscape = false,
+                    if (visibleQuickActions.isNotEmpty()) {
+                        QuickActionsRow(
+                            actions = visibleQuickActions,
+                            enabled = !uiState.isSending,
                             onQuickAction = onQuickAction,
-                            modifier = Modifier.weight(1f),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        val inputTrayShape = companionInputTrayShape(compactLandscape = false)
-                        InputBar(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 112.dp)
-                                .navigationBarsPadding()
-                                .windowInsetsPadding(WindowInsets.ime)
-                                .clip(inputTrayShape)
-                                .background(companionInputTrayColor())
-                                .border(
-                                    width = 1.dp,
-                                    color = companionSoftBorderColor(alpha = 0.48f),
-                                    shape = inputTrayShape,
-                                )
-                                .padding(horizontal = 18.dp, vertical = 14.dp),
-                            onSend = onSend,
-                            enabled = !uiState.isSending,
-                            voice = uiState.voice,
-                            tts = uiState.tts,
-                            presentation = uiState.interactionPresentation,
-                            onStopTts = onStopTts,
-                            onToggleTtsMuted = onToggleTtsMuted,
-                            onOpenTtsSettings = onOpenTtsSettings,
-                            onInstallTtsData = onInstallTtsData,
-                            onPhotoCaptured = onPhotoCaptured,
-                            onPhotoCaptureFailed = onPhotoCaptureFailed,
-                        )
                     }
+                    val inputTrayShape = companionInputTrayShape(compactLandscape = false)
+                    InputBar(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 112.dp)
+                            .navigationBarsPadding()
+                            .windowInsetsPadding(WindowInsets.ime)
+                            .clip(inputTrayShape)
+                            .background(companionInputTrayColor())
+                            .border(
+                                width = 1.dp,
+                                color = companionSoftBorderColor(alpha = 0.48f),
+                                shape = inputTrayShape,
+                            )
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        onSend = onSend,
+                        enabled = !uiState.isSending,
+                        voice = uiState.voice,
+                        tts = uiState.tts,
+                        presentation = uiState.interactionPresentation,
+                        onStopTts = onStopTts,
+                        onToggleTtsMuted = onToggleTtsMuted,
+                        onOpenTtsSettings = onOpenTtsSettings,
+                        onInstallTtsData = onInstallTtsData,
+                        onPhotoCaptured = onPhotoCaptured,
+                        onPhotoCaptureFailed = onPhotoCaptureFailed,
+                    )
                 }
             }
         }
@@ -550,6 +563,117 @@ private fun ChatMessageBubbleWithPreview(
 }
 
 @Composable
+private fun CompanionFloatingConversationBubbles(
+    messages: List<ChatMessage>,
+    imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    isLandscape: Boolean,
+    onImageRetry: (String) -> Unit,
+    onImageDismiss: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val visibleMessages = remember(messages) {
+        companionVisibleMessages(messages, maxVisibleMessages = 2)
+    }
+    val visibleSignature = visibleMessages.joinToString(separator = "|") { message ->
+        val previewStatus = imagePreviewCards[message.id]?.status?.name.orEmpty()
+        "${message.id}:${message.text}:$previewStatus"
+    }
+    var showBubbles by remember { mutableStateOf(false) }
+    LaunchedEffect(visibleSignature) {
+        showBubbles = visibleMessages.isNotEmpty()
+        if (visibleMessages.isNotEmpty()) {
+            delay(6_000)
+            showBubbles = false
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        visibleMessages.forEachIndexed { index, message ->
+            val childBubble = message.author == MessageAuthor.Child
+            val alignment = when {
+                childBubble -> Alignment.BottomEnd
+                index == 0 -> Alignment.TopStart
+                else -> Alignment.TopEnd
+            }
+            val horizontalPadding = if (isLandscape) 34.dp else 18.dp
+            val verticalPadding = if (isLandscape) 46.dp else 36.dp
+            val widthFraction = if (isLandscape) 0.46f else 0.62f
+            AnimatedVisibility(
+                visible = showBubbles,
+                enter = fadeIn(animationSpec = tween(durationMillis = 220)) +
+                    slideInVertically(animationSpec = tween(durationMillis = 220)) { it / 6 } +
+                    scaleIn(animationSpec = tween(durationMillis = 220), initialScale = 0.97f),
+                exit = fadeOut(animationSpec = tween(durationMillis = 220)) +
+                    slideOutVertically(animationSpec = tween(durationMillis = 220)) { it / 6 } +
+                    scaleOut(animationSpec = tween(durationMillis = 220), targetScale = 0.97f),
+                modifier = Modifier
+                    .align(alignment)
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding)
+                    .fillMaxWidth(widthFraction),
+            ) {
+                FloatingConversationBubble(
+                    message = message,
+                    imagePreview = imagePreviewCards[message.id],
+                    onImageRetry = { onImageRetry(message.id) },
+                    onImageDismiss = { onImageDismiss(message.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingConversationBubble(
+    message: ChatMessage,
+    imagePreview: LocalImagePreviewCardUiState?,
+    onImageRetry: () -> Unit,
+    onImageDismiss: () -> Unit,
+) {
+    val isChild = message.author == MessageAuthor.Child
+    val bubbleShape = RoundedCornerShape(24.dp)
+    val bubbleColor = if (isChild) {
+        Color(0xFFEAF4FF).copy(alpha = 0.82f)
+    } else {
+        Color.White.copy(alpha = 0.86f)
+    }
+    val textColor = if (isChild) {
+        Color(0xFF3F4C5D)
+    } else {
+        Color(0xFF3F4A3F)
+    }
+    Surface(
+        shape = bubbleShape,
+        color = bubbleColor,
+        shadowElevation = 3.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.58f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            Text(
+                text = message.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            imagePreview?.let { preview ->
+                LocalImagePreviewCard(
+                    preview = preview,
+                    childBubble = isChild,
+                    modifier = Modifier.padding(top = 8.dp),
+                    onRetry = onImageRetry,
+                    onDismiss = onImageDismiss,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LocalImagePreviewCard(
     preview: LocalImagePreviewCardUiState,
     childBubble: Boolean,
@@ -614,26 +738,51 @@ private fun LocalImagePreviewCard(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
+                LocalImagePreviewActionButton(
                     text = "我们可以再试一次",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { onRetry?.invoke() }
-                        .padding(horizontal = 4.dp),
+                    primary = true,
+                    onClick = { onRetry?.invoke() },
                 )
-                Text(
+                LocalImagePreviewActionButton(
                     text = "先不看也可以",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = contentColor.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { onDismiss?.invoke() }
-                        .padding(horizontal = 4.dp),
+                    primary = false,
+                    onClick = { onDismiss?.invoke() },
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LocalImagePreviewActionButton(
+    text: String,
+    primary: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Surface(
+        modifier = Modifier
+            .clip(shape)
+            .clickable { onClick() },
+        shape = shape,
+        color = if (primary) {
+            Color.White.copy(alpha = 0.72f)
+        } else {
+            Color.White.copy(alpha = 0.48f)
+        },
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.58f),
+        ),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (primary) MaterialTheme.colorScheme.primary else Color(0xFF42546A).copy(alpha = 0.72f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+        )
     }
 }
 
@@ -646,7 +795,7 @@ internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): Strin
 }
 
 @Composable
-private fun ChatPanel(
+private fun LandscapeOperationPanel(
     uiState: ChatUiState,
     compactLandscape: Boolean,
     parentEntryHint: String?,
@@ -661,42 +810,33 @@ private fun ChatPanel(
     onInstallTtsData: () -> Unit,
     onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
     onPhotoCaptureFailed: (String) -> Unit,
-    onImageRetry: (String) -> Unit = {},
-    onImageDismiss: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val panelGap = if (compactLandscape) 8.dp else 12.dp
     val inputHorizontalPadding = if (compactLandscape) 12.dp else 18.dp
     val inputVerticalPadding = if (compactLandscape) 10.dp else 14.dp
-    val panelShape = companionLandscapePanelShape(compactLandscape)
+    val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
 
     Column(
         modifier = modifier
-            .clip(panelShape)
-            .background(companionLandscapePanelColor())
-            .border(
-                width = 1.dp,
-                color = companionSoftBorderColor(alpha = 0.36f),
-                shape = panelShape,
-            )
-            .padding(if (compactLandscape) 10.dp else 16.dp),
+            .padding(if (compactLandscape) 4.dp else 8.dp),
+        horizontalAlignment = Alignment.End,
     ) {
-        AgentTopBar(
+        ParentEntryHintBar(
             parentEntryHint = parentEntryHint,
-            compactLandscape = compactLandscape,
             onParentEntryTap = onParentEntryTap,
             onParentEntryLongPress = onParentEntryLongPress,
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(panelGap))
-        ChatConversationPanel(
-            uiState = uiState,
-            isLandscape = true,
-            onQuickAction = onQuickAction,
-            onImageRetry = onImageRetry,
-            onImageDismiss = onImageDismiss,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(modifier = Modifier.height(panelGap))
+        Spacer(modifier = Modifier.weight(1f))
+        if (visibleQuickActions.isNotEmpty()) {
+            QuickActionsRow(
+                actions = visibleQuickActions,
+                enabled = !uiState.isSending,
+                onQuickAction = onQuickAction,
+            )
+            Spacer(modifier = Modifier.height(panelGap))
+        }
         val inputTrayShape = companionInputTrayShape(compactLandscape = compactLandscape)
         InputBar(
             modifier = Modifier
@@ -746,6 +886,22 @@ internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
 }
 
 @Composable
+private fun CompanionRoomBackground(isLandscape: Boolean) {
+    Image(
+        painter = painterResource(id = R.drawable.companion_room_background),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        alignment = if (isLandscape) Alignment.Center else Alignment.Center,
+        modifier = Modifier.fillMaxSize(),
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(companionRoomScrimBrush(isLandscape = isLandscape)),
+    )
+}
+
+@Composable
 private fun companionPageBackgroundBrush(): Brush {
     return Brush.verticalGradient(
         colors = companionPageBackgroundColors(),
@@ -758,6 +914,26 @@ internal fun companionPageBackgroundColors(): List<Color> {
         Color(0xFFFFFDF8),
         Color(0xFFFFF2D8),
     )
+}
+
+private fun companionRoomScrimBrush(isLandscape: Boolean): Brush {
+    return if (isLandscape) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.05f),
+                Color(0xFFFFF1D6).copy(alpha = 0.16f),
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.20f),
+                Color.White.copy(alpha = 0.04f),
+                Color(0xFFFFE2B5).copy(alpha = 0.22f),
+            ),
+        )
+    }
 }
 
 @Composable
@@ -836,9 +1012,9 @@ internal data class CompanionLayoutWeights(
 
 internal fun companionLayoutWeights(isLandscape: Boolean): CompanionLayoutWeights {
     return if (isLandscape) {
-        CompanionLayoutWeights(agent = 0.60f, conversation = 0.40f)
+        CompanionLayoutWeights(agent = 0.68f, conversation = 0.32f)
     } else {
-        CompanionLayoutWeights(agent = 0.62f, conversation = 0.38f)
+        CompanionLayoutWeights(agent = 0.72f, conversation = 0.28f)
     }
 }
 
@@ -918,13 +1094,29 @@ private fun QuickActionsRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         actions.forEach { action ->
-            AssistChip(
-                onClick = { onQuickAction(action) },
-                enabled = enabled,
-                label = {
-                    Text(text = action.label)
-                },
-            )
+            val shape = RoundedCornerShape(22.dp)
+            Surface(
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .clip(shape)
+                    .clickable(enabled = enabled) { onQuickAction(action) },
+                shape = shape,
+                color = Color.White.copy(alpha = if (enabled) 0.72f else 0.38f),
+                shadowElevation = 2.dp,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.58f),
+                ),
+            ) {
+                Text(
+                    text = action.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFF42546A).copy(alpha = if (enabled) 0.92f else 0.45f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
     }
 }
@@ -1016,19 +1208,25 @@ private fun ParentEntryButton(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val buttonShape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier.combinedClickable(
             onClick = onTap,
             onLongClick = onLongPress,
             onLongClickLabel = "进入家长页面",
         ),
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        shape = buttonShape,
+        color = Color.White.copy(alpha = 0.64f),
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.58f),
+        ),
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
@@ -1109,7 +1307,12 @@ private fun ParentEntryTargetDialog(
 @Composable
 private fun AgentPanel(
     presentation: ChildInteractionPresentation,
+    messages: List<ChatMessage>,
+    imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    isLandscape: Boolean,
     compactLandscape: Boolean,
+    onImageRetry: (String) -> Unit,
+    onImageDismiss: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1119,13 +1322,23 @@ private fun AgentPanel(
 
     Box(modifier = modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            XiaobaohuCompanionStage(
-                agent = presentation.agent,
-                mascotState = effectiveMascotState,
-                compactLandscape = compactLandscape,
-                debugMascotState = debugMascotState,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                XiaobaohuCompanionStage(
+                    agent = presentation.agent,
+                    mascotState = effectiveMascotState,
+                    compactLandscape = compactLandscape,
+                    debugMascotState = debugMascotState,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                CompanionFloatingConversationBubbles(
+                    messages = messages,
+                    imagePreviewCards = imagePreviewCards,
+                    isLandscape = isLandscape,
+                    onImageRetry = onImageRetry,
+                    onImageDismiss = onImageDismiss,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
             if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
                 Spacer(modifier = Modifier.height(10.dp))
                 MascotDebugSwitcher(

@@ -40,6 +40,7 @@ fun CartoonAgentView(
     agent: FoxAgentUiState,
     modifier: Modifier = Modifier,
     debugMascotState: MascotState? = null,
+    visualScaleMultiplier: Float = 1f,
 ) {
     val context = LocalContext.current
     val renderMode = DevSettings.FOX_RENDER_MODE.lowercase()
@@ -165,8 +166,8 @@ fun CartoonAgentView(
             .fillMaxWidth(0.96f)
             .sizeIn(minWidth = 180.dp, maxWidth = 470.dp)
             .graphicsLayer {
-                scaleX = visualScale
-                scaleY = visualScale
+                scaleX = visualScale * visualScaleMultiplier
+                scaleY = visualScale * visualScaleMultiplier
             }
             .aspectRatio(1f),
     ) {

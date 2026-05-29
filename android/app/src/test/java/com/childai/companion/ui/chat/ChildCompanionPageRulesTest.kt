@@ -64,16 +64,22 @@ class ChildCompanionPageRulesTest {
 
     @Test
     fun mascotStateBubbleCopyUsesSingleApprovedStatusLine() {
-        assertEquals("我在这里。", mascotStateBubbleText(MascotState.Idle))
-        assertEquals("想说的时候再说。", mascotStateBubbleText(MascotState.WaitingSoft))
-        assertEquals("我在听。", mascotStateBubbleText(MascotState.Listening))
-        assertEquals("我想一想。", mascotStateBubbleText(MascotState.Thinking))
-        assertEquals("我准备说。", mascotStateBubbleText(MascotState.PreparingSpeech))
+        assertEquals("我在这儿", mascotStateBubbleText(MascotState.Idle))
+        assertEquals("想说再说", mascotStateBubbleText(MascotState.WaitingSoft))
+        assertEquals("我在听", mascotStateBubbleText(MascotState.Listening))
+        assertEquals("我想想", mascotStateBubbleText(MascotState.Thinking))
+        assertEquals("我准备说", mascotStateBubbleText(MascotState.PreparingSpeech))
         assertNull(mascotStateBubbleText(MascotState.Speaking))
-        assertEquals("我正在看。", mascotStateBubbleText(MascotState.ImageViewing))
-        assertEquals("我们一起想想。", mascotStateBubbleText(MascotState.CoCreate))
-        assertEquals("好，我们先停一下。", mascotStateBubbleText(MascotState.Paused))
-        assertEquals("这次没弄好，可以再试一次。", mascotStateBubbleText(MascotState.Retry))
+        assertEquals("我在看", mascotStateBubbleText(MascotState.ImageViewing))
+        assertEquals("一起想想", mascotStateBubbleText(MascotState.CoCreate))
+        assertEquals("先停一下", mascotStateBubbleText(MascotState.Paused))
+        assertEquals("再试一次", mascotStateBubbleText(MascotState.Retry))
+
+        MascotState.entries
+            .mapNotNull { mascotStateBubbleText(it) }
+            .forEach { copy ->
+                assertFalse(copy.contains("。"))
+            }
     }
 
     @Test

@@ -178,9 +178,9 @@ fun InputBar(
                 enabled = enabled && interactionPresentation.primaryButtonEnabled,
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF77AFFF),
+                    containerColor = Color(0xFF89BDF4),
                     contentColor = Color.White,
-                    disabledContainerColor = Color(0xFFBFD7FF).copy(alpha = 0.50f),
+                    disabledContainerColor = Color(0xFFBFD7FF).copy(alpha = 0.56f),
                     disabledContentColor = Color.White.copy(alpha = 0.76f),
                 ),
                 modifier = Modifier
@@ -200,59 +200,32 @@ fun InputBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (interactionPresentation.showImageInput) {
-                    OutlinedButton(
+                    InputBarSecondaryButton(
                         onClick = { showImageSourceDialog = true },
                         enabled = enabled && !voice.isRecording && !voice.isUploading,
-                        shape = RoundedCornerShape(22.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.62f),
-                            contentColor = Color(0xFF42546A),
-                            disabledContainerColor = Color.White.copy(alpha = 0.34f),
-                            disabledContentColor = Color(0xFF42546A).copy(alpha = 0.45f),
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.58f),
-                        ),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text(text = "给小白狐看看")
-                    }
+                        text = "给小白狐看看",
+                    )
                 }
                 if (inputBarShouldShowTopicShift(useChildVoiceFirstInput, interactionPresentation)) {
-                    TextButton(
+                    InputBarSecondaryButton(
                         onClick = { onSend("换个话题") },
                         enabled = enabled && !voice.isRecording && !voice.isUploading,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color(0xFF5D6270),
-                            disabledContentColor = Color(0xFF5D6270).copy(alpha = 0.42f),
-                        ),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text(text = "换个话题")
-                    }
+                        text = "换个话题",
+                    )
                 }
                 if (interactionPresentation.showStopSpeaking) {
-                    TextButton(
+                    InputBarSecondaryButton(
                         onClick = onStopTts,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color(0xFF5D6270),
-                        ),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text(text = "停一下")
-                    }
+                        enabled = enabled,
+                        text = "停一下",
+                    )
                 }
                 if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
-                    TextButton(
+                    InputBarSecondaryButton(
                         onClick = onToggleTtsMuted,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color(0xFF5D6270),
-                        ),
-                        modifier = Modifier.heightIn(min = 44.dp),
-                    ) {
-                        Text(text = inputBarMuteToggleText(tts))
-                    }
+                        enabled = enabled,
+                        text = inputBarMuteToggleText(tts),
+                    )
                 }
             }
         } else {
@@ -355,6 +328,32 @@ fun InputBar(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun InputBarSecondaryButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(22.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White.copy(alpha = 0.66f),
+            contentColor = Color(0xFF42546A),
+            disabledContainerColor = Color.White.copy(alpha = 0.36f),
+            disabledContentColor = Color(0xFF42546A).copy(alpha = 0.45f),
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.62f),
+        ),
+        modifier = Modifier.heightIn(min = 44.dp),
+    ) {
+        Text(text = text)
     }
 }
 

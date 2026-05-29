@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -172,6 +176,13 @@ fun InputBar(
                     }
                 },
                 enabled = enabled && interactionPresentation.primaryButtonEnabled,
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF77AFFF),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFBFD7FF).copy(alpha = 0.50f),
+                    disabledContentColor = Color.White.copy(alpha = 0.76f),
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 64.dp),
@@ -192,6 +203,17 @@ fun InputBar(
                     OutlinedButton(
                         onClick = { showImageSourceDialog = true },
                         enabled = enabled && !voice.isRecording && !voice.isUploading,
+                        shape = RoundedCornerShape(22.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.62f),
+                            contentColor = Color(0xFF42546A),
+                            disabledContainerColor = Color.White.copy(alpha = 0.34f),
+                            disabledContentColor = Color(0xFF42546A).copy(alpha = 0.45f),
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.58f),
+                        ),
                         modifier = Modifier.heightIn(min = 44.dp),
                     ) {
                         Text(text = "给小白狐看看")
@@ -201,6 +223,10 @@ fun InputBar(
                     TextButton(
                         onClick = { onSend("换个话题") },
                         enabled = enabled && !voice.isRecording && !voice.isUploading,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color(0xFF5D6270),
+                            disabledContentColor = Color(0xFF5D6270).copy(alpha = 0.42f),
+                        ),
                         modifier = Modifier.heightIn(min = 44.dp),
                     ) {
                         Text(text = "换个话题")
@@ -209,6 +235,9 @@ fun InputBar(
                 if (interactionPresentation.showStopSpeaking) {
                     TextButton(
                         onClick = onStopTts,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color(0xFF5D6270),
+                        ),
                         modifier = Modifier.heightIn(min = 44.dp),
                     ) {
                         Text(text = "停一下")
@@ -217,6 +246,9 @@ fun InputBar(
                 if (inputBarShouldShowMuteToggle(useChildVoiceFirstInput, interactionPresentation)) {
                     TextButton(
                         onClick = onToggleTtsMuted,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color(0xFF5D6270),
+                        ),
                         modifier = Modifier.heightIn(min = 44.dp),
                     ) {
                         Text(text = inputBarMuteToggleText(tts))

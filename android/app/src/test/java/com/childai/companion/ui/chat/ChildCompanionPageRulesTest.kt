@@ -1,5 +1,7 @@
 package com.childai.companion.ui.chat
 
+import androidx.compose.ui.graphics.Color
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
@@ -44,5 +46,17 @@ class ChildCompanionPageRulesTest {
                 assertFalse("$copy should not contain $marker", copy.contains(marker))
             }
         }
+    }
+
+    @Test
+    fun companionBackgroundUsesSoftGeneratedPalette() {
+        assertEquals(
+            listOf(
+                Color(0xFFEDF4FF),
+                Color(0xFFFFFDF8),
+                Color(0xFFFFF2D8),
+            ),
+            companionPageBackgroundColors(),
+        )
     }
 }

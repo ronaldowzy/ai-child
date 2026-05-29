@@ -3,6 +3,7 @@ package com.childai.companion.ui.chat
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,6 +53,7 @@ fun XiaobaohuCompanionStage(
 
     BoxWithConstraints(modifier = modifier) {
         val statusReserve = if (compactLandscape) 64.dp else 86.dp
+        val stageShape = RoundedCornerShape(if (compactLandscape) 24.dp else 32.dp)
         val mascotMaxSize = minOf(
             maxWidth,
             (maxHeight - statusReserve).coerceAtLeast(160.dp),
@@ -61,21 +63,25 @@ fun XiaobaohuCompanionStage(
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color.Transparent,
-            shape = RoundedCornerShape(20.dp),
+            shape = stageShape,
         ) {
-            // Warm gradient background
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFFFFF8F0), // warm cream
-                                Color(0xFFFFF3E0), // soft peach
-                                Color(0xFFFFECB3).copy(alpha = 0.4f), // light amber fade
+                                Color.White.copy(alpha = 0.18f),
+                                Color(0xFFFFFDF8).copy(alpha = 0.28f),
+                                Color(0xFFFFF2D8).copy(alpha = 0.22f),
                             ),
                         ),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = stageShape,
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.28f),
+                        shape = stageShape,
                     ),
             )
 
@@ -143,7 +149,7 @@ private fun XiaobaohuStateBubble(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.75f),
+        color = Color.White.copy(alpha = 0.82f),
         shadowElevation = 0.dp,
     ) {
         Text(

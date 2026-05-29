@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -253,6 +254,11 @@ private fun ChildChatScreenContent(
             val isLandscape = maxWidth > maxHeight
             val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
 
+            CompanionAmbientGlows(
+                isLandscape = isLandscape,
+                compactLandscape = compactLandscape,
+            )
+
             if (isLandscape) {
                 // Landscape: fox on left, chat on right — fox is prominent
                 val layoutWeights = companionLayoutWeights(isLandscape = true)
@@ -348,13 +354,20 @@ private fun ChildChatScreenContent(
                             modifier = Modifier.weight(1f),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        val inputTrayShape = companionInputTrayShape(compactLandscape = false)
                         InputBar(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 112.dp)
-                                .background(MaterialTheme.colorScheme.surface)
                                 .navigationBarsPadding()
                                 .windowInsetsPadding(WindowInsets.ime)
+                                .clip(inputTrayShape)
+                                .background(companionInputTrayColor())
+                                .border(
+                                    width = 1.dp,
+                                    color = companionSoftBorderColor(alpha = 0.48f),
+                                    shape = inputTrayShape,
+                                )
                                 .padding(horizontal = 18.dp, vertical = 14.dp),
                             onSend = onSend,
                             enabled = !uiState.isSending,
@@ -474,15 +487,16 @@ private fun ChatMessageBubbleWithPreview(
     onImageDismiss: (String) -> Unit = {},
 ) {
     val isChild = message.author == MessageAuthor.Child
+    val bubbleShape = RoundedCornerShape(if (isChild) 20.dp else 22.dp)
     val bubbleColor = if (isChild) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
+        Color(0xFFEAF4FF).copy(alpha = 0.72f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        Color.White.copy(alpha = 0.82f)
     }
     val textColor = if (isChild) {
-        MaterialTheme.colorScheme.onPrimary
+        Color(0xFF3F4C5D)
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color(0xFF3F4A3F)
     }
     val alignment = if (isChild) Alignment.CenterEnd else Alignment.CenterStart
     val bubbleWidth = if (isChild) 0.70f else 0.82f
@@ -494,11 +508,20 @@ private fun ChatMessageBubbleWithPreview(
         Column(
             modifier = Modifier
                 .fillMaxWidth(bubbleWidth)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(bubbleShape)
                 .background(bubbleColor)
+                .border(
+                    width = 1.dp,
+                    color = if (isChild) {
+                        Color(0xFFBFD7FF).copy(alpha = 0.28f)
+                    } else {
+                        companionSoftBorderColor(alpha = 0.50f)
+                    },
+                    shape = bubbleShape,
+                )
                 .padding(
-                    horizontal = if (isChild) 12.dp else 16.dp,
-                    vertical = if (isChild) 8.dp else 12.dp,
+                    horizontal = if (isChild) 14.dp else 16.dp,
+                    vertical = if (isChild) 9.dp else 12.dp,
                 ),
         ) {
             Text(
@@ -540,29 +563,34 @@ private fun LocalImagePreviewCard(
         }
     }
     val contentColor = if (childBubble) {
-        MaterialTheme.colorScheme.onPrimary
+        Color(0xFF3F4C5D)
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color(0xFF3F4A3F)
     }
     val statusText = localImagePreviewStatusText(preview.status)
-    val cardColor = if (childBubble) {
-        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f)
-    } else {
-        MaterialTheme.colorScheme.surface
+    val cardShape = RoundedCornerShape(16.dp)
+    val cardColor = when {
+        preview.status == LocalImagePreviewStatus.Failed -> Color(0xFFFFF4E4).copy(alpha = 0.76f)
+        childBubble -> Color.White.copy(alpha = 0.58f)
+        else -> Color.White.copy(alpha = 0.72f)
     }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(cardShape)
             .background(cardColor)
             .border(
                 width = 1.dp,
-                color = contentColor.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(8.dp),
+                color = if (preview.status == LocalImagePreviewStatus.Failed) {
+                    Color(0xFFFFDDA8).copy(alpha = 0.50f)
+                } else {
+                    companionSoftBorderColor(alpha = 0.52f)
+                },
+                shape = cardShape,
             )
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (previewBitmap != null) {
             Image(
@@ -572,7 +600,7 @@ private fun LocalImagePreviewCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp)
-                    .clip(RoundedCornerShape(6.dp)),
+                    .clip(RoundedCornerShape(12.dp)),
             )
         }
         Text(
@@ -640,8 +668,19 @@ private fun ChatPanel(
     val panelGap = if (compactLandscape) 8.dp else 12.dp
     val inputHorizontalPadding = if (compactLandscape) 12.dp else 18.dp
     val inputVerticalPadding = if (compactLandscape) 10.dp else 14.dp
+    val panelShape = companionLandscapePanelShape(compactLandscape)
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .clip(panelShape)
+            .background(companionLandscapePanelColor())
+            .border(
+                width = 1.dp,
+                color = companionSoftBorderColor(alpha = 0.36f),
+                shape = panelShape,
+            )
+            .padding(if (compactLandscape) 10.dp else 16.dp),
+    ) {
         AgentTopBar(
             parentEntryHint = parentEntryHint,
             statusText = presentation.statusText,
@@ -659,13 +698,20 @@ private fun ChatPanel(
             modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.height(panelGap))
+        val inputTrayShape = companionInputTrayShape(compactLandscape = compactLandscape)
         InputBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (compactLandscape) 96.dp else 112.dp)
-                .background(MaterialTheme.colorScheme.surface)
                 .navigationBarsPadding()
                 .windowInsetsPadding(WindowInsets.ime)
+                .clip(inputTrayShape)
+                .background(companionInputTrayColor())
+                .border(
+                    width = 1.dp,
+                    color = companionSoftBorderColor(alpha = 0.48f),
+                    shape = inputTrayShape,
+                )
                 .padding(
                     horizontal = inputHorizontalPadding,
                     vertical = inputVerticalPadding,
@@ -703,12 +749,85 @@ internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
 @Composable
 private fun companionPageBackgroundBrush(): Brush {
     return Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
-            MaterialTheme.colorScheme.background,
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.16f),
-        ),
+        colors = companionPageBackgroundColors(),
     )
+}
+
+internal fun companionPageBackgroundColors(): List<Color> {
+    return listOf(
+        Color(0xFFEDF4FF),
+        Color(0xFFFFFDF8),
+        Color(0xFFFFF2D8),
+    )
+}
+
+@Composable
+private fun CompanionAmbientGlows(
+    isLandscape: Boolean,
+    compactLandscape: Boolean,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        val topGlowWidth = if (isLandscape) 560.dp else 320.dp
+        val topGlowHeight = if (isLandscape) 360.dp else 300.dp
+        val warmGlowWidth = if (isLandscape) 520.dp else 340.dp
+        val warmGlowHeight = if (isLandscape) 300.dp else 260.dp
+        val blurRadius = if (compactLandscape) 42.dp else 56.dp
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset(x = (-96).dp, y = (-76).dp)
+                .width(topGlowWidth)
+                .height(topGlowHeight)
+                .blur(blurRadius)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFBFD7FF).copy(alpha = 0.36f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    shape = CircleShape,
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 90.dp, y = 66.dp)
+                .width(warmGlowWidth)
+                .height(warmGlowHeight)
+                .blur(blurRadius)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFE3A8).copy(alpha = 0.30f),
+                            Color.Transparent,
+                        ),
+                    ),
+                    shape = CircleShape,
+                ),
+        )
+    }
+}
+
+private fun companionInputTrayShape(compactLandscape: Boolean): RoundedCornerShape {
+    return RoundedCornerShape(if (compactLandscape) 22.dp else 28.dp)
+}
+
+private fun companionInputTrayColor(): Color {
+    return Color.White.copy(alpha = 0.58f)
+}
+
+private fun companionLandscapePanelShape(compactLandscape: Boolean): RoundedCornerShape {
+    return RoundedCornerShape(if (compactLandscape) 24.dp else 32.dp)
+}
+
+private fun companionLandscapePanelColor(): Color {
+    return Color.White.copy(alpha = 0.36f)
+}
+
+private fun companionSoftBorderColor(alpha: Float = 0.42f): Color {
+    return Color.White.copy(alpha = alpha)
 }
 
 internal data class CompanionLayoutWeights(
@@ -824,9 +943,16 @@ private fun AgentTopBar(
 ) {
     val horizontalPadding = if (compactLandscape) 16.dp else 24.dp
     val verticalPadding = if (compactLandscape) 10.dp else 18.dp
+    val topBarShape = RoundedCornerShape(if (compactLandscape) 18.dp else 24.dp)
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        color = Color.White.copy(alpha = 0.56f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        shape = topBarShape,
+        border = BorderStroke(
+            width = 1.dp,
+            color = companionSoftBorderColor(alpha = 0.38f),
+        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -978,7 +1104,7 @@ private fun AgentPanel(
     val resolvedMascotState = XiaobaohuVisualStateResolver.resolve(presentation.agent).mascotState
     val effectiveMascotState = debugMascotState ?: resolvedMascotState
 
-    BoxWithConstraints(modifier = modifier) {
+    Box(modifier = modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             XiaobaohuCompanionStage(
                 agent = presentation.agent,

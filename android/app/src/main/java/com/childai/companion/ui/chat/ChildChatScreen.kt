@@ -988,78 +988,34 @@ private fun AgentPanel(
 ) {
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
     val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
+    val resolvedMascotState = XiaobaohuVisualStateResolver.resolve(presentation.agent).mascotState
+    val effectiveMascotState = debugMascotState ?: resolvedMascotState
+
     BoxWithConstraints(modifier = modifier) {
-        val statusReserve = if (compactLandscape) 64.dp else 86.dp
-        val mascotMaxSize = minOf(
-            maxWidth,
-            (maxHeight - statusReserve).coerceAtLeast(160.dp),
-            if (compactLandscape) 340.dp else 470.dp,
-        )
-        val foxGlowColor = foxGlowColorForPhase(presentation.phase)
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
-            shape = RoundedCornerShape(16.dp),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(if (compactLandscape) 8.dp else 14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // Glow effect behind fox
-                    Box(
-                        modifier = Modifier
-                            .sizeIn(
-                                maxWidth = mascotMaxSize * 0.7f,
-                                maxHeight = mascotMaxSize * 0.7f,
-                            )
-                            .blur(radius = 32.dp)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        foxGlowColor.copy(alpha = 0.35f),
-                                        foxGlowColor.copy(alpha = 0.0f),
-                                    ),
-                                ),
-                                shape = CircleShape,
-                            ),
-                    )
-                    CartoonAgentView(
-                        agent = presentation.agent,
-                        debugMascotState = debugMascotState,
-                        modifier = Modifier.sizeIn(
-                            maxWidth = mascotMaxSize,
-                            maxHeight = mascotMaxSize,
-                        ),
-                    )
-                }
-                Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
-                AgentReplyCarouselText(
-                    text = presentation.statusText,
-                    compactLandscape = compactLandscape,
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            XiaobaohuCompanionStage(
+                agent = presentation.agent,
+                mascotState = effectiveMascotState,
+                compactLandscape = compactLandscape,
+                debugMascotState = debugMascotState,
+                modifier = Modifier.weight(1f),
+            )
+            if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
+                Spacer(modifier = Modifier.height(if (compactLandscape) 2.dp else 4.dp))
+                Text(
+                    text = "不说也没关系。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (presentation.phase == ChildTurnUiPhase.Ready || presentation.phase == ChildTurnUiPhase.Resting) {
-                    Spacer(modifier = Modifier.height(if (compactLandscape) 2.dp else 4.dp))
-                    Text(
-                        text = "不说也没关系。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    MascotDebugSwitcher(
-                        selectedStateId = debugMascotStateId,
-                        onStateSelected = { debugMascotStateId = it },
-                    )
-                }
+            }
+            if (DevSettings.SHOW_MASCOT_DEBUG_SWITCHER) {
+                Spacer(modifier = Modifier.height(10.dp))
+                MascotDebugSwitcher(
+                    selectedStateId = debugMascotStateId,
+                    onStateSelected = { debugMascotStateId = it },
+                )
             }
         }
     }

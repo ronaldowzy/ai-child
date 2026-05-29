@@ -16,7 +16,7 @@ class MascotManifestTest {
         assertTrue(manifest.states.containsKey(MascotState.Speaking))
         assertTrue(manifest.states.containsKey(MascotState.Retry))
         assertEquals(12, manifest.defaultFps)
-        assertEquals("0.2.1-v2-idle-hq", manifest.assetPackageVersion)
+        assertEquals("0.3.0-hd-ondemand", manifest.assetPackageVersion)
         assertEquals(1024, manifest.states.getValue(MascotState.Idle).width)
         assertEquals(1024, manifest.states.getValue(MascotState.Idle).height)
     }
@@ -109,6 +109,26 @@ class MascotManifestTest {
     @Test
     fun unknownStateFallsBackToIdle() {
         assertEquals(MascotState.Idle, MascotState.fromId("not_in_manifest"))
+    }
+
+    @Test
+    fun idleStateHasNoHdSpec() {
+        val manifest = parseTestManifest()
+        val idleSpec = manifest.states.getValue(MascotState.Idle)
+        assertTrue("idle should have no hd spec", idleSpec.hd == null)
+    }
+
+    @Test
+    fun nonIdleStatesHaveHdSpec() {
+        val manifest = parseTestManifest()
+        val nonIdleStates = MascotState.entries.filter { it != MascotState.Idle }
+        nonIdleStates.forEach { state ->
+            val spec = manifest.states.getValue(state)
+            assertTrue("${state.id} should have hd spec", spec.hd != null)
+            assertEquals(1024, spec.hd!!.width)
+            assertEquals(1024, spec.hd!!.height)
+            assertTrue("${state.id} hd framePattern should contain %04d", spec.hd!!.framePattern.contains("%04d"))
+        }
     }
 
     private fun parseTestManifest(): MascotManifest {

@@ -2,6 +2,7 @@ package com.childai.companion.mascot
 
 import android.content.res.AssetManager
 import org.json.JSONObject
+import java.io.File
 
 class AssetManifestLoader(
     private val assetManager: AssetManager,
@@ -61,6 +62,7 @@ class AssetManifestLoader(
                 for (key in statesObject.keys()) {
                     val state = MascotState.fromId(key)
                     val item = statesObject.getJSONObject(key)
+                    val hdObj = item.optJSONObject("hd")
                     put(
                         state,
                         MascotStateSpec(
@@ -78,6 +80,13 @@ class AssetManifestLoader(
                             framePattern = item.getString("framePattern"),
                             spritesheet = item.optString("spritesheet").takeIf {
                                 it.isNotBlank()
+                            },
+                            hd = hdObj?.let { h ->
+                                HdSpec(
+                                    width = h.optInt("width", 1024),
+                                    height = h.optInt("height", 1024),
+                                    framePattern = h.optString("framePattern", item.getString("framePattern")),
+                                )
                             },
                         ),
                     )

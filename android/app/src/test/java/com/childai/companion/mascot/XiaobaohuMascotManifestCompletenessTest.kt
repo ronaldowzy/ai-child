@@ -59,6 +59,29 @@ class XiaobaohuMascotManifestCompletenessTest {
         }
     }
 
+    @Test
+    fun nonIdleStatesHaveHdSpecWithValidDimensions() {
+        val manifest = AssetManifestLoader.parseMascotManifest(MASCOT_MANIFEST_JSON)
+
+        MascotState.entries.filter { it != MascotState.Idle }.forEach { state ->
+            val spec = manifest.states[state]
+            requireNotNull(spec) { "Missing spec for ${state.id}" }
+            val hd = spec.hd
+            requireNotNull(hd) { "${state.id} should have hd spec" }
+            assertEquals("${state.id} hd width", 1024, hd.width)
+            assertEquals("${state.id} hd height", 1024, hd.height)
+            assertTrue("${state.id} hd framePattern", hd.framePattern.contains("%04d"))
+        }
+    }
+
+    @Test
+    fun idleStateHasNoHdSpec() {
+        val manifest = AssetManifestLoader.parseMascotManifest(MASCOT_MANIFEST_JSON)
+        val idleSpec = manifest.states[MascotState.Idle]
+        requireNotNull(idleSpec)
+        assertTrue("idle should have no hd spec", idleSpec.hd == null)
+    }
+
     private companion object {
         private const val MASCOT_MANIFEST_JSON = """
             {
@@ -94,7 +117,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "listening/v2.0.0/",
                   "manifest": "listening/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_listening_%04d.webp"
+                  "framePattern": "frames_webp/fox_listening_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_listening_%04d.webp" }
                 },
                 "thinking": {
                   "version": "v2.0.0",
@@ -105,7 +129,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "thinking/v2.0.0/",
                   "manifest": "thinking/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_thinking_%04d.webp"
+                  "framePattern": "frames_webp/fox_thinking_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_thinking_%04d.webp" }
                 },
                 "speaking": {
                   "version": "v2.0.0",
@@ -116,7 +141,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "speaking/v2.0.0/",
                   "manifest": "speaking/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_speaking_%04d.webp"
+                  "framePattern": "frames_webp/fox_speaking_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_speaking_%04d.webp" }
                 },
                 "waiting_soft": {
                   "version": "v2.0.0",
@@ -127,7 +153,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "waiting_soft/v2.0.0/",
                   "manifest": "waiting_soft/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_waiting_soft_%04d.webp"
+                  "framePattern": "frames_webp/fox_waiting_soft_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_waiting_soft_%04d.webp" }
                 },
                 "preparing_speech": {
                   "version": "v2.0.0",
@@ -138,7 +165,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "preparing_speech/v2.0.0/",
                   "manifest": "preparing_speech/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_preparing_speech_%04d.webp"
+                  "framePattern": "frames_webp/fox_preparing_speech_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_preparing_speech_%04d.webp" }
                 },
                 "image_viewing": {
                   "version": "v2.0.0",
@@ -149,7 +177,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "image_viewing/v2.0.0/",
                   "manifest": "image_viewing/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_image_viewing_%04d.webp"
+                  "framePattern": "frames_webp/fox_image_viewing_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_image_viewing_%04d.webp" }
                 },
                 "co_create": {
                   "version": "v2.0.0",
@@ -160,7 +189,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "co_create/v2.0.0/",
                   "manifest": "co_create/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_co_create_%04d.webp"
+                  "framePattern": "frames_webp/fox_co_create_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_co_create_%04d.webp" }
                 },
                 "paused": {
                   "version": "v2.0.0",
@@ -171,7 +201,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "paused/v2.0.0/",
                   "manifest": "paused/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_paused_%04d.webp"
+                  "framePattern": "frames_webp/fox_paused_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_paused_%04d.webp" }
                 },
                 "retry": {
                   "version": "v2.0.0",
@@ -182,7 +213,8 @@ class XiaobaohuMascotManifestCompletenessTest {
                   "height": 512,
                   "path": "retry/v2.0.0/",
                   "manifest": "retry/v2.0.0/manifest.json",
-                  "framePattern": "frames_webp/fox_retry_%04d.webp"
+                  "framePattern": "frames_webp/fox_retry_%04d.webp",
+                  "hd": { "width": 1024, "height": 1024, "framePattern": "frames_webp/fox_retry_%04d.webp" }
                 }
               },
               "statePriority": [

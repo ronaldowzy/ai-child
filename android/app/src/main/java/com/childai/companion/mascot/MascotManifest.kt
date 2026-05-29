@@ -21,6 +21,13 @@ data class MascotStateSpec(
     val manifestPath: String,
     val framePattern: String,
     val spritesheet: String?,
+    val hd: HdSpec?,
+)
+
+data class HdSpec(
+    val width: Int,
+    val height: Int,
+    val framePattern: String,
 )
 
 data class MascotStateManifest(

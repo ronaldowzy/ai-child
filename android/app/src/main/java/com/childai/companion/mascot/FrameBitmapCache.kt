@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import java.io.File
+import java.io.FileInputStream
 
 class FrameBitmapCache(
     private val assetManager: AssetManager,
@@ -19,20 +21,44 @@ class FrameBitmapCache(
 
     fun load(path: String): ImageBitmap? {
         cache[path]?.let { return it }
-        val decoded = runCatching {
+        val decoded = if (path.startsWith("/")) {
+            loadFromFileSystem(path)
+        } else {
+            loadFromAssets(path)
+        }
+        if (decoded != null) {
+            cache[path] = decoded
+        }
+        return decoded
+    }
+
+    private fun loadFromAssets(path: String): ImageBitmap? {
+        return runCatching {
             assetManager.open(path).use { stream ->
                 BitmapFactory.decodeStream(
                     stream,
                     null,
-                    BitmapFactory.Options().apply {
-                        inPreferredConfig = Bitmap.Config.ARGB_8888
-                        inSampleSize = sampleSize.coerceAtLeast(1)
-                    },
+                    decodeOptions(),
                 )?.asImageBitmap()
             }
-        }.getOrNull() ?: return null
-        cache[path] = decoded
-        return decoded
+        }.getOrNull()
+    }
+
+    private fun loadFromFileSystem(path: String): ImageBitmap? {
+        return runCatching {
+            FileInputStream(File(path)).use { stream ->
+                BitmapFactory.decodeStream(
+                    stream,
+                    null,
+                    decodeOptions(),
+                )?.asImageBitmap()
+            }
+        }.getOrNull()
+    }
+
+    private fun decodeOptions() = BitmapFactory.Options().apply {
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+        inSampleSize = sampleSize.coerceAtLeast(1)
     }
 
     fun clear() {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,9 +30,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.childai.companion.config.DevSettings
+import com.childai.companion.data.FoxHdAssetManager
+import com.childai.companion.data.HdAssetState
 import com.childai.companion.mascot.AssetManifestLoader
 import com.childai.companion.mascot.FrameBitmapCache
 import com.childai.companion.mascot.FrameSequencePlayer
+import com.childai.companion.mascot.FrameSequenceUiState
 import com.childai.companion.mascot.MascotController
 import com.childai.companion.mascot.MascotState
 
@@ -138,10 +142,47 @@ fun CartoonAgentView(
     } else {
         baseMascotState
     }
+
+    // HD on-demand download: trigger when state changes to a non-idle state with hd spec
+    val hdManager = remember(context) {
+        FoxHdAssetManager.getInstance(context)
+    }
+    val hdState = remember(requestedMascotState, manifest) {
+        val spec = manifest?.states?.get(requestedMascotState)
+        if (useAnimation && spec?.hd != null && requestedMascotState != MascotState.Idle) {
+            hdManager.ensureHdAvailable(requestedMascotState)
+        } else {
+            null
+        }
+    }
+    // Observe HD download state to trigger recomposition
+    val currentHdState = hdState?.collectAsState()?.value
+
     val visualScale = mascotVisualScale(requestedMascotState)
-    val frameSequence = remember(useAnimation, requestedMascotState, manifest) {
+    val frameSequence = remember(useAnimation, requestedMascotState, manifest, currentHdState) {
         if (useAnimation && manifest != null) {
-            manifestLoader.loadFrameSequenceOrNull(requestedMascotState, manifest)
+            val spec = manifest.states[requestedMascotState]
+            val hdSpec = spec?.hd
+            val hdReady = currentHdState is HdAssetState.Ready
+            if (hdSpec != null && hdReady && spec != null) {
+                val hdFramesDir = (currentHdState as HdAssetState.Ready).framesDir
+                val hdFramePaths = buildHdFramePaths(hdFramesDir, hdSpec.framePattern, spec.frameCount)
+                if (hdFramePaths.isNotEmpty()) {
+                    FrameSequenceUiState(
+                        state = requestedMascotState,
+                        animationType = spec.animationType,
+                        fps = spec.fps.coerceAtLeast(1),
+                        width = hdSpec.width,
+                        height = hdSpec.height,
+                        framePaths = hdFramePaths,
+                        assetVersion = manifest.assetPackageVersion + "-hd",
+                    )
+                } else {
+                    manifestLoader.loadFrameSequenceOrNull(requestedMascotState, manifest)
+                }
+            } else {
+                manifestLoader.loadFrameSequenceOrNull(requestedMascotState, manifest)
+            }
         } else {
             null
         }
@@ -374,4 +415,19 @@ private fun DrawScope.drawEar(
         close()
     }
     drawPath(path = innerPath, color = innerColor)
+}
+
+private fun buildHdFramePaths(
+    framesDir: java.io.File,
+    framePattern: String,
+    frameCount: Int,
+): List<String> {
+    return (1..frameCount).mapNotNull { frameNumber ->
+        val frameName = framePattern.replace(
+            "%04d",
+            frameNumber.toString().padStart(4, '0'),
+        )
+        val file = java.io.File(framesDir, frameName)
+        if (file.exists()) file.absolutePath else null
+    }
 }

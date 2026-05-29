@@ -1,0 +1,16 @@
+{
+  "state": "listening",
+  "displayName": "fox_listening",
+  "version": "v2.0.0",
+  "type": "frame_sequence",
+  "fps": 12,
+  "frameCount": 48,
+  "loop": true,
+  "width": 512,
+  "height": 512,
+  "path": "listening/v2.0.0/",
+  "manifest": "listening/v2.0.0/manifest.json",
+  "framePattern": "frames_webp/fox_listening_%04d.webp",
+  "format": "webp",
+  "runtimeOnly": true
+}

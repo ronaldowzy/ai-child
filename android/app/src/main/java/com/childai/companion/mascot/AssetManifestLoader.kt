@@ -52,7 +52,7 @@ class AssetManifestLoader(
     }
 
     companion object {
-        const val DEFAULT_ROOT_PATH = "mascot/xiaobaohu/v1"
+        const val DEFAULT_ROOT_PATH = "mascot/xiaobaohu/v2"
 
         fun parseMascotManifest(rawJson: String): MascotManifest {
             val root = JSONObject(rawJson)

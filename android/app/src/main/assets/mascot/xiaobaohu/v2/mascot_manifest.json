@@ -1,0 +1,62 @@
+{
+  "mascot": "Little White Fox",
+  "assetPackageVersion": "0.2.0-v2-states",
+  "format": "webp_frame_sequence_runtime",
+  "defaultFps": 12,
+  "defaultState": "idle",
+  "dimensions": [
+    {
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "states": {
+    "idle": {
+      "version": "v2.0.0",
+      "type": "loop",
+      "fps": 12,
+      "frameCount": 48,
+      "width": 512,
+      "height": 512,
+      "path": "idle/v2.0.0/",
+      "manifest": "idle/v2.0.0/manifest.json",
+      "framePattern": "frames_webp/fox_idle_%04d.webp"
+    },
+    "listening": {
+      "version": "v2.0.0",
+      "type": "loop",
+      "fps": 12,
+      "frameCount": 48,
+      "width": 512,
+      "height": 512,
+      "path": "listening/v2.0.0/",
+      "manifest": "listening/v2.0.0/manifest.json",
+      "framePattern": "frames_webp/fox_listening_%04d.webp"
+    },
+    "speaking": {
+      "version": "v2.0.0",
+      "type": "loop",
+      "fps": 12,
+      "frameCount": 48,
+      "width": 512,
+      "height": 512,
+      "path": "speaking/v2.0.0/",
+      "manifest": "speaking/v2.0.0/manifest.json",
+      "framePattern": "frames_webp/fox_speaking_%04d.webp"
+    }
+  },
+  "statePriority": [
+    "safety_concern",
+    "privacy_boundary",
+    "network_error",
+    "speaking",
+    "thinking",
+    "listening",
+    "homework_focus",
+    "calm",
+    "sleepy",
+    "jumping_happy",
+    "idle"
+  ],
+  "notes": "v2 mascot package: 512px WebP frame sequences from states-v2 assets."
+}

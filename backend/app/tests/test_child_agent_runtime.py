@@ -268,6 +268,55 @@ def test_child_agent_runtime_normalizes_model_reply_for_voice() -> None:
     assert result.model_metadata["reply_normalized"] is True
 
 
+def test_child_agent_runtime_unwraps_fenced_json_model_reply() -> None:
+    raw = (
+        "```json\n"
+        "{\"reply\":\"我听到啦，我们慢慢来。\","
+        "\"conversation_control\":{\"child_engagement\":\"high\","
+        "\"topic_continuity\":\"continue\","
+        "\"topic_shift_intent\":\"unlikely\"}}\n"
+        "```"
+    )
+    registry = CapturingModelRegistry(
+        response=_model_response(raw, structured_output={"text": raw})
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "我听到啦，我们慢慢来。"
+    assert "reply" not in result.reply_text
+    assert "conversation_control" not in result.reply_text
+
+
+def test_child_agent_runtime_unwraps_json_string_inside_reply_field() -> None:
+    raw_reply = "{\"reply\":\"我记住啦，我们先轻轻说。\"}"
+    registry = CapturingModelRegistry(
+        response=_model_response(
+            raw_reply,
+            structured_output={"reply": raw_reply},
+        )
+    )
+    route_decision = _route_decision(
+        active_scene=SceneId.DAILY_AFTER_SCHOOL_CHECKIN,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(route_decision=route_decision)
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.reply_text == "我记住啦，我们先轻轻说。"
+    assert "reply" not in result.reply_text
+
+
 def test_child_agent_runtime_strips_stage_direction_from_model_reply() -> None:
     registry = CapturingModelRegistry(
         response=_model_response("（用温和的语调）题目是什么呀？")

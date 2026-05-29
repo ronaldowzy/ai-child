@@ -1,10 +1,14 @@
 {
   "mascot": "Little White Fox",
-  "assetPackageVersion": "0.2.0-v2-full",
+  "assetPackageVersion": "0.2.1-v2-idle-hq",
   "format": "webp_frame_sequence_runtime",
   "defaultFps": 12,
   "defaultState": "idle",
   "dimensions": [
+    {
+      "width": 1024,
+      "height": 1024
+    },
     {
       "width": 512,
       "height": 512
@@ -16,8 +20,8 @@
       "type": "loop",
       "fps": 12,
       "frameCount": 48,
-      "width": 512,
-      "height": 512,
+      "width": 1024,
+      "height": 1024,
       "path": "idle/v2.0.0/",
       "manifest": "idle/v2.0.0/manifest.json",
       "framePattern": "frames_webp/fox_idle_%04d.webp"
@@ -134,5 +138,5 @@
     "waiting_soft",
     "idle"
   ],
-  "notes": "v2 mascot package: 512px WebP frame sequences, 10 states full mapping."
+  "notes": "v2 mascot package: idle uses 1024px WebP frames for clarity trial; remaining states use 512px WebP frame sequences."
 }

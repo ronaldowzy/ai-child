@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.childai.companion.mascot.MascotState
 
@@ -50,10 +51,11 @@ import com.childai.companion.mascot.MascotState
  * prompt, or parent report logic.
  */
 @Composable
-fun XiaobaohuCompanionStage(
+internal fun XiaobaohuCompanionStage(
     agent: FoxAgentUiState,
     mascotState: MascotState,
     compactLandscape: Boolean,
+    viewportClass: CompanionRoomViewportClass = CompanionRoomViewportClass.Portrait,
     modifier: Modifier = Modifier,
     debugMascotState: MascotState? = null,
 ) {
@@ -64,13 +66,14 @@ fun XiaobaohuCompanionStage(
     )
 
     BoxWithConstraints(modifier = modifier) {
-        val mascotMaxSize = minOf(
-            maxWidth * if (compactLandscape) 0.94f else 0.98f,
-            (maxHeight * if (compactLandscape) 0.86f else 0.80f).coerceAtLeast(190.dp),
-            if (compactLandscape) 560.dp else 520.dp,
+        val mascotMaxSize = mascotMaxSizeForViewport(
+            maxWidth = maxWidth,
+            maxHeight = maxHeight,
+            viewportClass = viewportClass,
         )
-        val mascotOffsetY = if (compactLandscape) 34.dp else 42.dp
-        val visualScaleMultiplier = if (compactLandscape) 1.38f else 1.20f
+        val mascotOffsetY = mascotOffsetYForViewport(viewportClass)
+        val visualScaleMultiplier = mascotVisualScaleMultiplier(viewportClass)
+        val bubbleOffset = mascotStateBubbleOffset(viewportClass)
 
         Box(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -125,8 +128,8 @@ fun XiaobaohuCompanionStage(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .offset(
-                        x = if (compactLandscape) (-20).dp else (-14).dp,
-                        y = if (compactLandscape) (-84).dp else (-72).dp,
+                        x = bubbleOffset.x,
+                        y = bubbleOffset.y,
                     ),
             ) {
                 renderedBubbleText?.let { text ->
@@ -137,6 +140,79 @@ fun XiaobaohuCompanionStage(
                 }
             }
         }
+    }
+}
+
+private data class MascotBubbleOffset(
+    val x: Dp,
+    val y: Dp,
+)
+
+private fun mascotMaxSizeForViewport(
+    maxWidth: Dp,
+    maxHeight: Dp,
+    viewportClass: CompanionRoomViewportClass,
+): Dp {
+    return when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> minOf(
+            maxWidth * 0.94f,
+            (maxHeight * 0.82f).coerceAtLeast(190.dp),
+            590.dp,
+        )
+
+        CompanionRoomViewportClass.LandscapeTablet -> minOf(
+            maxWidth * 0.86f,
+            (maxHeight * 0.74f).coerceAtLeast(240.dp),
+            680.dp,
+        )
+
+        CompanionRoomViewportClass.LandscapeSquare -> minOf(
+            maxWidth * 0.82f,
+            (maxHeight * 0.70f).coerceAtLeast(240.dp),
+            620.dp,
+        )
+
+        CompanionRoomViewportClass.Portrait -> minOf(
+            maxWidth * 0.98f,
+            (maxHeight * 0.80f).coerceAtLeast(190.dp),
+            520.dp,
+        )
+
+        CompanionRoomViewportClass.PortraitExpanded -> minOf(
+            maxWidth * 0.86f,
+            (maxHeight * 0.74f).coerceAtLeast(260.dp),
+            650.dp,
+        )
+    }
+}
+
+private fun mascotOffsetYForViewport(viewportClass: CompanionRoomViewportClass): Dp {
+    return when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> (-8).dp
+        CompanionRoomViewportClass.LandscapeTablet -> 6.dp
+        CompanionRoomViewportClass.LandscapeSquare -> 12.dp
+        CompanionRoomViewportClass.Portrait -> 28.dp
+        CompanionRoomViewportClass.PortraitExpanded -> 18.dp
+    }
+}
+
+private fun mascotVisualScaleMultiplier(viewportClass: CompanionRoomViewportClass): Float {
+    return when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> 1.30f
+        CompanionRoomViewportClass.LandscapeTablet -> 1.16f
+        CompanionRoomViewportClass.LandscapeSquare -> 1.08f
+        CompanionRoomViewportClass.Portrait -> 1.18f
+        CompanionRoomViewportClass.PortraitExpanded -> 1.10f
+    }
+}
+
+private fun mascotStateBubbleOffset(viewportClass: CompanionRoomViewportClass): MascotBubbleOffset {
+    return when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> MascotBubbleOffset(x = (-44).dp, y = (-90).dp)
+        CompanionRoomViewportClass.LandscapeTablet -> MascotBubbleOffset(x = (-28).dp, y = (-78).dp)
+        CompanionRoomViewportClass.LandscapeSquare -> MascotBubbleOffset(x = (-20).dp, y = (-68).dp)
+        CompanionRoomViewportClass.Portrait -> MascotBubbleOffset(x = (-20).dp, y = (-72).dp)
+        CompanionRoomViewportClass.PortraitExpanded -> MascotBubbleOffset(x = (-24).dp, y = (-78).dp)
     }
 }
 

@@ -77,6 +77,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.childai.companion.R
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -254,6 +255,7 @@ private fun ChildChatScreenContent(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp),
     ) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -261,10 +263,15 @@ private fun ChildChatScreenContent(
                 .fillMaxSize()
                 .background(companionPageBackgroundBrush()),
         ) {
-            val isLandscape = maxWidth > maxHeight
-            val compactLandscape = maxHeight < 430.dp || maxWidth < 760.dp
+            val viewportClass = companionRoomViewportClass(maxWidth = maxWidth, maxHeight = maxHeight)
+            val isLandscape = viewportClass.isLandscape
+            val compactLandscape = companionLandscapeIsCompact(
+                maxWidth = maxWidth,
+                maxHeight = maxHeight,
+                viewportClass = viewportClass,
+            )
 
-            CompanionRoomBackground(isLandscape = isLandscape)
+            CompanionRoomBackground(viewportClass = viewportClass)
             CompanionAmbientGlows(
                 isLandscape = isLandscape,
                 compactLandscape = compactLandscape,
@@ -272,15 +279,19 @@ private fun ChildChatScreenContent(
 
             if (isLandscape) {
                 // Landscape: keep the room and mascot as the scene, with controls only as a light rail.
-                val layoutWeights = companionLayoutWeights(isLandscape = true)
-                val horizontalPadding = if (compactLandscape) 14.dp else 32.dp
-                val verticalPadding = if (compactLandscape) 10.dp else 24.dp
-                val columnGap = if (compactLandscape) 14.dp else 28.dp
+                val layoutWeights = companionLayoutWeights(viewportClass = viewportClass)
+                val layoutMetrics = companionLandscapeLayoutMetrics(
+                    viewportClass = viewportClass,
+                    compactLandscape = compactLandscape,
+                )
 
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                        .padding(
+                            horizontal = layoutMetrics.horizontalPadding,
+                            vertical = layoutMetrics.verticalPadding,
+                        ),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -288,7 +299,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
-                        isLandscape = true,
+                        viewportClass = viewportClass,
                         compactLandscape = compactLandscape,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
@@ -296,10 +307,11 @@ private fun ChildChatScreenContent(
                             .weight(layoutWeights.agent)
                             .fillMaxHeight(),
                     )
-                    Spacer(modifier = Modifier.width(columnGap))
+                    Spacer(modifier = Modifier.width(layoutMetrics.columnGap))
                     LandscapeOperationPanel(
                         uiState = uiState,
                         compactLandscape = compactLandscape,
+                        maxPanelWidth = layoutMetrics.operationPanelMaxWidth,
                         parentEntryHint = parentEntryHint,
                         presentation = uiState.interactionPresentation,
                         onParentEntryTap = {
@@ -324,8 +336,13 @@ private fun ChildChatScreenContent(
                 }
             } else {
                 // Portrait: fox lives in the room; dialogue floats around it instead of sitting in a chat card.
-                val horizontalPadding = 20.dp
-                val verticalPadding = 16.dp
+                val portraitMetrics = companionPortraitLayoutMetrics(viewportClass = viewportClass)
+                val horizontalPadding = portraitMetrics.horizontalPadding
+                val verticalPadding = portraitMetrics.verticalPadding
+                val inputWidth = minOf(
+                    (maxWidth - horizontalPadding * 2f).coerceAtLeast(280.dp),
+                    portraitMetrics.inputMaxWidth,
+                )
                 val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
 
                 Column(
@@ -351,7 +368,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
-                        isLandscape = false,
+                        viewportClass = viewportClass,
                         compactLandscape = false,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
@@ -368,21 +385,12 @@ private fun ChildChatScreenContent(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
-                    val inputTrayShape = companionInputTrayShape(compactLandscape = false)
                     InputBar(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 112.dp)
+                            .width(inputWidth)
                             .navigationBarsPadding()
                             .windowInsetsPadding(WindowInsets.ime)
-                            .clip(inputTrayShape)
-                            .background(companionInputTrayColor())
-                            .border(
-                                width = 1.dp,
-                                color = companionSoftBorderColor(alpha = 0.48f),
-                                shape = inputTrayShape,
-                            )
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                            .padding(bottom = 4.dp),
                         onSend = onSend,
                         enabled = !uiState.isSending,
                         voice = uiState.voice,
@@ -394,6 +402,7 @@ private fun ChildChatScreenContent(
                         onInstallTtsData = onInstallTtsData,
                         onPhotoCaptured = onPhotoCaptured,
                         onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        playfulControls = true,
                     )
                 }
             }
@@ -798,6 +807,7 @@ internal fun localImagePreviewStatusText(status: LocalImagePreviewStatus): Strin
 private fun LandscapeOperationPanel(
     uiState: ChatUiState,
     compactLandscape: Boolean,
+    maxPanelWidth: Dp,
     parentEntryHint: String?,
     presentation: ChildInteractionPresentation,
     onParentEntryTap: () -> Unit,
@@ -817,56 +827,54 @@ private fun LandscapeOperationPanel(
     val inputVerticalPadding = if (compactLandscape) 10.dp else 14.dp
     val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
 
-    Column(
-        modifier = modifier
-            .padding(if (compactLandscape) 4.dp else 8.dp),
-        horizontalAlignment = Alignment.End,
-    ) {
-        ParentEntryHintBar(
-            parentEntryHint = parentEntryHint,
-            onParentEntryTap = onParentEntryTap,
-            onParentEntryLongPress = onParentEntryLongPress,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        if (visibleQuickActions.isNotEmpty()) {
-            QuickActionsRow(
-                actions = visibleQuickActions,
-                enabled = !uiState.isSending,
-                onQuickAction = onQuickAction,
-            )
-            Spacer(modifier = Modifier.height(panelGap))
-        }
-        val inputTrayShape = companionInputTrayShape(compactLandscape = compactLandscape)
-        InputBar(
+    BoxWithConstraints(modifier = modifier) {
+        val panelWidth = minOf(maxWidth, maxPanelWidth)
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = if (compactLandscape) 96.dp else 112.dp)
-                .navigationBarsPadding()
-                .windowInsetsPadding(WindowInsets.ime)
-                .clip(inputTrayShape)
-                .background(companionInputTrayColor())
-                .border(
-                    width = 1.dp,
-                    color = companionSoftBorderColor(alpha = 0.48f),
-                    shape = inputTrayShape,
+                .align(Alignment.CenterEnd)
+                .width(panelWidth)
+                .fillMaxHeight()
+                .padding(if (compactLandscape) 4.dp else 8.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            ParentEntryHintBar(
+                parentEntryHint = parentEntryHint,
+                onParentEntryTap = onParentEntryTap,
+                onParentEntryLongPress = onParentEntryLongPress,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (visibleQuickActions.isNotEmpty()) {
+                QuickActionsRow(
+                    actions = visibleQuickActions,
+                    enabled = !uiState.isSending,
+                    onQuickAction = onQuickAction,
                 )
-                .padding(
-                    horizontal = inputHorizontalPadding,
-                    vertical = inputVerticalPadding,
-                ),
-            onSend = onSend,
-            enabled = !uiState.isSending,
-            voice = uiState.voice,
-            tts = uiState.tts,
-            presentation = presentation,
-            onStopTts = onStopTts,
-            onToggleTtsMuted = onToggleTtsMuted,
-            onOpenTtsSettings = onOpenTtsSettings,
-            onInstallTtsData = onInstallTtsData,
-            onPhotoCaptured = onPhotoCaptured,
-            onPhotoCaptureFailed = onPhotoCaptureFailed,
-        )
+                Spacer(modifier = Modifier.height(panelGap))
+            }
+            InputBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(
+                        horizontal = if (compactLandscape) 4.dp else inputHorizontalPadding,
+                        vertical = if (compactLandscape) 6.dp else inputVerticalPadding,
+                    ),
+                onSend = onSend,
+                enabled = !uiState.isSending,
+                voice = uiState.voice,
+                tts = uiState.tts,
+                presentation = presentation,
+                onStopTts = onStopTts,
+                onToggleTtsMuted = onToggleTtsMuted,
+                onOpenTtsSettings = onOpenTtsSettings,
+                onInstallTtsData = onInstallTtsData,
+                onPhotoCaptured = onPhotoCaptured,
+                onPhotoCaptureFailed = onPhotoCaptureFailed,
+                playfulControls = true,
+            )
+        }
     }
 }
 
@@ -886,18 +894,70 @@ internal fun topicShiftChipActions(uiState: ChatUiState): List<QuickActionUi> {
 }
 
 @Composable
-private fun CompanionRoomBackground(isLandscape: Boolean) {
-    Image(
-        painter = painterResource(id = R.drawable.companion_room_background),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        alignment = if (isLandscape) Alignment.Center else Alignment.Center,
-        modifier = Modifier.fillMaxSize(),
-    )
+private fun CompanionRoomBackground(viewportClass: CompanionRoomViewportClass) {
+    when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> {
+            Image(
+                painter = painterResource(id = R.drawable.companion_room_background_land),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        CompanionRoomViewportClass.LandscapeTablet,
+        CompanionRoomViewportClass.LandscapeSquare -> {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Image(
+                    painter = painterResource(id = R.drawable.companion_room_background_land),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(22.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(alpha = 0.38f)),
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.companion_room_background_land),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.BottomCenter,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        CompanionRoomViewportClass.Portrait,
+        CompanionRoomViewportClass.PortraitExpanded -> {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val portraitBackgroundExtraHeight = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
+                    96.dp
+                } else {
+                    160.dp
+                }
+                Image(
+                    painter = painterResource(id = R.drawable.companion_room_background_portrait),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .width(maxWidth)
+                        .height(maxHeight + portraitBackgroundExtraHeight),
+                )
+            }
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(companionRoomScrimBrush(isLandscape = isLandscape)),
+            .background(companionRoomScrimBrush(isLandscape = viewportClass.isLandscape)),
     )
 }
 
@@ -1011,10 +1071,41 @@ internal data class CompanionLayoutWeights(
 )
 
 internal fun companionLayoutWeights(isLandscape: Boolean): CompanionLayoutWeights {
-    return if (isLandscape) {
-        CompanionLayoutWeights(agent = 0.68f, conversation = 0.32f)
-    } else {
-        CompanionLayoutWeights(agent = 0.72f, conversation = 0.28f)
+    return companionLayoutWeights(
+        viewportClass = if (isLandscape) {
+            CompanionRoomViewportClass.LandscapeWide
+        } else {
+            CompanionRoomViewportClass.Portrait
+        },
+    )
+}
+
+internal fun companionLayoutWeights(viewportClass: CompanionRoomViewportClass): CompanionLayoutWeights {
+    return when (viewportClass) {
+        CompanionRoomViewportClass.LandscapeWide -> CompanionLayoutWeights(
+            agent = 0.58f,
+            conversation = 0.42f,
+        )
+
+        CompanionRoomViewportClass.LandscapeTablet -> CompanionLayoutWeights(
+            agent = 0.66f,
+            conversation = 0.34f,
+        )
+
+        CompanionRoomViewportClass.LandscapeSquare -> CompanionLayoutWeights(
+            agent = 0.70f,
+            conversation = 0.30f,
+        )
+
+        CompanionRoomViewportClass.Portrait -> CompanionLayoutWeights(
+            agent = 0.72f,
+            conversation = 0.28f,
+        )
+
+        CompanionRoomViewportClass.PortraitExpanded -> CompanionLayoutWeights(
+            agent = 0.70f,
+            conversation = 0.30f,
+        )
     }
 }
 
@@ -1309,7 +1400,7 @@ private fun AgentPanel(
     presentation: ChildInteractionPresentation,
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
-    isLandscape: Boolean,
+    viewportClass: CompanionRoomViewportClass,
     compactLandscape: Boolean,
     onImageRetry: (String) -> Unit,
     onImageDismiss: (String) -> Unit,
@@ -1319,6 +1410,7 @@ private fun AgentPanel(
     val debugMascotState = debugMascotStateId?.let(MascotState::fromId)
     val resolvedMascotState = XiaobaohuVisualStateResolver.resolve(presentation.agent).mascotState
     val effectiveMascotState = debugMascotState ?: resolvedMascotState
+    val isLandscape = viewportClass.isLandscape
 
     Box(modifier = modifier) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1327,6 +1419,7 @@ private fun AgentPanel(
                     agent = presentation.agent,
                     mascotState = effectiveMascotState,
                     compactLandscape = compactLandscape,
+                    viewportClass = viewportClass,
                     debugMascotState = debugMascotState,
                     modifier = Modifier.fillMaxSize(),
                 )

@@ -1,5 +1,6 @@
 package com.childai.companion.ui.chat
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,6 +74,39 @@ class AgentReplyCarouselTest {
         assertTrue(portrait.agent > portrait.conversation)
         assertTrue(landscape.agent > landscape.conversation)
         assertTrue(landscape.agent >= 0.50f)
+    }
+
+    @Test
+    fun landscapeViewportClassSeparatesWidePhonesAndTablets() {
+        assertEquals(
+            CompanionRoomViewportClass.LandscapeWide,
+            companionRoomViewportClass(maxWidth = 2712.dp, maxHeight = 1220.dp),
+        )
+        assertEquals(
+            CompanionRoomViewportClass.LandscapeTablet,
+            companionRoomViewportClass(maxWidth = 1280.dp, maxHeight = 800.dp),
+        )
+        assertEquals(
+            CompanionRoomViewportClass.LandscapeSquare,
+            companionRoomViewportClass(maxWidth = 1024.dp, maxHeight = 768.dp),
+        )
+        assertEquals(
+            CompanionRoomViewportClass.Portrait,
+            companionRoomViewportClass(maxWidth = 390.dp, maxHeight = 844.dp),
+        )
+    }
+
+    @Test
+    fun tabletLandscapeGivesMoreRoomToMascotAndCapsOperationPanel() {
+        val wide = companionLayoutWeights(CompanionRoomViewportClass.LandscapeWide)
+        val tablet = companionLayoutWeights(CompanionRoomViewportClass.LandscapeTablet)
+        val tabletMetrics = companionLandscapeLayoutMetrics(
+            viewportClass = CompanionRoomViewportClass.LandscapeTablet,
+            compactLandscape = false,
+        )
+
+        assertTrue(tablet.agent > wide.agent)
+        assertEquals(680.dp, tabletMetrics.operationPanelMaxWidth)
     }
 
     @Test

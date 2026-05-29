@@ -559,16 +559,61 @@ class ChildAgentRuntime:
         reply_text = str(reply_candidate).strip() if reply_candidate else raw_text
         control_raw = payload.get("conversation_control")
         control = self._parse_conversation_control(control_raw, source="model")
+        nested_payload = self._parse_json_object(reply_text)
+        if nested_payload is not None:
+            nested_reply_candidate = nested_payload.get("reply") or nested_payload.get("text")
+            if nested_reply_candidate:
+                reply_text = str(nested_reply_candidate).strip()
+            if control is None:
+                control = self._parse_conversation_control(
+                    nested_payload.get("conversation_control"),
+                    source="model",
+                )
         return reply_text, control
 
     def _parse_json_object(self, text: str) -> dict[str, Any] | None:
-        if not text.startswith("{") or not text.endswith("}"):
-            return None
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-        return parsed if isinstance(parsed, dict) else None
+        candidates = self._json_object_candidates(text)
+        decoder = json.JSONDecoder()
+        for candidate in candidates:
+            try:
+                parsed, end_index = decoder.raw_decode(candidate)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(parsed, dict):
+                continue
+            trailing = candidate[end_index:].strip()
+            if trailing and not self._looks_like_model_payload(parsed):
+                continue
+            return parsed
+        return None
+
+    def _json_object_candidates(self, text: str) -> list[str]:
+        stripped = text.strip()
+        if not stripped:
+            return []
+        candidates: list[str] = []
+        for match in re.finditer(
+            r"```(?:json)?\s*(.*?)\s*```",
+            stripped,
+            flags=re.IGNORECASE | re.DOTALL,
+        ):
+            block = match.group(1).strip()
+            if block.startswith("{"):
+                candidates.append(block)
+        if stripped.startswith("{"):
+            candidates.append(stripped)
+        first_brace = stripped.find("{")
+        if first_brace > 0:
+            candidates.append(stripped[first_brace:])
+        seen: set[str] = set()
+        return [
+            candidate
+            for candidate in candidates
+            if not (candidate in seen or seen.add(candidate))
+        ]
+
+    def _looks_like_model_payload(self, payload: dict[str, Any]) -> bool:
+        return any(key in payload for key in ("reply", "text", "conversation_control"))
 
     def _parse_conversation_control(
         self,

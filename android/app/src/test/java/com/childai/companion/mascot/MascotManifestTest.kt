@@ -16,7 +16,9 @@ class MascotManifestTest {
         assertTrue(manifest.states.containsKey(MascotState.Speaking))
         assertTrue(manifest.states.containsKey(MascotState.Retry))
         assertEquals(12, manifest.defaultFps)
-        assertEquals("0.2.0-v2-full", manifest.assetPackageVersion)
+        assertEquals("0.2.1-v2-idle-hq", manifest.assetPackageVersion)
+        assertEquals(1024, manifest.states.getValue(MascotState.Idle).width)
+        assertEquals(1024, manifest.states.getValue(MascotState.Idle).height)
     }
 
     @Test

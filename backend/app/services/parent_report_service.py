@@ -33,7 +33,6 @@ from app.services.parent_report_language_v4 import (
     avoid_followup_v4,
     deterministic_narrative_v4,
     parent_report_system_prompt_v4,
-    tonight_parent_bridge_v4,
 )
 from app.services.relationship_memory import (
     memory_relationship_next_hook,
@@ -278,17 +277,6 @@ class ParentReportService:
             has_show_tell=has_show_tell,
             has_unfinished=has_unfinished,
         )
-        bridge = tonight_parent_bridge_v4(
-            has_material=has_material,
-            has_safety=has_safety,
-            topics=topics,
-        )
-        avoid = avoid_followup_v4(
-            topics=topics,
-            has_topic_change=has_topic_change,
-            has_sports_fatigue=has_sports_fatigue,
-            has_safety=has_safety,
-        )
 
         return ParentReport(
             child_id=child_id,
@@ -301,8 +289,8 @@ class ParentReportService:
             emotion_observations=[],
             safety_alerts=list(conversation.get("safety_alerts", [])),
             suggested_parent_actions=[],
-            tonight_parent_bridge=bridge,
-            avoid_followup=avoid,
+            tonight_parent_bridge=None,
+            avoid_followup=[],
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -411,22 +399,14 @@ class ParentReportService:
                 summary=parsed["summary"],
                 topic_overview=parsed["topic_overview"]
                 or fallback_report.topic_overview,
-                conversation_summary=parsed["conversation_summary"]
-                or fallback_report.conversation_summary,
-                learning_observations=parsed["learning_observations"],
-                expression_observations=parsed["expression_observations"],
-                emotion_observations=parsed["emotion_observations"],
+                conversation_summary=None,
+                learning_observations=[],
+                expression_observations=[],
+                emotion_observations=[],
                 safety_alerts=parsed["safety_alerts"],
-                suggested_parent_actions=parsed["suggested_parent_actions"],
-                tonight_parent_bridge=parsed["tonight_parent_bridge"]
-                or self._tonight_parent_bridge(
-                    actions=parsed["suggested_parent_actions"],
-                    topics=conversation["topics"],
-                    has_material=bool(memories or conversation_messages),
-                    has_safety=bool(parsed["safety_alerts"]),
-                ),
-                avoid_followup=parsed["avoid_followup"]
-                or fallback_report.avoid_followup,
+                suggested_parent_actions=[],
+                tonight_parent_bridge=None,
+                avoid_followup=[],
                 created_at=self._now(),
                 generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
                 generated_by="model",
@@ -468,12 +448,9 @@ class ParentReportService:
             expression_observations=[],
             emotion_observations=[],
             safety_alerts=[],
-            suggested_parent_actions=["请稍后重试生成家长日报；不要把当前失败状态当作孩子当天表现。"],
-            tonight_parent_bridge=(
-                "今天的小结还没准备好。今晚先轻松陪孩子做一件日常小事，"
-                "不要追问孩子在小白狐里聊了什么。"
-            ),
-            avoid_followup=["不要把日报生成失败当作孩子当天表现。"],
+            suggested_parent_actions=[],
+            tonight_parent_bridge=None,
+            avoid_followup=[],
             created_at=self._now(),
             generation_status=status,
             generated_by="model",
@@ -636,21 +613,10 @@ class ParentReportService:
                 for message in conversation_messages[:2]
             ],
             "report_schema": (
-                "Return strict JSON. Keys: narrative_report, tonight_parent_bridge, avoid_followup."
+                "Return strict JSON. Keys: summary, mentioned_items, attention_items."
             ),
             "deterministic_fallback_hints": {
                 "topics": conversation["topics"],
-                "avoid_followup": fallback_report.avoid_followup[:3],
-                "tonight_parent_bridge": (
-                    fallback_report.tonight_parent_bridge or ""
-                )[:180],
-                "relationship_parent_actions": [
-                    action[:120]
-                    for action in fallback_report.suggested_parent_actions
-                    if "今晚可以轻轻问" in action
-                    or "孩子表达不想聊" in action
-                    or "孩子今天有表达展开" in action
-                ][:2],
             },
         }
         if support_style:
@@ -715,7 +681,45 @@ class ParentReportService:
         if not isinstance(raw, dict):
             return None
 
-        # Support new narrative format
+        # New schema: summary + mentioned_items + attention_items
+        summary = self._safe_text(str(raw.get("summary") or ""))
+        if summary:
+            mentioned = raw.get("mentioned_items")
+            attention = raw.get("attention_items")
+            topic_overview: list[ParentReportTopicOverview] = []
+            if isinstance(mentioned, list):
+                for item in mentioned[:4]:
+                    text = self._safe_text(str(item))[:60]
+                    if text:
+                        topic_overview.append(
+                            ParentReportTopicOverview(
+                                topic=text,
+                                child_intent="",
+                                summary=text,
+                                emotion_tone="",
+                                parent_bridge="",
+                            )
+                        )
+            safety_alerts: list[str] = []
+            if isinstance(attention, list):
+                for item in attention[:3]:
+                    text = self._safe_text(str(item))
+                    if text:
+                        safety_alerts.append(text)
+            return {
+                "summary": summary[:500],
+                "topic_overview": topic_overview,
+                "conversation_summary": None,
+                "learning_observations": [],
+                "expression_observations": [],
+                "emotion_observations": [],
+                "safety_alerts": safety_alerts,
+                "suggested_parent_actions": [],
+                "tonight_parent_bridge": None,
+                "avoid_followup": [],
+            }
+
+        # Legacy format: narrative_report
         narrative = self._safe_text(str(raw.get("narrative_report") or ""))
         if narrative:
             return {
@@ -727,18 +731,16 @@ class ParentReportService:
                 "emotion_observations": [],
                 "safety_alerts": [],
                 "suggested_parent_actions": [],
-                "tonight_parent_bridge": self._safe_bridge_text(
-                    str(raw.get("tonight_parent_bridge") or ""),
-                ),
-                "avoid_followup": self._model_list(raw, "avoid_followup"),
+                "tonight_parent_bridge": None,
+                "avoid_followup": [],
             }
 
-        # Fallback: support legacy format
-        summary = self._safe_text(str(raw.get("summary") or ""))
-        if not summary:
+        # Legacy format: summary
+        legacy_summary = self._safe_text(str(raw.get("summary") or ""))
+        if not legacy_summary:
             return None
         return {
-            "summary": summary[:500],
+            "summary": legacy_summary[:500],
             "topic_overview": self._model_topic_overview(raw),
             "conversation_summary": self._safe_text(
                 str(raw.get("conversation_summary") or ""),
@@ -748,14 +750,9 @@ class ParentReportService:
             "expression_observations": self._model_list(raw, "expression_observations"),
             "emotion_observations": self._model_list(raw, "emotion_observations"),
             "safety_alerts": self._model_list(raw, "safety_alerts"),
-            "suggested_parent_actions": self._model_list(
-                raw,
-                "suggested_parent_actions",
-            ),
-            "tonight_parent_bridge": self._safe_bridge_text(
-                str(raw.get("tonight_parent_bridge") or ""),
-            ),
-            "avoid_followup": self._model_list(raw, "avoid_followup"),
+            "suggested_parent_actions": [],
+            "tonight_parent_bridge": None,
+            "avoid_followup": [],
         }
 
     def _strip_json_fence(self, value: str) -> str:

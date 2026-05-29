@@ -424,9 +424,7 @@ def test_parent_report_uses_conversation_generated_memory_summary() -> None:
     )
     report_json = report.model_dump_json()
     assert memory_service.list_memories(child_id)
-    assert report.learning_observations == [
-        "孩子本次遇到学习求助，系统引导其先说明题目在问什么。"
-    ]
+    assert report.learning_observations == []
     assert "evidence" not in report_json
     assert "quote_summary" not in report_json
     assert "逐字聊天记录" not in report_json

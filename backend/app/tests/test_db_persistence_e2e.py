@@ -85,13 +85,8 @@ class E2EParentReportModelRegistry:
             structured_output={
                 "daily_report": {
                     "summary": "模型日报：今天出现学习求助素材。",
-                    "learning_observations": ["孩子今天有学习求助线索，适合先复述题意。"],
-                    "expression_observations": [],
-                    "emotion_observations": [],
-                    "safety_alerts": [],
-                    "suggested_parent_actions": [
-                        "今晚可以轻轻问题目在问什么；避免直接给最终答案。"
-                    ],
+                    "mentioned_items": ["提到有道题不会做"],
+                    "attention_items": [],
                 }
             },
             provider_name="mimo",
@@ -293,7 +288,7 @@ def test_parent_report_repository_failure_does_not_block_e2e_report(
         ensure_ascii=False,
     )
 
-    assert report.learning_observations == ["孩子今天有学习求助线索，适合先复述题意。"]
+    assert report.learning_observations == []
     assert "parent_report_repository_fallback" in log_json
     assert "孩子在学习求助时适合先复述题意" not in log_json
     assert "结构化摘要来源" not in log_json

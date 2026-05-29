@@ -110,12 +110,8 @@ def test_prompt_contains_real_parent_concerns_and_v4_examples() -> None:
 
     for phrase in (
         "今天孩子整体状态大概怎么样",
-        "兴趣、困惑、情绪或需要",
-        "安全、隐私、边界、情绪、学习",
-        "陪孩子看题意、找第一步",
-        "图片、作品、玩具、运动、游戏、故事",
-        "低压力打开一个话题",
-        "防止孩子感觉被盘问",
+        "孩子今天提到了哪些具体内容",
+        "有没有需要家长留意的信号",
     ):
         assert phrase in prompt
 
@@ -137,14 +133,13 @@ def test_prompt_forbids_monitoring_raw_quote_image_and_usage_count() -> None:
         "不引用或改写孩子原话",
         "不暴露具体给小白狐看了哪张图",
         "不写消息数量、使用时长、活跃度",
-        "不引导家长问“你今天和小白狐聊了什么”",
+        "不写今晚接话建议、话术建议、亲子沟通建议",
     ):
         assert phrase in prompt
 
     for bad in (
         "孩子今天和小白狐聊了三件事",
         "孩子今天共有 5 条消息",
-        "你今天给小白狐看的是什么",
         "小白狐发现孩子表达能力较好",
     ):
         assert bad in prompt
@@ -167,34 +162,28 @@ def test_fallback_avoids_monitoring_wording() -> None:
 
 def test_image_fallback_uses_broad_expression_tendency() -> None:
     report = _fallback(messages=[_message("你看这个", attachments_count=1)])
-    all_text = " ".join(
-        [
-            report.summary or "",
-            report.tonight_parent_bridge or "",
-            " ".join(report.avoid_followup or []),
-        ]
-    )
+    all_text = report.summary or ""
+
+    # New schema: bridge and avoid_followup are always empty
+    assert report.tonight_parent_bridge is None
+    assert report.avoid_followup == []
 
     assert "通过图片或作品来表达、展示的倾向" in all_text
-    assert "不需要追问具体是哪张图" in all_text
     assert "你今天给小白狐看的是什么" not in all_text
     assert "给小白狐看的东西" not in all_text
 
 
 def test_learning_fallback_guides_topic_meaning_and_first_step_not_final_answer() -> None:
     report = _fallback(messages=[_message("我有一道数学题不会做")])
-    all_text = " ".join(
-        [
-            report.summary or "",
-            report.tonight_parent_bridge or "",
-            " ".join(report.avoid_followup or []),
-        ]
-    )
+    all_text = report.summary or ""
+
+    # New schema: bridge and avoid_followup are always empty
+    assert report.tonight_parent_bridge is None
+    assert report.avoid_followup == []
 
     assert "题目大概在问什么" in all_text or "题目在问什么" in all_text
     assert "第一步" in all_text
-    assert "不要直接追最终答案" in all_text
-    assert "替孩子完成" in all_text
+    assert "追问答案" in all_text or "替孩子完成" in all_text
 
 
 def test_safety_fallback_prioritizes_calm_confirmation_and_adult_support() -> None:
@@ -209,18 +198,15 @@ def test_safety_fallback_prioritizes_calm_confirmation_and_adult_support() -> No
             )
         ]
     )
-    all_text = " ".join(
-        [
-            report.summary or "",
-            report.tonight_parent_bridge or "",
-            " ".join(report.avoid_followup or []),
-        ]
-    )
+    all_text = report.summary or ""
+
+    # New schema: bridge and avoid_followup are always empty
+    assert report.tonight_parent_bridge is None
+    assert report.avoid_followup == []
 
     assert "保持平静" in all_text or "平静确认" in all_text
     assert "需要大人帮忙" in all_text
     assert "不要逼问细节" in all_text or "不逼问细节" in all_text
-    assert "责备" in all_text
 
 
 def test_model_generated_narrative_without_topic_overview_is_not_stale_when_fingerprint_matches() -> None:
@@ -238,8 +224,8 @@ def test_model_generated_narrative_without_topic_overview_is_not_stale_when_fing
         emotion_observations=[],
         safety_alerts=[],
         suggested_parent_actions=[],
-        tonight_parent_bridge="今晚可以轻轻问一件小事。",
-        avoid_followup=["不要追问具体聊了什么。"],
+        tonight_parent_bridge=None,
+        avoid_followup=[],
         created_at=datetime(2026, 5, 26, 20, 5, tzinfo=timezone.utc),
         generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
         generated_by="model",
@@ -260,9 +246,9 @@ def test_report_json_does_not_expose_raw_transcript() -> None:
                 response_text="",
                 structured_output={
                     "daily_report": {
-                        "narrative_report": "今天出现了一点学习或题目相关的求助线索。家长今晚可以先听孩子说题目大概在问什么，再陪他找第一步。",
-                        "tonight_parent_bridge": "今晚可以说：“如果有题卡住，我们先看看题目在问什么，再找第一步。”",
-                        "avoid_followup": ["不要直接追最终答案或替孩子完成作业。"],
+                        "summary": "今天出现了一点学习或题目相关的求助线索。家长今晚可以先听孩子说题目大概在问什么，再陪他找第一步。",
+                        "mentioned_items": ["学习求助"],
+                        "attention_items": [],
                     }
                 },
                 provider_name="mimo",

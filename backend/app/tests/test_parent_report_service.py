@@ -264,8 +264,9 @@ def test_parent_report_service_generates_normal_daily_report() -> None:
         f"Should mention learning: {report.summary}"
     )
     assert report.safety_alerts == []
-    # Should have tonight_parent_bridge
-    assert report.tonight_parent_bridge is not None
+    # New schema: tonight_parent_bridge is always None
+    assert report.tonight_parent_bridge is None
+    assert report.suggested_parent_actions == []
     assert "逐字返回" not in report.model_dump_json()
 
 
@@ -334,8 +335,8 @@ def test_parent_report_service_uses_daily_conversation_without_raw_transcript() 
     # Should not expose raw transcript
     assert "我发了一张家里的照片" not in report_json
     assert "数学题不会做" not in report_json
-    # Should have tonight_parent_bridge
-    assert report.tonight_parent_bridge is not None
+    # New schema: tonight_parent_bridge is always None
+    assert report.tonight_parent_bridge is None
 
 
 def test_parent_report_redesign_summarizes_game_topic_without_raw_transcript() -> None:
@@ -390,11 +391,26 @@ def test_parent_report_redesign_summarizes_game_topic_without_raw_transcript() -
     assert "provider" not in report_json.lower()
 
 
-def test_parent_report_model_parse_accepts_optional_bridge_text() -> None:
-    bridge = (
-        "今晚可以轻轻问：'你今天那张图，最想让我看哪里？'"
-        "如果孩子不想说，就换轻松方式，不追问。"
-    )
+def test_parent_report_model_parse_accepts_new_schema_summary_mentioned_items_attention_items() -> None:
+    """New schema with summary + mentioned_items + attention_items should be parsed correctly,
+    and tonight_parent_bridge / avoid_followup should always be None/empty."""
+    class NewSchemaModelRegistry:
+        def generate(self, request):
+            return ModelResponse(
+                task_type=ModelTaskType.PARENT_REPORT,
+                response_text="",
+                structured_output={
+                    "daily_report": {
+                        "summary": "今天孩子聊了画画和一张图片。",
+                        "mentioned_items": ["画画", "图片分享"],
+                        "attention_items": ["情绪低落"],
+                    }
+                },
+                provider_name="mimo",
+                model_name="mimo-v2.5-pro",
+                metadata={},
+            )
+
     report_service = ParentReportService(
         memory_service=MemoryService(
             repository=InMemoryMemoryRepository(),
@@ -403,13 +419,13 @@ def test_parent_report_model_parse_accepts_optional_bridge_text() -> None:
         conversation_repository=FakeConversationRepository(
             [
                 _conversation_message(
-                    message_id="msg_child_bridge_photo",
+                    message_id="msg_child_new_schema",
                     text="我拍了一张图给小白狐看。",
                     attachments_count=1,
                 )
             ]
         ),
-        model_registry=SuccessfulParentReportModelRegistry(bridge_text=bridge),
+        model_registry=NewSchemaModelRegistry(),
         now_provider=_fixed_now,
     )
 
@@ -419,8 +435,11 @@ def test_parent_report_model_parse_accepts_optional_bridge_text() -> None:
     )
 
     assert report.generation_status == ParentReportGenerationStatus.MODEL_GENERATED
-    # Bridge text should be set (may be from model or fallback)
-    assert report.tonight_parent_bridge, f"Should have a bridge: {report.tonight_parent_bridge}"
+    assert report.summary == "今天孩子聊了画画和一张图片。"
+    # New schema: bridge and avoid_followup are always empty
+    assert report.tonight_parent_bridge is None
+    assert report.avoid_followup == []
+    assert report.suggested_parent_actions == []
     assert "逐字聊天记录" not in report.model_dump_json()
 
 
@@ -449,13 +468,12 @@ def test_parent_report_deterministic_empty_material_bridge_avoids_interrogation(
         },
     )
 
-    assert report.tonight_parent_bridge is not None
-    assert "不想说也没关系" in report.tonight_parent_bridge or "不想聊也没关系" in report.tonight_parent_bridge
-    assert (
-        "不追问" in report.tonight_parent_bridge
-        or "不要追问" in report.tonight_parent_bridge
-        or "不一定要聊" in report.tonight_parent_bridge
-    )
+    # New schema: bridge is always None, avoid_followup is always empty
+    assert report.tonight_parent_bridge is None
+    assert report.avoid_followup == []
+    assert report.suggested_parent_actions == []
+    # Summary should still be generated
+    assert report.summary, f"Should have a summary: {report.summary}"
     assert "监控" not in report.model_dump_json()
 
 

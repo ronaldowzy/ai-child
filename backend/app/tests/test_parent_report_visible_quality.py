@@ -213,12 +213,12 @@ def test_report_fallback_mentions_session_materials() -> None:
     assert len(summary) > 10, f"Summary should be substantive: {summary}"
 
 
-# --- Test 2: support_style ask_fewer_questions ---
+# --- Test 2: new schema produces empty bridge/actions/avoid_followup ---
 
 
-def test_report_uses_ask_fewer_questions_support_style() -> None:
-    """With ask_fewer_questions support style, report should recommend
-    one small question or not追问."""
+def test_report_new_schema_bridge_actions_avoid_followup_are_empty() -> None:
+    """With the new schema, tonight_parent_bridge is None,
+    suggested_parent_actions and avoid_followup are empty lists."""
     memories = [
         _make_memory(
             "mem_interest",
@@ -238,59 +238,14 @@ def test_report_uses_ask_fewer_questions_support_style() -> None:
         conversation_messages=conversation_messages,
     )
 
-    bridge = fallback.tonight_parent_bridge or ""
-    actions = fallback.suggested_parent_actions or []
-
-    # With ask_fewer_questions, bridge should recommend gentle approach
-    assert any(
-        phrase in bridge
-        for phrase in ("轻轻", "一句", "不用多问", "不用追问", "一个就好", "不追问")
-    ), f"Should recommend gentle approach: {bridge}"
-
-    # Actions should include advice about not追问
-    all_text = bridge + " ".join(actions)
-    assert any(
-        phrase in all_text
-        for phrase in ("不要追问", "少追问", "不追问", "轻轻问", "一个就好")
-    ), f"Should advise gentle approach: bridge={bridge}, actions={actions}"
+    assert fallback.tonight_parent_bridge is None
+    assert fallback.suggested_parent_actions == []
+    assert fallback.avoid_followup == []
+    # Summary should still be generated
+    assert fallback.summary, f"Should have a summary: {fallback.summary}"
 
 
-# --- Test 3: report respects boundary "不要追问比赛输赢" ---
-
-
-def test_report_respects_boundary_no_followup_on_match_result() -> None:
-    """With boundary '不要追问比赛输赢', report should advise against
-    asking about win/loss/ranking."""
-    memories = [
-        _make_memory(
-            "mem_sports",
-            "孩子今天聊了跑步比赛",
-            relationship_type=INTEREST_SEED,
-        ),
-    ]
-
-    conversation_messages = [
-        _make_conversation_message("child", "我今天有跑步比赛"),
-        _make_conversation_message("agent", "跑步比赛呀，感觉怎么样？"),
-        _make_conversation_message("child", "还行吧"),
-    ]
-
-    fallback, _ = _build_report(
-        memories=memories,
-        conversation_messages=conversation_messages,
-    )
-
-    avoid = fallback.avoid_followup or []
-    all_avoid = " ".join(avoid)
-
-    # Should advise against追问比赛输赢
-    assert any(
-        phrase in all_avoid
-        for phrase in ("不要追问", "输赢", "排名", "赢了吗", "第几")
-    ), f"Should advise against追问比赛结果: {avoid}"
-
-
-# --- Test 4: report does not contain internal words ---
+# --- Test 3: report does not contain internal words ---
 
 
 def test_report_does_not_contain_internal_words() -> None:
@@ -609,11 +564,8 @@ def test_parent_report_prompt_forbids_snippet_reconstruction() -> None:
 
     prompt = service._parent_report_system_prompt()
 
-    assert "short_content_hint" in prompt, (
-        f"Prompt should mention short_content_hint: {prompt[:200]}"
-    )
-    assert "不能当准原话" in prompt or "不得改写成" in prompt or "不得作为准原话" in prompt, (
-        f"Prompt should forbid snippet reconstruction: {prompt[:200]}"
+    assert "不引用或改写孩子原话" in prompt, (
+        f"Prompt should mention '不引用或改写孩子原话': {prompt[:200]}"
     )
 
 

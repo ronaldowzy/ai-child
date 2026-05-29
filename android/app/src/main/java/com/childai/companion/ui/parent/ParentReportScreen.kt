@@ -156,8 +156,9 @@ private fun ReportBody(report: ParentReport) {
         ReportSection(title = "孩子今天提到的内容") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 report.topicOverview.forEach { topic ->
+                    val displayText = topic.summary.takeIf { it.isNotBlank() } ?: topic.topic
                     Text(
-                        text = "· ${topic.topic}",
+                        text = "· $displayText",
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }

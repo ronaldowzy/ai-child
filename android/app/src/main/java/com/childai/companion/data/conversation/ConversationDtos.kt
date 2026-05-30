@@ -112,11 +112,34 @@ data class ConversationQuickAction(
     val label: String,
 )
 
+data class CompanionObjectMeta(
+    val id: String,
+    val name: String,
+    val objectType: String,
+    val lightLocation: String,
+    val state: String,
+    val action: String,
+) {
+    companion object {
+        fun fromJson(json: JSONObject): CompanionObjectMeta {
+            return CompanionObjectMeta(
+                id = json.getString("id"),
+                name = json.getString("name"),
+                objectType = json.getString("object_type"),
+                lightLocation = json.getString("light_location"),
+                state = json.getString("state"),
+                action = json.getString("action"),
+            )
+        }
+    }
+}
+
 data class ConversationSessionState(
     val baseScene: String,
     val activeScene: String,
     val needsInput: String?,
     val requiresParentAttention: Boolean,
+    val companionObject: CompanionObjectMeta? = null,
 ) {
     fun toDisplayText(): String {
         val parts = mutableListOf(
@@ -128,6 +151,9 @@ data class ConversationSessionState(
         }
         if (requiresParentAttention) {
             parts.add("parent_attention=true")
+        }
+        if (companionObject != null) {
+            parts.add("companion=${companionObject.state}/${companionObject.action}")
         }
         return parts.joinToString(separator = " | ")
     }
@@ -142,6 +168,9 @@ data class ConversationSessionState(
                     "requires_parent_attention",
                     false,
                 ),
+                companionObject = json.optJSONObject("companion_object")?.let {
+                    CompanionObjectMeta.fromJson(it)
+                },
             )
         }
     }

@@ -2,6 +2,10 @@ package com.childai.companion.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,14 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.mascot.MascotState
 
 /**
@@ -56,6 +63,7 @@ internal fun XiaobaohuCompanionStage(
     mascotState: MascotState,
     compactLandscape: Boolean,
     viewportClass: CompanionRoomViewportClass = CompanionRoomViewportClass.Portrait,
+    companionObject: CompanionObjectMeta? = null,
     modifier: Modifier = Modifier,
     debugMascotState: MascotState? = null,
 ) {
@@ -81,6 +89,12 @@ internal fun XiaobaohuCompanionStage(
         val bubbleOffset = mascotStateBubbleOffset(viewportClass)
 
         Box(modifier = Modifier.fillMaxSize()) {
+            // Companion object light point - rendered before fox so it stays behind
+            CompanionLightPoint(
+                companionObject = companionObject,
+                viewportClass = viewportClass,
+            )
+
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -335,4 +349,222 @@ internal fun mascotStateBubbleText(state: MascotState): String? {
         MascotState.Paused -> "先停一下"
         MascotState.Retry -> "再试一次"
     }
+}
+
+// --- Companion object visual types ---
+
+internal enum class CompanionLocation {
+    WindowSide,
+    CarpetEdge,
+    NearFox,
+    OutsideWindow,
+}
+
+internal enum class CompanionVisualType {
+    StarPoint,
+    CloudShadow,
+    LightSpot,
+    SoftOutline,
+}
+
+internal fun String.toCompanionLocation(): CompanionLocation {
+    return when (this) {
+        "窗边" -> CompanionLocation.WindowSide
+        "地毯边" -> CompanionLocation.CarpetEdge
+        "小白狐旁边" -> CompanionLocation.NearFox
+        "窗外" -> CompanionLocation.OutsideWindow
+        else -> CompanionLocation.WindowSide
+    }
+}
+
+internal fun String.toCompanionVisualType(): CompanionVisualType {
+    return when {
+        contains("星") -> CompanionVisualType.StarPoint
+        contains("云") -> CompanionVisualType.CloudShadow
+        contains("光") || contains("影") -> CompanionVisualType.LightSpot
+        else -> CompanionVisualType.SoftOutline
+    }
+}
+
+internal fun CompanionObjectMeta.shouldShowVisual(): Boolean {
+    // Only show for seed state (first-time star) or active+recall state
+    // Do not show for paused state or action=none
+    if (state == "paused") return false
+    if (state == "seed" && action == "name_seed") return true
+    if (state == "active" && action == "recall") return true
+    return false
+}
+
+private data class CompanionVisualConfig(
+    val size: Dp,
+    val blurRadius: Dp,
+    val baseAlpha: Float,
+    val colors: List<Color>,
+    val animationType: CompanionAnimationType,
+)
+
+private enum class CompanionAnimationType {
+    Breathing,
+    Floating,
+    Static,
+}
+
+private fun CompanionVisualType.config(): CompanionVisualConfig {
+    return when (this) {
+        CompanionVisualType.StarPoint -> CompanionVisualConfig(
+            size = 18.dp,
+            blurRadius = 10.dp,
+            baseAlpha = 0.65f,
+            colors = listOf(
+                Color(0xFFFFF8E1).copy(alpha = 0.9f),
+                Color(0xFFFFECB3).copy(alpha = 0.5f),
+                Color(0xFFFFF8E1).copy(alpha = 0.0f),
+            ),
+            animationType = CompanionAnimationType.Breathing,
+        )
+        CompanionVisualType.CloudShadow -> CompanionVisualConfig(
+            size = 22.dp,
+            blurRadius = 12.dp,
+            baseAlpha = 0.55f,
+            colors = listOf(
+                Color(0xFFE8EAF6).copy(alpha = 0.8f),
+                Color(0xFFC5CAE9).copy(alpha = 0.4f),
+                Color(0xFFE8EAF6).copy(alpha = 0.0f),
+            ),
+            animationType = CompanionAnimationType.Floating,
+        )
+        CompanionVisualType.LightSpot -> CompanionVisualConfig(
+            size = 20.dp,
+            blurRadius = 11.dp,
+            baseAlpha = 0.6f,
+            colors = listOf(
+                Color(0xFFFFF3E0).copy(alpha = 0.85f),
+                Color(0xFFFFE0B2).copy(alpha = 0.45f),
+                Color(0xFFFFF3E0).copy(alpha = 0.0f),
+            ),
+            animationType = CompanionAnimationType.Floating,
+        )
+        CompanionVisualType.SoftOutline -> CompanionVisualConfig(
+            size = 20.dp,
+            blurRadius = 10.dp,
+            baseAlpha = 0.55f,
+            colors = listOf(
+                Color(0xFFF3E5F5).copy(alpha = 0.8f),
+                Color(0xFFE1BEE7).copy(alpha = 0.4f),
+                Color(0xFFF3E5F5).copy(alpha = 0.0f),
+            ),
+            animationType = CompanionAnimationType.Static,
+        )
+    }
+}
+
+private fun CompanionLocation.offsetForViewport(
+    viewportClass: CompanionRoomViewportClass,
+): Offset {
+    return when (this) {
+        CompanionLocation.WindowSide -> when (viewportClass) {
+            CompanionRoomViewportClass.Portrait -> Offset(110f, -95f)
+            CompanionRoomViewportClass.PortraitExpanded -> Offset(140f, -120f)
+            CompanionRoomViewportClass.LandscapeWide -> Offset(180f, -70f)
+            CompanionRoomViewportClass.LandscapeTablet -> Offset(160f, -80f)
+            CompanionRoomViewportClass.LandscapeSquare -> Offset(140f, -75f)
+        }
+        CompanionLocation.CarpetEdge -> when (viewportClass) {
+            CompanionRoomViewportClass.Portrait -> Offset(-60f, 80f)
+            CompanionRoomViewportClass.PortraitExpanded -> Offset(-80f, 100f)
+            CompanionRoomViewportClass.LandscapeWide -> Offset(-100f, 60f)
+            CompanionRoomViewportClass.LandscapeTablet -> Offset(-90f, 70f)
+            CompanionRoomViewportClass.LandscapeSquare -> Offset(-80f, 65f)
+        }
+        CompanionLocation.NearFox -> when (viewportClass) {
+            CompanionRoomViewportClass.Portrait -> Offset(70f, 30f)
+            CompanionRoomViewportClass.PortraitExpanded -> Offset(90f, 40f)
+            CompanionRoomViewportClass.LandscapeWide -> Offset(110f, 20f)
+            CompanionRoomViewportClass.LandscapeTablet -> Offset(100f, 25f)
+            CompanionRoomViewportClass.LandscapeSquare -> Offset(90f, 22f)
+        }
+        CompanionLocation.OutsideWindow -> when (viewportClass) {
+            CompanionRoomViewportClass.Portrait -> Offset(140f, -120f)
+            CompanionRoomViewportClass.PortraitExpanded -> Offset(180f, -150f)
+            CompanionRoomViewportClass.LandscapeWide -> Offset(220f, -90f)
+            CompanionRoomViewportClass.LandscapeTablet -> Offset(200f, -100f)
+            CompanionRoomViewportClass.LandscapeSquare -> Offset(180f, -95f)
+        }
+    }
+}
+
+@Composable
+private fun CompanionLightPoint(
+    companionObject: CompanionObjectMeta?,
+    viewportClass: CompanionRoomViewportClass,
+    modifier: Modifier = Modifier,
+) {
+    if (companionObject == null || !companionObject.shouldShowVisual()) return
+
+    val location = companionObject.lightLocation.toCompanionLocation()
+    val visualType = companionObject.objectType.toCompanionVisualType()
+    val config = visualType.config()
+    val offset = location.offsetForViewport(viewportClass)
+
+    val alpha = when (config.animationType) {
+        CompanionAnimationType.Breathing -> {
+            val infiniteTransition = rememberInfiniteTransition(label = "companionBreathing")
+            val animatedAlpha by infiniteTransition.animateFloat(
+                initialValue = config.baseAlpha - 0.15f,
+                targetValue = config.baseAlpha + 0.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3000),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "companionAlpha",
+            )
+            animatedAlpha
+        }
+        CompanionAnimationType.Floating -> {
+            val infiniteTransition = rememberInfiniteTransition(label = "companionFloating")
+            val animatedAlpha by infiniteTransition.animateFloat(
+                initialValue = config.baseAlpha - 0.1f,
+                targetValue = config.baseAlpha + 0.08f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(4000),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "companionAlpha",
+            )
+            animatedAlpha
+        }
+        CompanionAnimationType.Static -> config.baseAlpha
+    }
+
+    // Floating offset animation for cloud/light types
+    val offsetY = when (config.animationType) {
+        CompanionAnimationType.Floating -> {
+            val infiniteTransition = rememberInfiniteTransition(label = "companionOffsetY")
+            val animatedOffset by infiniteTransition.animateFloat(
+                initialValue = -2f,
+                targetValue = 2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(4000),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "companionOffsetY",
+            )
+            animatedOffset
+        }
+        else -> 0f
+    }
+
+    Box(
+        modifier = modifier
+            .offset(x = offset.x.dp, y = (offset.y + offsetY).dp)
+            .size(config.size)
+            .alpha(alpha)
+            .blur(radius = config.blurRadius)
+            .background(
+                brush = Brush.radialGradient(
+                    colors = config.colors,
+                ),
+                shape = CircleShape,
+            ),
+    )
 }

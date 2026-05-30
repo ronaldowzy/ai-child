@@ -85,6 +85,7 @@ import com.childai.companion.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.PhotoUploadPayload
+import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.parent.ParentEntryCredentialDialog
@@ -303,6 +304,7 @@ private fun ChildChatScreenContent(
                         imagePreviewCards = uiState.imagePreviewCards,
                         viewportClass = viewportClass,
                         compactLandscape = compactLandscape,
+                        companionObject = uiState.sessionState?.companionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
                         modifier = Modifier
@@ -373,6 +375,7 @@ private fun ChildChatScreenContent(
                         imagePreviewCards = uiState.imagePreviewCards,
                         viewportClass = viewportClass,
                         compactLandscape = false,
+                        companionObject = uiState.sessionState?.companionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
                         modifier = Modifier
@@ -1433,6 +1436,7 @@ private fun AgentPanel(
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
     viewportClass: CompanionRoomViewportClass,
     compactLandscape: Boolean,
+    companionObject: CompanionObjectMeta? = null,
     onImageRetry: (String) -> Unit,
     onImageDismiss: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -1451,6 +1455,7 @@ private fun AgentPanel(
                     mascotState = effectiveMascotState,
                     compactLandscape = compactLandscape,
                     viewportClass = viewportClass,
+                    companionObject = companionObject,
                     debugMascotState = debugMascotState,
                     modifier = Modifier.fillMaxSize(),
                 )

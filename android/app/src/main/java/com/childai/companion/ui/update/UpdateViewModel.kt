@@ -34,9 +34,15 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     private var updateInfo: VersionCheckResult? = null
+    private var dismissedVersionCode: Int? = null
 
     fun checkForUpdate() {
-        if (_state.value is UpdateState.Checking || _state.value is UpdateState.Downloading) {
+        if (
+            _state.value is UpdateState.Checking ||
+            _state.value is UpdateState.Downloading ||
+            _state.value is UpdateState.Available ||
+            _state.value is UpdateState.Downloaded
+        ) {
             return
         }
 
@@ -48,6 +54,10 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
                 val result = repository.checkForUpdate(currentVersionCode)
 
                 if (result != null) {
+                    if (dismissedVersionCode == result.versionCode) {
+                        _state.value = UpdateState.Idle
+                        return@launch
+                    }
                     updateInfo = result
                     _state.value = UpdateState.Available(result)
                 } else {
@@ -97,6 +107,7 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun dismiss() {
+        dismissedVersionCode = updateInfo?.versionCode ?: dismissedVersionCode
         _state.value = UpdateState.Idle
     }
 }

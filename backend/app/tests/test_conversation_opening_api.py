@@ -14,6 +14,7 @@ from app.domain.memory import (
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.domain.schemas.parent_policy import ParentPolicyUpdateRequest
 from app.main import app
+from app.services.conversation_history_service import ConversationHistoryService
 from app.services.memory_service import MemoryService
 from app.services.opening_service import OpeningService
 from app.services.parent_policy_service import get_parent_policy_service
@@ -224,6 +225,29 @@ def test_opening_can_use_non_mock_model_text_when_safe() -> None:
     )
 
     assert response.reply.text == "豆豆，今天可以从恐龙或画画里选一个轻松说。"
+
+
+def test_opening_records_reply_into_conversation_history() -> None:
+    history_service = ConversationHistoryService()
+    service = OpeningService(conversation_history_service=history_service)
+
+    response = service.create_opening(
+        _request_model(
+            child_id="opening_history_child",
+            session_id="opening-history-session",
+            device_time="2026-05-21T16:30:00+08:00",
+        )
+    )
+
+    recent = history_service.get_recent_model_messages(
+        session_id="opening-history-session",
+        limit=6,
+    )
+
+    assert response.reply.text
+    assert len(recent) == 1
+    assert recent[0].role == "assistant"
+    assert recent[0].content == response.reply.text
 
 
 def test_model_opening_prompt_constrains_interest_revisit() -> None:

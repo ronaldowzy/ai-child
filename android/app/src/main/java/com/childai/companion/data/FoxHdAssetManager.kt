@@ -20,6 +20,10 @@ import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipInputStream
 
+internal fun buildFoxHdAssetUrl(baseUrl: String, state: MascotState): URL {
+    return URL("${baseUrl.trimEnd('/')}/api/v1/assets/fox/hd/${state.id}")
+}
+
 /**
  * Manages on-demand download and local caching of HD (1024px) mascot state assets.
  *
@@ -110,7 +114,7 @@ class FoxHdAssetManager(
 
             try {
                 // Step 1: Download zip
-                val url = URL("$baseUrl/api/v1/assets/fox/hd/${state.id}")
+                val url = buildHdAssetUrl(state)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 30_000
@@ -187,6 +191,10 @@ class FoxHdAssetManager(
 
     private fun hdStateDir(state: MascotState): File {
         return File(hdRootDir, state.id)
+    }
+
+    internal fun buildHdAssetUrl(state: MascotState): URL {
+        return buildFoxHdAssetUrl(baseUrl, state)
     }
 
     /**

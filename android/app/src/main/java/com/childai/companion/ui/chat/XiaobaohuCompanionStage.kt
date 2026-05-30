@@ -211,7 +211,7 @@ private fun mascotOffsetYForViewport(viewportClass: CompanionRoomViewportClass):
         CompanionRoomViewportClass.LandscapeTablet -> 6.dp
         CompanionRoomViewportClass.LandscapeSquare -> 12.dp
         CompanionRoomViewportClass.Portrait -> 28.dp
-        CompanionRoomViewportClass.PortraitExpanded -> 106.dp
+        CompanionRoomViewportClass.PortraitExpanded -> 82.dp
     }
 }
 
@@ -230,10 +230,10 @@ private fun mascotGroundOffsetYForViewport(
         MascotState.PreparingSpeech,
         MascotState.CoCreate,
         MascotState.Paused,
-        MascotState.Retry -> 38.dp
-        MascotState.ImageViewing -> 66.dp
+        MascotState.Retry -> 36.dp
+        MascotState.ImageViewing -> 60.dp
         MascotState.Idle,
-        MascotState.WaitingSoft -> 82.dp
+        MascotState.WaitingSoft -> 96.dp
     }
 }
 

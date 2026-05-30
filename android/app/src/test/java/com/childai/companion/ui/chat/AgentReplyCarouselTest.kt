@@ -1,9 +1,13 @@
 package com.childai.companion.ui.chat
 
 import androidx.compose.ui.unit.dp
+import com.childai.companion.data.conversation.CompanionObjectMeta
+import com.childai.companion.data.conversation.ConversationSessionState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class AgentReplyCarouselTest {
     @Test
@@ -149,6 +153,19 @@ class AgentReplyCarouselTest {
     }
 
     @Test
+    fun openingBubbleDropsOutAsSoonAsChildStartsTalking() {
+        val messages = listOf(
+            ChatMessage(id = "agent-welcome", author = MessageAuthor.Agent, text = "窗边这颗小星星还没有名字"),
+            ChatMessage(id = "child-1", author = MessageAuthor.Child, text = "那就叫亮亮"),
+        )
+
+        assertEquals(
+            listOf("那就叫亮亮"),
+            companionVisibleMessages(messages, companionRecentMessageLimit(true)).map { it.text },
+        )
+    }
+
+    @Test
     fun imageContextShowsOnlyOneLowPressureCoCreationEntry() {
         val state = ChatUiState(
             pendingImageContext = PendingImageContextUiState(
@@ -219,5 +236,78 @@ class AgentReplyCarouselTest {
             listOf("恐龙"),
             childCompanionVisibleQuickActions(state).map { it.label },
         )
+    }
+
+    @Test
+    fun openingQuickActionsKeepWelcomeBubblePinnedBeforeChildSpeaks() {
+        val state = ChatUiState(
+            messages = listOf(
+                ChatMessage(id = "agent-welcome", author = MessageAuthor.Agent, text = "窗边这颗小星星还没有名字"),
+            ),
+            quickActions = listOf(
+                QuickActionUi(id = "companion_name", label = "起个名字"),
+                QuickActionUi(id = "companion_skip", label = "先看看"),
+            ),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+                companionObject = CompanionObjectMeta(
+                    id = "star_seed",
+                    name = "小星星",
+                    objectType = "star",
+                    lightLocation = "窗边",
+                    state = "seed",
+                    action = "name_seed",
+                ),
+            ),
+        )
+
+        assertEquals("agent-welcome", companionPinnedBubbleMessageId(state))
+        assertEquals(listOf("起个名字", "先看看"), childCompanionVisibleQuickActions(state).map { it.label })
+    }
+
+    @Test
+    fun nonOpeningCompanionNameActionIsHiddenInNormalChat() {
+        val state = ChatUiState(
+            messages = listOf(
+                ChatMessage(id = "child-1", author = MessageAuthor.Child, text = "这个像飞船"),
+                ChatMessage(id = "agent-1", author = MessageAuthor.Agent, text = "我也觉得像飞船"),
+            ),
+            quickActions = listOf(
+                QuickActionUi(id = "companion_name", label = "起个名字"),
+                QuickActionUi(id = "topic_choice_1", label = "恐龙"),
+            ),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+            ),
+        )
+
+        assertNull(companionPinnedBubbleMessageId(state))
+        assertEquals(listOf("恐龙"), childCompanionVisibleQuickActions(state).map { it.label })
+    }
+
+    @Test
+    fun hdFramePathsUseFramesDirectoryWithoutDuplicatingPrefix() {
+        val rootDir = createTempDir(prefix = "hd_frames_test")
+        try {
+            val framesDir = File(rootDir, "frames_webp").apply { mkdirs() }
+            File(framesDir, "fox_speaking_0001.webp").writeBytes(byteArrayOf(1, 2, 3))
+
+            assertEquals(
+                listOf(File(framesDir, "fox_speaking_0001.webp").absolutePath),
+                buildHdFramePaths(
+                    framesDir = framesDir,
+                    framePattern = "frames_webp/fox_speaking_%04d.webp",
+                    frameCount = 1,
+                ),
+            )
+        } finally {
+            rootDir.deleteRecursively()
+        }
     }
 }

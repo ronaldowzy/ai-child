@@ -5,7 +5,7 @@ plugins {
 }
 
 val conversationApiBaseUrl: String =
-    providers.gradleProperty("conversationApiBaseUrl").orNull ?: "http://192.168.0.118:8000/"
+    providers.gradleProperty("conversationApiBaseUrl").orNull ?: "http://192.168.0.101:8000/"
 
 android {
     namespace = "com.childai.companion"
@@ -15,8 +15,8 @@ android {
         applicationId = "com.childai.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(

@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.data.attachment.AttachmentApiClient
 import com.childai.companion.data.attachment.AttachmentRepository
 import com.childai.companion.data.auth.AuthRepository
@@ -71,15 +74,18 @@ fun AppNavHost(
 
     when (destination) {
         AppDestination.Chat -> {
-            val chatViewModel = remember(session.childId) {
-                ChatViewModel(
+            val chatViewModel: ChatViewModel = viewModel(
+                key = "chat-${session.childId}",
+                factory = simpleViewModelFactory {
+                    ChatViewModel(
                     conversationSender = ConversationRepositoryMessageSender(
                         repository = conversationRepository,
                     ),
                     attachmentRepository = attachmentRepository,
                     childId = session.childId,
                 )
-            }
+                },
+            )
             ChildChatScreen(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
@@ -120,4 +126,18 @@ private enum class AppDestination {
     Chat,
     ParentSettings,
     ParentReport,
+}
+
+private inline fun <reified T : ViewModel> simpleViewModelFactory(
+    crossinline create: () -> T,
+): ViewModelProvider.Factory {
+    return object : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <VM : ViewModel> create(modelClass: Class<VM>): VM {
+            require(modelClass.isAssignableFrom(T::class.java)) {
+                "Unsupported ViewModel class: ${modelClass.name}"
+            }
+            return create() as VM
+        }
+    }
 }

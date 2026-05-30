@@ -526,3 +526,50 @@ def test_privacy_image_context_still_routes_to_boundary_on_followup() -> None:
 
     assert body["session_state"]["active_scene"] == "privacy.boundary"
     assert body["debug"]["intent"]["intent"] == "privacy_question"
+
+
+def test_share_image_followup_does_not_repeat_name_prompt_action() -> None:
+    child_id = "child_attachment_followup_test"
+    session_id = "attachment_followup_no_repeat_name_session"
+    attachment_response = client.post(
+        "/api/v1/conversation/attachment",
+        json={
+            "child_id": child_id,
+            "session_id": session_id,
+            "attachment_type": "image",
+            "image_purpose": "share",
+            "file_id": "mock_toy_photo",
+            "mock_vision_text": "孩子搭了一个积木城堡",
+            "child_caption": "你看我搭的这个",
+            "mock_confidence": 0.9,
+        },
+    )
+    attachment_id = attachment_response.json()["attachment_id"]
+
+    response = client.post(
+        "/api/v1/conversation/message",
+        json={
+            "child_id": child_id,
+            "session_id": session_id,
+            "input": {
+                "type": "text",
+                "text": "我想跟你继续聊这个",
+                "attachments": [attachment_id],
+            },
+            "client_context": {
+                "device_time": "2026-05-18T16:30:00+08:00",
+                "timezone": "Asia/Shanghai",
+                "app_mode": "child",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    action_ids = {
+        action["id"]
+        for action_group in body["ui_actions"]
+        for action in action_group["actions"]
+    }
+
+    assert "companion_name" not in action_ids

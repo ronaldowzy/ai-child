@@ -31,6 +31,10 @@ from app.services.parent_policy_service import (
     ParentPolicyService,
     get_parent_policy_service,
 )
+from app.services.conversation_history_service import (
+    ConversationHistoryService,
+    get_conversation_history_service,
+)
 from app.services.relationship_memory import (
     latest_interest_seed,
     latest_show_and_tell_event,
@@ -85,6 +89,7 @@ class OpeningService:
         model_soft_timeout_ms: int | None = None,
         tts_soft_timeout_ms: int | None = None,
         companion_object_service: object | None = None,
+        conversation_history_service: ConversationHistoryService | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -98,6 +103,9 @@ class OpeningService:
             or OpeningPolicyBuilder(memory_service=self._memory_service)
         )
         self._companion_object_service = companion_object_service
+        self._conversation_history_service = (
+            conversation_history_service or get_conversation_history_service()
+        )
         self._model_soft_timeout_ms = (
             model_soft_timeout_ms
             if model_soft_timeout_ms is not None
@@ -365,6 +373,11 @@ class OpeningService:
         self._opening_policy_builder.record_policy_used(
             child_id=request.child_id,
             policy=opening_policy,
+        )
+        self._conversation_history_service.record_turn(
+            session_id=request.session_id,
+            child_text="",
+            agent_text=response.reply.text,
         )
         self._session_cache[cache_key] = response
         self._session_cache_info[cache_key] = _OpeningCacheInfo(

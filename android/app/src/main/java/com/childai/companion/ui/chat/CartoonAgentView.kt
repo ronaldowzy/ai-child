@@ -417,13 +417,14 @@ private fun DrawScope.drawEar(
     drawPath(path = innerPath, color = innerColor)
 }
 
-private fun buildHdFramePaths(
+internal fun buildHdFramePaths(
     framesDir: java.io.File,
     framePattern: String,
     frameCount: Int,
 ): List<String> {
+    val normalizedFramePattern = framePattern.removePrefix("frames_webp/")
     return (1..frameCount).mapNotNull { frameNumber ->
-        val frameName = framePattern.replace(
+        val frameName = normalizedFramePattern.replace(
             "%04d",
             frameNumber.toString().padStart(4, '0'),
         )

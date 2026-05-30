@@ -61,6 +61,28 @@ class FoxHdAssetManagerTest {
     }
 
     @Test
+    fun buildHdAssetUrlTrimsTrailingSlash() {
+        assertEquals(
+            "http://192.168.0.101:8001/api/v1/assets/fox/hd/speaking",
+            buildFoxHdAssetUrl(
+                baseUrl = "http://192.168.0.101:8001/",
+                state = MascotState.Speaking,
+            ).toString(),
+        )
+    }
+
+    @Test
+    fun buildHdAssetUrlKeepsBaseWithoutTrailingSlash() {
+        assertEquals(
+            "http://192.168.0.101:8001/api/v1/assets/fox/hd/listening",
+            buildFoxHdAssetUrl(
+                baseUrl = "http://192.168.0.101:8001",
+                state = MascotState.Listening,
+            ).toString(),
+        )
+    }
+
+    @Test
     fun zipExtractionProducesExpectedStructure() {
         val tmpDir = createTempDir("hd_test")
         try {

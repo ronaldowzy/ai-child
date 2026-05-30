@@ -69,6 +69,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -288,6 +289,7 @@ private fun ChildChatScreenContent(
                     compactLandscape = compactLandscape,
                 )
 
+                val pinnedBubbleMessageId = companionPinnedBubbleMessageId(uiState)
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
@@ -302,6 +304,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
+                        pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = compactLandscape,
                         companionObject = uiState.sessionState?.companionObject,
@@ -349,6 +352,7 @@ private fun ChildChatScreenContent(
                     portraitMetrics.inputMaxWidth,
                 )
                 val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
+                val pinnedBubbleMessageId = companionPinnedBubbleMessageId(uiState)
 
                 Column(
                     modifier = Modifier
@@ -373,6 +377,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
+                        pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = false,
                         companionObject = uiState.sessionState?.companionObject,
@@ -583,6 +588,7 @@ private fun CompanionFloatingConversationBubbles(
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
     isLandscape: Boolean,
+    pinnedMessageId: String?,
     onImageRetry: (String) -> Unit,
     onImageDismiss: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -595,9 +601,10 @@ private fun CompanionFloatingConversationBubbles(
         "${message.id}:${message.text}:$previewStatus"
     }
     var showBubbles by remember { mutableStateOf(false) }
-    LaunchedEffect(visibleSignature) {
+    LaunchedEffect(visibleSignature, pinnedMessageId) {
         showBubbles = visibleMessages.isNotEmpty()
-        if (visibleMessages.isNotEmpty()) {
+        val pinnedVisible = pinnedMessageId != null && visibleMessages.any { it.id == pinnedMessageId }
+        if (visibleMessages.isNotEmpty() && !pinnedVisible) {
             delay(6_000)
             showBubbles = false
         }
@@ -947,29 +954,18 @@ private fun CompanionRoomBackground(viewportClass: CompanionRoomViewportClass) {
             )
         }
 
-        CompanionRoomViewportClass.Portrait,
         CompanionRoomViewportClass.PortraitExpanded -> {
+            Image(
+                painter = painterResource(id = R.drawable.companion_room_background_portrait),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.1f),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        CompanionRoomViewportClass.Portrait -> {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val portraitBackgroundExtraHeight = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
-                    180.dp
-                } else {
-                    160.dp
-                }
-                val portraitBackgroundOffsetY = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
-                    (-44).dp
-                } else {
-                    0.dp
-                }
-                val portraitBackgroundWidth = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
-                    maxWidth * 1.06f
-                } else {
-                    maxWidth
-                }
-                val portraitBackgroundScaleY = if (viewportClass == CompanionRoomViewportClass.PortraitExpanded) {
-                    1.08f
-                } else {
-                    1f
-                }
                 Image(
                     painter = painterResource(id = R.drawable.companion_room_background_portrait),
                     contentDescription = null,
@@ -977,11 +973,10 @@ private fun CompanionRoomBackground(viewportClass: CompanionRoomViewportClass) {
                     alignment = Alignment.TopCenter,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .offset(y = portraitBackgroundOffsetY)
-                        .width(portraitBackgroundWidth)
-                        .height(maxHeight + portraitBackgroundExtraHeight)
+                        .width(maxWidth)
+                        .height(maxHeight + 160.dp)
                         .graphicsLayer {
-                            scaleY = portraitBackgroundScaleY
+                            scaleY = 1f
                             transformOrigin = TransformOrigin(0.5f, 0f)
                         },
                 )
@@ -1151,8 +1146,10 @@ internal fun companionVisibleMessages(
     messages: List<ChatMessage>,
     maxVisibleMessages: Int,
 ): List<ChatMessage> {
-    return messages
-        .filterNot(::isStageOnlyStatusMessage)
+    val filteredMessages = messages.filterNot(::isStageOnlyStatusMessage)
+    val hasChildMessage = filteredMessages.any { it.author == MessageAuthor.Child }
+    return filteredMessages
+        .filterNot { hasChildMessage && it.id == "agent-welcome" }
         .takeLast(maxVisibleMessages.coerceAtLeast(1))
 }
 
@@ -1182,12 +1179,36 @@ private val primaryImageCoCreationActionIds = setOf(
     "image_story",
 )
 
+private val openingQuickActionIds = setOf(
+    "companion_name",
+    "companion_skip",
+    "companion_continue",
+)
+
+internal fun companionOpeningQuickActionsActive(uiState: ChatUiState): Boolean {
+    val openingActionVisible = uiState.quickActions.any { it.id in openingQuickActionIds }
+    if (!openingActionVisible) return false
+    if (uiState.messages.any { it.author == MessageAuthor.Child }) return false
+    return uiState.sessionState?.companionObject?.action in setOf("name_seed", "recall")
+}
+
+internal fun companionPinnedBubbleMessageId(uiState: ChatUiState): String? {
+    val hasOpeningBubble = uiState.messages.any { it.id == "agent-welcome" && it.author == MessageAuthor.Agent }
+    return if (hasOpeningBubble && companionOpeningQuickActionsActive(uiState)) {
+        "agent-welcome"
+    } else {
+        null
+    }
+}
+
 internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<QuickActionUi> {
+    val openingActionsActive = companionOpeningQuickActionsActive(uiState)
     val baseActions = uiState.quickActions.filterNot { action ->
         action.id == "take_photo" ||
             action.id == "share_photo" ||
             action.id == "start_voice" ||
-            action.label == "我想说话"
+            action.label == "我想说话" ||
+            (action.id in openingQuickActionIds && !openingActionsActive)
     }
     if (uiState.pendingImageContext == null) {
         return baseActions.filterNot { it.id in imageContextActionIds }
@@ -1434,6 +1455,7 @@ private fun AgentPanel(
     presentation: ChildInteractionPresentation,
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    pinnedBubbleMessageId: String?,
     viewportClass: CompanionRoomViewportClass,
     compactLandscape: Boolean,
     companionObject: CompanionObjectMeta? = null,
@@ -1463,6 +1485,7 @@ private fun AgentPanel(
                     messages = messages,
                     imagePreviewCards = imagePreviewCards,
                     isLandscape = isLandscape,
+                    pinnedMessageId = pinnedBubbleMessageId,
                     onImageRetry = onImageRetry,
                     onImageDismiss = onImageDismiss,
                     modifier = Modifier.matchParentSize(),

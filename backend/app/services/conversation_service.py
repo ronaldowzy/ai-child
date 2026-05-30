@@ -666,25 +666,6 @@ class ConversationService:
             ),
         )
 
-        # Image co-creation: add "起个名字" button after safe image recognition
-        _IMAGE_CO_CREATION_SAFE_TYPES = (
-            "child_drawing", "art_feedback", "toy", "object", "handmade",
-        )
-        if (
-            image_context is not None
-            and hasattr(image_context, "recognized_type")
-            and image_context.recognized_type in _IMAGE_CO_CREATION_SAFE_TYPES
-            and decision.active_scene not in (
-                SceneId.SAFETY_GUARDIAN,
-                SceneId.SAFETY_GENTLE_CHECKIN,
-                SceneId.PRIVACY_BOUNDARY,
-                SceneId.LEARNING_HOMEWORK_HELP,
-            )
-        ):
-            from app.domain.scene import SceneAction
-            quick_actions = list(quick_actions) if quick_actions else []
-            quick_actions.append(SceneAction(id="companion_name", label="起个名字"))
-
         # Build companion metadata if companion is active
         companion_meta = None
         if companion_action is not None:

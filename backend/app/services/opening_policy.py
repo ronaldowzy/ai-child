@@ -21,6 +21,7 @@ class OpeningMode(StrEnum):
     BEDTIME_DEFER_INTEREST = "bedtime_defer_interest"
     PARENT_BRIDGE_LIGHT = "parent_bridge_light"
     LOW_EXPRESSION_SUPPORT = "low_expression_support"
+    COMPANION_RECALL = "companion_recall"
 
 
 FORBIDDEN_OPENING_PHRASES: tuple[str, ...] = (
@@ -90,6 +91,10 @@ class OpeningPolicy:
     parent_goal_hint: str | None
     forbidden_phrases: tuple[str, ...]
     prompt_rules: tuple[str, ...]
+    companion_name: str | None = None
+    companion_light_location: str | None = None
+    companion_object_type: str | None = None
+    companion_id: str | None = None
 
 
 class OpeningPolicyBuilder:

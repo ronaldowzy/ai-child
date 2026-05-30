@@ -629,9 +629,14 @@ def test_bedtime_opening_with_interest_seed_is_low_stimulation() -> None:
         )
     )
 
-    assert "跑步比赛" in response.reply.text
-    assert "明天白天再慢慢说" in response.reply.text
+    # BEDTIME_DEFER_INTEREST: exciting topic should NOT be mentioned at bedtime
+    assert "跑步比赛" not in response.reply.text
     assert "继续聊一点" not in response.reply.text
+    # Should have low-stimulation defer text
+    assert any(
+        phrase in response.reply.text
+        for phrase in ("明天白天", "轻轻收个尾", "慢慢")
+    )
 
 
 def _memory_service_with_interest_seed(

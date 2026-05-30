@@ -9,6 +9,7 @@ from app.core.logging import hash_identifier
 from app.core.config import get_settings
 from app.domain.memory import MemorySensitivity
 from app.domain.schemas.conversation import (
+    CompanionObjectMeta,
     ConversationMessageResponse,
     ConversationOpeningRequest,
     QuickAction,
@@ -83,6 +84,7 @@ class OpeningService:
         opening_policy_builder: OpeningPolicyBuilder | None = None,
         model_soft_timeout_ms: int | None = None,
         tts_soft_timeout_ms: int | None = None,
+        companion_object_service: object | None = None,
     ) -> None:
         self._parent_policy_service = (
             parent_policy_service or get_parent_policy_service()
@@ -95,6 +97,7 @@ class OpeningService:
             opening_policy_builder
             or OpeningPolicyBuilder(memory_service=self._memory_service)
         )
+        self._companion_object_service = companion_object_service
         self._model_soft_timeout_ms = (
             model_soft_timeout_ms
             if model_soft_timeout_ms is not None
@@ -107,6 +110,45 @@ class OpeningService:
         )
         self._session_cache: dict[tuple[str, str], ConversationMessageResponse] = {}
         self._session_cache_info: dict[tuple[str, str], _OpeningCacheInfo] = {}
+
+    def _check_companion_recall(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        bedtime: bool,
+        current_mode: OpeningMode,
+    ) -> object | None:
+        """Check if a companion object should be recalled at opening.
+
+        Returns the companion object if recall is appropriate, None otherwise.
+        Recall is blocked when:
+        - bedtime (never recall at bedtime)
+        - mode is already safety/privacy/boundary/low_expression
+        - no companion_object_service configured
+        """
+        if self._companion_object_service is None:
+            return None
+        if bedtime:
+            return None
+        # Don't override safety/boundary/low_expression modes
+        if current_mode in (
+            OpeningMode.BOUNDARY_RESPECT,
+            OpeningMode.LOW_EXPRESSION_SUPPORT,
+        ):
+            return None
+        try:
+            companion = self._companion_object_service.can_recall(
+                child_id, session_id=session_id, is_bedtime=False,
+            )
+            return companion
+        except Exception as exc:
+            logger.warning(
+                "companion_recall_check_failed: %s: %s",
+                exc.__class__.__name__,
+                exc,
+            )
+            return None
 
     def create_opening(
         self,
@@ -147,6 +189,39 @@ class OpeningService:
             parent_policy=parent_policy,
             time_context=time_context,
         )
+
+        # Companion recall: override to COMPANION_RECALL if applicable
+        companion = self._check_companion_recall(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            bedtime=opening_policy.bedtime,
+            current_mode=opening_policy.mode,
+        )
+        if companion is not None:
+            opening_policy = OpeningPolicy(
+                mode=OpeningMode.COMPANION_RECALL,
+                age_band=opening_policy.age_band,
+                max_chars=opening_policy.max_chars,
+                max_spoken_options=opening_policy.max_spoken_options,
+                seed_topic=opening_policy.seed_topic,
+                seed_recall_allowed=False,
+                seed_recall_reason="companion_recall",
+                boundary_kind=opening_policy.boundary_kind,
+                boundary_topic=opening_policy.boundary_topic,
+                boundary_cooldown_active=opening_policy.boundary_cooldown_active,
+                bedtime=opening_policy.bedtime,
+                exciting_topic_deferred=opening_policy.exciting_topic_deferred,
+                must_offer_topic_switch=True,
+                must_allow_no_chat=True,
+                prefer_parent_bridge=opening_policy.prefer_parent_bridge,
+                parent_goal_hint=opening_policy.parent_goal_hint,
+                forbidden_phrases=opening_policy.forbidden_phrases,
+                prompt_rules=opening_policy.prompt_rules,
+                companion_name=companion.name,
+                companion_light_location=companion.light_location,
+                companion_object_type=companion.object_type,
+                companion_id=str(companion.id),
+            )
         fallback_text = self._build_opening_text(
             parent_policy=parent_policy,
             opening_policy=opening_policy,
@@ -166,16 +241,46 @@ class OpeningService:
         tts_result = self._attach_audio_url(reply)
         if not reply.audio_url:
             reply.voice_enabled = False
+        # Build ui_actions and session_state based on mode
+        if opening_policy.mode == OpeningMode.COMPANION_RECALL and opening_policy.companion_id:
+            ui_actions = [
+                UiAction(actions=[
+                    QuickAction(id="companion_continue", label="加一个朋友"),
+                    QuickAction(id="companion_skip", label="先聊别的"),
+                ])
+            ]
+            companion_meta = CompanionObjectMeta(
+                id=opening_policy.companion_id,
+                name=opening_policy.companion_name or "",
+                object_type=opening_policy.companion_object_type or "other",
+                light_location=opening_policy.companion_light_location or "窗边",
+                state="active",
+                action="recall",
+            )
+            # Mark as recalled
+            if self._companion_object_service is not None:
+                try:
+                    self._companion_object_service.mark_recalled(
+                        opening_policy.companion_id,
+                        session_id=request.session_id,
+                    )
+                except Exception:
+                    pass
+        else:
+            ui_actions = [
+                UiAction(actions=[QuickAction(id="start_voice", label="我想说话")])
+            ]
+            companion_meta = None
+
         response = ConversationMessageResponse(
             reply=reply,
-            ui_actions=[
-                UiAction(actions=[QuickAction(id="start_voice", label="我想说话")])
-            ],
+            ui_actions=ui_actions,
             session_state=SessionState(
                 base_scene="conversation.open",
                 active_scene="conversation.open",
                 needs_input=None,
                 requires_parent_attention=None,
+                companion_object=companion_meta,
             ),
         )
         self._opening_policy_builder.record_policy_used(
@@ -437,19 +542,21 @@ class OpeningService:
             )
             text = bedtime_mem or f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
         elif opening_policy.mode == OpeningMode.BEDTIME_DEFER_INTEREST and topic:
+            # BEDTIME_DEFER_INTEREST: topic is exciting, use generic bedtime
+            # template that does NOT mention the topic (low stimulation).
             bedtime_mem = self._bedtime_memory_opening(
                 prefix=prefix, parent_policy=parent_policy, opening_policy=opening_policy,
             )
-            # If the seed topic itself is exciting, use generic bedtime fallback
-            topic_is_exciting = any(m in topic for m in self._BEDTIME_EXCITING_MARKERS)
             if bedtime_mem:
                 text = bedtime_mem
-            elif topic_is_exciting:
-                text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
             else:
-                text = f"{prefix}{topic}我们明天白天再慢慢说。现在轻轻收个尾，好吗？"
+                text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
             text = f"{prefix}这句话也可以告诉家长。小白狐先听你说。"
+        elif opening_policy.mode == OpeningMode.COMPANION_RECALL:
+            name = opening_policy.companion_name or "小星星"
+            location = opening_policy.companion_light_location or "窗边"
+            text = f"{prefix}{name}今天在{location}呢。要不要给它加一个朋友？"
         else:
             templates = self._default_greeting_templates(prefix, opening_policy)
             text = self._select_by_variation(templates, parent_policy)
@@ -778,8 +885,16 @@ class OpeningService:
         return round((time.perf_counter() - started_at) * 1000, 1)
 
 
-_opening_service = OpeningService()
+_opening_service: OpeningService | None = None
 
 
 def get_opening_service() -> OpeningService:
+    global _opening_service
+    if _opening_service is None:
+        from app.services.companion_object_service import get_companion_object_service
+        try:
+            companion_svc = get_companion_object_service()
+        except Exception:
+            companion_svc = None
+        _opening_service = OpeningService(companion_object_service=companion_svc)
     return _opening_service

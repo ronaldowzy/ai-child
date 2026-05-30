@@ -56,11 +56,22 @@ class UiAction(BaseModel):
     actions: list[QuickAction]
 
 
+class CompanionObjectMeta(BaseModel):
+    """Minimal companion object metadata for Android rendering."""
+    id: str
+    name: str
+    object_type: str
+    light_location: str
+    state: str  # active / paused
+    action: str  # recall / co_create / none
+
+
 class SessionState(BaseModel):
     base_scene: str
     active_scene: str
     needs_input: str | None = None
     requires_parent_attention: bool | None = None
+    companion_object: CompanionObjectMeta | None = None
 
 
 class SafetyDebug(BaseModel):

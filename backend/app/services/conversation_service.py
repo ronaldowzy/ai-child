@@ -39,6 +39,10 @@ from app.services.light_co_creation_service import (
     LightCoCreationService,
     get_light_co_creation_service,
 )
+from app.services.companion_object_service import (
+    CompanionObjectService,
+    get_companion_object_service,
+)
 from app.services.conversation_history_service import (
     ConversationHistoryService,
     get_conversation_history_service,
@@ -99,6 +103,7 @@ class ConversationService:
         quick_action_service: QuickActionService | None = None,
         tts_service: TtsService | None = None,
         light_co_creation_service: LightCoCreationService | None = None,
+        companion_object_service: CompanionObjectService | None = None,
         debug_enabled: bool = True,
         persistence_enabled: bool = True,
     ) -> None:
@@ -122,6 +127,11 @@ class ConversationService:
         self._tts_service = tts_service or get_tts_service()
         self._light_co_creation_service = (
             light_co_creation_service or get_light_co_creation_service()
+        )
+        self._companion_object_service = (
+            companion_object_service
+            if companion_object_service is not None
+            else get_companion_object_service()
         )
         self._debug_enabled = debug_enabled
         self._persistence_enabled = persistence_enabled
@@ -262,6 +272,13 @@ class ConversationService:
                 ),
             )
         )
+        # Companion object: check for skip/continue after recall
+        companion_action_result = self._check_companion_action(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            child_text=request.input.text,
+            scene_id=route_decision.active_scene,
+        )
         # Lightweight pre-check for memory recall suppression.
         # Full turn_guidance is built inside ChildAgentRuntime after memory retrieval,
         # so we do a minimal boundary/engagement check here.
@@ -339,6 +356,8 @@ class ConversationService:
             runtime_result,
             child_text=request.input.text,
             parent_policy=parent_policy,
+            companion_action=companion_action_result,
+            image_context=image_context,
         )
         tts_ms = self._attach_audio_url_if_enabled(response)
         self._persist_turn_if_enabled(
@@ -574,6 +593,59 @@ class ConversationService:
     def _elapsed_ms(self, started_at: float) -> float:
         return round((time.perf_counter() - started_at) * 1000, 1)
 
+    # --- Companion object lightweight action detection ---
+
+    _SKIP_SIGNALS = (
+        "先聊别的", "先聊新的", "不想", "不要", "不知道",
+        "换个话题", "聊别的", "说别的",
+    )
+
+    def _check_companion_action(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        child_text: str,
+        scene_id: object,
+    ) -> dict | None:
+        """Check if child is responding to a companion recall.
+
+        Returns a dict with companion info if action was taken, None otherwise.
+        """
+        from app.domain.scene import SceneId as _SceneId
+
+        # Only process companion actions in safe scenes
+        if scene_id in (
+            _SceneId.SAFETY_GUARDIAN,
+            _SceneId.SAFETY_GENTLE_CHECKIN,
+            _SceneId.PRIVACY_BOUNDARY,
+            _SceneId.LEARNING_HOMEWORK_HELP,
+            _SceneId.DAILY_BEDTIME_REFLECTION,
+        ):
+            return None
+
+        svc = self._companion_object_service
+        if svc is None:
+            return None
+
+        companion = svc.get_active_by_child(child_id)
+        if companion is None:
+            return None
+
+        text = child_text.strip()
+
+        # Skip detection
+        if any(signal in text for signal in self._SKIP_SIGNALS):
+            svc.mark_skipped(companion.id, session_id=session_id)
+            return {"action": "skip", "companion": companion}
+
+        # Continue detection: child mentions the companion name
+        if companion.name and companion.name in text:
+            # Child is engaging with the companion
+            return {"action": "continue", "companion": companion}
+
+        return None
+
     def _response_from_route_decision(
         self,
         decision: SceneRouteDecision,
@@ -581,6 +653,8 @@ class ConversationService:
         *,
         child_text: str,
         parent_policy: object | None,
+        companion_action: dict | None = None,
+        image_context: object | None = None,
     ) -> ConversationMessageResponse:
         quick_actions = self._quick_action_service.actions_for(
             decision=decision,
@@ -591,6 +665,42 @@ class ConversationService:
                 "final_conversation_control"
             ),
         )
+
+        # Image co-creation: add "起个名字" button after safe image recognition
+        _IMAGE_CO_CREATION_SAFE_TYPES = (
+            "child_drawing", "art_feedback", "toy", "object", "handmade",
+        )
+        if (
+            image_context is not None
+            and hasattr(image_context, "recognized_type")
+            and image_context.recognized_type in _IMAGE_CO_CREATION_SAFE_TYPES
+            and decision.active_scene not in (
+                SceneId.SAFETY_GUARDIAN,
+                SceneId.SAFETY_GENTLE_CHECKIN,
+                SceneId.PRIVACY_BOUNDARY,
+                SceneId.LEARNING_HOMEWORK_HELP,
+            )
+        ):
+            from app.domain.scene import SceneAction
+            quick_actions = list(quick_actions) if quick_actions else []
+            quick_actions.append(SceneAction(id="companion_name", label="起个名字"))
+
+        # Build companion metadata if companion is active
+        companion_meta = None
+        if companion_action is not None:
+            companion = companion_action.get("companion")
+            action = companion_action.get("action", "none")
+            if companion is not None:
+                from app.domain.schemas.conversation import CompanionObjectMeta
+                companion_meta = CompanionObjectMeta(
+                    id=str(companion.id),
+                    name=companion.name,
+                    object_type=companion.object_type,
+                    light_location=companion.light_location,
+                    state=companion.status,
+                    action=action if action in ("recall", "co_create") else "none",
+                )
+
         return ConversationMessageResponse(
             reply=Reply(
                 text=runtime_result.reply_text,
@@ -614,6 +724,7 @@ class ConversationService:
                 requires_parent_attention=(
                     True if decision.requires_parent_attention else None
                 ),
+                companion_object=companion_meta,
             ),
         )
 

@@ -380,70 +380,59 @@ D1 接口设计与现有对话运行时架构兼容：
 
 **与 D2 的关系**：
 1. 此失败不是 D1 引入，是 opening_service 的既有逻辑问题
-2. D2 会修改 opening_service（新增小客人召回逻辑），但不会修改 `_bedtime_memory_opening()` 或 `BEDTIME_DEFER_INTEREST` 的 fallback 文本
-3. 此失败与 D2 的"睡前不主动召回小客人"规则无直接冲突——D2 只在非 bedtime 时检查小客人召回
-4. D2 不应一并修复此问题，因为：(a) 它不属于 D2 任务范围；(b) 修改 fallback 文本涉及主控 master-copy 文案，需主控确认
-
-**建议**：D2 在交接中标记此既有失败，由主控决定是否单独修复。
+2. 主控已确认：D2 必须一并修复此测试，不得借机重写 opening 系统
+3. 修复方向：调整 `_bedtime_memory_opening()` 的返回逻辑，使 `BEDTIME_DEFER_INTEREST` 模式下 topic 优先于通用记忆 opening
 
 ---
 
-## 14. 需要主控确认的问题
+## 14. 主控确认结论（2026-05-30）
 
-### 问题 1：首次打开的小星星起名是否由 D2 实现？
+### Q1：首次打开小星星起名
 
-主控文档定义了首次打开的"小星星起名"种子（`docs/小白狐首次与每日打开体验设计_2026_05_30_V0_1.md` 第 2.3 节）。当前 `OpeningPolicyBuilder` 已有 `DEFAULT_LIGHT` 模式可生成低压 opening。
+**确认**：D2 实现后端 opening 决策和 metadata，不做 Android UI。孩子未命名前不能创建小客人。
 
-D2 是否需要在首次打开时注入"窗边这颗小星星还没有名字 / 要不要给它起一个？"这个共创种子？还是由模型从 prompt 中自行生成？
+### Q2：共创意图检测
 
-### 问题 2：共创意图检测的精确度要求
+**确认**：MVP 采用"显式 action + 轻量规则"，不新增 prompt 结构化标记，不重写全局 prompt。
 
-D2 需要在对话中检测孩子是否"起名成功"以创建小客人。检测方式有两种：
+实现方式：Android 端通过 `ui_actions` 按钮（如"起个名字"）发送显式 action；后端通过 `ConversationInput` 中的 action 字段或轻量关键词规则识别共创意图。
 
-- **方案 A**：通过 prompt 指令让模型在回复中输出结构化标记（如 `[companion_created:小棉花,star,窗边]`），D2 解析此标记调用 `CompanionObjectService.create()`
-- **方案 B**：在对话结束后，由 D2 层面通过关键词/语义分析判断孩子是否完成了起名，然后调用 create
+### Q3：图片成功后共创入口
 
-主控倾向哪种方案？方案 A 更精确但依赖模型遵循指令；方案 B 更稳健但可能误判。
+**确认**：不放在 AttachmentService 做产品决策。AttachmentService 只提供图片成功/失败事实；conversation runtime / image context 编排层负责只输出一个共创入口；D3 只负责渲染。
 
-### 问题 3：图片成功后的共创入口由哪层控制？
+### Q4：SessionState companion_object 字段
 
-当前图片上传后由 `AttachmentService` 返回 `AttachmentCreateResponse`，其中已有 `ui_actions`。
+**确认**：需要，但极简。只给 id、name、object_type、light_location、state、action。不要给 safe_summary、完整故事、召回次数、跳过次数或历史列表。
 
-D2 的共创入口（"起个名字"按钮）是：
-- **方案 A**：在 `AttachmentService` 构建响应时追加（需修改 attachment 相关代码）
-- **方案 B**：在下一次对话消息中由 prompt 指令生成（不改 attachment 代码）
+### Q5：小客人召回文案
 
-主控倾向哪种？
+**确认**：已有 master-copy，只能引用以下文档中的精确文本：
+- `docs/小白狐首次与每日打开体验设计_2026_05_30_V0_1.md`
+- `docs/四个核心场景话术与状态库_2026_05_30_V0_1.md`
+- `docs/明天还记得轻记忆与召回规则_2026_05_30_V0_1.md`
 
-### 问题 4：SessionState 中 companion_object 字段的 Android 端用途
+如果需要模板，只能做 `{name}` 和 `{light_location}` 变量替换。
 
-D2 计划在 `SessionState` 中新增 `companion_object: CompanionObjectMeta | None` 字段。D3（Android 儿童端小屋呈现）是否需要此字段来渲染小屋中的轻视觉点？如果不需要，D2 可以暂不扩展 `SessionState`，只在内部使用小客人状态。
+### Q6：既有 bedtime opening 测试失败
 
-### 问题 5：prompt 中小客人召回指令的精确文案
-
-D2 需要在 opening scene prompt 中追加一段小客人召回指令。此指令的内容（例如"用以下话术召回：{name}今天在{location}呢"）需要主控确认精确文本。
-
-主控是否已有此段 prompt 指令的 master-copy？还是需要主控在 D2 实现前提供？
-
-### 问题 6：既有的 `test_bedtime_opening_with_interest_seed_is_low_stimulation` 失败
-
-此失败的根因是 `_bedtime_memory_opening()` 返回通用文本覆盖了 topic-specific 逻辑。D2 不会修改此逻辑，但 D2 的 opening 修改可能影响此测试的 mock 行为。
-
-主控是否希望 D2 一并修复此测试？如果需要，修复方向是调整 `_bedtime_memory_opening()` 的返回逻辑，使 `BEDTIME_DEFER_INTEREST` 模式下的 topic 优先于通用记忆 opening。
+**确认**：必须纳入 D2。复现并窄修 bedtime opening 优先级/低刺激规则，完整回归不能继续保留此失败。不得借机重写 opening 系统，不得新增儿童端文案。
 
 ---
 
-## 15. 实现步骤概览
+## 15. 实现步骤概览（修正版）
 
 ```text
+步骤 0：修复 bedtime opening 既有失败（窄修 _bedtime_memory_opening 优先级）
 步骤 1：在 opening_policy.py 新增 COMPANION_RECALL 模式
 步骤 2：在 opening_service.py 注入 CompanionObjectService，opening 阶段检查召回
-步骤 3：在 prompt_manager.py 新增 render_companion_context()
-步骤 4：在 conversation_open_v0_1.txt 追加小客人召回指令段
-步骤 5：在 conversation_service.py 注入 CompanionObjectService，对话中检测共创意图
-步骤 6：在 schemas/conversation.py 扩展 SessionState
-步骤 7：编写 test_companion_object_runtime.py 集成测试
-步骤 8：运行完整回归，确认无新失败
+步骤 3：首次打开小星星种子：opening 决策 + metadata，不创建小客人
+步骤 4：在 schemas/conversation.py 扩展 SessionState（极简 companion_object）
+步骤 5：在 conversation_service.py 注入 CompanionObjectService
+步骤 6：图片成功后由 conversation runtime 输出一个共创入口
+步骤 7：对话中通过显式 action + 轻量规则检测共创意图
+步骤 8：编写集成测试
+步骤 9：运行完整回归，确认 0 失败
 ```
 
 每步完成后运行对应测试，不一次性写完再测。

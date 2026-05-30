@@ -16,6 +16,7 @@ from app.api.v1.memories import router as memories_router
 from app.api.v1.parent_report import router as parent_report_router
 from app.api.v1.parent_policy import router as parent_policy_router
 from app.api.v1.tts import router as tts_router
+from app.api.v1.version import router as version_router
 from app.api.fox_assets import router as fox_assets_router
 from app.api.tts_media import router as tts_media_router
 from app.core.config import get_settings
@@ -92,6 +93,7 @@ app.include_router(parent_report_router, prefix=settings.api_v1_prefix)
 app.include_router(memories_router, prefix=settings.api_v1_prefix)
 app.include_router(tts_router, prefix=settings.api_v1_prefix)
 app.include_router(asr_router, prefix=settings.api_v1_prefix)
+app.include_router(version_router, prefix=settings.api_v1_prefix)
 app.include_router(fox_assets_router, prefix=settings.api_v1_prefix)
 
 

@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
@@ -13,8 +15,13 @@ import com.childai.companion.data.auth.AuthRepository
 import com.childai.companion.data.auth.SharedPreferencesAuthSessionStore
 import com.childai.companion.ui.AppNavHost
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
+import com.childai.companion.ui.update.UpdateDialog
+import com.childai.companion.ui.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val updateViewModel: UpdateViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -43,6 +50,15 @@ class MainActivity : ComponentActivity() {
                         ),
                     )
                 }
+
+                // 启动时检查版本更新
+                LaunchedEffect(Unit) {
+                    updateViewModel.checkForUpdate()
+                }
+
+                // 显示更新弹窗
+                UpdateDialog(viewModel = updateViewModel)
+
                 AppNavHost(authRepository = authRepository)
             }
         }

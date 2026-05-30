@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy import Text, UniqueConstraint
 from sqlalchemy import false, text, true
 from sqlalchemy.orm import Mapped, mapped_column
@@ -437,4 +437,39 @@ class TtsCacheRecord(Base, TimestampMixin):
     last_accessed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+
+class CompanionObjectRecord(Base, TimestampMixin):
+    __tablename__ = "companion_objects"
+    __table_args__ = (
+        Index(
+            "ix_companion_child_active",
+            "child_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    child_id: Mapped[str] = mapped_column(
+        String(120),
+        ForeignKey("children.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    object_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    safe_summary: Mapped[str] = mapped_column(String(500), nullable=False)
+    light_location: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    last_recalled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    recall_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    skip_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
     )

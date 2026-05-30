@@ -153,12 +153,8 @@ class CompanionObjectService:
         if companion is None:
             return None
 
-        # Same-session suppression
+        # Same-session suppression (covers both recall and skip within session)
         if self._session_tracker.has_recalled(session_id, child_id):
-            return None
-
-        # Skip-based suppression: any prior skip means don't recall this session
-        if companion.skip_count > 0:
             return None
 
         now = self._now()
@@ -201,8 +197,13 @@ class CompanionObjectService:
     # Skip
     # ------------------------------------------------------------------
 
-    def mark_skipped(self, companion_id: str) -> CompanionObject:
-        """Record a skip. If skip_count >= 2, move to PAUSED."""
+    def mark_skipped(self, companion_id: str, *, session_id: str | None = None) -> CompanionObject:
+        """Record a skip. If skip_count >= 2, move to PAUSED.
+
+        If session_id is provided, marks the session as having handled this
+        companion (via SessionRecallTracker) so can_recall() won't suggest
+        it again this session.
+        """
         companion = self._get(companion_id)
         if companion is None:
             raise CompanionObjectNotFoundError(
@@ -223,6 +224,8 @@ class CompanionObjectService:
             },
             deep=True,
         )
+        if session_id is not None:
+            self._session_tracker.mark_recalled(session_id, companion.child_id)
         return self._save(updated)
 
     # ------------------------------------------------------------------

@@ -123,16 +123,10 @@ class SqlAlchemyCompanionObjectRepository:
 
     def _ensure_child(self, session: Session, child_id: str) -> None:
         child = session.get(Child, child_id)
-        if child is not None:
-            return
-        session.add(
-            Child(
-                id=child_id,
-                nickname=child_id,
-                timezone="Asia/Shanghai",
-                profile={},
+        if child is None:
+            raise CompanionObjectRepositoryUnavailable(
+                f"child_id {child_id} does not exist in children table"
             )
-        )
 
     def _apply(
         self, record: CompanionObjectRecord, companion: CompanionObject

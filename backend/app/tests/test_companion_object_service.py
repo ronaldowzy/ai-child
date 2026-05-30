@@ -87,8 +87,8 @@ class TestCreate:
         svc = _make_service()
         first = svc.create(_make_request(name="小棉花"))
         # Simulate two skips to pause
-        svc.mark_skipped(first.id)
-        svc.mark_skipped(first.id)
+        svc.mark_skipped(first.id, session_id="s1")
+        svc.mark_skipped(first.id, session_id="s2")
         paused = svc.get_by_id(first.id)
         assert paused is not None
         assert paused.status == CompanionObjectStatus.PAUSED
@@ -282,14 +282,41 @@ class TestRecall:
         result = svc.can_recall(CHILD_ID, session_id=SESSION_ID, is_bedtime=True)
         assert result is None
 
-    def test_recall_skip_blocks(self) -> None:
+    def test_recall_skip_blocks_same_session(self) -> None:
+        """Skip once: same session can't recall."""
         now = datetime(2026, 5, 30, 10, 0, 0, tzinfo=timezone.utc)
         svc = _make_service(now=now)
         companion = svc.create(_make_request())
 
-        svc.mark_skipped(companion.id)
+        svc.mark_skipped(companion.id, session_id=SESSION_ID)
         result = svc.can_recall(CHILD_ID, session_id=SESSION_ID)
         assert result is None
+
+    def test_recall_skip_once_allows_future_session(self) -> None:
+        """Skip once: new session next day can recall."""
+        base = datetime(2026, 5, 30, 10, 0, 0, tzinfo=timezone.utc)
+        svc = _make_service(now=base)
+        companion = svc.create(_make_request())
+
+        svc.mark_skipped(companion.id, session_id="session-A")
+        assert companion.status == CompanionObjectStatus.ACTIVE
+
+        # Next day, new session
+        svc_next = _make_service(now=base + timedelta(days=1))
+        svc_next._repository = svc._repository
+        result = svc_next.can_recall(CHILD_ID, session_id="session-B")
+        assert result is not None
+
+    def test_recall_skip_once_allows_different_session_same_day(self) -> None:
+        """Skip once: different session same day can still recall (skip is session-scoped)."""
+        now = datetime(2026, 5, 30, 10, 0, 0, tzinfo=timezone.utc)
+        svc = _make_service(now=now)
+        companion = svc.create(_make_request())
+
+        svc.mark_skipped(companion.id, session_id="session-A")
+        # Different session same day — skip was session-scoped via tracker
+        result = svc.can_recall(CHILD_ID, session_id="session-B")
+        assert result is not None
 
     def test_recall_no_active_companion(self) -> None:
         svc = _make_service()
@@ -305,7 +332,7 @@ class TestSkip:
         svc = _make_service()
         companion = svc.create(_make_request())
 
-        updated = svc.mark_skipped(companion.id)
+        updated = svc.mark_skipped(companion.id, session_id=SESSION_ID)
         assert updated.skip_count == 1
         assert updated.status == CompanionObjectStatus.ACTIVE
 
@@ -313,8 +340,8 @@ class TestSkip:
         svc = _make_service()
         companion = svc.create(_make_request())
 
-        svc.mark_skipped(companion.id)
-        updated = svc.mark_skipped(companion.id)
+        svc.mark_skipped(companion.id, session_id="s1")
+        updated = svc.mark_skipped(companion.id, session_id="s2")
         assert updated.skip_count == 2
         assert updated.status == CompanionObjectStatus.PAUSED
 
@@ -323,7 +350,7 @@ class TestSkip:
         from app.services.companion_object_service import CompanionObjectNotFoundError
 
         with pytest.raises(CompanionObjectNotFoundError):
-            svc.mark_skipped("nonexistent")
+            svc.mark_skipped("nonexistent", session_id=SESSION_ID)
 
 
 # ------ Unpause tests ------
@@ -333,8 +360,8 @@ class TestUnpause:
     def test_unpause_back_to_active(self) -> None:
         svc = _make_service()
         companion = svc.create(_make_request())
-        svc.mark_skipped(companion.id)
-        svc.mark_skipped(companion.id)
+        svc.mark_skipped(companion.id, session_id="s1")
+        svc.mark_skipped(companion.id, session_id="s2")
 
         unpaused = svc.unpause(companion.id)
         assert unpaused.status == CompanionObjectStatus.ACTIVE
@@ -401,8 +428,8 @@ class TestFadeOut:
         base = datetime(2026, 5, 30, 10, 0, 0, tzinfo=timezone.utc)
         svc = _make_service(now=base)
         companion = svc.create(_make_request())
-        svc.mark_skipped(companion.id)
-        svc.mark_skipped(companion.id)  # PAUSED
+        svc.mark_skipped(companion.id, session_id="s1")
+        svc.mark_skipped(companion.id, session_id="s2")  # PAUSED
 
         svc_later = _make_service(now=base + timedelta(days=8))
         paused = svc._get(companion.id)
@@ -423,8 +450,8 @@ class TestFadeOut:
         base = datetime(2026, 5, 30, 10, 0, 0, tzinfo=timezone.utc)
         svc = _make_service(now=base)
         companion = svc.create(_make_request())
-        svc.mark_skipped(companion.id)
-        svc.mark_skipped(companion.id)
+        svc.mark_skipped(companion.id, session_id="s1")
+        svc.mark_skipped(companion.id, session_id="s2")
 
         svc_later = _make_service(now=base + timedelta(days=5))
         paused = svc._get(companion.id)

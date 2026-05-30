@@ -1,8 +1,8 @@
 # D2 交接：对话运行时与提示词接入
 
-状态：done，待主控审核
+状态：done（返修完成），待主控审核
 
-更新时间：2026-05-30
+更新时间：2026-05-30（返修更新）
 
 ---
 
@@ -18,30 +18,30 @@
 
 | 文件 | 说明 |
 |---|---|
-| `backend/app/services/opening_policy.py` | 新增 `COMPANION_RECALL` opening 模式；OpeningPolicy 新增 companion 字段 |
-| `backend/app/services/opening_service.py` | 注入 CompanionObjectService；opening 阶段检查小客人召回；构建 companion metadata 和 ui_actions |
+| `backend/app/services/opening_policy.py` | 新增 `COMPANION_RECALL`、`COMPANION_STAR_SEED` opening 模式；OpeningPolicy 新增 companion 字段 |
+| `backend/app/services/opening_service.py` | 注入 CompanionObjectService；opening 阶段检查小客人召回和小星星种子；构建 companion metadata 和 ui_actions |
 | `backend/app/services/conversation_service.py` | 注入 CompanionObjectService；对话中检测跳过/继续信号；图片成功后输出"起个名字"共创入口 |
 | `backend/app/domain/schemas/conversation.py` | 新增 `CompanionObjectMeta` schema；`SessionState` 新增 `companion_object` 字段 |
 | `backend/app/tests/test_conversation_opening_api.py` | 修正 `test_bedtime_opening_with_interest_seed_is_low_stimulation` 断言 |
-| `backend/app/tests/test_opening_visible_quality.py` | 无修改（`test_bedtime_defer_interest_blocks_exciting_memory` 断言已正确） |
 
 ### 新建
 
 | 文件 | 说明 |
 |---|---|
-| `backend/app/tests/test_companion_object_runtime.py` | D2 集成测试（11 个用例） |
+| `backend/app/tests/test_companion_object_runtime.py` | D2 集成测试（18 个用例） |
 | `docs/session_process/handoffs/20260530_D2_runtime_companion_object_plan.md` | D2 计划文档 |
 
 ---
 
 ## Child-visible change
 
-1. **首次打开**：低压在场，无小客人召回（与之前一致）
-2. **有活跃小客人时打开**：opening 阶段轻召回一次，气泡"{name}今天在{location}呢。要不要给它加一个朋友？"，按钮"加一个朋友"/"先聊别的"
-3. **睡前打开**：统一不召回小客人（与之前一致）
-4. **图片成功后**：出现"起个名字"共创入口按钮
-5. **孩子跳过时**：检测"先聊别的"等信号，调用 mark_skipped()，本会话不再召回
-6. **SessionState**：携带 companion_object 元数据（id、name、object_type、light_location、state、action）
+1. **首次打开**：无小客人历史时，出现小星星起名种子（"窗边这颗小星星还没有名字\n要不要给它起一个？"），按钮"起个名字"/"先看看"，不创建小客人
+2. **有活跃小客人时打开**：opening 阶段轻召回一次（"{name}今天在{location}呢\n要不要给它加一个朋友？"），按钮"加一个朋友"/"先聊别的"
+3. **睡前打开**：统一不召回小客人，不出现小星星种子
+4. **默认 opening**：按钮为"按一下开始说"（非"我想说话"）
+5. **图片成功后**：出现"起个名字"共创入口按钮
+6. **孩子跳过时**：检测"先聊别的"等信号，调用 mark_skipped()，本会话不再召回
+7. **SessionState**：携带 companion_object 元数据（id、name、object_type、light_location、state、action）
 
 ---
 
@@ -51,16 +51,16 @@
 bash scripts/test_backend.sh
 ```
 
-结果：814 passed, 0 failed
+结果：821 passed, 0 failed
 
-新增测试：`test_companion_object_runtime.py`（11 个用例）
+新增测试：`test_companion_object_runtime.py`（18 个用例）
 
 ---
 
 ## Safety
 
-- 睡前统一不召回小客人
-- 学习/安全/隐私场景不处理小客人动作
+- 睡前统一不召回小客人，不出现小星星种子
+- 学习/安全/隐私场景不处理小客人动作，不出现种子
 - 不保存原始音频、照片、长篇原文
 - 不涉及儿童端文案新增（所有文案来自主控 master-copy）
 - 不涉及家长端文案
@@ -73,6 +73,29 @@ bash scripts/test_backend.sh
 - 未新增任何儿童端文案或小白狐话术
 - 未扩展为成长档案、兴趣画像、作品库或小客人列表
 - companion_object 字段极简（id、name、object_type、light_location、state、action）
+
+---
+
+## 返修记录（2026-05-30）
+
+**返修 1：修正儿童端文案不符合 master-copy**
+- 默认 opening 按钮从"我想说话"改为"按一下开始说"
+- 小客人召回文案格式修正为两行（"{name}今天在{location}呢\n要不要给它加一个朋友？"），不加句号
+
+**返修 2：首次打开小星星起名种子落地**
+- 新增 COMPANION_STAR_SEED opening 模式
+- 无小客人历史 + 非睡前 + 安全场景时，返回小星星种子
+- 返回极简 companion_object metadata（state="seed", action="name_seed"）
+- 不调用 create()，孩子未命名前不创建小客人
+
+**返修 3：quick action 文案全部来自 master-copy**
+- "按一下开始说" — 来自 docs/四个核心场景话术与状态库
+- "加一个朋友" / "先聊别的" — 来自 docs/小白狐首次与每日打开体验设计
+- "起个名字" / "先看看" — 来自 docs/小白狐首次与每日打开体验设计
+
+**返修 4：补测试**
+- 新增 7 个测试用例覆盖：首次打开小星星种子、睡前不返回种子、有小客人不返回种子、默认按钮文案、召回禁用话术、召回文案格式、种子文案格式
+- 总计 18 个 D2 集成测试
 
 ---
 

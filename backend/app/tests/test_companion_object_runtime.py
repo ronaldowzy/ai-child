@@ -318,3 +318,132 @@ class TestForbiddenPhrases:
         ]
         for phrase in forbidden:
             assert phrase not in text, f"Forbidden phrase '{phrase}' found in: {text}"
+
+
+class TestStarNamingSeed:
+    """Test first-open star naming seed."""
+
+    def test_first_open_returns_star_seed(self) -> None:
+        """First open with no companion history: star naming seed."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(_opening_request())
+
+        # Should have star seed
+        assert response.session_state.companion_object is not None
+        meta = response.session_state.companion_object
+        assert meta.state == "seed"
+        assert meta.action == "name_seed"
+        assert meta.name == "小星星"
+        assert meta.light_location == "窗边"
+
+        # Should have star seed text
+        assert "小星星" in response.reply.text
+        assert "名字" in response.reply.text
+
+        # Should have naming action
+        action_ids = [a.id for ua in response.ui_actions for a in ua.actions]
+        assert "companion_name" in action_ids
+
+    def test_bedtime_no_star_seed(self) -> None:
+        """Bedtime: no star naming seed."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(
+            _opening_request(device_time="2026-05-30T21:00:00+08:00")
+        )
+
+        # Should NOT have star seed at bedtime
+        assert response.session_state.companion_object is None
+
+    def test_existing_companion_no_star_seed(self) -> None:
+        """Existing companion: no star seed (should recall instead)."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        _create_companion(companion_svc)
+
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(_opening_request())
+
+        # Should have recall, not star seed
+        assert response.session_state.companion_object is not None
+        assert response.session_state.companion_object.state == "active"
+        assert response.session_state.companion_object.action == "recall"
+
+    def test_default_opening_button_is_start_voice(self) -> None:
+        """Default opening button should be '按一下开始说'."""
+        opening_svc = OpeningService(companion_object_service=None)
+        response = opening_svc.create_opening(_opening_request())
+
+        action_labels = [a.label for ua in response.ui_actions for a in ua.actions]
+        assert "按一下开始说" in action_labels
+        assert "我想说话" not in action_labels
+
+    def test_recall_text_no_forbidden_phrases(self) -> None:
+        """Recall text should not contain forbidden phrases."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        _create_companion(companion_svc, name="小棉花", light_location="窗边")
+
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(_opening_request())
+
+        text = response.reply.text
+        forbidden = [
+            "我一直在等你", "你终于来了", "小白狐想你了",
+            "明天一定要来", "你不来小白狐会想你",
+        ]
+        for phrase in forbidden:
+            assert phrase not in text, f"Forbidden phrase '{phrase}' found in: {text}"
+
+    def test_recall_text_matches_master_copy(self) -> None:
+        """Recall text should match master-copy format."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        _create_companion(companion_svc, name="小棉花", light_location="窗边")
+
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(_opening_request())
+
+        text = response.reply.text
+        # Should match master-copy: "{name}今天在{location}呢\n要不要给它加一个朋友？"
+        assert "小棉花今天在窗边呢" in text
+        assert "要不要给它加一个朋友？" in text
+
+    def test_star_seed_text_matches_master_copy(self) -> None:
+        """Star seed text should match master-copy."""
+        from app.services.companion_object_service import CompanionObjectService
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        opening_svc = OpeningService(companion_object_service=companion_svc)
+        response = opening_svc.create_opening(_opening_request())
+
+        text = response.reply.text
+        # Should match master-copy: "窗边这颗小星星还没有名字\n要不要给它起一个？"
+        assert "窗边这颗小星星还没有名字" in text
+        assert "要不要给它起一个？" in text

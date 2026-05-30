@@ -150,6 +150,45 @@ class OpeningService:
             )
             return None
 
+    def _check_star_seed_eligible(
+        self,
+        *,
+        child_id: str,
+        bedtime: bool,
+        current_mode: OpeningMode,
+    ) -> bool:
+        """Check if first-open star naming seed should be offered.
+
+        Returns True if:
+        - companion_object_service is configured
+        - not bedtime
+        - child has no companion history (no active, paused, or retired)
+        - current mode is safe (DEFAULT_LIGHT or INTEREST_CALLBACK)
+        """
+        if self._companion_object_service is None:
+            return False
+        if bedtime:
+            return False
+        if current_mode not in (OpeningMode.DEFAULT_LIGHT, OpeningMode.INTEREST_CALLBACK):
+            return False
+        try:
+            # Check if child has any companion history
+            existing = self._companion_object_service.get_active_by_child(child_id)
+            if existing is not None:
+                return False
+            # Also check paused companions (don't offer seed if child has history)
+            paused = getattr(self._companion_object_service, '_get_active_or_paused_by_child', None)
+            if paused:
+                try:
+                    result = paused(child_id)
+                    if result is not None:
+                        return False
+                except Exception:
+                    pass
+            return True
+        except Exception:
+            return False
+
     def create_opening(
         self,
         request: ConversationOpeningRequest,
@@ -222,6 +261,31 @@ class OpeningService:
                 companion_object_type=companion.object_type,
                 companion_id=str(companion.id),
             )
+        elif companion is None and self._check_star_seed_eligible(
+            child_id=request.child_id,
+            bedtime=opening_policy.bedtime,
+            current_mode=opening_policy.mode,
+        ):
+            opening_policy = OpeningPolicy(
+                mode=OpeningMode.COMPANION_STAR_SEED,
+                age_band=opening_policy.age_band,
+                max_chars=opening_policy.max_chars,
+                max_spoken_options=opening_policy.max_spoken_options,
+                seed_topic=opening_policy.seed_topic,
+                seed_recall_allowed=False,
+                seed_recall_reason="companion_star_seed",
+                boundary_kind=opening_policy.boundary_kind,
+                boundary_topic=opening_policy.boundary_topic,
+                boundary_cooldown_active=opening_policy.boundary_cooldown_active,
+                bedtime=opening_policy.bedtime,
+                exciting_topic_deferred=opening_policy.exciting_topic_deferred,
+                must_offer_topic_switch=True,
+                must_allow_no_chat=True,
+                prefer_parent_bridge=opening_policy.prefer_parent_bridge,
+                parent_goal_hint=opening_policy.parent_goal_hint,
+                forbidden_phrases=opening_policy.forbidden_phrases,
+                prompt_rules=opening_policy.prompt_rules,
+            )
         fallback_text = self._build_opening_text(
             parent_policy=parent_policy,
             opening_policy=opening_policy,
@@ -242,7 +306,22 @@ class OpeningService:
         if not reply.audio_url:
             reply.voice_enabled = False
         # Build ui_actions and session_state based on mode
-        if opening_policy.mode == OpeningMode.COMPANION_RECALL and opening_policy.companion_id:
+        if opening_policy.mode == OpeningMode.COMPANION_STAR_SEED:
+            ui_actions = [
+                UiAction(actions=[
+                    QuickAction(id="companion_name", label="起个名字"),
+                    QuickAction(id="companion_skip", label="先看看"),
+                ])
+            ]
+            companion_meta = CompanionObjectMeta(
+                id="star_seed",
+                name="小星星",
+                object_type="star",
+                light_location="窗边",
+                state="seed",
+                action="name_seed",
+            )
+        elif opening_policy.mode == OpeningMode.COMPANION_RECALL and opening_policy.companion_id:
             ui_actions = [
                 UiAction(actions=[
                     QuickAction(id="companion_continue", label="加一个朋友"),
@@ -268,7 +347,7 @@ class OpeningService:
                     pass
         else:
             ui_actions = [
-                UiAction(actions=[QuickAction(id="start_voice", label="我想说话")])
+                UiAction(actions=[QuickAction(id="start_voice", label="按一下开始说")])
             ]
             companion_meta = None
 
@@ -553,10 +632,12 @@ class OpeningService:
                 text = f"{prefix}小白狐在这里。现在有点晚，我们可以慢慢说一小会儿，也可以明天再说。"
         elif opening_policy.mode == OpeningMode.PARENT_BRIDGE_LIGHT:
             text = f"{prefix}这句话也可以告诉家长。小白狐先听你说。"
+        elif opening_policy.mode == OpeningMode.COMPANION_STAR_SEED:
+            text = f"{prefix}窗边这颗小星星还没有名字\n要不要给它起一个？"
         elif opening_policy.mode == OpeningMode.COMPANION_RECALL:
             name = opening_policy.companion_name or "小星星"
             location = opening_policy.companion_light_location or "窗边"
-            text = f"{prefix}{name}今天在{location}呢。要不要给它加一个朋友？"
+            text = f"{prefix}{name}今天在{location}呢\n要不要给它加一个朋友？"
         else:
             templates = self._default_greeting_templates(prefix, opening_policy)
             text = self._select_by_variation(templates, parent_policy)

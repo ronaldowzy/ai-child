@@ -22,6 +22,7 @@ class OpeningMode(StrEnum):
     PARENT_BRIDGE_LIGHT = "parent_bridge_light"
     LOW_EXPRESSION_SUPPORT = "low_expression_support"
     COMPANION_RECALL = "companion_recall"
+    COMPANION_STAR_SEED = "companion_star_seed"
 
 
 FORBIDDEN_OPENING_PHRASES: tuple[str, ...] = (

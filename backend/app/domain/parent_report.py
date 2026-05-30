@@ -37,6 +37,7 @@ class ParentReport(BaseModel):
     suggested_parent_actions: list[str] = Field(default_factory=list, max_length=10)
     tonight_parent_bridge: str | None = Field(default=None, max_length=280)
     avoid_followup: list[str] = Field(default_factory=list, max_length=8)
+    companion_summary: str | None = Field(default=None, max_length=200)
     created_at: datetime
     generation_status: ParentReportGenerationStatus = ParentReportGenerationStatus.LEGACY
     generated_by: str = Field(default="legacy", max_length=80)

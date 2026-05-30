@@ -23,6 +23,7 @@ data class ParentReport(
     val suggestedParentActions: List<String>,
     val tonightParentBridge: String? = null,
     val avoidFollowup: List<String> = emptyList(),
+    val companionSummary: String? = null,
     val generationStatus: String = "legacy",
     val generatedBy: String = "legacy",
     val generationErrorCode: String? = null,
@@ -65,6 +66,7 @@ data class ParentReport(
                 tonightParentBridge = root.optNullableString("tonight_parent_bridge"),
                 avoidFollowup = root.optJSONArray("avoid_followup")
                     .toParentReportStringList(),
+                companionSummary = root.optNullableString("companion_summary"),
                 generationStatus = root.optString("generation_status", "legacy"),
                 generatedBy = root.optString("generated_by", "legacy"),
                 generationErrorCode = root.optNullableString(

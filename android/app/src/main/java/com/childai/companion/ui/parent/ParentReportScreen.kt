@@ -152,6 +152,14 @@ private fun ReportBody(report: ParentReport) {
             style = MaterialTheme.typography.bodyLarge,
         )
     }
+    report.companionSummary?.let { summary ->
+        ReportSection(title = "轻共创") {
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
     if (report.topicOverview.isNotEmpty()) {
         ReportSection(title = "孩子今天提到的内容") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

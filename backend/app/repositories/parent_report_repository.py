@@ -238,6 +238,7 @@ class ParentReportRepository:
             avoid_followup=self._avoid_followup_from_legacy_actions(
                 list(record.suggested_parent_actions or []),
             ),
+            companion_summary=None,
         )
 
     def _aware_datetime(self, value: datetime) -> datetime:

@@ -20,6 +20,42 @@ MONITORING_STYLE_FORBIDDEN = (
     "孩子表现不错",
 )
 
+# companion_summary 禁止表达（来自 master-copy）
+COMPANION_FORBIDDEN = (
+    "系统记录到孩子创建了小客人",
+    "孩子与 AI 建立了持续关系",
+    "孩子今天完成了小屋互动任务",
+    "孩子拒绝继续昨日内容",
+    "孩子连续两次跳过小白狐召回",
+    "小客人名字",
+    "小客人类型",
+    "召回次数",
+    "跳过次数",
+    "小屋位置",
+    "窗边",
+    "地毯边",
+)
+
+
+def companion_deterministic_summary(
+    *,
+    has_companion: bool,
+    source_type: str,
+) -> str | None:
+    """Deterministic companion summary from master-copy.
+
+    source_type values: first_open, image_share, chat_story, story_chain.
+    Returns None when no companion event today.
+    """
+    if not has_companion:
+        return None
+    if source_type == "image_share":
+        return "孩子主动分享了一张作品。"
+    if source_type in ("chat_story", "story_chain"):
+        return "今天孩子和小白狐接了一点小故事。"
+    # first_open / star_seed / default
+    return "今天孩子和小白狐有一次轻松共创。"
+
 
 def parent_report_system_prompt_v4() -> str:
     return (
@@ -43,7 +79,12 @@ def parent_report_system_prompt_v4() -> str:
         '- 不给孩子贴固定标签，不写老师评语、客服总结、心理诊断、行为评分。\n'
         '- 不引导家长问“你今天和小白狐聊了什么”。\n'
         '- 不写今晚接话建议、话术建议、亲子沟通建议。\n'
-        '- 不使用“桥接”“结构化摘要”“表达入口”“provider”“prompt”等内部词。\n\n'
+        '- 不使用”桥接””结构化摘要””表达入口””provider””prompt”等内部词。\n'
+        '- 如果看到轻共创信号（had_light_cocreation），可以在 summary 或 mentioned_items 中自然提及，'
+        '但不要暴露小客人名字、类型、位置、召回次数、跳过次数。\n'
+        '- 轻共创相关表达只允许：今天孩子和小白狐有一次轻松共创 / 孩子主动分享了一张作品 / '
+        '今天孩子和小白狐接了一点小故事。\n'
+        '- 不要说”系统记录到孩子创建了小客人””孩子与 AI 建立了持续关系””孩子拒绝继续”。\n\n'
         '必须返回严格 JSON object，只包含以下字段：\n'
         '{\n'
         '  "summary": "1 句自然中文，20-45 字，是当天主小结",\n'

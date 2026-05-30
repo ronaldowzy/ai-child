@@ -26,11 +26,16 @@ from app.repositories.parent_report_repository import (
     ParentReportRepositoryProtocol,
     ParentReportRepositoryUnavailable,
 )
+from app.services.companion_object_service import (
+    CompanionObjectService,
+    get_companion_object_service,
+)
 from app.services.memory_service import MemoryService, get_memory_service
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.parent_policy_service import ParentPolicyService
 from app.services.parent_report_language_v4 import (
     avoid_followup_v4,
+    companion_deterministic_summary,
     deterministic_narrative_v4,
     parent_report_system_prompt_v4,
 )
@@ -73,6 +78,7 @@ class ParentReportService:
         now_provider: Callable[[], datetime] | None = None,
         fallback_to_memory: bool = True,
         parent_policy_service: ParentPolicyService | None = None,
+        companion_object_service: CompanionObjectService | None = None,
     ) -> None:
         self._memory_service = memory_service or get_memory_service()
         self._repository = repository or ParentReportRepository()
@@ -84,6 +90,7 @@ class ParentReportService:
         )
         self._model_registry = model_registry or get_model_registry()
         self._parent_policy_service = parent_policy_service
+        self._companion_object_service = companion_object_service
         self._fallback_to_memory = fallback_to_memory
         self._repository_available = True
         self._conversation_repository_available = True
@@ -101,11 +108,13 @@ class ParentReportService:
             child_id,
             target_date,
         )
+        companion_signal = self._get_companion_signal(child_id, target_date)
         existing = self._get_persisted_report(child_id, target_date)
         if existing is not None and not self._is_stale(
             existing,
             memories=memories,
             conversation_messages=conversation_messages,
+            companion_signal=companion_signal,
         ):
             return existing
         report = self._generate_daily_report_from_materials(
@@ -180,6 +189,44 @@ class ParentReportService:
         ]
         return len(child_messages) >= 1
 
+    def _get_companion_signal(
+        self,
+        child_id: str,
+        target_date: date,
+    ) -> dict[str, object]:
+        """Fetch companion object signal for parent report.
+
+        Returns dict with has_companion (bool) and source_type (str).
+        Only returns ACTIVE companions created/updated on target_date.
+        """
+        if self._companion_object_service is None:
+            try:
+                self._companion_object_service = get_companion_object_service()
+            except Exception:  # noqa: BLE001
+                return {"has_companion": False, "source_type": ""}
+        try:
+            companion = self._companion_object_service.get_active_by_child(child_id)
+        except Exception:  # noqa: BLE001
+            return {"has_companion": False, "source_type": ""}
+        if companion is None:
+            return {"has_companion": False, "source_type": ""}
+        # Only show ACTIVE companions in parent report (not PAUSED)
+        from app.domain.companion_object import CompanionObjectStatus
+
+        if companion.status != CompanionObjectStatus.ACTIVE:
+            return {"has_companion": False, "source_type": ""}
+        # Only include if created or updated on target_date
+        created_date = companion.created_at.date()
+        updated_date = companion.updated_at.date()
+        if created_date != target_date and updated_date != target_date:
+            return {"has_companion": False, "source_type": ""}
+        return {
+            "has_companion": True,
+            "source_type": companion.source_type.value
+            if hasattr(companion.source_type, "value")
+            else str(companion.source_type),
+        }
+
     def _generate_daily_report_from_materials(
         self,
         *,
@@ -199,6 +246,7 @@ class ParentReportService:
         support_style = self._lookup_support_style(child_id)
         topic_boundaries = self._lookup_topic_boundaries(child_id)
         conversation = self._conversation_analysis(conversation_messages)
+        companion_signal = self._get_companion_signal(child_id, target_date)
         fallback_report = self._deterministic_fallback_report(
             child_id=child_id,
             target_date=target_date,
@@ -206,10 +254,12 @@ class ParentReportService:
             conversation_messages=conversation_messages,
             conversation=conversation,
             support_style=support_style,
+            companion_signal=companion_signal,
         )
         material_fingerprint = self._material_fingerprint(
             memories=memories,
             conversation_messages=conversation_messages,
+            companion_signal=companion_signal,
         )
         model_result = self._model_daily_report(
             child_id=child_id,
@@ -221,6 +271,7 @@ class ParentReportService:
             material_fingerprint=material_fingerprint,
             support_style=support_style,
             topic_boundaries=topic_boundaries,
+            companion_signal=companion_signal,
         )
         if model_result.report is not None:
             return model_result.report
@@ -229,6 +280,7 @@ class ParentReportService:
             target_date=target_date,
             error_code=model_result.error_code or "model_unavailable",
             material_fingerprint=material_fingerprint,
+            companion_signal=companion_signal,
         )
 
     def _deterministic_fallback_report(
@@ -240,6 +292,7 @@ class ParentReportService:
         conversation_messages: list[ConversationReportMessage],
         conversation: dict[str, list[str]],
         support_style: list[str] | None = None,
+        companion_signal: dict[str, object] | None = None,
     ) -> ParentReport:
         has_material = bool(memories or conversation_messages)
         topics = conversation.get("topics", [])
@@ -278,6 +331,15 @@ class ParentReportService:
             has_unfinished=has_unfinished,
         )
 
+        companion_summary = None
+        tonight_bridge = None
+        if companion_signal and companion_signal.get("has_companion"):
+            companion_summary = companion_deterministic_summary(
+                has_companion=True,
+                source_type=str(companion_signal.get("source_type", "")),
+            )
+            tonight_bridge = "今晚可以轻轻问一句：你今天给小白狐看了什么呀？"
+
         return ParentReport(
             child_id=child_id,
             date=target_date,
@@ -289,8 +351,9 @@ class ParentReportService:
             emotion_observations=[],
             safety_alerts=list(conversation.get("safety_alerts", [])),
             suggested_parent_actions=[],
-            tonight_parent_bridge=None,
+            tonight_parent_bridge=tonight_bridge,
             avoid_followup=[],
+            companion_summary=companion_summary,
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.DETERMINISTIC_FALLBACK,
             generated_by="deterministic_fallback",
@@ -298,6 +361,7 @@ class ParentReportService:
             material_fingerprint=self._material_fingerprint(
                 memories=memories,
                 conversation_messages=conversation_messages,
+                companion_signal=companion_signal,
             ),
         )
 
@@ -313,6 +377,7 @@ class ParentReportService:
         material_fingerprint: str,
         support_style: list[str] | None = None,
         topic_boundaries: list[str] | None = None,
+        companion_signal: dict[str, object] | None = None,
     ) -> _ModelDailyReportResult:
         try:
             response = self._request_model_report(
@@ -325,6 +390,7 @@ class ParentReportService:
                 retry=False,
                 support_style=support_style,
                 topic_boundaries=topic_boundaries,
+                companion_signal=companion_signal,
             )
         except Exception as exc:  # noqa: BLE001 - report generation must not block.
             error_type = exc.__class__.__name__
@@ -360,6 +426,7 @@ class ParentReportService:
                     retry=True,
                     support_style=support_style,
                     topic_boundaries=topic_boundaries,
+                    companion_signal=companion_signal,
                 )
             except Exception as exc:  # noqa: BLE001 - report fallback must hold.
                 error_type = exc.__class__.__name__
@@ -392,6 +459,15 @@ class ParentReportService:
                 report=None,
                 error_code="empty_or_unparseable_model_report",
             )
+        companion_summary = None
+        tonight_bridge = None
+        if companion_signal and companion_signal.get("has_companion"):
+            companion_summary = companion_deterministic_summary(
+                has_companion=True,
+                source_type=str(companion_signal.get("source_type", "")),
+            )
+            tonight_bridge = "今晚可以轻轻问一句：你今天给小白狐看了什么呀？"
+
         return _ModelDailyReportResult(
             report=ParentReport(
                 child_id=child_id,
@@ -405,8 +481,9 @@ class ParentReportService:
                 emotion_observations=[],
                 safety_alerts=parsed["safety_alerts"],
                 suggested_parent_actions=[],
-                tonight_parent_bridge=None,
+                tonight_parent_bridge=tonight_bridge,
                 avoid_followup=[],
+                companion_summary=companion_summary,
                 created_at=self._now(),
                 generation_status=ParentReportGenerationStatus.MODEL_GENERATED,
                 generated_by="model",
@@ -432,12 +509,21 @@ class ParentReportService:
         target_date: date,
         error_code: str,
         material_fingerprint: str,
+        companion_signal: dict[str, object] | None = None,
     ) -> ParentReport:
         status = (
             ParentReportGenerationStatus.MODEL_BLOCKED
             if "policy" in error_code.lower() or "blocked" in error_code.lower()
             else ParentReportGenerationStatus.MODEL_FAILED
         )
+        companion_summary = None
+        tonight_bridge = None
+        if companion_signal and companion_signal.get("has_companion"):
+            companion_summary = companion_deterministic_summary(
+                has_companion=True,
+                source_type=str(companion_signal.get("source_type", "")),
+            )
+            tonight_bridge = "今晚可以轻轻问一句：你今天给小白狐看了什么呀？"
         return ParentReport(
             child_id=child_id,
             date=target_date,
@@ -449,8 +535,9 @@ class ParentReportService:
             emotion_observations=[],
             safety_alerts=[],
             suggested_parent_actions=[],
-            tonight_parent_bridge=None,
+            tonight_parent_bridge=tonight_bridge,
             avoid_followup=[],
+            companion_summary=companion_summary,
             created_at=self._now(),
             generation_status=status,
             generated_by="model",
@@ -477,6 +564,7 @@ class ParentReportService:
             suggested_parent_actions=[],
             tonight_parent_bridge=None,
             avoid_followup=[],
+            companion_summary=None,
             created_at=self._now(),
             generation_status=ParentReportGenerationStatus.MATERIAL_INSUFFICIENT,
             generated_by="system",
@@ -496,6 +584,7 @@ class ParentReportService:
         retry: bool,
         support_style: list[str] | None = None,
         topic_boundaries: list[str] | None = None,
+        companion_signal: dict[str, object] | None = None,
     ):
         payload = self._parent_report_model_payload(
             target_date=target_date,
@@ -505,6 +594,7 @@ class ParentReportService:
             fallback_report=fallback_report,
             support_style=support_style,
             topic_boundaries=topic_boundaries,
+            companion_signal=companion_signal,
         )
         user_prefix = (
             "上一次输出为空或不可解析。请只返回严格 JSON object，不要解释。\n"
@@ -551,6 +641,7 @@ class ParentReportService:
         fallback_report: ParentReport,
         support_style: list[str] | None = None,
         topic_boundaries: list[str] | None = None,
+        companion_signal: dict[str, object] | None = None,
     ) -> dict[str, object]:
         # Build memory summaries with relationship_memory_type
         memory_summaries = []
@@ -625,6 +716,13 @@ class ParentReportService:
         # Add topic_boundaries from parent policy
         if topic_boundaries:
             payload["topic_boundaries"] = topic_boundaries[:3]
+
+        # Add companion signal (boolean/enum only, no names/locations/counts)
+        if companion_signal and companion_signal.get("has_companion"):
+            payload["companion_hints"] = {
+                "had_light_cocreation": True,
+                "cocreation_kind": companion_signal.get("source_type", ""),
+            }
 
         return payload
 
@@ -948,6 +1046,7 @@ class ParentReportService:
         *,
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
+        companion_signal: dict[str, object] | None = None,
     ) -> bool:
         if report.generation_status != ParentReportGenerationStatus.MODEL_GENERATED:
             return True
@@ -956,6 +1055,7 @@ class ParentReportService:
         material_fingerprint = self._material_fingerprint(
             memories=memories,
             conversation_messages=conversation_messages,
+            companion_signal=companion_signal,
         )
         if report.material_fingerprint != material_fingerprint:
             return True
@@ -1610,6 +1710,7 @@ class ParentReportService:
         *,
         memories: list[MemoryItem],
         conversation_messages: list[ConversationReportMessage],
+        companion_signal: dict[str, object] | None = None,
     ) -> str:
         payload = {
             "memories": [
@@ -1627,6 +1728,8 @@ class ParentReportService:
                 for message in conversation_messages
             ],
         }
+        if companion_signal:
+            payload["companion"] = companion_signal
         raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return sha256(raw.encode("utf-8")).hexdigest()[:32]
 

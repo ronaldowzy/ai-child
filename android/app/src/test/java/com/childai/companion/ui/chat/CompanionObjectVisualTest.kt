@@ -74,43 +74,53 @@ class CompanionObjectVisualTest {
     }
 
     @Test
-    fun starObjectTypeMapsToStarPoint() {
-        assertEquals(
-            CompanionVisualType.StarPoint,
-            "小星星".toCompanionVisualType(),
-        )
+    fun starVisualKindMapsToStar() {
+        assertEquals(CompanionVisualType.Star, "star".toCompanionVisualType())
     }
 
     @Test
-    fun backendStarEnumMapsToStarPoint() {
-        assertEquals(
-            CompanionVisualType.StarPoint,
-            "star".toCompanionVisualType(),
-        )
+    fun cloudVisualKindMapsToCloud() {
+        assertEquals(CompanionVisualType.Cloud, "cloud".toCompanionVisualType())
     }
 
     @Test
-    fun cloudObjectTypeMapsToCloudShadow() {
-        assertEquals(
-            CompanionVisualType.CloudShadow,
-            "小云朵".toCompanionVisualType(),
-        )
+    fun paperBoatVisualKindMapsToPaperBoat() {
+        assertEquals(CompanionVisualType.PaperBoat, "paper_boat".toCompanionVisualType())
     }
 
     @Test
-    fun lightObjectTypeMapsToLightSpot() {
-        assertEquals(
-            CompanionVisualType.LightSpot,
-            "小光影".toCompanionVisualType(),
-        )
+    fun tinyDoorVisualKindMapsToTinyDoor() {
+        assertEquals(CompanionVisualType.TinyDoor, "tiny_door".toCompanionVisualType())
     }
 
     @Test
-    fun unknownObjectTypeMapsToSoftOutline() {
-        assertEquals(
-            CompanionVisualType.SoftOutline,
-            "小恐龙".toCompanionVisualType(),
-        )
+    fun dinoShadowVisualKindMapsToDinoShadow() {
+        assertEquals(CompanionVisualType.DinoShadow, "dino_shadow".toCompanionVisualType())
+    }
+
+    @Test
+    fun blockLightVisualKindMapsToBlockLight() {
+        assertEquals(CompanionVisualType.BlockLight, "block_light".toCompanionVisualType())
+    }
+
+    @Test
+    fun legacyStarFallbackMapsToStar() {
+        assertEquals(CompanionVisualType.Star, "小星星".toCompanionVisualType())
+    }
+
+    @Test
+    fun legacyCloudFallbackMapsToCloud() {
+        assertEquals(CompanionVisualType.Cloud, "小云朵".toCompanionVisualType())
+    }
+
+    @Test
+    fun legacyDinoFallbackMapsToDinoShadow() {
+        assertEquals(CompanionVisualType.DinoShadow, "小恐龙".toCompanionVisualType())
+    }
+
+    @Test
+    fun legacyUnknownDefaultsToStar() {
+        assertEquals(CompanionVisualType.Star, "未知类型".toCompanionVisualType())
     }
 
     @Test

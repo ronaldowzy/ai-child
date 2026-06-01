@@ -2,6 +2,8 @@ package com.childai.companion.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -41,10 +43,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.CornerRadius as GeoCornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.childai.companion.data.conversation.CompanionObjectMeta
@@ -360,11 +367,14 @@ internal enum class CompanionLocation {
     OutsideWindow,
 }
 
+/** 6 种小物件影子类型，每种 visual_kind 对应独立渲染。 */
 internal enum class CompanionVisualType {
-    StarPoint,
-    CloudShadow,
-    LightSpot,
-    SoftOutline,
+    Star,
+    Cloud,
+    PaperBoat,
+    TinyDoor,
+    DinoShadow,
+    BlockLight,
 }
 
 internal fun String.toCompanionLocation(): CompanionLocation {
@@ -377,113 +387,156 @@ internal fun String.toCompanionLocation(): CompanionLocation {
     }
 }
 
-internal fun String.toCompanionVisualType(): CompanionVisualType {
-    // 优先从 visual_kind 精确映射
+/**
+ * 当 light_location 为空或未知时，按 visual_kind 给出兜底位置。
+ * star / cloud / tiny_door 默认窗边；paper_boat / dino_shadow / block_light 默认地毯边。
+ */
+private fun String.defaultLocationForVisualKind(): CompanionLocation {
     return when (this) {
-        "star" -> CompanionVisualType.StarPoint
-        "cloud" -> CompanionVisualType.CloudShadow
-        "paper_boat" -> CompanionVisualType.LightSpot
-        "tiny_door" -> CompanionVisualType.SoftOutline
-        "dino_shadow" -> CompanionVisualType.SoftOutline
-        "block_light" -> CompanionVisualType.LightSpot
+        "star", "cloud", "tiny_door" -> CompanionLocation.WindowSide
+        "paper_boat", "dino_shadow", "block_light" -> CompanionLocation.CarpetEdge
+        else -> CompanionLocation.WindowSide
+    }
+}
+
+internal fun String.toCompanionVisualType(): CompanionVisualType {
+    return when (this) {
+        "star" -> CompanionVisualType.Star
+        "cloud" -> CompanionVisualType.Cloud
+        "paper_boat" -> CompanionVisualType.PaperBoat
+        "tiny_door" -> CompanionVisualType.TinyDoor
+        "dino_shadow" -> CompanionVisualType.DinoShadow
+        "block_light" -> CompanionVisualType.BlockLight
         // legacy fallback: 从 objectType 模糊匹配（兼容旧后端）
         else -> when {
-            contains("星") || equals("star", ignoreCase = true) -> CompanionVisualType.StarPoint
-            contains("云") || equals("cloud", ignoreCase = true) -> CompanionVisualType.CloudShadow
-            contains("光") || contains("影") -> CompanionVisualType.LightSpot
-            else -> CompanionVisualType.SoftOutline
+            contains("星") || equals("star", ignoreCase = true) -> CompanionVisualType.Star
+            contains("云") || equals("cloud", ignoreCase = true) -> CompanionVisualType.Cloud
+            contains("纸") || contains("船") -> CompanionVisualType.PaperBoat
+            contains("门") -> CompanionVisualType.TinyDoor
+            contains("恐") || contains("龙") -> CompanionVisualType.DinoShadow
+            contains("积") || contains("木") -> CompanionVisualType.BlockLight
+            contains("光") || contains("影") -> CompanionVisualType.BlockLight
+            else -> CompanionVisualType.Star
         }
     }
 }
 
 internal fun CompanionObjectMeta.shouldShowVisual(): Boolean {
-    // Only show for seed state (first-time star) or active+recall state
-    // Do not show for paused state or action=none
     if (state == "paused") return false
     if (state == "seed" && action == "name_seed") return true
     if (state == "active" && action in setOf("recall", "co_create")) return true
     return false
 }
 
+/** 小物件影子渲染配置：光晕层 + Canvas 形状层 + 入场/持续动效。 */
 private data class CompanionVisualConfig(
-    val size: Dp,
-    val midGlowSize: Dp,
-    val coreSize: Dp,
-    val blurRadius: Dp,
-    val baseAlpha: Float,
-    val colors: List<Color>,
-    val midGlowColor: Color,
-    val coreColor: Color,
+    val glowSize: Dp,
+    val glowBlurRadius: Dp,
+    val glowAlpha: Float,
+    val glowColors: List<Color>,
+    val shapeSize: Dp,
+    val shapeSizeV: Dp,
+    val shapeFill: Color,
+    val shapeStroke: Color,
     val animationType: CompanionAnimationType,
 )
 
 private enum class CompanionAnimationType {
     Breathing,
     Floating,
-    Static,
 }
 
 private fun CompanionVisualType.config(): CompanionVisualConfig {
     return when (this) {
-        CompanionVisualType.StarPoint -> CompanionVisualConfig(
-            size = 38.dp,
-            midGlowSize = 22.dp,
-            coreSize = 9.dp,
-            blurRadius = 16.dp,
-            baseAlpha = 0.96f,
-            colors = listOf(
-                Color(0xFFFFF7CC).copy(alpha = 0.98f),
-                Color(0xFFFFD86B).copy(alpha = 0.72f),
+        CompanionVisualType.Star -> CompanionVisualConfig(
+            glowSize = 42.dp,
+            glowBlurRadius = 16.dp,
+            glowAlpha = 0.45f,
+            glowColors = listOf(
+                Color(0xFFFFF8E1).copy(alpha = 0.72f),
+                Color(0xFFFFECB3).copy(alpha = 0.36f),
                 Color(0xFFFFF8E1).copy(alpha = 0.0f),
             ),
-            midGlowColor = Color(0xFFFFD45A),
-            coreColor = Color(0xFFFFFCF0),
+            shapeSize = 30.dp,
+            shapeSizeV = 30.dp,
+            shapeFill = Color(0xFFFFE082).copy(alpha = 0.50f),
+            shapeStroke = Color(0xFFFFCA28).copy(alpha = 0.30f),
             animationType = CompanionAnimationType.Breathing,
         )
-        CompanionVisualType.CloudShadow -> CompanionVisualConfig(
-            size = 26.dp,
-            midGlowSize = 16.dp,
-            coreSize = 0.dp,
-            blurRadius = 12.dp,
-            baseAlpha = 0.62f,
-            colors = listOf(
-                Color(0xFFE8EAF6).copy(alpha = 0.8f),
-                Color(0xFFC5CAE9).copy(alpha = 0.4f),
-                Color(0xFFE8EAF6).copy(alpha = 0.0f),
+        CompanionVisualType.Cloud -> CompanionVisualConfig(
+            glowSize = 46.dp,
+            glowBlurRadius = 14.dp,
+            glowAlpha = 0.40f,
+            glowColors = listOf(
+                Color(0xFFF5F5F5).copy(alpha = 0.65f),
+                Color(0xFFE8EAF6).copy(alpha = 0.30f),
+                Color(0xFFF5F5F5).copy(alpha = 0.0f),
             ),
-            midGlowColor = Color.Transparent,
-            coreColor = Color.Transparent,
+            shapeSize = 40.dp,
+            shapeSizeV = 26.dp,
+            shapeFill = Color(0xFFE8EAF6).copy(alpha = 0.45f),
+            shapeStroke = Color(0xFFC5CAE9).copy(alpha = 0.28f),
             animationType = CompanionAnimationType.Floating,
         )
-        CompanionVisualType.LightSpot -> CompanionVisualConfig(
-            size = 24.dp,
-            midGlowSize = 14.dp,
-            coreSize = 0.dp,
-            blurRadius = 12.dp,
-            baseAlpha = 0.68f,
-            colors = listOf(
-                Color(0xFFFFF3E0).copy(alpha = 0.85f),
-                Color(0xFFFFE0B2).copy(alpha = 0.45f),
+        CompanionVisualType.PaperBoat -> CompanionVisualConfig(
+            glowSize = 38.dp,
+            glowBlurRadius = 13.dp,
+            glowAlpha = 0.38f,
+            glowColors = listOf(
+                Color(0xFFFFF8E1).copy(alpha = 0.60f),
+                Color(0xFFE1F5FE).copy(alpha = 0.28f),
+                Color(0xFFFFF8E1).copy(alpha = 0.0f),
+            ),
+            shapeSize = 34.dp,
+            shapeSizeV = 28.dp,
+            shapeFill = Color(0xFFFFF8E1).copy(alpha = 0.42f),
+            shapeStroke = Color(0xFFE1F5FE).copy(alpha = 0.30f),
+            animationType = CompanionAnimationType.Floating,
+        )
+        CompanionVisualType.TinyDoor -> CompanionVisualConfig(
+            glowSize = 34.dp,
+            glowBlurRadius = 13.dp,
+            glowAlpha = 0.40f,
+            glowColors = listOf(
+                Color(0xFFFFF3E0).copy(alpha = 0.62f),
+                Color(0xFFEFEBE9).copy(alpha = 0.30f),
                 Color(0xFFFFF3E0).copy(alpha = 0.0f),
             ),
-            midGlowColor = Color.Transparent,
-            coreColor = Color.Transparent,
+            shapeSize = 26.dp,
+            shapeSizeV = 36.dp,
+            shapeFill = Color(0xFFFFF3E0).copy(alpha = 0.42f),
+            shapeStroke = Color(0xFFD7CCC8).copy(alpha = 0.32f),
+            animationType = CompanionAnimationType.Breathing,
+        )
+        CompanionVisualType.DinoShadow -> CompanionVisualConfig(
+            glowSize = 40.dp,
+            glowBlurRadius = 14.dp,
+            glowAlpha = 0.38f,
+            glowColors = listOf(
+                Color(0xFFE8F5E9).copy(alpha = 0.60f),
+                Color(0xFFC8E6C9).copy(alpha = 0.28f),
+                Color(0xFFE8F5E9).copy(alpha = 0.0f),
+            ),
+            shapeSize = 36.dp,
+            shapeSizeV = 30.dp,
+            shapeFill = Color(0xFFC8E6C9).copy(alpha = 0.40f),
+            shapeStroke = Color(0xFFA5D6A7).copy(alpha = 0.28f),
             animationType = CompanionAnimationType.Floating,
         )
-        CompanionVisualType.SoftOutline -> CompanionVisualConfig(
-            size = 22.dp,
-            midGlowSize = 12.dp,
-            coreSize = 0.dp,
-            blurRadius = 11.dp,
-            baseAlpha = 0.6f,
-            colors = listOf(
-                Color(0xFFF3E5F5).copy(alpha = 0.8f),
-                Color(0xFFE1BEE7).copy(alpha = 0.4f),
-                Color(0xFFF3E5F5).copy(alpha = 0.0f),
+        CompanionVisualType.BlockLight -> CompanionVisualConfig(
+            glowSize = 36.dp,
+            glowBlurRadius = 13.dp,
+            glowAlpha = 0.40f,
+            glowColors = listOf(
+                Color(0xFFFFE0B2).copy(alpha = 0.62f),
+                Color(0xFFFFCC80).copy(alpha = 0.30f),
+                Color(0xFFFFE0B2).copy(alpha = 0.0f),
             ),
-            midGlowColor = Color.Transparent,
-            coreColor = Color.Transparent,
-            animationType = CompanionAnimationType.Static,
+            shapeSize = 28.dp,
+            shapeSizeV = 28.dp,
+            shapeFill = Color(0xFFFFCC80).copy(alpha = 0.42f),
+            shapeStroke = Color(0xFFFFB74D).copy(alpha = 0.30f),
+            animationType = CompanionAnimationType.Breathing,
         )
     }
 }
@@ -548,102 +601,343 @@ private fun CompanionLightPoint(
 ) {
     if (companionObject == null || !companionObject.shouldShowVisual()) return
 
-    val location = companionObject.lightLocation.toCompanionLocation()
+    val location = if (companionObject.lightLocation.isBlank()) {
+        companionObject.visualKind.defaultLocationForVisualKind()
+    } else {
+        companionObject.lightLocation.toCompanionLocation()
+    }
     val visualType = companionObject.visualKind.toCompanionVisualType()
     val config = visualType.config()
     val placement = location.placementForViewport(viewportClass)
 
-    val alpha = when (config.animationType) {
-        CompanionAnimationType.Breathing -> {
-            val infiniteTransition = rememberInfiniteTransition(label = "companionBreathing")
-            val animatedAlpha by infiniteTransition.animateFloat(
-                initialValue = config.baseAlpha - 0.15f,
-                targetValue = config.baseAlpha + 0.1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(3000),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "companionAlpha",
+    // 入场动画：fade in 1.2s + scale 从 0.8 到 1.0，只播放一次
+    var entranceDone by remember { mutableStateOf(false) }
+    val entranceProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        if (!entranceDone) {
+            entranceProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 1200, easing = EaseOut),
             )
-            animatedAlpha
+            entranceDone = true
         }
-        CompanionAnimationType.Floating -> {
-            val infiniteTransition = rememberInfiniteTransition(label = "companionFloating")
-            val animatedAlpha by infiniteTransition.animateFloat(
-                initialValue = config.baseAlpha - 0.1f,
-                targetValue = config.baseAlpha + 0.08f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(4000),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "companionAlpha",
-            )
-            animatedAlpha
-        }
-        CompanionAnimationType.Static -> config.baseAlpha
     }
 
-    // Floating offset animation for cloud/light types
-    val offsetY = when (config.animationType) {
-        CompanionAnimationType.Floating -> {
-            val infiniteTransition = rememberInfiniteTransition(label = "companionOffsetY")
-            val animatedOffset by infiniteTransition.animateFloat(
-                initialValue = -2f,
-                targetValue = 2f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(4000),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "companionOffsetY",
-            )
-            animatedOffset
+    val alpha: Float
+    val offsetY: Float
+
+    if (!entranceDone) {
+        // 入场阶段：fade in + 轻微 scale
+        alpha = entranceProgress.value * config.glowAlpha
+        offsetY = 0f
+    } else {
+        // 入场完成后：持续动效
+        when (config.animationType) {
+            CompanionAnimationType.Breathing -> {
+                val infiniteTransition = rememberInfiniteTransition(label = "companionBreathing")
+                val animatedAlpha by infiniteTransition.animateFloat(
+                    initialValue = config.glowAlpha - 0.08f,
+                    targetValue = config.glowAlpha + 0.06f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(3500),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "companionAlpha",
+                )
+                alpha = animatedAlpha
+                offsetY = 0f
+            }
+            CompanionAnimationType.Floating -> {
+                val infiniteTransition = rememberInfiniteTransition(label = "companionFloating")
+                val animatedAlpha by infiniteTransition.animateFloat(
+                    initialValue = config.glowAlpha - 0.06f,
+                    targetValue = config.glowAlpha + 0.05f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(5000),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "companionAlpha",
+                )
+                val animatedOffset by infiniteTransition.animateFloat(
+                    initialValue = -3f,
+                    targetValue = 3f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(5000),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "companionOffsetY",
+                )
+                alpha = animatedAlpha
+                offsetY = animatedOffset
+            }
         }
-        else -> 0f
+    }
+
+    val scale = if (!entranceDone) {
+        0.8f + 0.2f * entranceProgress.value
+    } else {
+        1f
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .align(placement.alignment)
-                .offset(x = placement.offset.x.dp, y = (placement.offset.y + offsetY).dp)
-                .size(config.size),
+                .offset(
+                    x = placement.offset.x.dp,
+                    y = (placement.offset.y + offsetY).dp,
+                )
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .size(
+                    width = maxOf(config.glowSize, config.shapeSize),
+                    height = maxOf(config.glowSize, config.shapeSizeV),
+                ),
         ) {
+            // Layer 1: 光晕底层
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(config.size)
+                    .size(config.glowSize)
                     .alpha(alpha)
-                    .blur(radius = config.blurRadius)
+                    .blur(radius = config.glowBlurRadius)
                     .background(
-                        brush = Brush.radialGradient(
-                            colors = config.colors,
-                        ),
+                        brush = Brush.radialGradient(colors = config.glowColors),
                         shape = CircleShape,
                     ),
             )
-            if (config.midGlowColor != Color.Transparent) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(config.midGlowSize)
-                        .alpha((alpha * 0.82f).coerceAtMost(1f))
-                        .background(
-                            color = config.midGlowColor.copy(alpha = 0.66f),
-                            shape = CircleShape,
-                        ),
-                )
-            }
-            if (config.coreColor != Color.Transparent && config.coreSize > 0.dp) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(config.coreSize)
-                        .background(
-                            color = config.coreColor,
-                            shape = CircleShape,
-                        ),
-                )
+            // Layer 2: Canvas 形状层
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(config.shapeSize, config.shapeSizeV),
+            ) {
+                val w = size.width
+                val h = size.height
+                val fill = config.shapeFill.copy(alpha = config.shapeFill.alpha * alpha / config.glowAlpha)
+                val stroke = config.shapeStroke.copy(alpha = config.shapeStroke.alpha * alpha / config.glowAlpha)
+                drawCompanionShape(visualType, w, h, fill, stroke)
             }
         }
     }
+}
+
+// --- Shape drawing functions ---
+
+private fun DrawScope.drawCompanionShape(
+    type: CompanionVisualType,
+    w: Float,
+    h: Float,
+    fill: Color,
+    stroke: Color,
+) {
+    when (type) {
+        CompanionVisualType.Star -> drawStarShape(w, h, fill, stroke)
+        CompanionVisualType.Cloud -> drawCloudShape(w, h, fill, stroke)
+        CompanionVisualType.PaperBoat -> drawPaperBoatShape(w, h, fill, stroke)
+        CompanionVisualType.TinyDoor -> drawTinyDoorShape(w, h, fill, stroke)
+        CompanionVisualType.DinoShadow -> drawDinoShadowShape(w, h, fill, stroke)
+        CompanionVisualType.BlockLight -> drawBlockLightShape(w, h, fill, stroke)
+    }
+}
+
+/** 五角星：5 外顶点 + 5 内顶点，圆角软化。 */
+private fun DrawScope.drawStarShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val cx = w / 2f
+    val cy = h / 2f
+    val outerR = minOf(w, h) / 2f * 0.88f
+    val innerR = outerR * 0.42f
+    val path = Path()
+    for (i in 0 until 5) {
+        val outerAngle = Math.toRadians((i * 72 - 90).toDouble())
+        val innerAngle = Math.toRadians((i * 72 + 36 - 90).toDouble())
+        val ox = cx + outerR * kotlin.math.cos(outerAngle).toFloat()
+        val oy = cy + outerR * kotlin.math.sin(outerAngle).toFloat()
+        val ix = cx + innerR * kotlin.math.cos(innerAngle).toFloat()
+        val iy = cy + innerR * kotlin.math.sin(innerAngle).toFloat()
+        if (i == 0) path.moveTo(ox, oy) else path.lineTo(ox, oy)
+        path.lineTo(ix, iy)
+    }
+    path.close()
+    drawPath(path, color = fill)
+    drawPath(path, color = stroke, style = Stroke(width = 1.dp.toPx()))
+}
+
+/** 云朵：3 个重叠椭圆。 */
+private fun DrawScope.drawCloudShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val mainW = w * 0.60f
+    val mainH = h * 0.52f
+    val mainLeft = (w - mainW) / 2f
+    val mainTop = h * 0.42f
+    drawOval(
+        color = fill,
+        topLeft = Offset(mainLeft, mainTop),
+        size = Size(mainW, mainH),
+    )
+    drawOval(
+        color = stroke,
+        topLeft = Offset(mainLeft, mainTop),
+        size = Size(mainW, mainH),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val leftW = w * 0.38f
+    val leftH = h * 0.40f
+    drawOval(
+        color = fill,
+        topLeft = Offset(w * 0.14f, h * 0.22f),
+        size = Size(leftW, leftH),
+    )
+    val rightW = w * 0.34f
+    val rightH = h * 0.36f
+    drawOval(
+        color = fill,
+        topLeft = Offset(w * 0.50f, h * 0.18f),
+        size = Size(rightW, rightH),
+    )
+}
+
+/** 小纸船：倒梯形船身 + 三角帆。 */
+private fun DrawScope.drawPaperBoatShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val hull = Path().apply {
+        moveTo(w * 0.15f, h * 0.58f)
+        lineTo(w * 0.85f, h * 0.58f)
+        lineTo(w * 0.92f, h * 0.82f)
+        lineTo(w * 0.08f, h * 0.82f)
+        close()
+    }
+    drawPath(hull, color = fill)
+    drawPath(hull, color = stroke, style = Stroke(width = 1.dp.toPx()))
+    val sail = Path().apply {
+        moveTo(w * 0.50f, h * 0.12f)
+        lineTo(w * 0.50f, h * 0.58f)
+        lineTo(w * 0.72f, h * 0.42f)
+        close()
+    }
+    val sailFill = fill.copy(alpha = fill.alpha * 0.8f)
+    drawPath(sail, color = sailFill)
+    drawPath(sail, color = stroke, style = Stroke(width = 1.dp.toPx()))
+}
+
+/** 小门：圆角矩形 + 半圆门顶 + 小门把手。 */
+private fun DrawScope.drawTinyDoorShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val doorW = w * 0.72f
+    val doorH = h * 0.62f
+    val doorLeft = (w - doorW) / 2f
+    val doorTop = h * 0.30f
+    val cornerPx = 5.dp.toPx()
+    drawRoundRect(
+        color = fill,
+        topLeft = Offset(doorLeft, doorTop),
+        size = Size(doorW, doorH),
+        cornerRadius = GeoCornerRadius(cornerPx, cornerPx),
+    )
+    drawRoundRect(
+        color = stroke,
+        topLeft = Offset(doorLeft, doorTop),
+        size = Size(doorW, doorH),
+        cornerRadius = GeoCornerRadius(cornerPx, cornerPx),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val archR = doorW / 2f
+    drawArc(
+        color = fill,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = true,
+        topLeft = Offset(doorLeft, doorTop - archR),
+        size = Size(doorW, archR * 2f),
+    )
+    drawArc(
+        color = stroke,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(doorLeft, doorTop - archR),
+        size = Size(doorW, archR * 2f),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val handleR = 1.5.dp.toPx()
+    val handleCx = doorLeft + doorW * 0.76f
+    val handleCy = doorTop + doorH * 0.52f
+    drawCircle(
+        color = stroke,
+        radius = handleR,
+        center = Offset(handleCx, handleCy),
+    )
+}
+
+/** 小恐龙影子：极简圆润轮廓（身体 + 头 + 短尾巴），无眼睛、无表情、无背脊装饰。 */
+private fun DrawScope.drawDinoShadowShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val bodyW = w * 0.56f
+    val bodyH = h * 0.50f
+    val bodyLeft = w * 0.16f
+    val bodyTop = h * 0.38f
+    drawOval(
+        color = fill,
+        topLeft = Offset(bodyLeft, bodyTop),
+        size = Size(bodyW, bodyH),
+    )
+    drawOval(
+        color = stroke,
+        topLeft = Offset(bodyLeft, bodyTop),
+        size = Size(bodyW, bodyH),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val headR = w * 0.17f
+    val headCx = w * 0.68f
+    val headCy = h * 0.30f
+    drawCircle(
+        color = fill,
+        radius = headR,
+        center = Offset(headCx, headCy),
+    )
+    drawCircle(
+        color = stroke,
+        radius = headR,
+        center = Offset(headCx, headCy),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val tail = Path().apply {
+        moveTo(bodyLeft + bodyW * 0.08f, bodyTop + bodyH * 0.55f)
+        cubicTo(
+            w * 0.06f, h * 0.62f,
+            w * 0.02f, h * 0.44f,
+            w * 0.08f, h * 0.32f,
+        )
+    }
+    drawPath(tail, color = stroke, style = Stroke(width = 1.5.dp.toPx()))
+}
+
+/** 小积木光点：圆角正方形。 */
+private fun DrawScope.drawBlockLightShape(w: Float, h: Float, fill: Color, stroke: Color) {
+    val blockW = w * 0.78f
+    val blockH = h * 0.78f
+    val left = (w - blockW) / 2f
+    val top = (h - blockH) / 2f
+    val cornerPx = 5.dp.toPx()
+    drawRoundRect(
+        color = fill,
+        topLeft = Offset(left, top),
+        size = Size(blockW, blockH),
+        cornerRadius = GeoCornerRadius(cornerPx, cornerPx),
+    )
+    drawRoundRect(
+        color = stroke,
+        topLeft = Offset(left, top),
+        size = Size(blockW, blockH),
+        cornerRadius = GeoCornerRadius(cornerPx, cornerPx),
+        style = Stroke(width = 1.dp.toPx()),
+    )
+    val nubW = blockW * 0.36f
+    val nubH = 2.5.dp.toPx()
+    val nubLeft = left + (blockW - nubW) / 2f
+    val nubCornerPx = 1.5.dp.toPx()
+    drawRoundRect(
+        color = fill,
+        topLeft = Offset(nubLeft, top - nubH - 1.dp.toPx()),
+        size = Size(nubW, nubH),
+        cornerRadius = GeoCornerRadius(nubCornerPx, nubCornerPx),
+    )
 }

@@ -782,18 +782,9 @@ class ConversationService:
         companion_action: dict | None = None,
         image_context: object | None = None,
     ) -> ConversationMessageResponse:
-        quick_actions = self._quick_action_service.actions_for(
-            decision=decision,
-            child_text=child_text,
-            reply_text=runtime_result.reply_text,
-            parent_policy=parent_policy,
-            conversation_control=runtime_result.model_metadata.get(
-                "final_conversation_control"
-            ),
-        )
-
         # Build companion metadata if companion is active
         companion_meta = None
+        is_new_companion = False
         if companion_action is not None:
             companion = companion_action.get("companion")
             action = companion_action.get("action", "none")
@@ -810,11 +801,33 @@ class ConversationService:
                     visual_kind=getattr(companion, "visual_kind", None)
                         or resolve_visual_kind(companion.object_type),
                 )
+                if action == "co_create":
+                    is_new_companion = True
+
+        # 新建 companion（起名成功）：使用确定性模板，不返回 quick_actions
+        if is_new_companion and companion_meta is not None:
+            name = companion_meta.name
+            location = companion_meta.light_location or "窗边"
+            reply_text = f"{name}，软软的名字\n它轻轻落到{location}啦"
+            reply_emotion = "warm"
+            quick_actions: list = []
+        else:
+            reply_text = runtime_result.reply_text
+            reply_emotion = decision.reply_emotion
+            quick_actions = self._quick_action_service.actions_for(
+                decision=decision,
+                child_text=child_text,
+                reply_text=runtime_result.reply_text,
+                parent_policy=parent_policy,
+                conversation_control=runtime_result.model_metadata.get(
+                    "final_conversation_control"
+                ),
+            )
 
         return ConversationMessageResponse(
             reply=Reply(
-                text=runtime_result.reply_text,
-                emotion=decision.reply_emotion,
+                text=reply_text,
+                emotion=reply_emotion,
                 agent_motion=self._agent_motion_for(decision),
             ),
             ui_actions=[

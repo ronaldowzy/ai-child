@@ -228,6 +228,13 @@ class ConversationService:
             quick_action_id=request.input.quick_action_id,
             image_context=image_context,
         )
+        # E5: check companion extension before intent/routing
+        extension_result = self._check_pending_companion_extension(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            child_text=request.input.text,
+            quick_action_id=request.input.quick_action_id,
+        )
         use_homework_attachment = (
             homework_context is not None and safety.risk_level == RiskLevel.NONE
         )
@@ -288,6 +295,7 @@ class ConversationService:
         # Companion object: check for skip/continue after recall
         companion_action_result = (
             created_companion_action
+            or extension_result
             or self._check_companion_action(
                 child_id=request.child_id,
                 session_id=request.session_id,
@@ -652,6 +660,9 @@ class ConversationService:
             return None
 
         if quick_action_id == "companion_name":
+            # E5: if pending extension exists, skip seed creation — let extension handle it
+            if svc.get_pending_extension(session_id=session_id, child_id=child_id):
+                return None
             # 图片分享场景：从当前 image_context 或最近附件获取 recognized_type
             recognized_type = None
             source_type = CompanionObjectSource.FIRST_OPEN
@@ -718,6 +729,59 @@ class ConversationService:
         svc.clear_pending_seed_naming(session_id=session_id)
         return {"action": "co_create", "companion": companion}
 
+    def _check_pending_companion_extension(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        child_text: str,
+        quick_action_id: str | None,
+    ) -> dict | None:
+        """E5: Check if child is in 'add a friend' extension flow.
+
+        Returns a dict with extension result if consumed, None otherwise.
+        """
+        svc = self._companion_object_service
+        if svc is None:
+            return None
+
+        # Handle extension quick actions
+        if quick_action_id == "companion_skip":
+            svc.clear_pending_extension(session_id=session_id)
+            return {"action": "skip"}
+
+        if quick_action_id in ("companion_friend_name", "companion_friend_image"):
+            # Just acknowledge — child needs to provide name or image next
+            return None
+
+        pending = svc.get_pending_extension(session_id=session_id, child_id=child_id)
+        if pending is None:
+            return None
+
+        # Skip signals during extension
+        text = child_text.strip()
+        if any(signal in text for signal in self._SKIP_SIGNALS):
+            svc.clear_pending_extension(session_id=session_id)
+            return {"action": "skip"}
+
+        companion_name = self._extract_pending_companion_name(child_text)
+        if not companion_name:
+            return None
+
+        # Update existing companion's safe_summary
+        append_text = f"孩子给小屋小客人加了一个小伙伴：{companion_name}"
+        updated = svc.update_safe_summary_append(pending.companion_id, append_text)
+        if updated is None:
+            svc.clear_pending_extension(session_id=session_id)
+            return None
+
+        svc.clear_pending_extension(session_id=session_id)
+        return {
+            "action": "extension_done",
+            "companion": updated,
+            "friend_name": companion_name,
+        }
+
     def _check_companion_action(
         self,
         *,
@@ -751,6 +815,10 @@ class ConversationService:
         if companion is None:
             return None
 
+        # E5: if extension is pending, let extension handler deal with name input
+        if svc.get_pending_extension(session_id=session_id, child_id=child_id):
+            return None
+
         text = child_text.strip()
 
         if quick_action_id == "companion_skip":
@@ -758,7 +826,17 @@ class ConversationService:
             return {"action": "skip", "companion": companion}
 
         if quick_action_id == "companion_continue":
-            return {"action": "co_create", "companion": companion}
+            # E5: enter "add a friend" extension flow instead of direct co_create
+            svc.begin_extension(
+                session_id=session_id,
+                child_id=child_id,
+                companion_id=companion.id,
+                companion_name=companion.name,
+            )
+            return {
+                "action": "co_create_guidance",
+                "companion": companion,
+            }
 
         # Skip detection
         if any(signal in text for signal in self._SKIP_SIGNALS):
@@ -785,6 +863,7 @@ class ConversationService:
         # Build companion metadata if companion is active
         companion_meta = None
         is_new_companion = False
+        is_extension_done = False
         if companion_action is not None:
             companion = companion_action.get("companion")
             action = companion_action.get("action", "none")
@@ -803,14 +882,42 @@ class ConversationService:
                 )
                 if action == "co_create":
                     is_new_companion = True
+                elif action == "extension_done":
+                    is_extension_done = True
 
+        # E5: "add a friend" guidance — show guidance text + quick_actions
+        is_co_create_guidance = (
+            companion_action is not None
+            and companion_action.get("action") == "co_create_guidance"
+        )
+        if is_co_create_guidance and companion_meta is not None:
+            reply_text = "那我们给它找一个小伙伴\n你可以说一个名字，也可以给我看看"
+            reply_emotion = "warm"
+            quick_actions = [
+                QuickAction(id="companion_friend_name", label="说个名字"),
+                QuickAction(id="companion_friend_image", label="给小白狐看看"),
+                QuickAction(id="companion_skip", label="先聊别的"),
+            ]
+            companion_meta = companion_meta.model_copy(
+                update={"action": "co_create"},
+            )
         # 新建 companion（起名成功）：使用确定性模板，不返回 quick_actions
-        if is_new_companion and companion_meta is not None:
+        elif is_new_companion and companion_meta is not None:
             name = companion_meta.name
             location = companion_meta.light_location or "窗边"
             reply_text = f"{name}，软软的名字\n它轻轻落到{location}啦"
             reply_emotion = "warm"
             quick_actions: list = []
+        # E5: extension done — companion updated, show completion feedback
+        elif is_extension_done and companion_meta is not None:
+            # name in meta is the ORIGINAL companion name; use extension friend name
+            friend_name = (companion_action or {}).get("friend_name", companion_meta.name)
+            reply_text = f"{friend_name}，也来小屋里待一会儿啦"
+            reply_emotion = "warm"
+            quick_actions = []
+            companion_meta = companion_meta.model_copy(
+                update={"action": "co_create"},
+            )
         else:
             reply_text = runtime_result.reply_text
             reply_emotion = decision.reply_emotion

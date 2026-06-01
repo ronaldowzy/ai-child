@@ -92,6 +92,21 @@ class PendingCompanionSeed:
     recognized_image_type: str | None = None
 
 
+@dataclass(frozen=True)
+class PendingCompanionExtension:
+    """E5: Pending state for "add a friend" flow after companion recall.
+
+    Created when child clicks "加一个 friend" on a recalled companion.
+    Consumed when child says a name (or clicks skip).
+    Does NOT create a new companion — only appends to existing safe_summary.
+    """
+
+    child_id: str
+    companion_id: str
+    companion_name: str
+    requested_at: datetime
+
+
 class CompanionObjectService:
     def __init__(
         self,
@@ -108,6 +123,7 @@ class CompanionObjectService:
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
         self._fallback_to_memory = fallback_to_memory
         self._pending_seed_naming: dict[str, PendingCompanionSeed] = {}
+        self._pending_extension: dict[str, PendingCompanionExtension] = {}
 
     # ------------------------------------------------------------------
     # Create
@@ -181,6 +197,60 @@ class CompanionObjectService:
 
     def clear_pending_seed_naming(self, *, session_id: str) -> None:
         self._pending_seed_naming.pop(session_id, None)
+
+    # ------------------------------------------------------------------
+    # Extension (E5: "add a friend" after recall)
+    # ------------------------------------------------------------------
+
+    def begin_extension(
+        self,
+        *,
+        session_id: str,
+        child_id: str,
+        companion_id: str,
+        companion_name: str,
+    ) -> None:
+        self._pending_extension[session_id] = PendingCompanionExtension(
+            child_id=child_id,
+            companion_id=companion_id,
+            companion_name=companion_name,
+            requested_at=self._now(),
+        )
+
+    def get_pending_extension(
+        self,
+        *,
+        session_id: str,
+        child_id: str,
+    ) -> PendingCompanionExtension | None:
+        pending = self._pending_extension.get(session_id)
+        if pending is None or pending.child_id != child_id:
+            return None
+        return pending
+
+    def clear_pending_extension(self, *, session_id: str) -> None:
+        self._pending_extension.pop(session_id, None)
+
+    def update_safe_summary_append(
+        self,
+        companion_id: str,
+        append_text: str,
+    ) -> CompanionObject | None:
+        """Append text to existing companion's safe_summary (E5)."""
+        companion = self._get(companion_id)
+        if companion is None:
+            return None
+        existing = companion.safe_summary or ""
+        new_summary = f"{existing}；{append_text}" if existing else append_text
+        if len(new_summary) > SAFE_SUMMARY_MAX_LENGTH:
+            new_summary = new_summary[: SAFE_SUMMARY_MAX_LENGTH - 1] + "…"
+        self._validate_safe_summary(new_summary)
+        now = self._now()
+        updated = companion.model_copy(
+            update={"safe_summary": new_summary, "updated_at": now},
+            deep=True,
+        )
+        return self._save(updated)
 
     # ------------------------------------------------------------------
     # Recall

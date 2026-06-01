@@ -339,7 +339,8 @@ class TestCompanionSeedNaming:
         assert second.session_state.companion_object.state == "active"
         assert second.session_state.companion_object.light_location == "窗边"
 
-    def test_quick_action_id_continue_maps_to_co_create(self) -> None:
+    def test_quick_action_id_continue_maps_to_co_create_guidance(self) -> None:
+        """E5: companion_continue now enters extension flow with guidance."""
         from app.domain.scene import SceneId
         from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
 
@@ -358,7 +359,12 @@ class TestCompanionSeedNaming:
         )
 
         assert result is not None
-        assert result["action"] == "co_create"
+        assert result["action"] == "co_create_guidance"
+        # Verify pending extension was created
+        ext = companion_svc.get_pending_extension(
+            session_id="test_session", child_id="test_child",
+        )
+        assert ext is not None
 
 
 class TestForbiddenPhrases:

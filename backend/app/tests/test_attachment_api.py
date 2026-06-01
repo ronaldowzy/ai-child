@@ -2,7 +2,12 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import conversation_attachment as attachment_api
 from app.core.config import Settings
-from app.domain.attachment import ImagePurpose, RecognizedContent
+from app.domain.attachment import (
+    AttachmentCreateRequest,
+    AttachmentType,
+    ImagePurpose,
+    RecognizedContent,
+)
 from app.domain.model_types import ModelRequest, ModelResponse
 from app.main import app
 from app.repositories.attachment_repository import (
@@ -10,6 +15,7 @@ from app.repositories.attachment_repository import (
     get_attachment_repository,
 )
 from app.services.attachment_service import AttachmentService
+from app.services.conversation_history_service import ConversationHistoryService
 from app.services.modality_manager import ModalityManager
 
 
@@ -76,6 +82,66 @@ def test_conversation_attachment_accepts_high_confidence_homework_photo() -> Non
     assert body["session_state"]["needs_input"] == "problem_statement_confirm"
     assert "对一下题目" in body["reply"]["text"]
     assert "答案是" not in body["reply"]["text"]
+
+
+def test_generic_image_attachment_records_short_term_history() -> None:
+    history = ConversationHistoryService()
+    service = AttachmentService(
+        repository=InMemoryAttachmentRepository(),
+        conversation_history_service=history,
+    )
+
+    response = service.create_attachment(
+        AttachmentCreateRequest(
+            child_id="child_attachment_history_test",
+            session_id="attachment_history_session",
+            attachment_type=AttachmentType.IMAGE,
+            image_purpose=ImagePurpose.SHARE,
+            file_id="mock_share_photo",
+            mock_ocr_text="这是一只小猫玩偶。",
+            child_caption="我给小白狐看了一张图",
+            mock_confidence=0.92,
+        )
+    )
+
+    messages = history.get_recent_model_messages(
+        session_id="attachment_history_session",
+        limit=6,
+    )
+
+    assert response.recognized_content.type == "image_observation"
+    assert [message.role for message in messages] == ["user", "assistant"]
+    assert messages[0].content == "我给小白狐看了一张图"
+    assert messages[1].content == response.reply.text
+
+
+def test_homework_attachment_does_not_pre_record_history_before_followup() -> None:
+    history = ConversationHistoryService()
+    service = AttachmentService(
+        repository=InMemoryAttachmentRepository(),
+        conversation_history_service=history,
+    )
+
+    response = service.create_attachment(
+        AttachmentCreateRequest(
+            child_id="child_attachment_homework_history_test",
+            session_id="attachment_homework_history_session",
+            attachment_type=AttachmentType.IMAGE,
+            image_purpose=ImagePurpose.LEARNING_HOMEWORK,
+            file_id="mock_homework_photo",
+            mock_ocr_text="小明有24个苹果，平均分给6个同学，每人几个？",
+            child_caption="这是题目",
+            mock_confidence=0.93,
+        )
+    )
+
+    messages = history.get_recent_model_messages(
+        session_id="attachment_homework_history_session",
+        limit=6,
+    )
+
+    assert response.recognized_content.type == "homework_problem"
+    assert messages == []
 
 
 def test_image_upload_endpoint_accepts_real_multipart_and_uses_mimo_vision(

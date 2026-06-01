@@ -362,6 +362,25 @@ def test_show_and_tell_memory_opening() -> None:
     assert "航航" in text, f"Should use nickname: {text}"
 
 
+def test_generic_show_and_tell_hook_falls_back_to_interest_topic() -> None:
+    """Generic attachment memory should not create awkward opening text."""
+    repo = InMemoryMemoryRepository()
+    memory_service = MemoryService(repository=repo)
+
+    repo.save(
+        _make_memory(
+            "mem_generic_show_tell",
+            "孩子想给小白狐看一个东西，可能是在分享身边的物品或作品。",
+            relationship_type=SHOW_AND_TELL_EVENT,
+        )
+    )
+
+    text = _build_opening(memory_service=memory_service)
+
+    assert "孩子想给小白狐看一个东西" not in text, text
+    assert "画画" in text, f"Should fall back to real interest topic: {text}"
+
+
 # --- Additional: default greeting mode ---
 
 

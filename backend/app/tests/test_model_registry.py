@@ -404,10 +404,42 @@ def test_model_registry_can_route_vision_to_mimo_with_multimodal_policy(
     content = captured["body"]["messages"][0]["content"]
     assert isinstance(content, list)
     assert captured["body"]["model"] == "mimo-v2.5"
-    assert captured["body"]["max_completion_tokens"] == 800
+    assert captured["body"]["max_completion_tokens"] == 1200
     assert content[0]["type"] == "image_url"
     assert content[1]["type"] == "text"
     assert response.provider_name == "mimo"
+
+
+def test_model_registry_vision_profile_uses_dedicated_token_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_VISION_PROVIDER", "mimo")
+    monkeypatch.setenv("CHILD_AI_MIMO_ALLOW_IMAGE", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_RETENTION_POLICY_CHECKED", "true")
+    monkeypatch.setenv("CHILD_AI_MIMO_MAX_TOKENS", "300")
+    monkeypatch.setenv("CHILD_AI_MIMO_VISION_MAX_TOKENS", "1400")
+
+    registry = ModelRegistry()
+    vision_profile = registry.select_profile(ModelTaskType.VISION)
+    child_profile = registry.select_profile(ModelTaskType.CHILD_CHAT)
+
+    assert child_profile.default_params.max_tokens == 800
+    assert vision_profile.default_params.max_tokens == 1400
+
+
+def test_model_registry_child_chat_profile_uses_dedicated_token_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_mimo_env(monkeypatch)
+    monkeypatch.setenv("CHILD_AI_MIMO_MAX_TOKENS", "300")
+    monkeypatch.setenv("CHILD_AI_MIMO_CHILD_CHAT_MAX_TOKENS", "900")
+
+    registry = ModelRegistry()
+    child_profile = registry.select_profile(ModelTaskType.CHILD_CHAT)
+
+    assert child_profile.profile_name == "mimo_child_chat"
+    assert child_profile.default_params.max_tokens == 900
 
 
 def test_model_registry_can_route_parent_report_to_mimo_without_changing_child_chat(

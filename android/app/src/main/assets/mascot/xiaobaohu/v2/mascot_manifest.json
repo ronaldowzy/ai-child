@@ -16,14 +16,14 @@
   ],
   "states": {
     "idle": {
-      "version": "v2.0.1",
+      "version": "v2.0.2",
       "type": "loop",
       "fps": 12,
       "frameCount": 48,
       "width": 1024,
       "height": 1024,
-      "path": "idle/v2.0.1/",
-      "manifest": "idle/v2.0.1/manifest.json",
+      "path": "idle/v2.0.2/",
+      "manifest": "idle/v2.0.2/manifest.json",
       "framePattern": "frames_webp/fox_idle_%04d.webp"
     },
     "listening": {

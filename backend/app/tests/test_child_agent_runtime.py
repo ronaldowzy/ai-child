@@ -939,6 +939,37 @@ def test_child_agent_runtime_repairs_image_refusal_when_context_exists() -> None
     assert result.model_metadata["image_context_reply_repaired"] is True
 
 
+def test_child_agent_runtime_repairs_empty_image_reply_when_context_exists() -> None:
+    registry = CapturingModelRegistry(response=_model_response(""))
+    route_decision = _route_decision(
+        active_scene=SceneId.OPEN_CONVERSATION,
+        reply_text="我在听。",
+    )
+
+    result = ChildAgentRuntime(model_registry=registry).run(
+        _runtime_request(
+            route_decision=route_decision,
+            child_text="图片都有什么？",
+            conversation_metadata={
+                "message_id": "msg_runtime_image_context_empty",
+                "contains_image": True,
+                "image_context": {
+                    "attachment_id": "att_image_002",
+                    "image_purpose": "share",
+                    "recognized_type": "image_observation",
+                    "recognized_text": "",
+                    "child_caption": "我给小白狐看了一张图",
+                },
+            },
+        )
+    )
+
+    assert result.source == AgentRuntimeSource.MODEL
+    assert result.fallback_reason is None
+    assert "有点不清楚" in result.reply_text
+    assert result.model_metadata["image_context_reply_repaired"] is True
+
+
 def test_child_agent_runtime_guides_photo_upload_without_claiming_no_image_feature() -> None:
     registry = CapturingModelRegistry(
         response=_model_response("我没有看图功能，只能听你说文字。")

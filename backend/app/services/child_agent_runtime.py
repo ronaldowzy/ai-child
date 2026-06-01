@@ -973,7 +973,7 @@ class ChildAgentRuntime:
             ):
                 return "可以呀。点「给小白狐看看」，拍一张或选一张，我再和你一起看。"
             return None
-        if not self._looks_like_image_refusal(reply_text):
+        if reply_text and not self._looks_like_image_refusal(reply_text):
             return None
 
         recognized_type = str(image_context.get("recognized_type") or "")

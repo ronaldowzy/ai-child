@@ -1,0 +1,21 @@
+{
+  "state": "idle",
+  "displayName": "xiaobaohu_idle_motion_v2",
+  "version": "v2.0.2",
+  "sourceType": "frame_sequence",
+  "fps": 12,
+  "frameCount": 48,
+  "loop": true,
+  "width": 1024,
+  "height": 1024,
+  "framePattern": "frames_webp/fox_idle_%04d.webp",
+  "spritesheetFile": null,
+  "features": {
+    "breathing": true,
+    "blink": true,
+    "mouthMovement": false,
+    "tailMovement": true,
+    "localWarp": true
+  },
+  "notes": "v2.0.2 idle motion refreshed from v0.2.0_motion_test with subtle breathing, normal blink, and gentle tail sway."
+}

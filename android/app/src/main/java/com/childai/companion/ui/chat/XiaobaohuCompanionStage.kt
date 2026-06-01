@@ -397,9 +397,13 @@ internal fun CompanionObjectMeta.shouldShowVisual(): Boolean {
 
 private data class CompanionVisualConfig(
     val size: Dp,
+    val midGlowSize: Dp,
+    val coreSize: Dp,
     val blurRadius: Dp,
     val baseAlpha: Float,
     val colors: List<Color>,
+    val midGlowColor: Color,
+    val coreColor: Color,
     val animationType: CompanionAnimationType,
 )
 
@@ -412,18 +416,24 @@ private enum class CompanionAnimationType {
 private fun CompanionVisualType.config(): CompanionVisualConfig {
     return when (this) {
         CompanionVisualType.StarPoint -> CompanionVisualConfig(
-            size = 24.dp,
-            blurRadius = 12.dp,
-            baseAlpha = 0.78f,
+            size = 38.dp,
+            midGlowSize = 22.dp,
+            coreSize = 9.dp,
+            blurRadius = 16.dp,
+            baseAlpha = 0.96f,
             colors = listOf(
-                Color(0xFFFFF8E1).copy(alpha = 0.9f),
-                Color(0xFFFFECB3).copy(alpha = 0.5f),
+                Color(0xFFFFF7CC).copy(alpha = 0.98f),
+                Color(0xFFFFD86B).copy(alpha = 0.72f),
                 Color(0xFFFFF8E1).copy(alpha = 0.0f),
             ),
+            midGlowColor = Color(0xFFFFD45A),
+            coreColor = Color(0xFFFFFCF0),
             animationType = CompanionAnimationType.Breathing,
         )
         CompanionVisualType.CloudShadow -> CompanionVisualConfig(
             size = 26.dp,
+            midGlowSize = 16.dp,
+            coreSize = 0.dp,
             blurRadius = 12.dp,
             baseAlpha = 0.62f,
             colors = listOf(
@@ -431,10 +441,14 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
                 Color(0xFFC5CAE9).copy(alpha = 0.4f),
                 Color(0xFFE8EAF6).copy(alpha = 0.0f),
             ),
+            midGlowColor = Color.Transparent,
+            coreColor = Color.Transparent,
             animationType = CompanionAnimationType.Floating,
         )
         CompanionVisualType.LightSpot -> CompanionVisualConfig(
             size = 24.dp,
+            midGlowSize = 14.dp,
+            coreSize = 0.dp,
             blurRadius = 12.dp,
             baseAlpha = 0.68f,
             colors = listOf(
@@ -442,10 +456,14 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
                 Color(0xFFFFE0B2).copy(alpha = 0.45f),
                 Color(0xFFFFF3E0).copy(alpha = 0.0f),
             ),
+            midGlowColor = Color.Transparent,
+            coreColor = Color.Transparent,
             animationType = CompanionAnimationType.Floating,
         )
         CompanionVisualType.SoftOutline -> CompanionVisualConfig(
             size = 22.dp,
+            midGlowSize = 12.dp,
+            coreSize = 0.dp,
             blurRadius = 11.dp,
             baseAlpha = 0.6f,
             colors = listOf(
@@ -453,6 +471,8 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
                 Color(0xFFE1BEE7).copy(alpha = 0.4f),
                 Color(0xFFF3E5F5).copy(alpha = 0.0f),
             ),
+            midGlowColor = Color.Transparent,
+            coreColor = Color.Transparent,
             animationType = CompanionAnimationType.Static,
         )
     }
@@ -576,15 +596,44 @@ private fun CompanionLightPoint(
             modifier = Modifier
                 .align(placement.alignment)
                 .offset(x = placement.offset.x.dp, y = (placement.offset.y + offsetY).dp)
-                .size(config.size)
-                .alpha(alpha)
-                .blur(radius = config.blurRadius)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = config.colors,
+                .size(config.size),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(config.size)
+                    .alpha(alpha)
+                    .blur(radius = config.blurRadius)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = config.colors,
+                        ),
+                        shape = CircleShape,
                     ),
-                    shape = CircleShape,
-                ),
-        )
+            )
+            if (config.midGlowColor != Color.Transparent) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(config.midGlowSize)
+                        .alpha((alpha * 0.82f).coerceAtMost(1f))
+                        .background(
+                            color = config.midGlowColor.copy(alpha = 0.66f),
+                            shape = CircleShape,
+                        ),
+                )
+            }
+            if (config.coreColor != Color.Transparent && config.coreSize > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(config.coreSize)
+                        .background(
+                            color = config.coreColor,
+                            shape = CircleShape,
+                        ),
+                )
+            }
+        }
     }
 }

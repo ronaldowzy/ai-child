@@ -455,6 +455,12 @@ class ModelRegistry:
                 model_name=os.getenv("CHILD_AI_MIMO_MODEL", "mimo-v2.5-pro"),
                 task_type=ModelTaskType.CHILD_CHAT,
                 temperature=0.4,
+                max_tokens=int(
+                    os.getenv(
+                        "CHILD_AI_MIMO_CHILD_CHAT_MAX_TOKENS",
+                        "800",
+                    )
+                ),
             ),
             "intent_classifier_mock": self._mock_profile(
                 profile_name="intent_classifier_mock",
@@ -514,6 +520,9 @@ class ModelRegistry:
                 ),
                 task_type=ModelTaskType.VISION,
                 vision=True,
+                max_tokens=int(
+                    os.getenv("CHILD_AI_MIMO_VISION_MAX_TOKENS", "1200")
+                ),
             ),
             "mimo_ocr": self._mimo_profile(
                 profile_name="mimo_ocr",
@@ -523,6 +532,12 @@ class ModelRegistry:
                 ),
                 task_type=ModelTaskType.OCR,
                 vision=True,
+                max_tokens=int(
+                    os.getenv(
+                        "CHILD_AI_MIMO_OCR_MAX_TOKENS",
+                        os.getenv("CHILD_AI_MIMO_VISION_MAX_TOKENS", "1200"),
+                    )
+                ),
             ),
         }
 

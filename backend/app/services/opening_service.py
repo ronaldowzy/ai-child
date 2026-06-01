@@ -677,6 +677,13 @@ class OpeningService:
         "比赛", "输赢", "排名", "恐龙", "大战", "冒险",
         "挑战", "任务", "奖励", "游戏", "cs", "反恐",
     )
+    _GENERIC_SHOW_AND_TELL_MARKERS = (
+        "一个东西",
+        "一张图",
+        "一张照片",
+        "一张图片",
+        "一个物品",
+    )
 
     def _bedtime_memory_opening(
         self,
@@ -742,7 +749,7 @@ class OpeningService:
         if show_tell:
             topic = show_tell.content or ""
             safe_topic = self._safe_memory_hook(topic)
-            if safe_topic:
+            if safe_topic and not self._looks_like_generic_show_and_tell_hook(safe_topic):
                 text = f"{prefix}还记得你上次给小白狐看的{safe_topic}。今天想聊点什么？"
                 sanitized = self._sanitize_opening_text(text, opening_policy=opening_policy)
                 if sanitized:
@@ -760,6 +767,12 @@ class OpeningService:
                     return sanitized
 
         return None
+
+    def _looks_like_generic_show_and_tell_hook(self, text: str) -> bool:
+        compact = text.replace(" ", "")
+        if compact.startswith("孩子想给小白狐看"):
+            return True
+        return any(marker in compact for marker in self._GENERIC_SHOW_AND_TELL_MARKERS)
 
     def _safe_memory_hook(self, text: str) -> str:
         """Extract a safe, short summary from memory content."""

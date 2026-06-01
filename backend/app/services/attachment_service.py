@@ -30,6 +30,10 @@ from app.repositories.attachment_repository import (
 )
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.modality_manager import ModalityManager, get_modality_manager
+from app.services.conversation_history_service import (
+    ConversationHistoryService,
+    get_conversation_history_service,
+)
 
 
 ALLOWED_REAL_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -106,12 +110,16 @@ class AttachmentService:
         modality_manager: ModalityManager | None = None,
         ocr_provider: MockOCRProvider | None = None,
         model_registry: ModelRegistry | None = None,
+        conversation_history_service: ConversationHistoryService | None = None,
         settings: Settings | None = None,
     ) -> None:
         self._repository = repository or get_attachment_repository()
         self._modality_manager = modality_manager or get_modality_manager()
         self._ocr_provider = ocr_provider or MockOCRProvider()
         self._model_registry = model_registry or get_model_registry()
+        self._conversation_history_service = (
+            conversation_history_service or get_conversation_history_service()
+        )
         self._settings = settings or get_settings()
         self._image_storage_dir = self._settings.resolve_repo_path(
             "backend/storage/attachments/images"
@@ -151,7 +159,7 @@ class AttachmentService:
             )
         )
 
-        return AttachmentCreateResponse(
+        response = AttachmentCreateResponse(
             attachment_id=attachment.id,
             recognized_content=attachment.recognized_content,
             reply=Reply(text=decision.reply_text, emotion=decision.reply_emotion),
@@ -166,6 +174,12 @@ class AttachmentService:
                 needs_input=decision.needs_input,
             ),
         )
+        self._record_attachment_turn_if_needed(
+            session_id=request.session_id,
+            child_caption=request.child_caption,
+            response=response,
+        )
+        return response
 
     def create_real_image_upload(
         self,
@@ -242,7 +256,7 @@ class AttachmentService:
             )
         )
 
-        return AttachmentCreateResponse(
+        response = AttachmentCreateResponse(
             attachment_id=attachment.id,
             recognized_content=attachment.recognized_content,
             reply=Reply(text=decision.reply_text, emotion=decision.reply_emotion),
@@ -259,6 +273,43 @@ class AttachmentService:
             mime_type=mime_type,
             size_bytes=len(upload.image_bytes),
             created_at=attachment.created_at,
+        )
+        self._record_attachment_turn_if_needed(
+            session_id=upload.session_id,
+            child_caption=upload.child_caption,
+            response=response,
+        )
+        return response
+
+    def _record_attachment_turn_if_needed(
+        self,
+        *,
+        session_id: str,
+        child_caption: str | None,
+        response: AttachmentCreateResponse,
+    ) -> None:
+        if self._is_ready_homework_response(response):
+            return
+        child_text = (child_caption or "").strip() or "我给小白狐看了一张图"
+        agent_text = response.reply.text.strip()
+        if not agent_text:
+            return
+        self._conversation_history_service.record_turn(
+            session_id=session_id,
+            child_text=child_text,
+            agent_text=agent_text,
+        )
+
+    def _is_ready_homework_response(
+        self,
+        response: AttachmentCreateResponse,
+    ) -> bool:
+        recognized = response.recognized_content
+        return (
+            bool(recognized.text)
+            and recognized.type == "homework_problem"
+            and recognized.image_purpose == ImagePurpose.LEARNING_HOMEWORK
+            and recognized.confidence >= 0.75
         )
 
     def _recognize(self, request: AttachmentCreateRequest) -> RecognizedContent:

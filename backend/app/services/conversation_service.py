@@ -7,6 +7,7 @@ from app.domain.companion_object import (
     CompanionObjectCreateRequest,
     CompanionObjectSource,
     CompanionObjectType,
+    resolve_object_type_from_image,
 )
 from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
 from app.domain.enums import IntentType, RiskLevel
@@ -146,12 +147,6 @@ class ConversationService:
     ) -> ConversationMessageResponse:
         started_at = time.perf_counter()
         request_start = time.time()
-        created_companion_action = self._check_pending_companion_seed_creation(
-            child_id=request.child_id,
-            session_id=request.session_id,
-            child_text=request.input.text,
-            quick_action_id=request.input.quick_action_id,
-        )
         parent_policy = self._parent_policy_service.get_policy(request.child_id)
         time_context = self._time_context_service.build_context(
             device_time=request.client_context.device_time,
@@ -225,6 +220,13 @@ class ConversationService:
             request.input.attachments,
             child_id=request.child_id,
             session_id=request.session_id,
+        )
+        created_companion_action = self._check_pending_companion_seed_creation(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            child_text=request.input.text,
+            quick_action_id=request.input.quick_action_id,
+            image_context=image_context,
         )
         use_homework_attachment = (
             homework_context is not None and safety.risk_level == RiskLevel.NONE
@@ -643,18 +645,37 @@ class ConversationService:
         session_id: str,
         child_text: str,
         quick_action_id: str | None,
+        image_context: object | None = None,
     ) -> dict | None:
         svc = self._companion_object_service
         if svc is None:
             return None
 
         if quick_action_id == "companion_name":
+            # 图片分享场景：从当前 image_context 或最近附件获取 recognized_type
+            recognized_type = None
+            source_type = CompanionObjectSource.FIRST_OPEN
+            if image_context is not None:
+                recognized_type = getattr(image_context, "recognized_type", None)
+                source_type = CompanionObjectSource.IMAGE_SHARE
+            else:
+                # 快速动作消息无附件，从最近图片附件查询
+                recognized_type = self._attachment_service.get_latest_image_recognized_type(
+                    child_id=child_id, session_id=session_id,
+                )
+                if recognized_type:
+                    source_type = CompanionObjectSource.IMAGE_SHARE
+
+            object_type_str = resolve_object_type_from_image(recognized_type)
+            object_type = CompanionObjectType(object_type_str)
+
             svc.begin_seed_naming(
                 session_id=session_id,
                 child_id=child_id,
-                object_type=CompanionObjectType.STAR,
+                object_type=object_type,
                 light_location="窗边",
-                source_type=CompanionObjectSource.FIRST_OPEN,
+                source_type=source_type,
+                recognized_image_type=recognized_type,
             )
             return None
 
@@ -670,14 +691,24 @@ class ConversationService:
         if not companion_name:
             return None
 
+        # 根据 pending 中的 recognized_image_type 推导 object_type
+        object_type_str = resolve_object_type_from_image(pending.recognized_image_type)
+        object_type = CompanionObjectType(object_type_str)
+
+        # 构建 safe_summary：不保存图片细节
+        if pending.source_type == CompanionObjectSource.IMAGE_SHARE:
+            safe_summary = f"孩子给图片里的小东西起名为{companion_name}"
+        else:
+            safe_summary = f"这颗星星叫{companion_name}"
+
         try:
             companion = svc.create(
                 CompanionObjectCreateRequest(
                     child_id=child_id,
                     name=companion_name,
-                    object_type=pending.object_type,
+                    object_type=object_type,
                     source_type=pending.source_type,
-                    safe_summary=f"这颗星星叫{companion_name}",
+                    safe_summary=safe_summary,
                     light_location=pending.light_location,
                 )
             )

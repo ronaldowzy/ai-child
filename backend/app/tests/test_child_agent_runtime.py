@@ -966,7 +966,9 @@ def test_child_agent_runtime_repairs_empty_image_reply_when_context_exists() -> 
 
     assert result.source == AgentRuntimeSource.MODEL
     assert result.fallback_reason is None
-    assert "有点不清楚" in result.reply_text
+    # E3: 确定性模板回复，detail 为空时兜底"一个小东西"
+    assert "一个小东西" in result.reply_text
+    assert "要不要给它起个名字" in result.reply_text
     assert result.model_metadata["image_context_reply_repaired"] is True
 
 

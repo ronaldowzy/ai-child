@@ -3,6 +3,7 @@ import re
 from pydantic import BaseModel, Field
 
 from app.domain.attachment import AttachmentStatus, ImagePurpose, RecognizedContent
+from app.domain.companion_object import IMAGE_COCREATION_ALLOWED_TYPES
 from app.domain.schemas.conversation import QuickAction
 
 
@@ -54,29 +55,42 @@ class ModalityManager:
             )
 
         if recognized_content.image_purpose != ImagePurpose.LEARNING_HOMEWORK:
-            visible_detail = self._child_visible_image_detail(recognized_content)
+            # 低置信度或不在共创 allowlist 中：失败态，不进入共创
             if recognized_content.confidence < self.IMAGE_OBSERVATION_CONFIDENCE_THRESHOLD:
-                reply_text = (
-                    "这次看得不太清楚，但我知道你是想拿给我看。"
-                    "你可以告诉我它是什么，或者再拍一张更清楚的。"
-                )
                 return ModalityDecision(
                     status=AttachmentStatus.IMAGE_READY,
                     recognized_content=recognized_content,
-                    reply_text=reply_text,
+                    reply_text="这张图还没看到\n可以再试一次，也可以先不看",
                     needs_input=None,
                     sub_scene="image_share",
                     active_scene="conversation.open",
                     reply_emotion="encourage",
                     quick_actions=[
-                        QuickAction(id="tell_what_it_is", label="我来说说"),
-                        QuickAction(id="retake_photo", label="再拍一张"),
+                        QuickAction(id="retake_photo", label="再试一次"),
+                        QuickAction(id="skip_photo", label="先不看"),
                     ],
                 )
-            if visible_detail:
-                reply_text = f"我看到像是{visible_detail}。你可以给它起个名字，或者告诉我发生了什么。"
-            else:
-                reply_text = "图片已经传上来啦。你可以告诉我你最想让小白狐看哪里。"
+
+            recognized_type = recognized_content.type or ""
+            if recognized_type not in IMAGE_COCREATION_ALLOWED_TYPES:
+                return ModalityDecision(
+                    status=AttachmentStatus.IMAGE_READY,
+                    recognized_content=recognized_content,
+                    reply_text="这张图还没看到\n可以再试一次，也可以先不看",
+                    needs_input=None,
+                    sub_scene="image_share",
+                    active_scene="conversation.open",
+                    reply_emotion="encourage",
+                    quick_actions=[
+                        QuickAction(id="retake_photo", label="再试一次"),
+                        QuickAction(id="skip_photo", label="先不看"),
+                    ],
+                )
+
+            # 图片成功：确定性模板回复，只给一个"起个名字"入口
+            detail = self._safe_child_detail(recognized_content)
+            imagination = _imagination_phrase(recognized_type)
+            reply_text = f"我看到{detail}啦\n像{imagination}\n要不要给它起个名字？"
             return ModalityDecision(
                 status=AttachmentStatus.IMAGE_READY,
                 recognized_content=recognized_content,
@@ -86,9 +100,7 @@ class ModalityManager:
                 active_scene="conversation.open",
                 reply_emotion="encourage",
                 quick_actions=[
-                    QuickAction(id="give_name", label="起个名字"),
-                    QuickAction(id="tell_story", label="讲个故事"),
-                    QuickAction(id="say_what_happened", label="说说看"),
+                    QuickAction(id="companion_name", label="起个名字"),
                 ],
             )
 
@@ -203,6 +215,31 @@ class ModalityManager:
             return None
         return first_part
 
+    @staticmethod
+    def _safe_child_detail(recognized_content: RecognizedContent) -> str:
+        """提取安全的儿童可见短细节，截断到 20 字以内。"""
+        text = (recognized_content.text or "").strip()
+        if not text or _looks_private_for_child_detail(text):
+            return "一个小东西"
+
+        cleaned = _strip_image_detail_labels(text)
+        if not cleaned or _looks_too_vague_for_child_detail(cleaned):
+            return "一个小东西"
+
+        first_part = _first_child_safe_clause(cleaned)
+        if not first_part or _looks_too_vague_for_child_detail(first_part):
+            return "一个小东西"
+        if _looks_private_for_child_detail(first_part):
+            return "一个小东西"
+
+        first_part = _strip_image_lead_in(first_part)
+        # 截断到 20 个中文字符
+        if len(first_part) > 20:
+            first_part = first_part[:20].rstrip("，,。；;：:、 ")
+        if not first_part or _looks_too_vague_for_child_detail(first_part):
+            return "一个小东西"
+        return first_part
+
 
 _modality_manager = ModalityManager()
 
@@ -250,6 +287,23 @@ def _looks_private_for_child_detail(text: str) -> bool:
 def _looks_too_vague_for_child_detail(text: str) -> bool:
     normalized = text.strip()
     return len(normalized) < 3 or bool(_VAGUE_DETAIL_RE.search(normalized))
+
+
+# recognized_type -> 温柔想象短语映射
+_IMAGINATION_PHRASES: dict[str, str] = {
+    "child_drawing": "像一个小世界",
+    "art_feedback": "像一个小世界",
+    "toy": "像一个小伙伴",
+    "handmade": "像一个小故事",
+    "object": "像一个小发现",
+    "daily_life": "像一幅小画",
+    "cloud": "像一朵小云",
+}
+
+
+def _imagination_phrase(recognized_type: str) -> str:
+    """根据 recognized_type 返回温柔想象短语。未知类型兜底'软软的'。"""
+    return _IMAGINATION_PHRASES.get(recognized_type, "软软的")
 
 
 def get_modality_manager() -> ModalityManager:

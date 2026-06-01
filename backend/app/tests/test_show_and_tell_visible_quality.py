@@ -187,10 +187,9 @@ def test_unclear_repair_does_not_pretend_to_see() -> None:
     )
     result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
     assert result is not None
-    # Should not invent content
-    assert "像是" not in result
-    # Should acknowledge uncertainty
-    assert "不清楚" in result or "不太清楚" in result or "告诉我" in result
+    # E3: unclear 类型使用失败模板
+    assert "这张图还没看到" in result
+    assert "起个名字" not in result
 
 
 # --- Test 6: PromptManager image_context rules ---
@@ -396,7 +395,7 @@ def test_normal_image_types_do_not_route_to_homework() -> None:
 # --- Test 10: Blurry/unclear image acknowledges it can't see clearly ---
 
 def test_blurry_image_admits_cannot_see() -> None:
-    """Low-confidence image should say '看得不太清楚' and not invent details."""
+    """Low-confidence image should use failure template and not invent details."""
     from app.services.modality_manager import ModalityManager
     from app.domain.attachment import ImagePurpose, RecognizedContent
 
@@ -409,12 +408,13 @@ def test_blurry_image_admits_cannot_see() -> None:
         image_purpose=ImagePurpose.SHARE,
     )
     decision = manager.decide_image_attachment(content)
-    assert "不太清楚" in decision.reply_text
+    # E3: 低置信度使用 master-copy 失败文案
+    assert "这张图还没看到" in decision.reply_text
     assert decision.active_scene == "conversation.open"
 
 
 def test_blurry_image_repair_does_not_pretend() -> None:
-    """Unclear image repair should not invent content."""
+    """Unclear image repair should use failure template."""
     runtime = _make_runtime()
     request = _make_request(
         child_text="你看这个",
@@ -427,10 +427,9 @@ def test_blurry_image_repair_does_not_pretend() -> None:
     )
     result = runtime._image_context_repair_reply(request, IMAGE_REFUSAL_TEXT)
     assert result is not None
-    assert "我的画" in result
-    assert "不清楚" in result or "不太清楚" in result
-    # Should not invent specific content for unclear images
-    assert "像" not in result
+    # E3: unclear 类型使用失败模板
+    assert "这张图还没看到" in result
+    assert "起个名字" not in result
 
 
 # --- Test 11: Image context continuation doesn't say "看不到图片" ---

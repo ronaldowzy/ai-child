@@ -110,6 +110,42 @@ def resolve_visual_kind(object_type: str, source_type: str | None = None) -> str
     return str(_OBJECT_TYPE_TO_VISUAL_KIND.get(ot, VisualKind.STAR))
 
 
+# recognized_type (from vision provider) -> CompanionObjectType 映射
+# 用于图片分享场景下确定 object_type
+_RECOGNIZED_TYPE_TO_OBJECT_TYPE: dict[str, CompanionObjectType] = {
+    "child_drawing": CompanionObjectType.DRAWING_CHARACTER,
+    "art_feedback": CompanionObjectType.DRAWING_CHARACTER,
+    "toy": CompanionObjectType.TOY_CHARACTER,
+    "handmade": CompanionObjectType.TOY_CHARACTER,
+    "object": CompanionObjectType.OTHER,
+    "daily_life": CompanionObjectType.CLOUD,
+    "cloud": CompanionObjectType.CLOUD,
+}
+
+# 允许进入图片共创的 recognized_type allowlist
+IMAGE_COCREATION_ALLOWED_TYPES: frozenset[str] = frozenset(
+    {
+        "child_drawing",
+        "art_feedback",
+        "toy",
+        "object",
+        "handmade",
+        "daily_life",
+        "cloud",
+        "image_observation",  # vision provider 默认类型，代表普通安全图片
+    }
+)
+
+
+def resolve_object_type_from_image(recognized_type: str | None) -> str:
+    """从 vision provider 的 recognized_type 推导 object_type。未知类型兜底 star。"""
+    if not recognized_type:
+        return CompanionObjectType.STAR
+    return str(
+        _RECOGNIZED_TYPE_TO_OBJECT_TYPE.get(recognized_type, CompanionObjectType.STAR)
+    )
+
+
 class CompanionObjectCreateRequest(BaseModel):
     child_id: str = Field(..., min_length=1, max_length=120)
     name: str = Field(..., min_length=1, max_length=NAME_MAX_LENGTH)

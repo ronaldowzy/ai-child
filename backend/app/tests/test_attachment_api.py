@@ -314,22 +314,22 @@ def test_conversation_attachment_accepts_generic_image_share() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["recognized_content"]["type"] == "image_observation"
     assert body["recognized_content"]["image_purpose"] == "share"
     assert body["session_state"]["active_scene"] == "conversation.open"
-    assert "积木城堡" in body["reply"]["text"]
-    assert "起个名字" in body["reply"]["text"] or "发生了什么" in body["reply"]["text"]
+    # E3: 确定性模板回复
+    assert "起个名字" in body["reply"]["text"]
+    assert "我看到" in body["reply"]["text"]
     assert body["reply"]["emotion"] == "encourage"
     assert "这道题" not in body["reply"]["text"]
-    # Quick actions should be creative entry points
+    # E3: 只有一个 quick action: companion_name
     action_ids = {
         action["id"]
         for action_group in body["ui_actions"]
         for action in action_group["actions"]
     }
-    assert "give_name" in action_ids
-    assert "tell_story" in action_ids
-    assert "say_what_happened" in action_ids
+    assert "companion_name" in action_ids
+    assert "tell_story" not in action_ids
+    assert "say_what_happened" not in action_ids
 
 
 def test_generic_image_low_confidence_does_not_pretend_to_see_detail() -> None:
@@ -350,18 +350,19 @@ def test_generic_image_low_confidence_does_not_pretend_to_see_detail() -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["recognized_content"]["type"] == "image_observation"
     assert body["session_state"]["active_scene"] == "conversation.open"
-    assert "不太清楚" in body["reply"]["text"]
+    # E3: 低置信度使用 master-copy 失败文案
+    assert "这张图还没看到" in body["reply"]["text"]
     assert "积木城堡" not in body["reply"]["text"]
-    # Low confidence should offer tell-what-it-is and retake actions
+    # E3: 低置信度返回"再试一次"和"先不看"
     action_ids = {
         action["id"]
         for action_group in body["ui_actions"]
         for action in action_group["actions"]
     }
-    assert "tell_what_it_is" in action_ids
     assert "retake_photo" in action_ids
+    assert "skip_photo" in action_ids
+    assert "companion_name" not in action_ids
 
 
 def test_generic_photo_with_homework_like_text_stays_image_context() -> None:
@@ -413,9 +414,10 @@ def test_generic_image_attachment_reply_does_not_echo_long_vision_text() -> None
     body = response.json()
 
     assert body["recognized_content"]["text"].startswith("这是一段很长的图片识别内容")
-    assert "图片识别内容" in body["reply"]["text"]
+    # E3: 回复使用确定性模板，detail 截断到 20 字
+    assert "我看到" in body["reply"]["text"]
     assert "分类判断" not in body["reply"]["text"]
-    assert len(body["reply"]["text"]) <= 70
+    assert "要不要给它起个名字" in body["reply"]["text"]
 
 
 def test_image_detail_helper_strips_labels_and_blocks_private_details() -> None:

@@ -30,6 +30,7 @@ from app.services.light_co_creation_service import (
     LightCoCreationService,
     get_light_co_creation_service,
 )
+from app.services.modality_manager import _imagination_phrase, _strip_image_detail_labels, _looks_private_for_child_detail, _first_child_safe_clause, _strip_image_lead_in, _looks_too_vague_for_child_detail
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.prompt_manager import PromptManager, get_prompt_manager
 from app.services.safety_engine import SafetyEngine, get_safety_engine
@@ -983,14 +984,13 @@ class ChildAgentRuntime:
             or image_context.get("text")
             or ""
         ).strip()
-        child_caption = str(image_context.get("child_caption") or "").strip()
-        summary = self._short_image_summary(recognized_text)
 
         # Homework — scaffold, no final answer
         if recognized_type == "homework_problem" or image_purpose in (
             "learning_homework",
             "homework_problem",
         ):
+            summary = self._short_image_summary(recognized_text)
             if summary:
                 return f"我看到这张图像是一道题，里面大概是：{summary}。我们先看看题目在问什么，你可以读一小段给我听。"
             return "我看到这张图像是一道题。我们先看看题目在问什么，你可以读一小段给我听。"
@@ -999,44 +999,40 @@ class ChildAgentRuntime:
         if recognized_type == "privacy_sensitive" or image_purpose == "privacy_sensitive":
             return "这张图可能有隐私内容，我们先不说细节。可以请家长一起看一下。"
 
-        # Child drawing / art — notice one detail, invite child to tell or name
-        if recognized_type in ("child_drawing", "art_feedback") or image_purpose in (
-            "art_feedback",
-            "child_drawing",
-        ):
-            detail = child_caption or summary
-            if detail:
-                return f"我看到你画里有一个{detail}。这个地方很有意思，你想给它起个名字，还是编个小故事？"
-            return "这张图我看到了。你可以跟我说说画的是什么，或者最想让我看哪里。"
+        # Unclear / unsafe — failure template, no co-creation
+        if recognized_type in ("unclear", "low_confidence", "unsafe_unknown"):
+            return "这张图还没看到\n可以再试一次，也可以先不看"
 
-        # Toy / object / handmade / daily life — one detail + creative entry
-        if recognized_type in ("toy", "object", "handmade", "daily_life") or image_purpose in (
-            "toy",
-            "object",
-            "handmade",
-            "daily_life",
-            "ask_what_is_this",
-        ):
-            if summary:
-                return f"我看到图里像是一个{summary}。你可以给它起个名字，或者告诉我发生了什么。"
-            return "这张图我看到了。你可以跟我说说最想让我看哪里。"
+        # 不在共创 allowlist 中的类型 — failure template
+        from app.domain.companion_object import IMAGE_COCREATION_ALLOWED_TYPES
+        if recognized_type and recognized_type not in IMAGE_COCREATION_ALLOWED_TYPES:
+            return "这张图还没看到\n可以再试一次，也可以先不看"
 
-        # Tell story — light imaginative bridge
-        if image_purpose == "tell_story":
-            if summary:
-                return f"我看到图里像是{summary}。我们可以从这里编个小故事。"
-            return "这张图我看到了。你可以跟我讲讲里面的故事。"
+        # 允许共创的图片类型：确定性模板回复
+        detail = self._safe_detail_for_repair(recognized_text)
+        imagination = _imagination_phrase(recognized_type)
+        return f"我看到{detail}啦\n像{imagination}\n要不要给它起个名字？"
 
-        # Unclear / empty — do not pretend to see
-        if recognized_type in ("unclear", "low_confidence", "unsafe_unknown") or not summary:
-            if child_caption:
-                return f"这张图我看到了，但有点不清楚。你刚才说的「{child_caption}」很有意思，可以再跟我说说。"
-            return "这张图我看到了，但有点不清楚。你可以跟我说说它是什么，或者再拍一张更清楚的。"
-
-        # Default — generic share with one detail + creative entry
-        if summary:
-            return f"我看到图里像是{summary}。你可以给它起个名字，或者告诉我发生了什么。"
-        return "这张图我看到了。你可以跟我说说最想让我看哪里。"
+    @staticmethod
+    def _safe_detail_for_repair(recognized_text: str) -> str:
+        """从 recognized_text 提取安全短细节，用于修复回复。截断到 20 字。"""
+        text = (recognized_text or "").strip()
+        if not text or _looks_private_for_child_detail(text):
+            return "一个小东西"
+        cleaned = _strip_image_detail_labels(text)
+        if not cleaned or _looks_too_vague_for_child_detail(cleaned):
+            return "一个小东西"
+        first_part = _first_child_safe_clause(cleaned)
+        if not first_part or _looks_too_vague_for_child_detail(first_part):
+            return "一个小东西"
+        if _looks_private_for_child_detail(first_part):
+            return "一个小东西"
+        first_part = _strip_image_lead_in(first_part)
+        if len(first_part) > 20:
+            first_part = first_part[:20].rstrip("，,。；;：:、 ")
+        if not first_part or _looks_too_vague_for_child_detail(first_part):
+            return "一个小东西"
+        return first_part
 
     def _looks_like_image_refusal(self, text: str) -> bool:
         compact = text.replace(" ", "")

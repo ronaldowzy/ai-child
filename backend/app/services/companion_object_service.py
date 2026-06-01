@@ -89,6 +89,7 @@ class PendingCompanionSeed:
     light_location: str
     source_type: CompanionObjectSource
     requested_at: datetime
+    recognized_image_type: str | None = None
 
 
 class CompanionObjectService:
@@ -155,6 +156,7 @@ class CompanionObjectService:
         object_type: CompanionObjectType = CompanionObjectType.STAR,
         light_location: str = "窗边",
         source_type: CompanionObjectSource = CompanionObjectSource.FIRST_OPEN,
+        recognized_image_type: str | None = None,
     ) -> None:
         self._validate_location(light_location)
         self._pending_seed_naming[session_id] = PendingCompanionSeed(
@@ -163,6 +165,7 @@ class CompanionObjectService:
             light_location=light_location,
             source_type=source_type,
             requested_at=self._now(),
+            recognized_image_type=recognized_image_type,
         )
 
     def get_pending_seed_naming(

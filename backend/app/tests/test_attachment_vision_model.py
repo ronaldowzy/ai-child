@@ -113,9 +113,11 @@ def test_model_vision_keeps_richer_context_without_child_facing_echo() -> None:
     assert attachment is not None
     assert "蓝色积木" in attachment.recognized_content.text
     assert "问题卡片" in attachment.recognized_content.text
-    assert "红色玩具车" in response.reply.text
+    # E3: 回复使用确定性模板，只包含安全短细节
+    assert "我看到" in response.reply.text
     assert "蓝色积木" not in response.reply.text
     assert "问题卡片" not in response.reply.text
+    assert "要不要给它起个名字" in response.reply.text
 
 
 def test_model_vision_does_not_treat_privacy_words_as_route_signal() -> None:

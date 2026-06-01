@@ -590,6 +590,40 @@ class AttachmentService:
         logger.info("get_latest_ready_homework_context: not_found")
         return None
 
+    def get_latest_image_recognized_type(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        max_age_seconds: int = 1800,
+    ) -> str | None:
+        """获取当前 session 最近一次图片附件的 recognized_type。
+
+        用于图片分享场景：孩子点击"起个名字"按钮时，
+        需要知道之前图片的 recognized_type 来推导 object_type。
+        """
+        now = time.time()
+        attachments = self._repository.list_by_session(session_id)
+        for attachment in attachments:
+            if attachment.child_id != child_id:
+                continue
+            if attachment.status not in {
+                AttachmentStatus.IMAGE_READY,
+                AttachmentStatus.OCR_READY,
+            }:
+                continue
+            if attachment.recognized_content.image_purpose == ImagePurpose.LEARNING_HOMEWORK:
+                continue
+            age_seconds = (
+                now - attachment.created_at.timestamp()
+                if attachment.created_at
+                else 0
+            )
+            if age_seconds > max_age_seconds:
+                continue
+            return attachment.recognized_content.type
+        return None
+
     def get_image_context(
         self,
         attachment_ids: list[str],

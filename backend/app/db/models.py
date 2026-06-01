@@ -463,6 +463,9 @@ class CompanionObjectRecord(Base, TimestampMixin):
     source_type: Mapped[str] = mapped_column(String(40), nullable=False)
     safe_summary: Mapped[str] = mapped_column(String(500), nullable=False)
     light_location: Mapped[str] = mapped_column(String(40), nullable=False)
+    visual_kind: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, server_default=text("'star'")
+    )
     status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     last_recalled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

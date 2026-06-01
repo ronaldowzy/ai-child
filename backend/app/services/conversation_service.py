@@ -767,6 +767,7 @@ class ConversationService:
             companion = companion_action.get("companion")
             action = companion_action.get("action", "none")
             if companion is not None:
+                from app.domain.companion_object import resolve_visual_kind
                 from app.domain.schemas.conversation import CompanionObjectMeta
                 companion_meta = CompanionObjectMeta(
                     id=str(companion.id),
@@ -775,6 +776,8 @@ class ConversationService:
                     light_location=companion.light_location,
                     state=companion.status,
                     action=action if action in ("recall", "co_create") else "none",
+                    visual_kind=getattr(companion, "visual_kind", None)
+                        or resolve_visual_kind(companion.object_type),
                 )
 
         return ConversationMessageResponse(

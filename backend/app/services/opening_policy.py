@@ -96,6 +96,7 @@ class OpeningPolicy:
     companion_light_location: str | None = None
     companion_object_type: str | None = None
     companion_id: str | None = None
+    companion_visual_kind: str | None = None
 
 
 class OpeningPolicyBuilder:

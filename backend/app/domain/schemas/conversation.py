@@ -63,8 +63,9 @@ class CompanionObjectMeta(BaseModel):
     name: str
     object_type: str
     light_location: str
-    state: str  # active / paused
-    action: str  # recall / co_create / none
+    state: str  # active / paused / seed
+    action: str  # recall / co_create / none / name_seed
+    visual_kind: str = "star"
 
 
 class SessionState(BaseModel):

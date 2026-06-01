@@ -378,11 +378,21 @@ internal fun String.toCompanionLocation(): CompanionLocation {
 }
 
 internal fun String.toCompanionVisualType(): CompanionVisualType {
-    return when {
-        contains("星") || equals("star", ignoreCase = true) -> CompanionVisualType.StarPoint
-        contains("云") || equals("cloud", ignoreCase = true) -> CompanionVisualType.CloudShadow
-        contains("光") || contains("影") -> CompanionVisualType.LightSpot
-        else -> CompanionVisualType.SoftOutline
+    // 优先从 visual_kind 精确映射
+    return when (this) {
+        "star" -> CompanionVisualType.StarPoint
+        "cloud" -> CompanionVisualType.CloudShadow
+        "paper_boat" -> CompanionVisualType.LightSpot
+        "tiny_door" -> CompanionVisualType.SoftOutline
+        "dino_shadow" -> CompanionVisualType.SoftOutline
+        "block_light" -> CompanionVisualType.LightSpot
+        // legacy fallback: 从 objectType 模糊匹配（兼容旧后端）
+        else -> when {
+            contains("星") || equals("star", ignoreCase = true) -> CompanionVisualType.StarPoint
+            contains("云") || equals("cloud", ignoreCase = true) -> CompanionVisualType.CloudShadow
+            contains("光") || contains("影") -> CompanionVisualType.LightSpot
+            else -> CompanionVisualType.SoftOutline
+        }
     }
 }
 
@@ -539,7 +549,7 @@ private fun CompanionLightPoint(
     if (companionObject == null || !companionObject.shouldShowVisual()) return
 
     val location = companionObject.lightLocation.toCompanionLocation()
-    val visualType = companionObject.objectType.toCompanionVisualType()
+    val visualType = companionObject.visualKind.toCompanionVisualType()
     val config = visualType.config()
     val placement = location.placementForViewport(viewportClass)
 

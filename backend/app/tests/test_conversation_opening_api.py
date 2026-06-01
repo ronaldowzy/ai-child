@@ -101,6 +101,7 @@ def test_first_open_seed_includes_companion_object_metadata() -> None:
         "light_location": "窗边",
         "state": "seed",
         "action": "name_seed",
+        "visual_kind": "star",
     }
 
 

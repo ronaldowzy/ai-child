@@ -122,6 +122,7 @@ data class CompanionObjectMeta(
     val lightLocation: String,
     val state: String,
     val action: String,
+    val visualKind: String = "star",
 ) {
     companion object {
         fun fromJson(json: JSONObject): CompanionObjectMeta {
@@ -132,6 +133,7 @@ data class CompanionObjectMeta(
                 lightLocation = json.getString("light_location"),
                 state = json.getString("state"),
                 action = json.getString("action"),
+                visualKind = json.optString("visual_kind", "star"),
             )
         }
     }

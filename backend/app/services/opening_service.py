@@ -8,6 +8,7 @@ import time
 from app.core.logging import hash_identifier
 from app.core.config import get_settings
 from app.domain.memory import MemorySensitivity
+from app.domain.companion_object import resolve_visual_kind
 from app.domain.schemas.conversation import (
     CompanionObjectMeta,
     ConversationMessageResponse,
@@ -268,6 +269,7 @@ class OpeningService:
                 companion_light_location=companion.light_location,
                 companion_object_type=companion.object_type,
                 companion_id=str(companion.id),
+                companion_visual_kind=getattr(companion, "visual_kind", None),
             )
         elif companion is None and self._check_star_seed_eligible(
             child_id=request.child_id,
@@ -328,6 +330,7 @@ class OpeningService:
                 light_location="窗边",
                 state="seed",
                 action="name_seed",
+                visual_kind="star",
             )
         elif opening_policy.mode == OpeningMode.COMPANION_RECALL and opening_policy.companion_id:
             ui_actions = [
@@ -343,6 +346,9 @@ class OpeningService:
                 light_location=opening_policy.companion_light_location or "窗边",
                 state="active",
                 action="recall",
+                visual_kind=opening_policy.companion_visual_kind or resolve_visual_kind(
+                    opening_policy.companion_object_type or "other"
+                ),
             )
             # Mark as recalled
             if self._companion_object_service is not None:

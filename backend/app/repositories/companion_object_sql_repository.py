@@ -138,6 +138,7 @@ class SqlAlchemyCompanionObjectRepository:
         record.safe_summary = companion.safe_summary
         record.light_location = companion.light_location
         record.status = companion.status.value
+        record.visual_kind = companion.visual_kind
         record.last_recalled_at = companion.last_recalled_at
         record.recall_count = companion.recall_count
         record.skip_count = companion.skip_count
@@ -145,6 +146,11 @@ class SqlAlchemyCompanionObjectRepository:
         record.updated_at = companion.updated_at
 
     def _to_domain(self, record: CompanionObjectRecord) -> CompanionObject:
+        from app.domain.companion_object import VisualKind, resolve_visual_kind
+
+        visual_kind = record.visual_kind
+        if not visual_kind:
+            visual_kind = resolve_visual_kind(record.object_type)
         return CompanionObject(
             id=record.id,
             child_id=record.child_id,
@@ -154,6 +160,7 @@ class SqlAlchemyCompanionObjectRepository:
             safe_summary=record.safe_summary,
             light_location=record.light_location,
             status=CompanionObjectStatus(record.status),
+            visual_kind=visual_kind,
             last_recalled_at=self._aware_datetime(record.last_recalled_at),
             recall_count=record.recall_count,
             skip_count=record.skip_count,

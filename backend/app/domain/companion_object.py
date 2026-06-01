@@ -31,6 +31,16 @@ class CompanionObjectSource(StrEnum):
     STORY_CHAIN = "story_chain"
 
 
+class VisualKind(StrEnum):
+    """小物件影子类型，首版 6 种。"""
+    STAR = "star"
+    CLOUD = "cloud"
+    PAPER_BOAT = "paper_boat"
+    TINY_DOOR = "tiny_door"
+    DINO_SHADOW = "dino_shadow"
+    BLOCK_LIGHT = "block_light"
+
+
 LIGHT_LOCATIONS: tuple[str, ...] = ("窗边", "地毯边", "小白狐旁边", "窗外")
 
 EXCITING_TYPES: frozenset[CompanionObjectType] = frozenset(
@@ -77,6 +87,28 @@ FORBIDDEN_SUMMARY_MARKERS: tuple[str, ...] = (
 SAFE_SUMMARY_MAX_LENGTH = 200
 NAME_MAX_LENGTH = 80
 
+# object_type -> visual_kind 确定性映射
+_OBJECT_TYPE_TO_VISUAL_KIND: dict[CompanionObjectType, VisualKind] = {
+    CompanionObjectType.STAR: VisualKind.STAR,
+    CompanionObjectType.CLOUD: VisualKind.CLOUD,
+    CompanionObjectType.PAPER_BOAT: VisualKind.PAPER_BOAT,
+    CompanionObjectType.STORY_GATE: VisualKind.TINY_DOOR,
+    CompanionObjectType.DRAWING_CHARACTER: VisualKind.DINO_SHADOW,
+    CompanionObjectType.BLOCK_MONSTER: VisualKind.BLOCK_LIGHT,
+    CompanionObjectType.WINDOW_BIRD: VisualKind.CLOUD,
+    CompanionObjectType.TOY_CHARACTER: VisualKind.BLOCK_LIGHT,
+    CompanionObjectType.OTHER: VisualKind.STAR,
+}
+
+
+def resolve_visual_kind(object_type: str, source_type: str | None = None) -> str:
+    """从 object_type 推导 visual_kind。未知类型兜底 star。"""
+    try:
+        ot = CompanionObjectType(object_type)
+    except ValueError:
+        return VisualKind.STAR
+    return str(_OBJECT_TYPE_TO_VISUAL_KIND.get(ot, VisualKind.STAR))
+
 
 class CompanionObjectCreateRequest(BaseModel):
     child_id: str = Field(..., min_length=1, max_length=120)
@@ -103,6 +135,7 @@ class CompanionObject(BaseModel):
     safe_summary: str
     light_location: str
     status: CompanionObjectStatus
+    visual_kind: str = VisualKind.STAR
     last_recalled_at: datetime | None
     recall_count: int
     skip_count: int

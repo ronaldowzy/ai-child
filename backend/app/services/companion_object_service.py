@@ -25,12 +25,14 @@ from app.domain.companion_object import (
     FORBIDDEN_SUMMARY_MARKERS,
     LIGHT_LOCATIONS,
     SAFE_SUMMARY_MAX_LENGTH,
+    VisualKind,
     CompanionObject,
     CompanionObjectCreateRequest,
     CompanionObjectSource,
     CompanionObjectStatus,
     CompanionObjectType,
     CompanionObjectUpdateRequest,
+    resolve_visual_kind,
 )
 from app.repositories.companion_object_repository import (
     CompanionObjectRepository,
@@ -125,6 +127,8 @@ class CompanionObjectService:
             )
             self._save(retired)
 
+        visual_kind = resolve_visual_kind(request.object_type, request.source_type)
+
         companion = CompanionObject(
             id=str(uuid4()),
             child_id=request.child_id,
@@ -134,6 +138,7 @@ class CompanionObjectService:
             safe_summary=request.safe_summary.strip()[:SAFE_SUMMARY_MAX_LENGTH],
             light_location=request.light_location,
             status=CompanionObjectStatus.ACTIVE,
+            visual_kind=visual_kind,
             last_recalled_at=None,
             recall_count=0,
             skip_count=0,

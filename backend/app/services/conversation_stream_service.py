@@ -375,6 +375,10 @@ class ConversationStreamService:
             payload["riskLevel"] = response.debug.safety.risk_level.value
             payload["risk_category"] = response.debug.safety.primary_category.value
             payload["riskCategory"] = response.debug.safety.primary_category.value
+        if response.session_state.companion_object is not None:
+            payload["companion_object"] = response.session_state.companion_object.model_dump(
+                mode="json"
+            )
         return payload
 
     def _text_delta_payload(self, segment: TextSegment) -> dict[str, object]:

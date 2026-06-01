@@ -321,6 +321,7 @@ private class NaturalWaitingSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         sentTexts += text
@@ -348,6 +349,7 @@ private class NaturalWaitingSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,

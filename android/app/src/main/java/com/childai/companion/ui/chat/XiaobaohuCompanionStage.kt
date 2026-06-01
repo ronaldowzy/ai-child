@@ -379,8 +379,8 @@ internal fun String.toCompanionLocation(): CompanionLocation {
 
 internal fun String.toCompanionVisualType(): CompanionVisualType {
     return when {
-        contains("星") -> CompanionVisualType.StarPoint
-        contains("云") -> CompanionVisualType.CloudShadow
+        contains("星") || equals("star", ignoreCase = true) -> CompanionVisualType.StarPoint
+        contains("云") || equals("cloud", ignoreCase = true) -> CompanionVisualType.CloudShadow
         contains("光") || contains("影") -> CompanionVisualType.LightSpot
         else -> CompanionVisualType.SoftOutline
     }
@@ -391,7 +391,7 @@ internal fun CompanionObjectMeta.shouldShowVisual(): Boolean {
     // Do not show for paused state or action=none
     if (state == "paused") return false
     if (state == "seed" && action == "name_seed") return true
-    if (state == "active" && action == "recall") return true
+    if (state == "active" && action in setOf("recall", "co_create")) return true
     return false
 }
 
@@ -412,9 +412,9 @@ private enum class CompanionAnimationType {
 private fun CompanionVisualType.config(): CompanionVisualConfig {
     return when (this) {
         CompanionVisualType.StarPoint -> CompanionVisualConfig(
-            size = 18.dp,
-            blurRadius = 10.dp,
-            baseAlpha = 0.65f,
+            size = 24.dp,
+            blurRadius = 12.dp,
+            baseAlpha = 0.78f,
             colors = listOf(
                 Color(0xFFFFF8E1).copy(alpha = 0.9f),
                 Color(0xFFFFECB3).copy(alpha = 0.5f),
@@ -423,9 +423,9 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             animationType = CompanionAnimationType.Breathing,
         )
         CompanionVisualType.CloudShadow -> CompanionVisualConfig(
-            size = 22.dp,
+            size = 26.dp,
             blurRadius = 12.dp,
-            baseAlpha = 0.55f,
+            baseAlpha = 0.62f,
             colors = listOf(
                 Color(0xFFE8EAF6).copy(alpha = 0.8f),
                 Color(0xFFC5CAE9).copy(alpha = 0.4f),
@@ -434,9 +434,9 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             animationType = CompanionAnimationType.Floating,
         )
         CompanionVisualType.LightSpot -> CompanionVisualConfig(
-            size = 20.dp,
-            blurRadius = 11.dp,
-            baseAlpha = 0.6f,
+            size = 24.dp,
+            blurRadius = 12.dp,
+            baseAlpha = 0.68f,
             colors = listOf(
                 Color(0xFFFFF3E0).copy(alpha = 0.85f),
                 Color(0xFFFFE0B2).copy(alpha = 0.45f),
@@ -445,9 +445,9 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             animationType = CompanionAnimationType.Floating,
         )
         CompanionVisualType.SoftOutline -> CompanionVisualConfig(
-            size = 20.dp,
-            blurRadius = 10.dp,
-            baseAlpha = 0.55f,
+            size = 22.dp,
+            blurRadius = 11.dp,
+            baseAlpha = 0.6f,
             colors = listOf(
                 Color(0xFFF3E5F5).copy(alpha = 0.8f),
                 Color(0xFFE1BEE7).copy(alpha = 0.4f),
@@ -458,38 +458,55 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
     }
 }
 
-private fun CompanionLocation.offsetForViewport(
+private data class CompanionPlacement(
+    val alignment: Alignment,
+    val offset: Offset,
+)
+
+private fun CompanionLocation.placementForViewport(
     viewportClass: CompanionRoomViewportClass,
-): Offset {
+): CompanionPlacement {
     return when (this) {
-        CompanionLocation.WindowSide -> when (viewportClass) {
-            CompanionRoomViewportClass.Portrait -> Offset(110f, -95f)
-            CompanionRoomViewportClass.PortraitExpanded -> Offset(140f, -120f)
-            CompanionRoomViewportClass.LandscapeWide -> Offset(180f, -70f)
-            CompanionRoomViewportClass.LandscapeTablet -> Offset(160f, -80f)
-            CompanionRoomViewportClass.LandscapeSquare -> Offset(140f, -75f)
-        }
-        CompanionLocation.CarpetEdge -> when (viewportClass) {
-            CompanionRoomViewportClass.Portrait -> Offset(-60f, 80f)
-            CompanionRoomViewportClass.PortraitExpanded -> Offset(-80f, 100f)
-            CompanionRoomViewportClass.LandscapeWide -> Offset(-100f, 60f)
-            CompanionRoomViewportClass.LandscapeTablet -> Offset(-90f, 70f)
-            CompanionRoomViewportClass.LandscapeSquare -> Offset(-80f, 65f)
-        }
-        CompanionLocation.NearFox -> when (viewportClass) {
-            CompanionRoomViewportClass.Portrait -> Offset(70f, 30f)
-            CompanionRoomViewportClass.PortraitExpanded -> Offset(90f, 40f)
-            CompanionRoomViewportClass.LandscapeWide -> Offset(110f, 20f)
-            CompanionRoomViewportClass.LandscapeTablet -> Offset(100f, 25f)
-            CompanionRoomViewportClass.LandscapeSquare -> Offset(90f, 22f)
-        }
-        CompanionLocation.OutsideWindow -> when (viewportClass) {
-            CompanionRoomViewportClass.Portrait -> Offset(140f, -120f)
-            CompanionRoomViewportClass.PortraitExpanded -> Offset(180f, -150f)
-            CompanionRoomViewportClass.LandscapeWide -> Offset(220f, -90f)
-            CompanionRoomViewportClass.LandscapeTablet -> Offset(200f, -100f)
-            CompanionRoomViewportClass.LandscapeSquare -> Offset(180f, -95f)
-        }
+        CompanionLocation.WindowSide -> CompanionPlacement(
+            alignment = Alignment.TopStart,
+            offset = when (viewportClass) {
+                CompanionRoomViewportClass.Portrait -> Offset(92f, 118f)
+                CompanionRoomViewportClass.PortraitExpanded -> Offset(118f, 140f)
+                CompanionRoomViewportClass.LandscapeWide -> Offset(110f, 92f)
+                CompanionRoomViewportClass.LandscapeTablet -> Offset(102f, 96f)
+                CompanionRoomViewportClass.LandscapeSquare -> Offset(96f, 88f)
+            },
+        )
+        CompanionLocation.CarpetEdge -> CompanionPlacement(
+            alignment = Alignment.BottomCenter,
+            offset = when (viewportClass) {
+                CompanionRoomViewportClass.Portrait -> Offset(-96f, -86f)
+                CompanionRoomViewportClass.PortraitExpanded -> Offset(-118f, -106f)
+                CompanionRoomViewportClass.LandscapeWide -> Offset(-128f, -76f)
+                CompanionRoomViewportClass.LandscapeTablet -> Offset(-112f, -84f)
+                CompanionRoomViewportClass.LandscapeSquare -> Offset(-102f, -80f)
+            },
+        )
+        CompanionLocation.NearFox -> CompanionPlacement(
+            alignment = Alignment.Center,
+            offset = when (viewportClass) {
+                CompanionRoomViewportClass.Portrait -> Offset(96f, 38f)
+                CompanionRoomViewportClass.PortraitExpanded -> Offset(118f, 52f)
+                CompanionRoomViewportClass.LandscapeWide -> Offset(136f, 26f)
+                CompanionRoomViewportClass.LandscapeTablet -> Offset(122f, 30f)
+                CompanionRoomViewportClass.LandscapeSquare -> Offset(112f, 28f)
+            },
+        )
+        CompanionLocation.OutsideWindow -> CompanionPlacement(
+            alignment = Alignment.TopStart,
+            offset = when (viewportClass) {
+                CompanionRoomViewportClass.Portrait -> Offset(36f, 74f)
+                CompanionRoomViewportClass.PortraitExpanded -> Offset(48f, 82f)
+                CompanionRoomViewportClass.LandscapeWide -> Offset(42f, 62f)
+                CompanionRoomViewportClass.LandscapeTablet -> Offset(40f, 66f)
+                CompanionRoomViewportClass.LandscapeSquare -> Offset(38f, 60f)
+            },
+        )
     }
 }
 
@@ -504,7 +521,7 @@ private fun CompanionLightPoint(
     val location = companionObject.lightLocation.toCompanionLocation()
     val visualType = companionObject.objectType.toCompanionVisualType()
     val config = visualType.config()
-    val offset = location.offsetForViewport(viewportClass)
+    val placement = location.placementForViewport(viewportClass)
 
     val alpha = when (config.animationType) {
         CompanionAnimationType.Breathing -> {
@@ -554,17 +571,20 @@ private fun CompanionLightPoint(
         else -> 0f
     }
 
-    Box(
-        modifier = modifier
-            .offset(x = offset.x.dp, y = (offset.y + offsetY).dp)
-            .size(config.size)
-            .alpha(alpha)
-            .blur(radius = config.blurRadius)
-            .background(
-                brush = Brush.radialGradient(
-                    colors = config.colors,
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .align(placement.alignment)
+                .offset(x = placement.offset.x.dp, y = (placement.offset.y + offsetY).dp)
+                .size(config.size)
+                .alpha(alpha)
+                .blur(radius = config.blurRadius)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = config.colors,
+                    ),
+                    shape = CircleShape,
                 ),
-                shape = CircleShape,
-            ),
-    )
+        )
+    }
 }

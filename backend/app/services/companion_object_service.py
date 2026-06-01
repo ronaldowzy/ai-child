@@ -14,6 +14,7 @@ Business rules:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -79,6 +80,15 @@ class SessionRecallTracker:
         self._recalled.pop(session_id, None)
 
 
+@dataclass(frozen=True)
+class PendingCompanionSeed:
+    child_id: str
+    object_type: CompanionObjectType
+    light_location: str
+    source_type: CompanionObjectSource
+    requested_at: datetime
+
+
 class CompanionObjectService:
     def __init__(
         self,
@@ -94,6 +104,7 @@ class CompanionObjectService:
         self._session_tracker = session_tracker or SessionRecallTracker()
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
         self._fallback_to_memory = fallback_to_memory
+        self._pending_seed_naming: dict[str, PendingCompanionSeed] = {}
 
     # ------------------------------------------------------------------
     # Create
@@ -130,6 +141,38 @@ class CompanionObjectService:
             updated_at=now,
         )
         return self._save(companion)
+
+    def begin_seed_naming(
+        self,
+        *,
+        session_id: str,
+        child_id: str,
+        object_type: CompanionObjectType = CompanionObjectType.STAR,
+        light_location: str = "窗边",
+        source_type: CompanionObjectSource = CompanionObjectSource.FIRST_OPEN,
+    ) -> None:
+        self._validate_location(light_location)
+        self._pending_seed_naming[session_id] = PendingCompanionSeed(
+            child_id=child_id,
+            object_type=object_type,
+            light_location=light_location,
+            source_type=source_type,
+            requested_at=self._now(),
+        )
+
+    def get_pending_seed_naming(
+        self,
+        *,
+        session_id: str,
+        child_id: str,
+    ) -> PendingCompanionSeed | None:
+        pending = self._pending_seed_naming.get(session_id)
+        if pending is None or pending.child_id != child_id:
+            return None
+        return pending
+
+    def clear_pending_seed_naming(self, *, session_id: str) -> None:
+        self._pending_seed_naming.pop(session_id, None)
 
     # ------------------------------------------------------------------
     # Recall

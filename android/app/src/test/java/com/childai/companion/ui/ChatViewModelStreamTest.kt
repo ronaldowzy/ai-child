@@ -79,6 +79,31 @@ class ChatViewModelStreamTest {
     }
 
     @Test
+    fun routeDecisionCarriesCompanionObjectIntoUiState() {
+        val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
+
+        viewModel.applyStreamEvent(
+            streamEvent(
+                "route_decision",
+                "activeScene" to "conversation.open",
+                "companion_object" to JSONObject().apply {
+                    put("id", "co_123")
+                    put("name", "小棉花")
+                    put("object_type", "star")
+                    put("light_location", "窗边")
+                    put("state", "active")
+                    put("action", "co_create")
+                },
+            ),
+        )
+
+        val companion = viewModel.uiState.value.sessionState?.companionObject
+        assertEquals("co_123", companion?.id)
+        assertEquals("小棉花", companion?.name)
+        assertEquals("co_create", companion?.action)
+    }
+
+    @Test
     fun audioReadyUsesQueueWhenNotMuted() {
         val ttsController = RecordingTtsController()
         val viewModel = ChatViewModel(
@@ -298,6 +323,7 @@ private class NoopConversationSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         return ConversationMessageResponse(
@@ -324,6 +350,7 @@ private class NoopConversationSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -338,6 +365,7 @@ private class StreamFailureConversationSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         messageCalls += 1
@@ -365,6 +393,7 @@ private class StreamFailureConversationSender : ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -385,6 +414,7 @@ private class TtsStateRecordingConversationSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         ttsActiveWhenSending += ttsStateProvider().let {
@@ -414,6 +444,7 @@ private class TtsStateRecordingConversationSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -432,6 +463,7 @@ private class AttachmentRecordingConversationSender : ConversationMessageSender 
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         error("stream should handle this test")
@@ -442,6 +474,7 @@ private class AttachmentRecordingConversationSender : ConversationMessageSender 
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,

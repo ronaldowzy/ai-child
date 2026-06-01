@@ -157,7 +157,7 @@ class ChatViewModel(
         }
     }
 
-    fun sendText(text: String) {
+    fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
 
@@ -171,6 +171,7 @@ class ChatViewModel(
         sendTextWithAttachments(
             trimmedText,
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
+            quickActionId = quickActionId,
         )
     }
 
@@ -329,7 +330,11 @@ class ChatViewModel(
         }
     }
 
-    private fun sendTextWithAttachments(text: String, attachments: List<String>) {
+    private fun sendTextWithAttachments(
+        text: String,
+        attachments: List<String>,
+        quickActionId: String? = null,
+    ) {
         if (_uiState.value.isSending) return
 
         Log.d(TAG, "[LatencyTrace] stage=request_send textLen=${text.length}")
@@ -354,7 +359,11 @@ class ChatViewModel(
         viewModelScope.launch(sendDispatcher) {
             if (DevSettings.USE_STREAMING_CONVERSATION) {
                 val streamed = runCatching {
-                    streamTextWithAttachments(text = text, attachments = attachments)
+                    streamTextWithAttachments(
+                        text = text,
+                        attachments = attachments,
+                        quickActionId = quickActionId,
+                    )
                 }.getOrDefault(false)
                 if (streamed) return@launch
             }
@@ -365,6 +374,7 @@ class ChatViewModel(
                     sessionId = sessionId,
                     text = text,
                     attachments = attachments,
+                    quickActionId = quickActionId,
                 )
             }.onSuccess { response ->
                 Log.d(TAG, "sendTextWithAttachments: success, replyLength=${response.reply.text.length}")
@@ -419,7 +429,7 @@ class ChatViewModel(
             "image_story",
             "say_what_happened" ->
                 continuePendingImageConversation(action)
-            else -> sendText(action.label)
+            else -> sendText(action.label, quickActionId = action.id)
         }
     }
 
@@ -693,7 +703,7 @@ class ChatViewModel(
         val context = _uiState.value.pendingImageContext
         Log.d(TAG, "continuePendingImageConversation: action=${action.id}, hasContext=${context != null}")
         if (context == null) {
-            sendText(action.label)
+            sendText(action.label, quickActionId = action.id)
             return
         }
         _uiState.update { it.copy(pendingImageContext = null) }
@@ -703,7 +713,11 @@ class ChatViewModel(
             "ask_what_is_this" -> "这是什么？"
             else -> "给小白狐看看"
         }
-        sendTextWithAttachments(text, listOf(context.attachmentId))
+        sendTextWithAttachments(
+            text,
+            listOf(context.attachmentId),
+            quickActionId = action.id,
+        )
     }
 
     private fun activeSpeechInputController(cacheDirectory: File): SpeechInputController {
@@ -909,10 +923,11 @@ class ChatViewModel(
 
         val nextAgentState = reply.toFoxAgentUiState()
         baseAgentState = nextAgentState
+        val mergedSessionState = sessionState.mergeWith(_uiState.value.sessionState)
         _uiState.update { state ->
             state.copy(
                 quickActions = uiActions.toQuickActionUi(),
-                sessionState = sessionState,
+                sessionState = mergedSessionState,
                 agent = nextAgentState,
                 childTurnPhaseHint = null,
                 voice = state.voice.withReplyVoice(reply),
@@ -933,6 +948,7 @@ class ChatViewModel(
     private suspend fun streamTextWithAttachments(
         text: String,
         attachments: List<String>,
+        quickActionId: String? = null,
     ): Boolean {
         var doneReceived = false
         conversationSender.streamTextMessage(
@@ -940,6 +956,7 @@ class ChatViewModel(
             sessionId = sessionId,
             text = text,
             attachments = attachments,
+            quickActionId = quickActionId,
             includeTts = _uiState.value.tts.isAutoReadEnabled && !_uiState.value.tts.isMuted,
             onEvent = { event ->
                 applyStreamEvent(event)
@@ -1003,12 +1020,16 @@ class ChatViewModel(
 
     private fun applyStreamRoute(event: ConversationStreamEvent) {
         val activeScene = event.activeScene ?: "conversation.open"
-        val sessionState = ConversationSessionState(
+        val nextSessionState = ConversationSessionState(
             baseScene = event.payload.optString("baseScene", event.payload.optString("base_scene", activeScene)),
             activeScene = activeScene,
-            needsInput = null,
+            needsInput = event.payload.optString("needsInput").takeIf { it.isNotBlank() }
+                ?: event.payload.optString("needs_input").takeIf { it.isNotBlank() },
             requiresParentAttention = event.requiresParentAttention,
-        )
+            companionObject = event.payload.optJSONObject("companion_object")?.let {
+                com.childai.companion.data.conversation.CompanionObjectMeta.fromJson(it)
+            },
+        ).mergeWith(_uiState.value.sessionState)
         val nextAgentState = ConversationReply(
             type = "agent_message",
             text = "",
@@ -1020,7 +1041,7 @@ class ChatViewModel(
         baseAgentState = nextAgentState
         _uiState.update { state ->
             state.copy(
-                sessionState = sessionState,
+                sessionState = nextSessionState,
                 agent = nextAgentState,
             )
         }
@@ -1575,6 +1596,14 @@ data class PendingImageContextUiState(
     val recognizedType: String,
 )
 
+private fun ConversationSessionState.mergeWith(
+    previous: ConversationSessionState?,
+): ConversationSessionState {
+    return copy(
+        companionObject = companionObject ?: previous?.companionObject,
+    )
+}
+
 enum class LocalImagePreviewStatus {
     Uploading,
     Sent,
@@ -1668,6 +1697,7 @@ interface ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String> = emptyList(),
+        quickActionId: String? = null,
         timezone: String = DevSettings.TIMEZONE,
     ): ConversationMessageResponse
 
@@ -1676,6 +1706,7 @@ interface ConversationMessageSender {
         sessionId: String,
         text: String,
         attachments: List<String> = emptyList(),
+        quickActionId: String? = null,
         timezone: String = DevSettings.TIMEZONE,
         includeTts: Boolean = true,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -1702,6 +1733,7 @@ class ConversationRepositoryMessageSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         return repository.sendTextMessage(
@@ -1709,6 +1741,7 @@ class ConversationRepositoryMessageSender(
             sessionId = sessionId,
             text = text,
             attachments = attachments,
+            quickActionId = quickActionId,
             timezone = timezone,
         )
     }
@@ -1718,6 +1751,7 @@ class ConversationRepositoryMessageSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -1727,6 +1761,7 @@ class ConversationRepositoryMessageSender(
             sessionId = sessionId,
             text = text,
             attachments = attachments,
+            quickActionId = quickActionId,
             timezone = timezone,
             includeTts = includeTts,
             onEvent = onEvent,

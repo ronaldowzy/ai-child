@@ -15,6 +15,7 @@ class ConversationRepository(
         sessionId: String,
         text: String,
         attachments: List<String> = emptyList(),
+        quickActionId: String? = null,
         timezone: String = DevSettings.TIMEZONE,
     ): ConversationMessageResponse {
         return apiClient.sendMessage(
@@ -24,6 +25,7 @@ class ConversationRepository(
                 input = ConversationInput(
                     text = text,
                     attachments = attachments,
+                    quickActionId = quickActionId,
                 ),
                 clientContext = ClientContext(
                     deviceTime = nowIsoOffset(timezone),
@@ -55,6 +57,7 @@ class ConversationRepository(
         sessionId: String,
         text: String,
         attachments: List<String> = emptyList(),
+        quickActionId: String? = null,
         timezone: String = DevSettings.TIMEZONE,
         includeTts: Boolean = true,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -65,6 +68,7 @@ class ConversationRepository(
                 sessionId = sessionId,
                 text = text,
                 attachments = attachments,
+                quickActionId = quickActionId,
                 timezone = timezone,
             ),
             streamOptions = ConversationStreamOptions(
@@ -80,6 +84,7 @@ class ConversationRepository(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageRequest {
         return ConversationMessageRequest(
@@ -88,6 +93,7 @@ class ConversationRepository(
             input = ConversationInput(
                 text = text,
                 attachments = attachments,
+                quickActionId = quickActionId,
             ),
             clientContext = ClientContext(
                 deviceTime = nowIsoOffset(timezone),

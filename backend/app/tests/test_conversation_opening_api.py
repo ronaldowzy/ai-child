@@ -86,6 +86,24 @@ def test_opening_without_name_does_not_force_call_name() -> None:
     assert "大名" not in text
 
 
+def test_first_open_seed_includes_companion_object_metadata() -> None:
+    response = client.post(
+        "/api/v1/conversation/opening",
+        json=_opening_payload(child_id="opening_star_seed_child"),
+    )
+
+    assert response.status_code == 200
+    companion = response.json()["session_state"]["companion_object"]
+    assert companion == {
+        "id": "star_seed",
+        "name": "小星星",
+        "object_type": "star",
+        "light_location": "窗边",
+        "state": "seed",
+        "action": "name_seed",
+    }
+
+
 def test_after_school_opening_is_light_and_not_forced_school_checkin() -> None:
     response = client.post(
         "/api/v1/conversation/opening",

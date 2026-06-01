@@ -134,6 +134,20 @@ class ChatViewModelOpeningTest {
     }
 
     @Test
+    fun companionNameQuickActionReportsActionIdToBackend() {
+        val sender = OpeningSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.onQuickAction(QuickActionUi(id = "companion_name", label = "起个名字"))
+
+        assertEquals(listOf("起个名字"), sender.sentTexts)
+        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
+    }
+
+    @Test
     fun openingIsRequestedOnlyOncePerViewModelSession() {
         val sender = OpeningSender()
         val viewModel = ChatViewModel(
@@ -154,6 +168,7 @@ private class OpeningSender(
 ) : ConversationMessageSender {
     var openingCalls = 0
     val sentTexts = mutableListOf<String>()
+    val sentQuickActionIds = mutableListOf<String?>()
 
     override suspend fun requestOpening(
         childId: String,
@@ -170,9 +185,11 @@ private class OpeningSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         sentTexts += text
+        sentQuickActionIds += quickActionId
         return response("收到。", audioUrl = null)
     }
 
@@ -181,6 +198,7 @@ private class OpeningSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,
@@ -214,6 +232,7 @@ private class BlockingOpeningSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
     ): ConversationMessageResponse {
         sentTexts += text
@@ -226,6 +245,7 @@ private class BlockingOpeningSender(
         sessionId: String,
         text: String,
         attachments: List<String>,
+        quickActionId: String?,
         timezone: String,
         includeTts: Boolean,
         onEvent: (ConversationStreamEvent) -> Unit,

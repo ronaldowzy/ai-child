@@ -12,6 +12,7 @@ class ConversationInput(BaseModel):
     type: Literal["text"] = "text"
     text: str = Field(..., min_length=1, max_length=2000)
     attachments: list[str] = Field(default_factory=list)
+    quick_action_id: str | None = None
 
 
 class ClientContext(BaseModel):

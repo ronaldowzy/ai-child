@@ -35,6 +35,19 @@ class CompanionObjectVisualTest {
     }
 
     @Test
+    fun activeCoCreateShouldShowVisual() {
+        val companion = CompanionObjectMeta(
+            id = "co_123",
+            name = "小棉花",
+            objectType = "star",
+            lightLocation = "窗边",
+            state = "active",
+            action = "co_create",
+        )
+        assertTrue(companion.shouldShowVisual())
+    }
+
+    @Test
     fun pausedStateShouldNotShowVisual() {
         val companion = CompanionObjectMeta(
             id = "co_123",
@@ -65,6 +78,14 @@ class CompanionObjectVisualTest {
         assertEquals(
             CompanionVisualType.StarPoint,
             "小星星".toCompanionVisualType(),
+        )
+    }
+
+    @Test
+    fun backendStarEnumMapsToStarPoint() {
+        assertEquals(
+            CompanionVisualType.StarPoint,
+            "star".toCompanionVisualType(),
         )
     }
 

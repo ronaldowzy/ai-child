@@ -87,6 +87,28 @@ class ConversationDtosTest {
     }
 
     @Test
+    fun serializesQuickActionIdOnMessageRequest() {
+        val rawJson = com.childai.companion.data.conversation.ConversationMessageRequest(
+            childId = "child_demo",
+            sessionId = "session_demo",
+            input = com.childai.companion.data.conversation.ConversationInput(
+                text = "起个名字",
+                quickActionId = "companion_name",
+            ),
+            clientContext = ClientContext(
+                deviceTime = "2026-05-21T18:30:00+08:00",
+                timezone = "Asia/Shanghai",
+            ),
+        ).toJsonString()
+
+        val root = JSONObject(rawJson)
+        assertEquals(
+            "companion_name",
+            root.getJSONObject("input").getString("quick_action_id"),
+        )
+    }
+
+    @Test
     fun sessionStateParsesCompanionObjectForRecall() {
         val json = JSONObject(
             """
@@ -138,6 +160,30 @@ class ConversationDtosTest {
         assertNotNull(state.companionObject)
         assertEquals("seed", state.companionObject?.state)
         assertEquals("name_seed", state.companionObject?.action)
+    }
+
+    @Test
+    fun sessionStateParsesBackendEnumObjectTypeForSeed() {
+        val json = JSONObject(
+            """
+            {
+                "base_scene": "conversation.open",
+                "active_scene": "conversation.open",
+                "companion_object": {
+                    "id": "star_seed",
+                    "name": "小星星",
+                    "object_type": "star",
+                    "light_location": "窗边",
+                    "state": "seed",
+                    "action": "name_seed"
+                }
+            }
+            """.trimIndent(),
+        )
+        val state = ConversationSessionState.fromJson(json)
+
+        assertEquals("star", state.companionObject?.objectType)
+        assertEquals("小星星", state.companionObject?.name)
     }
 
     @Test

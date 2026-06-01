@@ -41,12 +41,13 @@ def _message_request(
     child_id: str = "test_child",
     session_id: str = "test_session",
     text: str = "你好",
+    quick_action_id: str | None = None,
     device_time: str = "2026-05-30T15:00:00+08:00",
 ) -> ConversationMessageRequest:
     return ConversationMessageRequest(
         child_id=child_id,
         session_id=session_id,
-        input=ConversationInput(text=text),
+        input=ConversationInput(text=text, quick_action_id=quick_action_id),
         client_context=ClientContext(
             deviceTime=datetime.fromisoformat(device_time),
             timezone="Asia/Shanghai",
@@ -220,6 +221,7 @@ class TestConversationCompanionSkip:
             child_id="test_child",
             session_id="test_session",
             child_text="先聊别的",
+            quick_action_id=None,
             scene_id=SceneId.OPEN_CONVERSATION,
         )
 
@@ -245,6 +247,7 @@ class TestConversationCompanionSkip:
             child_id="test_child",
             session_id="test_session",
             child_text="先聊别的",
+            quick_action_id=None,
             scene_id=SceneId.LEARNING_HOMEWORK_HELP,
         )
 
@@ -267,6 +270,7 @@ class TestConversationCompanionSkip:
             child_id="test_child",
             session_id="test_session",
             child_text="先聊别的",
+            quick_action_id=None,
             scene_id=SceneId.SAFETY_GUARDIAN,
         )
 
@@ -288,10 +292,73 @@ class TestConversationCompanionSkip:
             child_id="test_child",
             session_id="test_session",
             child_text="先聊别的",
+            quick_action_id=None,
             scene_id=SceneId.PRIVACY_BOUNDARY,
         )
 
         assert result is None
+
+
+class TestCompanionSeedNaming:
+    """Test seed naming quick action -> create chain."""
+
+    def test_quick_action_name_seed_followup_creates_companion(self) -> None:
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        conv_svc = ConversationService(companion_object_service=companion_svc)
+
+        first = conv_svc.handle_message(
+            _message_request(
+                text="起个名字",
+                quick_action_id="companion_name",
+            )
+        )
+        assert first.session_state.companion_object is None
+        assert (
+            companion_svc.get_pending_seed_naming(
+                session_id="test_session",
+                child_id="test_child",
+            )
+            is not None
+        )
+
+        second = conv_svc.handle_message(
+            _message_request(
+                text="叫小棉花",
+            )
+        )
+        created = companion_svc.get_active_by_child("test_child")
+
+        assert created is not None
+        assert created.name == "小棉花"
+        assert second.session_state.companion_object is not None
+        assert second.session_state.companion_object.action == "co_create"
+        assert second.session_state.companion_object.state == "active"
+        assert second.session_state.companion_object.light_location == "窗边"
+
+    def test_quick_action_id_continue_maps_to_co_create(self) -> None:
+        from app.domain.scene import SceneId
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        _create_companion(companion_svc)
+        conv_svc = ConversationService(companion_object_service=companion_svc)
+
+        result = conv_svc._check_companion_action(
+            child_id="test_child",
+            session_id="test_session",
+            child_text="加一个朋友",
+            quick_action_id="companion_continue",
+            scene_id=SceneId.OPEN_CONVERSATION,
+        )
+
+        assert result is not None
+        assert result["action"] == "co_create"
 
 
 class TestForbiddenPhrases:

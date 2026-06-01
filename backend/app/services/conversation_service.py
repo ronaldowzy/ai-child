@@ -3,6 +3,11 @@ import re
 import time
 
 from app.core.logging import hash_identifier
+from app.domain.companion_object import (
+    CompanionObjectCreateRequest,
+    CompanionObjectSource,
+    CompanionObjectType,
+)
 from app.domain.agent_runtime import AgentRuntimeRequest, AgentRuntimeResult
 from app.domain.enums import IntentType, RiskLevel
 from app.domain.schemas.conversation import (
@@ -141,6 +146,12 @@ class ConversationService:
     ) -> ConversationMessageResponse:
         started_at = time.perf_counter()
         request_start = time.time()
+        created_companion_action = self._check_pending_companion_seed_creation(
+            child_id=request.child_id,
+            session_id=request.session_id,
+            child_text=request.input.text,
+            quick_action_id=request.input.quick_action_id,
+        )
         parent_policy = self._parent_policy_service.get_policy(request.child_id)
         time_context = self._time_context_service.build_context(
             device_time=request.client_context.device_time,
@@ -273,11 +284,15 @@ class ConversationService:
             )
         )
         # Companion object: check for skip/continue after recall
-        companion_action_result = self._check_companion_action(
-            child_id=request.child_id,
-            session_id=request.session_id,
-            child_text=request.input.text,
-            scene_id=route_decision.active_scene,
+        companion_action_result = (
+            created_companion_action
+            or self._check_companion_action(
+                child_id=request.child_id,
+                session_id=request.session_id,
+                child_text=request.input.text,
+                quick_action_id=request.input.quick_action_id,
+                scene_id=route_decision.active_scene,
+            )
         )
         # Lightweight pre-check for memory recall suppression.
         # Full turn_guidance is built inside ChildAgentRuntime after memory retrieval,
@@ -599,6 +614,78 @@ class ConversationService:
         "先聊别的", "先聊新的", "不想", "不要", "不知道",
         "换个话题", "聊别的", "说别的",
     )
+    _COMPANION_NAME_PATTERNS = (
+        r"(?:这颗星星|小星星|它|名字)?(?:就)?叫(?P<name>[^，。！？!?、\\s]{1,12})",
+        r"名字(?:就)?叫(?P<name>[^，。！？!?、\\s]{1,12})",
+        r"给它起名(?:叫)?(?P<name>[^，。！？!?、\\s]{1,12})",
+    )
+
+    def _extract_pending_companion_name(self, child_text: str) -> str | None:
+        text = child_text.strip()
+        if not text:
+            return None
+        compact = re.sub(r"\s+", "", text)
+        if compact in {"起个名字", "起名字", "给它起个名字", "我想起个名字"}:
+            return None
+        for pattern in self._COMPANION_NAME_PATTERNS:
+            match = re.search(pattern, text)
+            if match:
+                return match.group("name").strip("，。！？!?、,. ")
+        plain = compact.strip("，。！？!?、,. ")
+        if 1 <= len(plain) <= 8 and not any(marker in plain for marker in self._SKIP_SIGNALS):
+            return plain
+        return None
+
+    def _check_pending_companion_seed_creation(
+        self,
+        *,
+        child_id: str,
+        session_id: str,
+        child_text: str,
+        quick_action_id: str | None,
+    ) -> dict | None:
+        svc = self._companion_object_service
+        if svc is None:
+            return None
+
+        if quick_action_id == "companion_name":
+            svc.begin_seed_naming(
+                session_id=session_id,
+                child_id=child_id,
+                object_type=CompanionObjectType.STAR,
+                light_location="窗边",
+                source_type=CompanionObjectSource.FIRST_OPEN,
+            )
+            return None
+
+        if quick_action_id == "companion_skip":
+            svc.clear_pending_seed_naming(session_id=session_id)
+            return None
+
+        pending = svc.get_pending_seed_naming(session_id=session_id, child_id=child_id)
+        if pending is None:
+            return None
+
+        companion_name = self._extract_pending_companion_name(child_text)
+        if not companion_name:
+            return None
+
+        try:
+            companion = svc.create(
+                CompanionObjectCreateRequest(
+                    child_id=child_id,
+                    name=companion_name,
+                    object_type=pending.object_type,
+                    source_type=pending.source_type,
+                    safe_summary=f"这颗星星叫{companion_name}",
+                    light_location=pending.light_location,
+                )
+            )
+        except Exception:
+            return None
+
+        svc.clear_pending_seed_naming(session_id=session_id)
+        return {"action": "co_create", "companion": companion}
 
     def _check_companion_action(
         self,
@@ -606,6 +693,7 @@ class ConversationService:
         child_id: str,
         session_id: str,
         child_text: str,
+        quick_action_id: str | None,
         scene_id: object,
     ) -> dict | None:
         """Check if child is responding to a companion recall.
@@ -634,6 +722,13 @@ class ConversationService:
 
         text = child_text.strip()
 
+        if quick_action_id == "companion_skip":
+            svc.mark_skipped(companion.id, session_id=session_id)
+            return {"action": "skip", "companion": companion}
+
+        if quick_action_id == "companion_continue":
+            return {"action": "co_create", "companion": companion}
+
         # Skip detection
         if any(signal in text for signal in self._SKIP_SIGNALS):
             svc.mark_skipped(companion.id, session_id=session_id)
@@ -642,7 +737,7 @@ class ConversationService:
         # Continue detection: child mentions the companion name
         if companion.name and companion.name in text:
             # Child is engaging with the companion
-            return {"action": "continue", "companion": companion}
+            return {"action": "co_create", "companion": companion}
 
         return None
 

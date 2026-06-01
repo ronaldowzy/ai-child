@@ -15,10 +15,12 @@ data class ConversationMessageRequest(
             .put("session_id", sessionId)
             .put(
                 "input",
-                JSONObject()
-                    .put("type", input.type)
-                    .put("text", input.text)
-                    .put("attachments", JSONArray(input.attachments)),
+                JSONObject().apply {
+                    put("type", input.type)
+                    put("text", input.text)
+                    put("attachments", JSONArray(input.attachments))
+                    input.quickActionId?.let { put("quick_action_id", it) }
+                },
             )
             .put(
                 "client_context",
@@ -46,6 +48,7 @@ data class ConversationInput(
     val text: String,
     val type: String = "text",
     val attachments: List<String> = emptyList(),
+    val quickActionId: String? = null,
 )
 
 data class ClientContext(

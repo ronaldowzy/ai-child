@@ -4,6 +4,7 @@ import time
 from fastapi import FastAPI
 from fastapi import Request
 
+from app.api.download_page import router as download_page_router
 from app.api.v1.asr import router as asr_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.conversation_attachment import image_router as attachment_image_router
@@ -80,6 +81,7 @@ async def log_request_timing(request: Request, call_next):
 
 app.add_middleware(RequestIdMiddleware)
 
+app.include_router(download_page_router)
 app.include_router(tts_media_router)
 app.include_router(health_router, prefix=settings.api_v1_prefix, tags=["health"])
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
@@ -100,5 +102,5 @@ app.include_router(fox_assets_router, prefix=settings.api_v1_prefix)
 @app.on_event("startup")
 async def prewarm_tts_cache() -> None:
     """启动时后台预热常见短句的 TTS 缓存。"""
-    if settings.conversation_tts_enabled:
+    if settings.conversation_tts_enabled and settings.tts_prewarm_enabled:
         get_tts_prewarm_service().prewarm_async()

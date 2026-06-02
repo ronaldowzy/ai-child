@@ -195,4 +195,18 @@ bash scripts/build_device_debug_apk.sh --base-url http://192.168.0.118:8000/
 bash scripts/install_android_debug.sh
 ```
 
+生产部署与 APK 发版：
+
+```bash
+bash scripts/bump_app_version.sh --bump patch --content "本次更新内容"
+bash scripts/build_release_apk.sh --base-url http://ihealth.znitech.com:22026/ --publish-to-backend-storage
+bash scripts/build_backend_deploy_package.sh --include-apk
+```
+
+生产环境部署说明见：
+
+```text
+deploy/centos7/README.md
+```
+
 后端细节以 `backend/README.md` 为准。Android 细节以 `android/README.md` 为准。多会话环境事实和已知坑以 `docs/session_process/SHARED_CONTEXT_V0_1.md` 为准。

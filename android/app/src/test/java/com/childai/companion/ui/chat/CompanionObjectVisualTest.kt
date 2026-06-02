@@ -1,8 +1,10 @@
 package com.childai.companion.ui.chat
 
 import com.childai.companion.data.conversation.CompanionObjectMeta
+import androidx.compose.ui.Alignment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,6 +47,33 @@ class CompanionObjectVisualTest {
             action = "co_create",
         )
         assertTrue(companion.shouldShowVisual())
+    }
+
+    @Test
+    fun coCreateUsesStrongerVisualEmphasisThanSeed() {
+        val seed = CompanionObjectMeta(
+            id = "seed_001",
+            name = "",
+            objectType = "star",
+            lightLocation = "窗边",
+            state = "seed",
+            action = "name_seed",
+        )
+        val created = CompanionObjectMeta(
+            id = "co_123",
+            name = "小棉花",
+            objectType = "star",
+            lightLocation = "窗边",
+            state = "active",
+            action = "co_create",
+        )
+
+        val seedEmphasis = seed.visualEmphasis()
+        val createdEmphasis = created.visualEmphasis()
+
+        assertTrue(createdEmphasis.foregroundAlphaMultiplier > seedEmphasis.foregroundAlphaMultiplier)
+        assertTrue(createdEmphasis.glowScale > seedEmphasis.glowScale)
+        assertTrue(createdEmphasis.foregroundGlowAlpha > seedEmphasis.foregroundGlowAlpha)
     }
 
     @Test
@@ -161,5 +190,21 @@ class CompanionObjectVisualTest {
             CompanionLocation.WindowSide,
             "未知位置".toCompanionLocation(),
         )
+    }
+
+    @Test
+    fun windowSidePlacementMovesAwayFromTopBubbleRegion() {
+        val portrait = CompanionLocation.WindowSide.placementForViewport(
+            CompanionRoomViewportClass.Portrait,
+        )
+        val portraitExpanded = CompanionLocation.WindowSide.placementForViewport(
+            CompanionRoomViewportClass.PortraitExpanded,
+        )
+
+        assertEquals(Alignment.CenterStart, portrait.alignment)
+        assertEquals(Alignment.CenterStart, portraitExpanded.alignment)
+        assertTrue(portrait.offset.y < 0f)
+        assertTrue(portraitExpanded.offset.y < 0f)
+        assertNotEquals(0f, portrait.offset.x)
     }
 }

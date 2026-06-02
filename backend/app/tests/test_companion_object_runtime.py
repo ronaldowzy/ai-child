@@ -374,6 +374,34 @@ class TestCompanionSeedNaming:
         assert second.session_state.companion_object is not None
         assert second.session_state.companion_object.action == "co_create"
 
+    def test_quick_action_name_with_name_text_creates_in_same_turn(self) -> None:
+        from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+
+        companion_svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        conv_svc = ConversationService(companion_object_service=companion_svc)
+
+        response = conv_svc.handle_message(
+            _message_request(
+                text="叫小棉花",
+                quick_action_id="companion_name",
+            )
+        )
+        created = companion_svc.get_active_by_child("test_child")
+
+        assert created is not None
+        assert created.name == "小棉花"
+        assert response.session_state.companion_object is not None
+        assert response.session_state.companion_object.action == "co_create"
+        assert (
+            companion_svc.get_pending_seed_naming(
+                session_id="test_session",
+                child_id="test_child",
+            )
+            is None
+        )
+
     def test_quick_action_id_continue_maps_to_co_create_guidance(self) -> None:
         """E5: companion_continue now enters extension flow with guidance."""
         from app.domain.scene import SceneId

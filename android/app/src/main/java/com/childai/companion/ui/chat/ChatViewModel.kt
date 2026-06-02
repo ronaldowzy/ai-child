@@ -85,6 +85,7 @@ class ChatViewModel(
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
+    private var pendingDeferredQuickActionId: String? = null
     private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
 
     private val _uiState = MutableStateFlow(
@@ -162,6 +163,8 @@ class ChatViewModel(
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
+        val effectiveQuickActionId = quickActionId ?: pendingDeferredQuickActionId
+        pendingDeferredQuickActionId = null
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
@@ -173,7 +176,7 @@ class ChatViewModel(
         sendTextWithAttachments(
             trimmedText,
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
-            quickActionId = quickActionId,
+            quickActionId = effectiveQuickActionId,
         )
     }
 
@@ -415,6 +418,9 @@ class ChatViewModel(
     }
 
     fun onQuickAction(action: QuickActionUi) {
+        if (action.id !in setOf("companion_name", "give_name", "image_naming", "companion_friend_name")) {
+            pendingDeferredQuickActionId = null
+        }
         when (action.id) {
             "take_photo", "share_photo" -> {
                 stopCurrentTts(restoreBaseAgent = true)
@@ -425,12 +431,17 @@ class ChatViewModel(
             "talk_about_image",
             "make_story",
             "ask_what_is_this",
-            "give_name",
-            "image_naming",
             "tell_story",
             "image_story",
             "say_what_happened" ->
                 continuePendingImageConversation(action)
+            "companion_name",
+            "give_name",
+            "image_naming",
+            "companion_friend_name" -> {
+                pendingDeferredQuickActionId = normalizedQuickActionId(action.id)
+                stopCurrentTts(restoreBaseAgent = true)
+            }
             else -> sendText(
                 action.label,
                 quickActionId = normalizedQuickActionId(action.id),

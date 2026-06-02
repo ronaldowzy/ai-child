@@ -637,6 +637,36 @@ class TestExtensionSkip:
         assert result["action"] == "skip"
 
 
+class TestExtensionImmediateNaming:
+    """Test quick action + name in the same turn."""
+
+    def test_quick_action_friend_name_with_name_text_completes_extension(self) -> None:
+        svc = CompanionObjectService(
+            repository=InMemoryCompanionObjectRepository(),
+        )
+        companion = _create_active_companion(svc, name="小棉花")
+        svc.begin_extension(
+            session_id="test_session",
+            child_id="test_child",
+            companion_id=companion.id,
+            companion_name="小棉花",
+        )
+
+        conv_svc = ConversationService(companion_object_service=svc)
+        result = conv_svc._check_pending_companion_extension(
+            child_id="test_child",
+            session_id="test_session",
+            child_text="叫小云朵",
+            quick_action_id="companion_friend_name",
+        )
+
+        assert result is not None
+        assert result["action"] == "extension_done"
+        assert result["friend_name"] == "小云朵"
+        ext = svc.get_pending_extension(session_id="test_session", child_id="test_child")
+        assert ext is None
+
+
 class TestExtensionNoNameReturnsNone:
     """Test that non-name input during extension returns None."""
 

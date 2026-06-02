@@ -155,5 +155,12 @@ class InputBarVoiceFirstTest {
                 model = "23078RKD5C",
             ),
         )
+        assertTrue(
+            companionSupportsGalleryPicker(
+                manufacturer = "Google",
+                brand = "google",
+                model = "Pixel 8",
+            ),
+        )
     }
 }

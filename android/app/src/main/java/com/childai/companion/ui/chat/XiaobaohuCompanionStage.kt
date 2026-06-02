@@ -96,8 +96,9 @@ internal fun XiaobaohuCompanionStage(
         val bubbleOffset = mascotStateBubbleOffset(viewportClass)
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Companion object light point - rendered before fox so it stays behind
-            CompanionLightPoint(
+            // Companion object ambient glow stays behind the fox,
+            // while the soft shape layer can still appear in front.
+            CompanionLightPointBackdrop(
                 companionObject = companionObject,
                 viewportClass = viewportClass,
             )
@@ -134,6 +135,11 @@ internal fun XiaobaohuCompanionStage(
                         maxWidth = mascotMaxSize,
                         maxHeight = mascotMaxSize,
                     ),
+            )
+
+            CompanionLightPointForeground(
+                companionObject = companionObject,
+                viewportClass = viewportClass,
             )
 
             val bubbleText = mascotStateBubbleText(mascotState)
@@ -441,6 +447,47 @@ private data class CompanionVisualConfig(
     val animationType: CompanionAnimationType,
 )
 
+internal data class CompanionVisualEmphasis(
+    val backdropAlphaMultiplier: Float,
+    val foregroundAlphaMultiplier: Float,
+    val glowScale: Float,
+    val shapeScale: Float,
+    val foregroundGlowAlpha: Float,
+)
+
+internal fun CompanionObjectMeta.visualEmphasis(): CompanionVisualEmphasis {
+    return when {
+        state == "active" && action == "co_create" -> CompanionVisualEmphasis(
+            backdropAlphaMultiplier = 1.34f,
+            foregroundAlphaMultiplier = 1.58f,
+            glowScale = 1.22f,
+            shapeScale = 1.14f,
+            foregroundGlowAlpha = 0.38f,
+        )
+        state == "active" && action == "recall" -> CompanionVisualEmphasis(
+            backdropAlphaMultiplier = 1.12f,
+            foregroundAlphaMultiplier = 1.18f,
+            glowScale = 1.08f,
+            shapeScale = 1.06f,
+            foregroundGlowAlpha = 0.24f,
+        )
+        state == "seed" && action == "name_seed" -> CompanionVisualEmphasis(
+            backdropAlphaMultiplier = 1.08f,
+            foregroundAlphaMultiplier = 1.10f,
+            glowScale = 1.04f,
+            shapeScale = 1.02f,
+            foregroundGlowAlpha = 0.20f,
+        )
+        else -> CompanionVisualEmphasis(
+            backdropAlphaMultiplier = 1f,
+            foregroundAlphaMultiplier = 1f,
+            glowScale = 1f,
+            shapeScale = 1f,
+            foregroundGlowAlpha = 0f,
+        )
+    }
+}
+
 private enum class CompanionAnimationType {
     Breathing,
     Floating,
@@ -541,23 +588,23 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
     }
 }
 
-private data class CompanionPlacement(
+internal data class CompanionPlacement(
     val alignment: Alignment,
     val offset: Offset,
 )
 
-private fun CompanionLocation.placementForViewport(
+internal fun CompanionLocation.placementForViewport(
     viewportClass: CompanionRoomViewportClass,
 ): CompanionPlacement {
     return when (this) {
         CompanionLocation.WindowSide -> CompanionPlacement(
-            alignment = Alignment.TopStart,
+            alignment = Alignment.CenterStart,
             offset = when (viewportClass) {
-                CompanionRoomViewportClass.Portrait -> Offset(92f, 118f)
-                CompanionRoomViewportClass.PortraitExpanded -> Offset(118f, 140f)
-                CompanionRoomViewportClass.LandscapeWide -> Offset(110f, 92f)
-                CompanionRoomViewportClass.LandscapeTablet -> Offset(102f, 96f)
-                CompanionRoomViewportClass.LandscapeSquare -> Offset(96f, 88f)
+                CompanionRoomViewportClass.Portrait -> Offset(84f, -84f)
+                CompanionRoomViewportClass.PortraitExpanded -> Offset(92f, -82f)
+                CompanionRoomViewportClass.LandscapeWide -> Offset(92f, -64f)
+                CompanionRoomViewportClass.LandscapeTablet -> Offset(84f, -54f)
+                CompanionRoomViewportClass.LandscapeSquare -> Offset(80f, -58f)
             },
         )
         CompanionLocation.CarpetEdge -> CompanionPlacement(
@@ -594,12 +641,146 @@ private fun CompanionLocation.placementForViewport(
 }
 
 @Composable
-private fun CompanionLightPoint(
+private fun CompanionLightPointBackdrop(
     companionObject: CompanionObjectMeta?,
     viewportClass: CompanionRoomViewportClass,
     modifier: Modifier = Modifier,
 ) {
-    if (companionObject == null || !companionObject.shouldShowVisual()) return
+    val renderState = rememberCompanionLightPointRenderState(
+        companionObject = companionObject,
+        viewportClass = viewportClass,
+    ) ?: return
+
+    val backdropAlpha = (renderState.alpha * renderState.emphasis.backdropAlphaMultiplier)
+        .coerceIn(0f, 0.90f)
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .align(renderState.placement.alignment)
+                .offset(
+                    x = renderState.placement.offset.x.dp,
+                    y = (renderState.placement.offset.y + renderState.offsetY).dp,
+                )
+                .graphicsLayer {
+                    scaleX = renderState.scale
+                    scaleY = renderState.scale
+                }
+                .size(
+                    width = maxOf(
+                        renderState.config.glowSize * renderState.emphasis.glowScale,
+                        renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                    ),
+                    height = maxOf(
+                        renderState.config.glowSize * renderState.emphasis.glowScale,
+                        renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                    ),
+                ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(renderState.config.glowSize * renderState.emphasis.glowScale)
+                    .alpha(backdropAlpha)
+                    .blur(radius = renderState.config.glowBlurRadius)
+                    .background(
+                        brush = Brush.radialGradient(colors = renderState.config.glowColors),
+                        shape = CircleShape,
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompanionLightPointForeground(
+    companionObject: CompanionObjectMeta?,
+    viewportClass: CompanionRoomViewportClass,
+    modifier: Modifier = Modifier,
+) {
+    val renderState = rememberCompanionLightPointRenderState(
+        companionObject = companionObject,
+        viewportClass = viewportClass,
+    ) ?: return
+    val foregroundAlpha = (renderState.alpha * renderState.emphasis.foregroundAlphaMultiplier)
+        .coerceIn(0f, 0.94f)
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .align(renderState.placement.alignment)
+                .offset(
+                    x = renderState.placement.offset.x.dp,
+                    y = (renderState.placement.offset.y + renderState.offsetY).dp,
+                )
+                .graphicsLayer {
+                    scaleX = renderState.scale
+                    scaleY = renderState.scale
+                }
+                .size(
+                    width = maxOf(
+                        renderState.config.glowSize * renderState.emphasis.glowScale,
+                        renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                    ),
+                    height = maxOf(
+                        renderState.config.glowSize * renderState.emphasis.glowScale,
+                        renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                    ),
+                ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(
+                        renderState.config.shapeSize * renderState.emphasis.shapeScale * 1.18f,
+                    )
+                    .alpha(renderState.emphasis.foregroundGlowAlpha)
+                    .blur(radius = (renderState.config.glowBlurRadius * 0.72f))
+                    .background(
+                        brush = Brush.radialGradient(colors = renderState.config.glowColors),
+                        shape = CircleShape,
+                    ),
+            )
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(
+                        renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                        renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                    ),
+            ) {
+                val w = size.width
+                val h = size.height
+                val fill = renderState.config.shapeFill.copy(
+                    alpha = (renderState.config.shapeFill.alpha * foregroundAlpha / renderState.config.glowAlpha)
+                        .coerceIn(0f, 0.88f),
+                )
+                val stroke = renderState.config.shapeStroke.copy(
+                    alpha = (renderState.config.shapeStroke.alpha * foregroundAlpha / renderState.config.glowAlpha)
+                        .coerceIn(0f, 0.82f),
+                )
+                drawCompanionShape(renderState.visualType, w, h, fill, stroke)
+            }
+        }
+    }
+}
+
+private data class CompanionLightPointRenderState(
+    val placement: CompanionPlacement,
+    val visualType: CompanionVisualType,
+    val config: CompanionVisualConfig,
+    val emphasis: CompanionVisualEmphasis,
+    val alpha: Float,
+    val offsetY: Float,
+    val scale: Float,
+)
+
+@Composable
+private fun rememberCompanionLightPointRenderState(
+    companionObject: CompanionObjectMeta?,
+    viewportClass: CompanionRoomViewportClass,
+): CompanionLightPointRenderState? {
+    if (companionObject == null || !companionObject.shouldShowVisual()) return null
 
     val location = if (companionObject.lightLocation.isBlank()) {
         companionObject.visualKind.defaultLocationForVisualKind()
@@ -609,29 +790,27 @@ private fun CompanionLightPoint(
     val visualType = companionObject.visualKind.toCompanionVisualType()
     val config = visualType.config()
     val placement = location.placementForViewport(viewportClass)
+    val emphasis = companionObject.visualEmphasis()
 
-    // 入场动画：fade in 1.2s + scale 从 0.8 到 1.0，只播放一次
-    var entranceDone by remember { mutableStateOf(false) }
-    val entranceProgress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        if (!entranceDone) {
-            entranceProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 1200, easing = EaseOut),
-            )
-            entranceDone = true
-        }
+    var entranceDone by remember(companionObject.id, companionObject.action) { mutableStateOf(false) }
+    val entranceProgress = remember(companionObject.id, companionObject.action) { Animatable(0f) }
+    LaunchedEffect(companionObject.id, companionObject.action) {
+        entranceDone = false
+        entranceProgress.snapTo(0f)
+        entranceProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 1200, easing = EaseOut),
+        )
+        entranceDone = true
     }
 
     val alpha: Float
     val offsetY: Float
 
     if (!entranceDone) {
-        // 入场阶段：fade in + 轻微 scale
         alpha = entranceProgress.value * config.glowAlpha
-        offsetY = 0f
+        offsetY = 10f * (1f - entranceProgress.value)
     } else {
-        // 入场完成后：持续动效
         when (config.animationType) {
             CompanionAnimationType.Breathing -> {
                 val infiniteTransition = rememberInfiniteTransition(label = "companionBreathing")
@@ -674,54 +853,20 @@ private fun CompanionLightPoint(
     }
 
     val scale = if (!entranceDone) {
-        0.8f + 0.2f * entranceProgress.value
+        0.82f + 0.18f * entranceProgress.value
     } else {
         1f
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .align(placement.alignment)
-                .offset(
-                    x = placement.offset.x.dp,
-                    y = (placement.offset.y + offsetY).dp,
-                )
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .size(
-                    width = maxOf(config.glowSize, config.shapeSize),
-                    height = maxOf(config.glowSize, config.shapeSizeV),
-                ),
-        ) {
-            // Layer 1: 光晕底层
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(config.glowSize)
-                    .alpha(alpha)
-                    .blur(radius = config.glowBlurRadius)
-                    .background(
-                        brush = Brush.radialGradient(colors = config.glowColors),
-                        shape = CircleShape,
-                    ),
-            )
-            // Layer 2: Canvas 形状层
-            Canvas(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(config.shapeSize, config.shapeSizeV),
-            ) {
-                val w = size.width
-                val h = size.height
-                val fill = config.shapeFill.copy(alpha = config.shapeFill.alpha * alpha / config.glowAlpha)
-                val stroke = config.shapeStroke.copy(alpha = config.shapeStroke.alpha * alpha / config.glowAlpha)
-                drawCompanionShape(visualType, w, h, fill, stroke)
-            }
-        }
-    }
+    return CompanionLightPointRenderState(
+        placement = placement,
+        visualType = visualType,
+        config = config,
+        emphasis = emphasis,
+        alpha = alpha,
+        offsetY = offsetY,
+        scale = scale,
+    )
 }
 
 // --- Shape drawing functions ---

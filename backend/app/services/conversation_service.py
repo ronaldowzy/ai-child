@@ -680,6 +680,28 @@ class ConversationService:
             object_type_str = resolve_object_type_from_image(recognized_type)
             object_type = CompanionObjectType(object_type_str)
 
+            companion_name = self._extract_pending_companion_name(child_text)
+            if companion_name:
+                if source_type == CompanionObjectSource.IMAGE_SHARE:
+                    safe_summary = f"孩子给图片里的小东西起名为{companion_name}"
+                else:
+                    safe_summary = f"这颗星星叫{companion_name}"
+                try:
+                    companion = svc.create(
+                        CompanionObjectCreateRequest(
+                            child_id=child_id,
+                            name=companion_name,
+                            object_type=object_type,
+                            source_type=source_type,
+                            safe_summary=safe_summary,
+                            light_location="窗边",
+                        )
+                    )
+                except Exception:
+                    return None
+                svc.clear_pending_seed_naming(session_id=session_id)
+                return {"action": "co_create", "companion": companion}
+
             svc.begin_seed_naming(
                 session_id=session_id,
                 child_id=child_id,
@@ -750,8 +772,27 @@ class ConversationService:
             svc.clear_pending_extension(session_id=session_id)
             return {"action": "skip"}
 
-        if quick_action_id in ("companion_friend_name", "companion_friend_image"):
-            # Just acknowledge — child needs to provide name or image next
+        if quick_action_id == "companion_friend_name":
+            pending = svc.get_pending_extension(session_id=session_id, child_id=child_id)
+            if pending is None:
+                return None
+            companion_name = self._extract_pending_companion_name(child_text)
+            if not companion_name:
+                return None
+            append_text = f"孩子给小屋小客人加了一个小伙伴：{companion_name}"
+            updated = svc.update_safe_summary_append(pending.companion_id, append_text)
+            if updated is None:
+                svc.clear_pending_extension(session_id=session_id)
+                return None
+            svc.clear_pending_extension(session_id=session_id)
+            return {
+                "action": "extension_done",
+                "companion": updated,
+                "friend_name": companion_name,
+            }
+
+        if quick_action_id == "companion_friend_image":
+            # Just acknowledge — child needs to provide image next
             return None
 
         pending = svc.get_pending_extension(session_id=session_id, child_id=child_id)

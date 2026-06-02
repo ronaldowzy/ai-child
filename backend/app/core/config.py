@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     mimo_tts_model: str = "mimo-v2.5-tts-voiceclone"
     mimo_tts_timeout_ms: int = 30000
     conversation_stream_tts_soft_timeout_ms: int = 15000
+    tts_prewarm_enabled: bool = False
     mimo_tts_allow_child_text: bool = False
     mimo_tts_retention_policy_checked: bool = False
     sherpa_onnx_tts_enabled: bool = False

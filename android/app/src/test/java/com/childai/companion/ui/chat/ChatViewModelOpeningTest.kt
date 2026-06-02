@@ -2,6 +2,7 @@ package com.childai.companion.ui.chat
 
 import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
+import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.voice.TtsCallbacks
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -142,8 +144,12 @@ class ChatViewModelOpeningTest {
         )
 
         viewModel.onQuickAction(QuickActionUi(id = "companion_name", label = "起个名字"))
+        assertTrue(sender.sentTexts.isEmpty())
+        assertTrue(sender.sentQuickActionIds.isEmpty())
 
-        assertEquals(listOf("起个名字"), sender.sentTexts)
+        viewModel.sendText("叫小棉花")
+
+        assertEquals(listOf("叫小棉花"), sender.sentTexts)
         assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
     }
 
@@ -156,9 +162,70 @@ class ChatViewModelOpeningTest {
         )
 
         viewModel.onQuickAction(QuickActionUi(id = "give_name", label = "起个名字"))
+        assertTrue(sender.sentTexts.isEmpty())
+        assertTrue(sender.sentQuickActionIds.isEmpty())
 
-        assertEquals(listOf("起个名字"), sender.sentTexts)
+        viewModel.sendText("叫小棉花")
+
+        assertEquals(listOf("叫小棉花"), sender.sentTexts)
         assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
+    }
+
+    @Test
+    fun companionFriendNameQuickActionDefersUntilChildSpeaks() {
+        val sender = OpeningSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.onQuickAction(QuickActionUi(id = "companion_friend_name", label = "说个名字"))
+        assertTrue(sender.sentTexts.isEmpty())
+        assertTrue(sender.sentQuickActionIds.isEmpty())
+
+        viewModel.sendText("叫小云朵")
+
+        assertEquals(listOf("叫小云朵"), sender.sentTexts)
+        assertEquals(listOf("companion_friend_name"), sender.sentQuickActionIds)
+    }
+
+    @Test
+    fun namingSuccessResponseWritesCompanionObjectIntoUiState() {
+        val sender = OpeningSender(
+            sendResponse = response(
+                text = "小棉花，软软的名字\n它轻轻落到窗边啦",
+                audioUrl = null,
+                voiceEnabled = false,
+                sessionState = ConversationSessionState(
+                    baseScene = "conversation.open",
+                    activeScene = "conversation.open",
+                    needsInput = null,
+                    requiresParentAttention = false,
+                    companionObject = CompanionObjectMeta(
+                        id = "co_123",
+                        name = "小棉花",
+                        objectType = "star",
+                        lightLocation = "窗边",
+                        state = "active",
+                        action = "co_create",
+                        visualKind = "star",
+                    ),
+                ),
+            ),
+        )
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.sendText("叫小棉花")
+
+        val companion = viewModel.uiState.value.sessionState?.companionObject
+        assertNotNull(companion)
+        assertEquals("小棉花", companion?.name)
+        assertEquals("active", companion?.state)
+        assertEquals("co_create", companion?.action)
+        assertEquals("star", companion?.visualKind)
     }
 
     @Test
@@ -178,6 +245,7 @@ class ChatViewModelOpeningTest {
 
 private class OpeningSender(
     private val openingResponse: ConversationMessageResponse = response("豆豆，回来啦。"),
+    private val sendResponse: ConversationMessageResponse = response("收到。", audioUrl = null),
     private val failOpening: Boolean = false,
 ) : ConversationMessageSender {
     var openingCalls = 0
@@ -204,7 +272,7 @@ private class OpeningSender(
     ): ConversationMessageResponse {
         sentTexts += text
         sentQuickActionIds += quickActionId
-        return response("收到。", audioUrl = null)
+        return sendResponse
     }
 
     override suspend fun streamTextMessage(
@@ -285,6 +353,12 @@ private fun response(
     text: String,
     audioUrl: String? = null,
     voiceEnabled: Boolean = audioUrl != null,
+    sessionState: ConversationSessionState = ConversationSessionState(
+        baseScene = "conversation.open",
+        activeScene = "conversation.open",
+        needsInput = null,
+        requiresParentAttention = false,
+    ),
 ): ConversationMessageResponse {
     return ConversationMessageResponse(
         reply = ConversationReply(
@@ -296,11 +370,6 @@ private fun response(
             agentMotion = "gentle_idle",
         ),
         uiActions = emptyList(),
-        sessionState = ConversationSessionState(
-            baseScene = "conversation.open",
-            activeScene = "conversation.open",
-            needsInput = null,
-            requiresParentAttention = false,
-        ),
+        sessionState = sessionState,
     )
 }

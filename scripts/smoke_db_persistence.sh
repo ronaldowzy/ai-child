@@ -76,6 +76,7 @@ os.environ["CHILD_AI_MIMO_ENABLED"] = "false"
 os.environ["CHILD_AI_CONVERSATION_TTS_ENABLED"] = "false"
 
 from sqlalchemy import func, select, text
+from sqlalchemy import inspect
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import get_settings
@@ -215,6 +216,11 @@ report = report_service.get_daily_report(child_id, report_date=date.today())
 assert report.child_id == child_id
 
 with SessionLocal() as session:
+    companion_columns = {
+        column["name"]
+        for column in inspect(session.get_bind()).get_columns("companion_objects")
+    }
+    assert "visual_kind" in companion_columns
     policy_count = session.scalar(
         select(func.count()).select_from(ParentPolicyRecord).where(
             ParentPolicyRecord.child_id == child_id

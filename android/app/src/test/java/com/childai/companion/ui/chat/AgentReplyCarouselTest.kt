@@ -175,7 +175,7 @@ class AgentReplyCarouselTest {
                 recognizedType = "image_observation",
             ),
             quickActions = listOf(
-                QuickActionUi(id = "give_name", label = "起个名字"),
+                QuickActionUi(id = "companion_name", label = "起个名字"),
                 QuickActionUi(id = "tell_story", label = "讲个故事"),
                 QuickActionUi(id = "say_what_happened", label = "说说看"),
             ),
@@ -184,11 +184,12 @@ class AgentReplyCarouselTest {
         val actions = childCompanionVisibleQuickActions(state)
 
         assertEquals(1, actions.size)
+        assertEquals("companion_name", actions.single().id)
         assertEquals("起个名字", actions.single().label)
     }
 
     @Test
-    fun imageStoryActionUsesApprovedShortLabel() {
+    fun legacyImageStoryActionsAreHiddenFromVisibleQuickActions() {
         val state = ChatUiState(
             pendingImageContext = PendingImageContextUiState(
                 attachmentId = "att_image",
@@ -204,7 +205,7 @@ class AgentReplyCarouselTest {
 
         val actions = childCompanionVisibleQuickActions(state)
 
-        assertEquals(listOf("讲一句小故事"), actions.map { it.label })
+        assertTrue(actions.isEmpty())
     }
 
     @Test
@@ -212,13 +213,64 @@ class AgentReplyCarouselTest {
         val state = ChatUiState(
             pendingImageContext = null,
             quickActions = listOf(
-                QuickActionUi(id = "give_name", label = "起个名字"),
+                QuickActionUi(id = "companion_name", label = "起个名字"),
                 QuickActionUi(id = "topic_choice_1", label = "小车"),
             ),
         )
 
         assertEquals(
             listOf("小车"),
+            childCompanionVisibleQuickActions(state).map { it.label },
+        )
+    }
+
+    @Test
+    fun legacyGiveNameActionNormalizesToCompanionName() {
+        val state = ChatUiState(
+            pendingImageContext = PendingImageContextUiState(
+                attachmentId = "att_image",
+                summary = "一个作品",
+                imagePurpose = IMAGE_PURPOSE_SHARE,
+                recognizedType = "image_observation",
+            ),
+            quickActions = listOf(
+                QuickActionUi(id = "give_name", label = "起个名字"),
+            ),
+        )
+
+        val action = childCompanionVisibleQuickActions(state).single()
+
+        assertEquals("companion_name", action.id)
+        assertEquals("起个名字", action.label)
+    }
+
+    @Test
+    fun coCreateGuidanceKeepsSkipActionVisible() {
+        val state = ChatUiState(
+            quickActions = listOf(
+                QuickActionUi(id = "companion_friend_name", label = "说个名字"),
+                QuickActionUi(id = "companion_friend_image", label = "给小白狐看看"),
+                QuickActionUi(id = "companion_skip", label = "先聊别的"),
+            ),
+            sessionState = ConversationSessionState(
+                baseScene = "conversation.open",
+                activeScene = "conversation.open",
+                needsInput = null,
+                requiresParentAttention = false,
+                companionObject = CompanionObjectMeta(
+                    id = "companion_1",
+                    name = "宝石",
+                    objectType = "star",
+                    lightLocation = "窗边",
+                    state = "active",
+                    action = "co_create",
+                    visualKind = "star",
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf("说个名字", "给小白狐看看", "先聊别的"),
             childCompanionVisibleQuickActions(state).map { it.label },
         )
     }

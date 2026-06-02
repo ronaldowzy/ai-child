@@ -56,6 +56,54 @@ else
   status_line "system python3" "INFO" "not found"
 fi
 
+check_visual_kind_migration() {
+  local python_runner=()
+  if [[ -n "${CONDA_CMD}" ]] && "${CONDA_CMD}" env list | awk '{print $1}' | grep -qx "${CONDA_ENV_NAME}"; then
+    python_runner=("${CONDA_CMD}" run --no-capture-output -n "${CONDA_ENV_NAME}" python)
+  elif command -v python3 >/dev/null 2>&1; then
+    python_runner=(python3)
+  elif command -v python >/dev/null 2>&1; then
+    python_runner=(python)
+  else
+    status_line "db migration" "WARN" "python not available for migration check"
+    return
+  fi
+
+  local migration_output
+  migration_output="$(
+    cd "${ROOT_DIR}/backend"
+    "${python_runner[@]}" - <<'PY' 2>&1
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.db.session import SessionLocal
+
+try:
+    with SessionLocal() as session:
+        session.execute(text("SELECT 1"))
+        inspector = inspect(session.get_bind())
+        columns = {column["name"] for column in inspector.get_columns("companion_objects")}
+except SQLAlchemyError as exc:
+    print(f"STATUS=WARN detail=db_unavailable error_type={exc.__class__.__name__}")
+except Exception as exc:
+    print(f"STATUS=WARN detail=migration_check_failed error_type={exc.__class__.__name__}")
+else:
+    if "visual_kind" in columns:
+        print("STATUS=OK detail=companion_objects.visual_kind present")
+    else:
+        print("STATUS=WARN detail=companion_objects.visual_kind missing; run bash scripts/db_migrate.sh")
+PY
+  )"
+  local status detail
+  status="$(awk '/^STATUS=/{sub(/^STATUS=/, "", $1); print $1}' <<<"${migration_output}" | tail -n 1)"
+  detail="$(awk '/^STATUS=/{sub(/^STATUS=[^ ]* detail=/, ""); print}' <<<"${migration_output}" | tail -n 1)"
+  if [[ -n "${status}" ]]; then
+    status_line "db migration" "${status}" "${detail}"
+  else
+    status_line "db migration" "WARN" "migration check produced no status"
+  fi
+}
+
 # shellcheck source=scripts/android_env.sh
 source "${ROOT_DIR}/scripts/android_env.sh"
 
@@ -84,6 +132,8 @@ if command -v adb >/dev/null 2>&1; then
 else
   status_line "adb" "FAIL" "not found after loading scripts/android_env.sh"
 fi
+
+check_visual_kind_migration
 
 DEFAULT_IFACE="$(route get default 2>/dev/null | awk '/interface:/ {print $2; exit}')"
 LAN_IP=""

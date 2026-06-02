@@ -2,6 +2,7 @@ package com.childai.companion.ui.chat
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.compose.animation.AnimatedVisibility
@@ -54,6 +55,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -188,6 +190,14 @@ private fun ChildChatScreenContent(
     var parentCredentialSubmitting by rememberSaveable { mutableStateOf(false) }
     var parentEntryHint by rememberSaveable { mutableStateOf<String?>(null) }
     var showParentEntryChoices by rememberSaveable { mutableStateOf(false) }
+    var pendingImageSourcePurpose by rememberSaveable { mutableStateOf<String?>(null) }
+    val imageInputLaunchers = rememberImageInputLaunchers(
+        onCaptured = onPhotoCaptured,
+        onFailed = onPhotoCaptureFailed,
+    )
+    val showGalleryEntry = remember {
+        companionSupportsGalleryPicker()
+    }
 
     fun resetParentGate() {
         pendingParentEntry = null
@@ -254,6 +264,27 @@ private fun ChildChatScreenContent(
             onOpenTarget = ::openParentGate,
             onDismiss = { showParentEntryChoices = false },
         )
+    }
+    pendingImageSourcePurpose?.let { imagePurpose ->
+        CompanionImageSourceDialog(
+            showGalleryEntry = showGalleryEntry,
+            onCapturePhoto = {
+                pendingImageSourcePurpose = null
+                imageInputLaunchers.capturePhoto(imagePurpose)
+            },
+            onPickFromGallery = {
+                pendingImageSourcePurpose = null
+                imageInputLaunchers.pickFromGallery(imagePurpose)
+            },
+            onDismiss = { pendingImageSourcePurpose = null },
+        )
+    }
+
+    fun handleQuickAction(action: QuickActionUi) {
+        when (action.id) {
+            "companion_friend_image" -> pendingImageSourcePurpose = IMAGE_PURPOSE_SHARE
+            else -> onQuickAction(action)
+        }
     }
 
     Scaffold(
@@ -329,13 +360,12 @@ private fun ChildChatScreenContent(
                             showParentEntryChoices = true
                         },
                         onSend = onSend,
-                        onQuickAction = onQuickAction,
+                        onQuickAction = ::handleQuickAction,
                         onStopTts = onStopTts,
                         onToggleTtsMuted = onToggleTtsMuted,
                         onOpenTtsSettings = onOpenTtsSettings,
                         onInstallTtsData = onInstallTtsData,
-                        onPhotoCaptured = onPhotoCaptured,
-                        onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        onOpenImageInput = { pendingImageSourcePurpose = it },
                         viewportClass = viewportClass,
                         modifier = Modifier
                             .weight(layoutWeights.conversation)
@@ -392,7 +422,7 @@ private fun ChildChatScreenContent(
                         QuickActionsRow(
                             actions = visibleQuickActions,
                             enabled = !uiState.isSending,
-                            onQuickAction = onQuickAction,
+                            onQuickAction = ::handleQuickAction,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -411,8 +441,7 @@ private fun ChildChatScreenContent(
                         onToggleTtsMuted = onToggleTtsMuted,
                         onOpenTtsSettings = onOpenTtsSettings,
                         onInstallTtsData = onInstallTtsData,
-                        onPhotoCaptured = onPhotoCaptured,
-                        onPhotoCaptureFailed = onPhotoCaptureFailed,
+                        onOpenImageInput = { pendingImageSourcePurpose = it },
                         playfulControls = true,
                         playfulCompactControls = viewportClass == CompanionRoomViewportClass.PortraitExpanded,
                     )
@@ -420,6 +449,58 @@ private fun ChildChatScreenContent(
             }
         }
     }
+}
+
+@Composable
+private fun CompanionImageSourceDialog(
+    showGalleryEntry: Boolean,
+    onCapturePhoto: () -> Unit,
+    onPickFromGallery: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "给小白狐看看")
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onCapturePhoto,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "拍一张照片")
+                }
+                if (showGalleryEntry) {
+                    OutlinedButton(
+                        onClick = onPickFromGallery,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "从相册选")
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "先不看")
+            }
+        },
+    )
+}
+
+internal fun companionSupportsGalleryPicker(
+    manufacturer: String = Build.MANUFACTURER,
+    brand: String = Build.BRAND,
+    model: String = Build.MODEL,
+): Boolean {
+    val fingerprint = listOf(manufacturer, brand, model)
+        .joinToString(" ")
+        .lowercase()
+    if ("jdn2" in fingerprint) return false
+    if ("honor" in fingerprint && "pad" in fingerprint) return false
+    return true
 }
 
 @Composable
@@ -832,8 +913,7 @@ private fun LandscapeOperationPanel(
     onToggleTtsMuted: () -> Unit,
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
-    onPhotoCaptured: (PhotoUploadPayload, String) -> Unit,
-    onPhotoCaptureFailed: (String) -> Unit,
+    onOpenImageInput: (String) -> Unit,
     viewportClass: CompanionRoomViewportClass,
     modifier: Modifier = Modifier,
 ) {
@@ -897,8 +977,7 @@ private fun LandscapeOperationPanel(
                 onToggleTtsMuted = onToggleTtsMuted,
                 onOpenTtsSettings = onOpenTtsSettings,
                 onInstallTtsData = onInstallTtsData,
-                onPhotoCaptured = onPhotoCaptured,
-                onPhotoCaptureFailed = onPhotoCaptureFailed,
+                onOpenImageInput = onOpenImageInput,
                 playfulControls = true,
                 playfulCompactControls = viewportClass == CompanionRoomViewportClass.LandscapeTablet,
             )
@@ -1172,11 +1251,9 @@ private val imageContextActionIds = setOf(
 )
 
 private val primaryImageCoCreationActionIds = setOf(
+    "companion_name",
     "give_name",
     "image_naming",
-    "tell_story",
-    "make_story",
-    "image_story",
 )
 
 private val openingQuickActionIds = setOf(
@@ -1203,12 +1280,20 @@ internal fun companionPinnedBubbleMessageId(uiState: ChatUiState): String? {
 
 internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<QuickActionUi> {
     val openingActionsActive = companionOpeningQuickActionsActive(uiState)
+    val coCreateGuidanceActive =
+        uiState.sessionState?.companionObject?.action == "co_create" &&
+            uiState.quickActions.any { it.id == "companion_friend_name" || it.id == "companion_friend_image" }
     val baseActions = uiState.quickActions.filterNot { action ->
         action.id == "take_photo" ||
             action.id == "share_photo" ||
             action.id == "start_voice" ||
             action.label == "我想说话" ||
-            (action.id in openingQuickActionIds && !openingActionsActive)
+            (
+                action.id in openingQuickActionIds &&
+                    !openingActionsActive &&
+                    !(coCreateGuidanceActive && action.id == "companion_skip") &&
+                    !(uiState.pendingImageContext != null && action.id == "companion_name")
+                )
     }
     if (uiState.pendingImageContext == null) {
         return baseActions.filterNot { it.id in imageContextActionIds }
@@ -1221,8 +1306,7 @@ internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<Quick
 
 private fun normalizeImageQuickAction(action: QuickActionUi): QuickActionUi {
     return when (action.id) {
-        "give_name", "image_naming" -> action.copy(label = "起个名字")
-        "tell_story", "make_story", "image_story" -> action.copy(label = "讲一句小故事")
+        "give_name", "image_naming" -> action.copy(id = "companion_name", label = "起个名字")
         else -> action
     }
 }

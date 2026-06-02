@@ -148,6 +148,20 @@ class ChatViewModelOpeningTest {
     }
 
     @Test
+    fun legacyGiveNameQuickActionAlsoReportsCompanionName() {
+        val sender = OpeningSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.onQuickAction(QuickActionUi(id = "give_name", label = "起个名字"))
+
+        assertEquals(listOf("起个名字"), sender.sentTexts)
+        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
+    }
+
+    @Test
     fun openingIsRequestedOnlyOncePerViewModelSession() {
         val sender = OpeningSender()
         val viewModel = ChatViewModel(

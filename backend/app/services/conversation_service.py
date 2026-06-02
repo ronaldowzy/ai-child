@@ -659,7 +659,7 @@ class ConversationService:
         if svc is None:
             return None
 
-        if quick_action_id == "companion_name":
+        if quick_action_id in {"companion_name", "give_name"}:
             # E5: if pending extension exists, skip seed creation — let extension handle it
             if svc.get_pending_extension(session_id=session_id, child_id=child_id):
                 return None

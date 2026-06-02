@@ -379,6 +379,15 @@ class ConversationStreamService:
             payload["companion_object"] = response.session_state.companion_object.model_dump(
                 mode="json"
             )
+        if response.ui_actions:
+            payload["quick_actions"] = [
+                {
+                    "id": action.id,
+                    "label": action.label,
+                }
+                for group in response.ui_actions
+                for action in group.actions
+            ]
         return payload
 
     def _text_delta_payload(self, segment: TextSegment) -> dict[str, object]:

@@ -138,4 +138,22 @@ class InputBarVoiceFirstTest {
             ),
         )
     }
+
+    @Test
+    fun honorPad5UsesCameraOnlyImageEntry() {
+        assertFalse(
+            companionSupportsGalleryPicker(
+                manufacturer = "HUAWEI",
+                brand = "HONOR",
+                model = "JDN2-W09HN",
+            ),
+        )
+        assertTrue(
+            companionSupportsGalleryPicker(
+                manufacturer = "Xiaomi",
+                brand = "Redmi",
+                model = "23078RKD5C",
+            ),
+        )
+    }
 }

@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 import android.util.Log
 import java.io.File
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
 
 private const val TAG = "ChatViewModel"
 
@@ -429,7 +431,10 @@ class ChatViewModel(
             "image_story",
             "say_what_happened" ->
                 continuePendingImageConversation(action)
-            else -> sendText(action.label, quickActionId = action.id)
+            else -> sendText(
+                action.label,
+                quickActionId = normalizedQuickActionId(action.id),
+            )
         }
     }
 
@@ -703,7 +708,10 @@ class ChatViewModel(
         val context = _uiState.value.pendingImageContext
         Log.d(TAG, "continuePendingImageConversation: action=${action.id}, hasContext=${context != null}")
         if (context == null) {
-            sendText(action.label, quickActionId = action.id)
+            sendText(
+                action.label,
+                quickActionId = normalizedQuickActionId(action.id),
+            )
             return
         }
         _uiState.update { it.copy(pendingImageContext = null) }
@@ -716,7 +724,7 @@ class ChatViewModel(
         sendTextWithAttachments(
             text,
             listOf(context.attachmentId),
-            quickActionId = action.id,
+            quickActionId = normalizedQuickActionId(action.id),
         )
     }
 
@@ -1043,6 +1051,7 @@ class ChatViewModel(
             state.copy(
                 sessionState = nextSessionState,
                 agent = nextAgentState,
+                quickActions = event.payload.toStreamQuickActionUi(),
             )
         }
     }
@@ -1650,6 +1659,13 @@ data class LocalImagePreviewCardUiState(
 const val IMAGE_PURPOSE_SHARE = "share"
 const val IMAGE_PURPOSE_HOMEWORK = "learning_homework"
 
+private fun normalizedQuickActionId(actionId: String): String {
+    return when (actionId) {
+        "give_name", "image_naming" -> "companion_name"
+        else -> actionId
+    }
+}
+
 private fun List<ConversationUiAction>.toQuickActionUi(): List<QuickActionUi> {
     return flatMap { action ->
         action.actions.map { quickAction ->
@@ -1657,6 +1673,22 @@ private fun List<ConversationUiAction>.toQuickActionUi(): List<QuickActionUi> {
                 id = quickAction.id,
                 label = quickAction.label,
             )
+        }
+    }
+}
+
+private fun JSONObject.toStreamQuickActionUi(): List<QuickActionUi> {
+    return optJSONArray("quick_actions").toQuickActionUiList()
+}
+
+private fun JSONArray?.toQuickActionUiList(): List<QuickActionUi> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = item.optString("id").takeIf { it.isNotBlank() } ?: continue
+            val label = item.optString("label").takeIf { it.isNotBlank() } ?: continue
+            add(QuickActionUi(id = id, label = label))
         }
     }
 }

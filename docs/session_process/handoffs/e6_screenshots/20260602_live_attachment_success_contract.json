@@ -1,0 +1,22 @@
+{
+  "reply_text": "我看到图片显示手机相机应用界面啦\n像软软的\n要不要给它起个名字？",
+  "ui_actions": [
+    {
+      "type": "show_quick_actions",
+      "actions": [
+        {
+          "id": "companion_name",
+          "label": "起个名字"
+        }
+      ]
+    }
+  ],
+  "recognized_content": {
+    "type": "image_observation",
+    "text": "图片显示手机相机应用界面，顶部有设置图标，底部中央是拍照按钮，标有“拍照”字样，左侧有方形图标，右侧有相机切换图标，背景为黑色，可能表示相机关闭或在暗处。图片用途为分享，无作业题或隐私敏感内容。",
+    "confidence": 0.9,
+    "provider_name": "mimo",
+    "image_purpose": "share",
+    "child_caption": "我拍了一张图片给小白狐看。"
+  }
+}

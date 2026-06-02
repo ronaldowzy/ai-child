@@ -245,6 +245,87 @@ def test_stream_endpoint_returns_ndjson_events(monkeypatch) -> None:
     assert route_event["payload"]["active_scene"] == "conversation.open"
 
 
+def test_stream_route_payload_matches_non_stream_companion_continue_actions() -> None:
+    from app.domain.companion_object import (
+        CompanionObjectCreateRequest,
+        CompanionObjectSource,
+        CompanionObjectType,
+    )
+    from app.repositories.companion_object_repository import InMemoryCompanionObjectRepository
+    from app.services.companion_object_service import CompanionObjectService
+
+    non_stream_companion_service = CompanionObjectService(
+        repository=InMemoryCompanionObjectRepository(),
+    )
+    non_stream_companion_service.create(
+        CompanionObjectCreateRequest(
+            child_id="stream_child",
+            name="小棉花",
+            object_type=CompanionObjectType.STAR,
+            source_type=CompanionObjectSource.FIRST_OPEN,
+            safe_summary="这颗星星叫小棉花",
+            light_location="窗边",
+        )
+    )
+    stream_companion_service = CompanionObjectService(
+        repository=InMemoryCompanionObjectRepository(),
+    )
+    stream_companion_service.create(
+        CompanionObjectCreateRequest(
+            child_id="stream_child",
+            name="小棉花",
+            object_type=CompanionObjectType.STAR,
+            source_type=CompanionObjectSource.FIRST_OPEN,
+            safe_summary="这颗星星叫小棉花",
+            light_location="窗边",
+        )
+    )
+
+    non_stream_conversation_service = ConversationService(
+        companion_object_service=non_stream_companion_service,
+        tts_service=NoopTtsService(),
+        debug_enabled=True,
+    )
+    stream_conversation_service = ConversationService(
+        companion_object_service=stream_companion_service,
+        tts_service=NoopTtsService(),
+        debug_enabled=True,
+    )
+    request_payload = _payload(text="加一个朋友")
+    request_payload["input"]["quick_action_id"] = "companion_continue"
+
+    non_stream_response = non_stream_conversation_service.handle_message(
+        ConversationStreamRequest.model_validate(request_payload),
+    )
+    stream_events = _events_from_service(
+        ConversationStreamService(
+            conversation_service=stream_conversation_service,
+            tts_service=NoopTtsService(),
+            tts_enabled=False,
+        ),
+        request_payload,
+    )
+    route_event = next(event for event in stream_events if event["type"] == "route_decision")
+
+    non_stream_action_ids = [
+        action.id
+        for group in non_stream_response.ui_actions
+        for action in group.actions
+    ]
+    stream_action_ids = [
+        action["id"]
+        for action in route_event["payload"]["quick_actions"]
+    ]
+
+    assert non_stream_response.reply.text == "那我们给它找一个小伙伴\n你可以说一个名字，也可以给我看看"
+    assert non_stream_action_ids == [
+        "companion_friend_name",
+        "companion_friend_image",
+        "companion_skip",
+    ]
+    assert stream_action_ids == non_stream_action_ids
+
+
 def test_include_tts_false_skips_tts_events_and_provider_calls() -> None:
     tts_service = UrlTtsService()
     service = ConversationStreamService(

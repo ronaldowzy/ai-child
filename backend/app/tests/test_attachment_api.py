@@ -189,6 +189,46 @@ def test_image_upload_endpoint_accepts_real_multipart_and_uses_mimo_vision(
     assert "data:image" not in str(attachment.metadata)
 
 
+def test_image_upload_endpoint_returns_only_companion_name_on_success(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        attachment_api,
+        "attachment_service",
+        AttachmentService(
+            repository=InMemoryAttachmentRepository(),
+            model_registry=CapturingVisionRegistry(provider_name="mimo"),
+            settings=Settings(model_provider="mimo", vision_provider="mimo"),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/attachments/images",
+        data={
+            "child_id": "child_real_image_contract_test",
+            "session_id": "real_image_contract_session",
+            "image_purpose": "share",
+            "child_caption": "我拍了一张图片给小白狐看。",
+        },
+        files={"file": ("sample.jpg", b"real-image-contract", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    action_ids = {
+        action["id"]
+        for action_group in body["ui_actions"]
+        for action in action_group["actions"]
+    }
+
+    assert action_ids == {"companion_name"}
+    assert "give_name" not in action_ids
+    assert "tell_story" not in action_ids
+    assert "say_what_happened" not in action_ids
+    assert "起个名字" in body["reply"]["text"]
+    assert "识别成功" not in body["reply"]["text"]
+
+
 def test_image_upload_rejects_unsupported_mime(monkeypatch) -> None:
     monkeypatch.setattr(
         attachment_api,

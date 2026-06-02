@@ -104,6 +104,28 @@ class ChatViewModelStreamTest {
     }
 
     @Test
+    fun routeDecisionCarriesQuickActionsIntoUiState() {
+        val viewModel = ChatViewModel(conversationSender = NoopConversationSender())
+
+        viewModel.applyStreamEvent(
+            streamEvent(
+                "route_decision",
+                "activeScene" to "conversation.open",
+                "quick_actions" to org.json.JSONArray().apply {
+                    put(JSONObject().put("id", "companion_friend_name").put("label", "说个名字"))
+                    put(JSONObject().put("id", "companion_friend_image").put("label", "给小白狐看看"))
+                    put(JSONObject().put("id", "companion_skip").put("label", "先聊别的"))
+                },
+            ),
+        )
+
+        assertEquals(
+            listOf("companion_friend_name", "companion_friend_image", "companion_skip"),
+            viewModel.uiState.value.quickActions.map { it.id },
+        )
+    }
+
+    @Test
     fun audioReadyUsesQueueWhenNotMuted() {
         val ttsController = RecordingTtsController()
         val viewModel = ChatViewModel(

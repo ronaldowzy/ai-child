@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +63,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.childai.companion.config.DevSettings
-import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.voice.TtsUiState
 
 @Composable
@@ -83,14 +81,12 @@ fun InputBar(
     onToggleTtsMuted: () -> Unit = {},
     onOpenTtsSettings: () -> Unit = {},
     onInstallTtsData: () -> Unit = {},
-    onPhotoCaptured: (PhotoUploadPayload, String) -> Unit = { _, _ -> },
-    onPhotoCaptureFailed: (String) -> Unit = {},
+    onOpenImageInput: (String) -> Unit = {},
     playfulControls: Boolean = false,
     playfulCompactControls: Boolean = false,
 ) {
     val context = LocalContext.current
     var draft by rememberSaveable { mutableStateOf("") }
-    var showImageSourceDialog by rememberSaveable { mutableStateOf(false) }
     val trimmedDraft = draft.trim()
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -101,11 +97,6 @@ fun InputBar(
             voice.actions.onPermissionDenied()
         }
     }
-    val imageInputLaunchers = rememberImageInputLaunchers(
-        onCaptured = onPhotoCaptured,
-        onFailed = onPhotoCaptureFailed,
-    )
-
     fun startVoiceRecordingWithPermission() {
         val isGranted = ContextCompat.checkSelfPermission(
             context,
@@ -138,43 +129,6 @@ fun InputBar(
         if (shouldAutoSendPendingTranscript) {
             voice.actions.onSendPendingTranscript()
         }
-    }
-
-    if (showImageSourceDialog) {
-        AlertDialog(
-            onDismissRequest = { showImageSourceDialog = false },
-            title = {
-                Text(text = "给小白狐看看")
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            showImageSourceDialog = false
-                            imageInputLaunchers.capturePhoto(IMAGE_PURPOSE_SHARE)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = "拍一张照片")
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            showImageSourceDialog = false
-                            imageInputLaunchers.pickFromGallery(IMAGE_PURPOSE_SHARE)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(text = "从相册选")
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showImageSourceDialog = false }) {
-                    Text(text = "先不看")
-                }
-            },
-        )
     }
 
     Column(
@@ -212,7 +166,7 @@ fun InputBar(
                             !voice.isRecording &&
                             !voice.isUploading,
                         visible = interactionPresentation.showImageInput,
-                        onClick = { showImageSourceDialog = true },
+                        onClick = { onOpenImageInput(IMAGE_PURPOSE_SHARE) },
                     ),
                     topicAction = InputBarPlayfulAction(
                         text = "换个话题",
@@ -276,7 +230,7 @@ fun InputBar(
                 ) {
                     if (interactionPresentation.showImageInput) {
                         InputBarSecondaryButton(
-                            onClick = { showImageSourceDialog = true },
+                            onClick = { onOpenImageInput(IMAGE_PURPOSE_SHARE) },
                             enabled = enabled && !voice.isRecording && !voice.isUploading,
                             text = "给小白狐看看",
                         )

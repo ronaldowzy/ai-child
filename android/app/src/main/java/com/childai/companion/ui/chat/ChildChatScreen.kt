@@ -1288,7 +1288,7 @@ private fun LandscapeOperationPanel(
 
 internal const val PARENT_ENTRY_COMPACT_LABEL = "家长入口"
 
-internal fun parentEntryTapHint(): String = ""
+internal fun parentEntryTapHint(): String = "长按进入家长入口"
 
 internal fun parentEntryDefaultHint(): String = ""
 

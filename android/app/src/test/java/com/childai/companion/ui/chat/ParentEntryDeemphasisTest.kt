@@ -15,12 +15,11 @@ class ParentEntryDeemphasisTest {
     }
 
     @Test
-    fun normalTapDoesNotAddExtraTopCopy() {
+    fun normalTapShowsLongPressHintWithoutAdultCopy() {
         val hint = parentEntryTapHint()
 
-        assertEquals("", hint)
+        assertEquals("长按进入家长入口", hint)
         assertFalse(hint.contains("大人"))
-        assertFalse(hint.contains("长按"))
     }
 
     @Test

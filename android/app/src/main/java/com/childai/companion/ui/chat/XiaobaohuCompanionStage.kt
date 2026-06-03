@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,6 +48,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.geometry.CornerRadius as GeoCornerRadius
@@ -442,6 +446,7 @@ private data class CompanionVisualConfig(
     val glowColors: List<Color>,
     val shapeSize: Dp,
     val shapeSizeV: Dp,
+    val assetSize: Dp,
     val shapeFill: Color,
     val shapeStroke: Color,
     val animationType: CompanionAnimationType,
@@ -506,6 +511,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 30.dp,
             shapeSizeV = 30.dp,
+            assetSize = 48.dp,
             shapeFill = Color(0xFFFFE082).copy(alpha = 0.50f),
             shapeStroke = Color(0xFFFFCA28).copy(alpha = 0.30f),
             animationType = CompanionAnimationType.Breathing,
@@ -521,6 +527,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 40.dp,
             shapeSizeV = 26.dp,
+            assetSize = 52.dp,
             shapeFill = Color(0xFFE8EAF6).copy(alpha = 0.45f),
             shapeStroke = Color(0xFFC5CAE9).copy(alpha = 0.28f),
             animationType = CompanionAnimationType.Floating,
@@ -536,6 +543,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 34.dp,
             shapeSizeV = 28.dp,
+            assetSize = 50.dp,
             shapeFill = Color(0xFFFFF8E1).copy(alpha = 0.42f),
             shapeStroke = Color(0xFFE1F5FE).copy(alpha = 0.30f),
             animationType = CompanionAnimationType.Floating,
@@ -551,6 +559,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 26.dp,
             shapeSizeV = 36.dp,
+            assetSize = 50.dp,
             shapeFill = Color(0xFFFFF3E0).copy(alpha = 0.42f),
             shapeStroke = Color(0xFFD7CCC8).copy(alpha = 0.32f),
             animationType = CompanionAnimationType.Breathing,
@@ -566,6 +575,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 36.dp,
             shapeSizeV = 30.dp,
+            assetSize = 54.dp,
             shapeFill = Color(0xFFC8E6C9).copy(alpha = 0.40f),
             shapeStroke = Color(0xFFA5D6A7).copy(alpha = 0.28f),
             animationType = CompanionAnimationType.Floating,
@@ -581,6 +591,7 @@ private fun CompanionVisualType.config(): CompanionVisualConfig {
             ),
             shapeSize = 28.dp,
             shapeSizeV = 28.dp,
+            assetSize = 48.dp,
             shapeFill = Color(0xFFFFCC80).copy(alpha = 0.42f),
             shapeStroke = Color(0xFFFFB74D).copy(alpha = 0.30f),
             animationType = CompanionAnimationType.Breathing,
@@ -650,6 +661,8 @@ private fun CompanionLightPointBackdrop(
         companionObject = companionObject,
         viewportClass = viewportClass,
     ) ?: return
+    val assetResId = renderState.assetResourceName?.let { companionObjectAssetResId(it) }
+    if (assetResId != null) return
 
     val backdropAlpha = (renderState.alpha * renderState.emphasis.backdropAlphaMultiplier)
         .coerceIn(0f, 0.90f)
@@ -670,10 +683,12 @@ private fun CompanionLightPointBackdrop(
                     width = maxOf(
                         renderState.config.glowSize * renderState.emphasis.glowScale,
                         renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                        renderState.assetSize,
                     ),
                     height = maxOf(
                         renderState.config.glowSize * renderState.emphasis.glowScale,
                         renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                        renderState.assetSize,
                     ),
                 ),
         ) {
@@ -706,6 +721,7 @@ private fun CompanionLightPointForeground(
         .coerceIn(0f, 0.94f)
 
     Box(modifier = modifier.fillMaxSize()) {
+        val assetResId = renderState.assetResourceName?.let { companionObjectAssetResId(it) }
         Box(
             modifier = Modifier
                 .align(renderState.placement.alignment)
@@ -721,45 +737,59 @@ private fun CompanionLightPointForeground(
                     width = maxOf(
                         renderState.config.glowSize * renderState.emphasis.glowScale,
                         renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                        renderState.assetSize,
                     ),
                     height = maxOf(
                         renderState.config.glowSize * renderState.emphasis.glowScale,
                         renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                        renderState.assetSize,
                     ),
                 ),
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(
-                        renderState.config.shapeSize * renderState.emphasis.shapeScale * 1.18f,
+            if (assetResId != null) {
+                Image(
+                    painter = painterResource(id = assetResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(renderState.assetSize)
+                        .alpha(renderState.assetAlpha),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(
+                            renderState.config.shapeSize * renderState.emphasis.shapeScale * 1.18f,
+                        )
+                        .alpha(renderState.emphasis.foregroundGlowAlpha)
+                        .blur(radius = (renderState.config.glowBlurRadius * 0.72f))
+                        .background(
+                            brush = Brush.radialGradient(colors = renderState.config.glowColors),
+                            shape = CircleShape,
+                        ),
+                )
+                Canvas(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(
+                            renderState.config.shapeSize * renderState.emphasis.shapeScale,
+                            renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
+                        ),
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val fill = renderState.config.shapeFill.copy(
+                        alpha = (renderState.config.shapeFill.alpha * foregroundAlpha / renderState.config.glowAlpha)
+                            .coerceIn(0f, 0.88f),
                     )
-                    .alpha(renderState.emphasis.foregroundGlowAlpha)
-                    .blur(radius = (renderState.config.glowBlurRadius * 0.72f))
-                    .background(
-                        brush = Brush.radialGradient(colors = renderState.config.glowColors),
-                        shape = CircleShape,
-                    ),
-            )
-            Canvas(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(
-                        renderState.config.shapeSize * renderState.emphasis.shapeScale,
-                        renderState.config.shapeSizeV * renderState.emphasis.shapeScale,
-                    ),
-            ) {
-                val w = size.width
-                val h = size.height
-                val fill = renderState.config.shapeFill.copy(
-                    alpha = (renderState.config.shapeFill.alpha * foregroundAlpha / renderState.config.glowAlpha)
-                        .coerceIn(0f, 0.88f),
-                )
-                val stroke = renderState.config.shapeStroke.copy(
-                    alpha = (renderState.config.shapeStroke.alpha * foregroundAlpha / renderState.config.glowAlpha)
-                        .coerceIn(0f, 0.82f),
-                )
-                drawCompanionShape(renderState.visualType, w, h, fill, stroke)
+                    val stroke = renderState.config.shapeStroke.copy(
+                        alpha = (renderState.config.shapeStroke.alpha * foregroundAlpha / renderState.config.glowAlpha)
+                            .coerceIn(0f, 0.82f),
+                    )
+                    drawCompanionShape(renderState.visualType, w, h, fill, stroke)
+                }
             }
         }
     }
@@ -770,6 +800,9 @@ private data class CompanionLightPointRenderState(
     val visualType: CompanionVisualType,
     val config: CompanionVisualConfig,
     val emphasis: CompanionVisualEmphasis,
+    val assetResourceName: String?,
+    val assetSize: Dp,
+    val assetAlpha: Float,
     val alpha: Float,
     val offsetY: Float,
     val scale: Float,
@@ -791,6 +824,7 @@ private fun rememberCompanionLightPointRenderState(
     val config = visualType.config()
     val placement = location.placementForViewport(viewportClass)
     val emphasis = companionObject.visualEmphasis()
+    val assetResourceName = visualType.assetResourceName()
 
     var entranceDone by remember(companionObject.id, companionObject.action) { mutableStateOf(false) }
     val entranceProgress = remember(companionObject.id, companionObject.action) { Animatable(0f) }
@@ -863,10 +897,45 @@ private fun rememberCompanionLightPointRenderState(
         visualType = visualType,
         config = config,
         emphasis = emphasis,
+        assetResourceName = assetResourceName,
+        assetSize = config.assetSize * emphasis.shapeScale,
+        assetAlpha = companionObject.assetAlpha(alpha = alpha, baseAlpha = config.glowAlpha),
         alpha = alpha,
         offsetY = offsetY,
         scale = scale,
     )
+}
+
+internal fun CompanionVisualType.assetResourceName(): String? {
+    return when (this) {
+        CompanionVisualType.Star -> "companion_object_star"
+        CompanionVisualType.Cloud -> "companion_object_cloud"
+        CompanionVisualType.PaperBoat -> "companion_object_paper_boat"
+        CompanionVisualType.TinyDoor -> "companion_object_tiny_door"
+        CompanionVisualType.DinoShadow -> "companion_object_dino_shadow"
+        CompanionVisualType.BlockLight -> "companion_object_block_light"
+    }
+}
+
+@Composable
+private fun companionObjectAssetResId(resourceName: String): Int? {
+    val context = LocalContext.current
+    return remember(resourceName, context) {
+        context.resources
+            .getIdentifier(resourceName, "drawable", context.packageName)
+            .takeIf { it != 0 }
+    }
+}
+
+private fun CompanionObjectMeta.assetAlpha(alpha: Float, baseAlpha: Float): Float {
+    val stateAlpha = when {
+        state == "active" && action == "co_create" -> 0.98f
+        state == "active" && action == "recall" -> 0.78f
+        state == "seed" && action == "name_seed" -> 0.88f
+        else -> 0.82f
+    }
+    val entranceAlpha = if (baseAlpha <= 0f) 1f else (alpha / baseAlpha).coerceIn(0f, 1.06f)
+    return (stateAlpha * entranceAlpha).coerceIn(0f, 1f)
 }
 
 // --- Shape drawing functions ---

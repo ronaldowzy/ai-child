@@ -133,6 +133,16 @@ class CompanionObjectVisualTest {
     }
 
     @Test
+    fun allVisualKindsHavePrimaryAssetResources() {
+        CompanionVisualType.entries.forEach { visualType ->
+            assertTrue(
+                "${visualType.name} should map to a drawable asset",
+                visualType.assetResourceName() != null,
+            )
+        }
+    }
+
+    @Test
     fun legacyStarFallbackMapsToStar() {
         assertEquals(CompanionVisualType.Star, "小星星".toCompanionVisualType())
     }

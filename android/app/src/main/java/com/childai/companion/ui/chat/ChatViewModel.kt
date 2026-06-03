@@ -424,6 +424,7 @@ class ChatViewModel(
     }
 
     fun onQuickAction(action: QuickActionUi) {
+        Log.d(TAG, "onQuickAction: id=${action.id}, label=${action.label}")
         if (action.id !in setOf("companion_name", "give_name", "image_naming", "companion_friend_name")) {
             pendingDeferredQuickActionId = null
         }
@@ -447,6 +448,22 @@ class ChatViewModel(
             "companion_friend_name" -> {
                 pendingDeferredQuickActionId = normalizedQuickActionId(action.id)
                 stopCurrentTts(restoreBaseAgent = true)
+                _uiState.update { state ->
+                    val nextVoice = state.voice.copy(
+                        inputMode = VoiceInputMode.WaitingForChild,
+                        pendingTranscript = "",
+                        errorMessage = null,
+                    )
+                    state.copy(
+                        quickActions = emptyList(),
+                        childTurnPhaseHint = null,
+                        voice = nextVoice,
+                        agent = childInteractionPresentation(
+                            voice = nextVoice,
+                            fallbackAgent = baseAgentState,
+                        ).agent,
+                    )
+                }
             }
             else -> sendText(
                 action.label,

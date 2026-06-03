@@ -146,6 +146,8 @@ class ChatViewModelOpeningTest {
         viewModel.onQuickAction(QuickActionUi(id = "companion_name", label = "起个名字"))
         assertTrue(sender.sentTexts.isEmpty())
         assertTrue(sender.sentQuickActionIds.isEmpty())
+        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
+        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
 
         viewModel.sendText("叫小棉花")
 
@@ -164,6 +166,8 @@ class ChatViewModelOpeningTest {
         viewModel.onQuickAction(QuickActionUi(id = "give_name", label = "起个名字"))
         assertTrue(sender.sentTexts.isEmpty())
         assertTrue(sender.sentQuickActionIds.isEmpty())
+        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
+        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
 
         viewModel.sendText("叫小棉花")
 
@@ -182,6 +186,8 @@ class ChatViewModelOpeningTest {
         viewModel.onQuickAction(QuickActionUi(id = "companion_friend_name", label = "说个名字"))
         assertTrue(sender.sentTexts.isEmpty())
         assertTrue(sender.sentQuickActionIds.isEmpty())
+        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
+        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
 
         viewModel.sendText("叫小云朵")
 

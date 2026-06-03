@@ -97,4 +97,38 @@ class ChildCompanionPageRulesTest {
             assertFalse(waitingCopy.contains(marker))
         }
     }
+
+    @Test
+    fun galleryPickerIsHiddenOnlyForKnownHonorPadFallback() {
+        assertFalse(
+            companionSupportsGalleryPicker(
+                manufacturer = "HONOR",
+                brand = "HONOR",
+                model = "JDN2-W09HN",
+            ),
+        )
+        assertFalse(
+            companionSupportsGalleryPicker(
+                manufacturer = "HONOR",
+                brand = "HONOR",
+                model = "Honor Pad 5",
+            ),
+        )
+        assertEquals(
+            true,
+            companionSupportsGalleryPicker(
+                manufacturer = "Xiaomi",
+                brand = "Redmi",
+                model = "Redmi K60",
+            ),
+        )
+        assertEquals(
+            true,
+            companionSupportsGalleryPicker(
+                manufacturer = "Google",
+                brand = "google",
+                model = "Pixel",
+            ),
+        )
+    }
 }

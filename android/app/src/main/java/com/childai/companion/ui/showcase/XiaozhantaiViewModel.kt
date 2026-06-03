@@ -39,12 +39,13 @@ class XiaozhantaiViewModel(
         }
     }
 
-    fun softDeleteItem(itemId: String) {
+    fun softDeleteItem(itemId: String, onDeleted: () -> Unit = {}) {
         viewModelScope.launch {
             repository.softDelete(childId, itemId)
             _uiState.update { state ->
                 state.copy(selectedItem = null)
             }
+            onDeleted()
         }
     }
 }

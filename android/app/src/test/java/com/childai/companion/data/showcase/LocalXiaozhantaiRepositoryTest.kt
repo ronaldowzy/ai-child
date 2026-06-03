@@ -67,4 +67,26 @@ class LocalXiaozhantaiRepositoryTest {
 
         assertFalse(repository.observeItems("child_002").first().any())
     }
+
+    @Test
+    fun saveCapturedPhotoNormalizesBlankNameAndFoxQuote() = runTest {
+        val repository = LocalXiaozhantaiRepository(
+            rootDirectory = temporaryFolder.newFolder("xiaozhantai-fallbacks"),
+            clock = { 1760000000000L },
+        )
+
+        val item = repository.saveCapturedPhoto(
+            XiaozhantaiSaveRequest(
+                childId = "child_003",
+                photoBytes = byteArrayOf(10, 11, 12),
+                name = "  \n  ",
+                foxQuote = "",
+            ),
+        )
+
+        assertEquals("小发现", item.name)
+        assertEquals("小白狐看见了这个小发现。", item.foxQuote)
+        assertTrue(File(item.photoUri).absolutePath.contains("xiaozhantai"))
+        assertTrue(File(item.photoUri).isFile)
+    }
 }

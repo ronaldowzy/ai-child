@@ -17,6 +17,8 @@ import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
 import com.childai.companion.data.showcase.suggestedXiaozhantaiItemName
 import com.childai.companion.data.showcase.xiaozhantaiFoxQuoteFromReply
+import com.childai.companion.data.showcase.xiaozhantaiNormalizeFoxQuote
+import com.childai.companion.data.showcase.xiaozhantaiNormalizeName
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.voice.AudioSegment
@@ -671,9 +673,7 @@ class ChatViewModel(
         val companionName = companionObject
             ?.takeIf { it.state == "active" && it.action == "co_create" }
             ?.name
-            ?.trim()
-            ?.take(24)
-            ?.takeIf { it.isNotBlank() }
+            ?.let(::xiaozhantaiNormalizeName)
             ?: return
         val messageId = latestXiaozhantaiSaveCandidateMessageId
             ?.takeIf { xiaozhantaiSaveCandidates.containsKey(it) }
@@ -700,7 +700,7 @@ class ChatViewModel(
     fun requestSavePhotoToXiaozhantai(messageId: String) {
         val candidate = xiaozhantaiSaveCandidates[messageId] ?: return
         val card = _uiState.value.imagePreviewCards[messageId] ?: return
-        if (!card.canSaveToXiaozhantai || card.savedToXiaozhantai) return
+        if (!card.canSaveToXiaozhantai || card.savedToXiaozhantai || card.isSavingToXiaozhantai) return
         _uiState.update { state ->
             state.copy(
                 xiaozhantaiSaveDraft = XiaozhantaiSaveDraftUiState(
@@ -736,18 +736,12 @@ class ChatViewModel(
     fun confirmXiaozhantaiSave() {
         val repository = xiaozhantaiRepository ?: return
         val draft = _uiState.value.xiaozhantaiSaveDraft ?: return
+        if (draft.isSaving) return
         val candidate = xiaozhantaiSaveCandidates[draft.messageId] ?: return
-        val itemName = draft.name.trim().ifBlank { draft.defaultName }.take(24)
-        if (itemName.isBlank()) {
-            _uiState.update { state ->
-                state.copy(
-                    xiaozhantaiSaveDraft = draft.copy(
-                        errorMessage = "可以给它一个短短的名字",
-                    ),
-                )
-            }
-            return
-        }
+        val itemName = xiaozhantaiNormalizeName(draft.name.ifBlank { draft.defaultName })
+        val foxQuote = xiaozhantaiNormalizeFoxQuote(
+            candidate.foxQuote.ifBlank { _uiState.value.agentReplyText },
+        )
         _uiState.update { state ->
             state.copy(
                 xiaozhantaiSaveDraft = draft.copy(
@@ -770,9 +764,7 @@ class ChatViewModel(
                         childId = childId,
                         photoBytes = candidate.payload.bytes,
                         name = itemName,
-                        foxQuote = candidate.foxQuote.ifBlank {
-                            _uiState.value.agentReplyText
-                        },
+                        foxQuote = foxQuote,
                     ),
                 )
             }.onSuccess { item ->
@@ -794,17 +786,17 @@ class ChatViewModel(
                             ),
                     )
                 }
-            }.onFailure { error ->
+            }.onFailure {
                 _uiState.update { state ->
                     state.copy(
                         xiaozhantaiSaveDraft = state.xiaozhantaiSaveDraft?.copy(
                             isSaving = false,
-                            errorMessage = "刚才没有放好，可以再试一次",
+                            errorMessage = "刚才没有放好，我们可以等一下再试。",
                         ),
                         imagePreviewCards = state.imagePreviewCards + (
                             draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
                                 isSavingToXiaozhantai = false,
-                                xiaozhantaiError = error.message.orEmpty().take(80),
+                                xiaozhantaiError = "刚才没有放好，我们可以等一下再试。",
                             ) ?: return@update state)
                             ),
                     )

@@ -210,6 +210,65 @@ class ChatViewModelImageAttachmentTest {
         assertEquals("我看到小黄星啦", showcaseRepository.savedRequest!!.foxQuote)
     }
 
+    @Test
+    fun confirmShowcaseSaveIgnoresDuplicateClicksWhileSaving() {
+        val attachmentRepository = HoldingAttachmentRepository()
+        val showcaseRepository = HoldingXiaozhantaiRepository()
+        val viewModel = viewModel(
+            repository = attachmentRepository,
+            showcaseRepository = showcaseRepository,
+        )
+
+        viewModel.submitCapturedPhoto(photoPayload())
+        val childMessage = viewModel.uiState.value.messages.last()
+        attachmentRepository.resumeSuccess(attachmentResponse())
+        viewModel.requestSavePhotoToXiaozhantai(childMessage.id)
+
+        viewModel.confirmXiaozhantaiSave()
+        viewModel.confirmXiaozhantaiSave()
+
+        assertEquals(1, showcaseRepository.saveCalls)
+        assertTrue(viewModel.uiState.value.xiaozhantaiSaveDraft!!.isSaving)
+        assertTrue(
+            viewModel.uiState.value.imagePreviewCards
+                .getValue(childMessage.id)
+                .isSavingToXiaozhantai,
+        )
+
+        showcaseRepository.resumeSuccess()
+
+        assertTrue(
+            viewModel.uiState.value.imagePreviewCards
+                .getValue(childMessage.id)
+                .savedToXiaozhantai,
+        )
+    }
+
+    @Test
+    fun failedShowcaseSaveRestoresRetryableStateWithGentleMessage() {
+        val attachmentRepository = HoldingAttachmentRepository()
+        val showcaseRepository = ThrowingXiaozhantaiRepository()
+        val viewModel = viewModel(
+            repository = attachmentRepository,
+            showcaseRepository = showcaseRepository,
+        )
+
+        viewModel.submitCapturedPhoto(photoPayload())
+        val childMessage = viewModel.uiState.value.messages.last()
+        attachmentRepository.resumeSuccess(attachmentResponse())
+        viewModel.requestSavePhotoToXiaozhantai(childMessage.id)
+        viewModel.confirmXiaozhantaiSave()
+
+        val draft = viewModel.uiState.value.xiaozhantaiSaveDraft
+        val card = viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id)
+        assertNotNull(draft)
+        assertFalse(draft!!.isSaving)
+        assertEquals("刚才没有放好，我们可以等一下再试。", draft.errorMessage)
+        assertFalse(card.isSavingToXiaozhantai)
+        assertFalse(card.savedToXiaozhantai)
+        assertEquals("刚才没有放好，我们可以等一下再试。", card.xiaozhantaiError)
+    }
+
     private fun viewModel(
         repository: AttachmentRepository,
         showcaseRepository: XiaozhantaiRepository? = null,
@@ -325,5 +384,41 @@ private class CapturingXiaozhantaiRepository : XiaozhantaiRepository() {
             source = request.source,
             isDeleted = false,
         )
+    }
+}
+
+private class HoldingXiaozhantaiRepository : XiaozhantaiRepository() {
+    private var continuation: Continuation<XiaozhantaiItem>? = null
+    var saveCalls = 0
+    private var lastRequest: XiaozhantaiSaveRequest? = null
+
+    override suspend fun saveCapturedPhoto(request: XiaozhantaiSaveRequest): XiaozhantaiItem {
+        saveCalls += 1
+        lastRequest = request
+        return suspendCoroutine { nextContinuation ->
+            continuation = nextContinuation
+        }
+    }
+
+    fun resumeSuccess() {
+        val request = lastRequest ?: return
+        continuation?.resume(
+            XiaozhantaiItem(
+                id = "stand_item_saved",
+                photoUri = "/tmp/stand_item_saved.jpg",
+                name = request.name,
+                foxQuote = request.foxQuote,
+                createdAt = 1760000000000L,
+                source = request.source,
+                isDeleted = false,
+            ),
+        )
+        continuation = null
+    }
+}
+
+private class ThrowingXiaozhantaiRepository : XiaozhantaiRepository() {
+    override suspend fun saveCapturedPhoto(request: XiaozhantaiSaveRequest): XiaozhantaiItem {
+        throw RuntimeException("save failed")
     }
 }

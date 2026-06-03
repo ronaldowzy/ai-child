@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.childai.companion.R
 import com.childai.companion.data.showcase.XiaozhantaiItem
 import com.childai.companion.data.showcase.xiaozhantaiDisplayName
+import com.childai.companion.data.showcase.xiaozhantaiNormalizeFoxQuote
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import java.io.File
 import java.net.URL
@@ -101,8 +102,7 @@ fun XiaozhantaiDetailScreen(
         item = selected,
         onBack = onBack,
         onDelete = { item ->
-            viewModel.softDeleteItem(item.id)
-            onBack()
+            viewModel.softDeleteItem(item.id, onDeleted = onBack)
         },
         modifier = modifier,
     )
@@ -443,7 +443,16 @@ private fun XiaozhantaiPhotoImage(
                     ),
                 ),
             ),
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "照片暂时看不到",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF7A8998).copy(alpha = 0.72f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
     }
 }
 
@@ -514,7 +523,7 @@ private fun XiaozhantaiFoxQuote(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = quote,
+                text = xiaozhantaiNormalizeFoxQuote(quote),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color(0xFF465B70),
             )

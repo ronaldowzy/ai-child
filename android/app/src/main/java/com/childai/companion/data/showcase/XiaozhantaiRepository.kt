@@ -27,8 +27,8 @@ open class XiaozhantaiRepository(
         val item = XiaozhantaiItem(
             id = "stand_item_${UUID.randomUUID()}",
             photoUri = "memory://${request.childId}/${UUID.randomUUID()}",
-            name = request.name,
-            foxQuote = request.foxQuote,
+            name = xiaozhantaiNormalizeName(request.name),
+            foxQuote = xiaozhantaiNormalizeFoxQuote(request.foxQuote),
             createdAt = request.createdAt ?: System.currentTimeMillis(),
             source = request.source,
             isDeleted = false,
@@ -78,8 +78,8 @@ class LocalXiaozhantaiRepository(
             val item = XiaozhantaiItem(
                 id = itemId,
                 photoUri = photoFile.absolutePath,
-                name = request.name.trim().take(24).ifBlank { "小发现" },
-                foxQuote = request.foxQuote.trim(),
+                name = xiaozhantaiNormalizeName(request.name),
+                foxQuote = xiaozhantaiNormalizeFoxQuote(request.foxQuote),
                 createdAt = createdAt,
                 source = request.source.ifBlank { SOURCE_CHILD_CAMERA },
                 isDeleted = false,

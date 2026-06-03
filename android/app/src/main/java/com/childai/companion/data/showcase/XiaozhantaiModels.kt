@@ -2,6 +2,9 @@ package com.childai.companion.data.showcase
 
 import org.json.JSONObject
 
+const val XIAOZHANTAI_DEFAULT_NAME = "小发现"
+const val XIAOZHANTAI_DEFAULT_FOX_QUOTE = "小白狐看见了这个小发现。"
+
 data class XiaozhantaiItem(
     val id: String,
     val photoUri: String,
@@ -34,9 +37,31 @@ fun visibleXiaozhantaiItems(items: List<XiaozhantaiItem>): List<XiaozhantaiItem>
 }
 
 fun xiaozhantaiDisplayName(name: String, maxLength: Int = 12): String {
-    val compact = name.trim().replace(Regex("\\s+"), " ")
+    val compact = xiaozhantaiNormalizeName(name, maxLength = 10_000)
     if (compact.length <= maxLength) return compact
     return compact.take(maxLength.coerceAtLeast(2) - 1) + "…"
+}
+
+fun xiaozhantaiNormalizeName(name: String?, maxLength: Int = 24): String {
+    val compact = name
+        ?.replace(Regex("[\\r\\n\\t]+"), " ")
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        .orEmpty()
+    return compact
+        .take(maxLength.coerceAtLeast(1))
+        .ifBlank { XIAOZHANTAI_DEFAULT_NAME }
+}
+
+fun xiaozhantaiNormalizeFoxQuote(quote: String?): String {
+    val compact = quote
+        ?.lineSequence()
+        ?.map { it.trim() }
+        ?.firstOrNull { it.isNotBlank() }
+        .orEmpty()
+    return compact
+        .take(80)
+        .ifBlank { XIAOZHANTAI_DEFAULT_FOX_QUOTE }
 }
 
 fun suggestedXiaozhantaiItemName(summary: String?): String {
@@ -55,17 +80,12 @@ fun suggestedXiaozhantaiItemName(summary: String?): String {
         .firstOrNull { token ->
             token !in setOf("我看到", "看到", "这张图", "图片里", "图里", "一个", "一张", "像是")
         }
-    return keyword?.take(8) ?: "小发现"
+    return keyword?.let { xiaozhantaiNormalizeName(it, maxLength = 8) }
+        ?: XIAOZHANTAI_DEFAULT_NAME
 }
 
 fun xiaozhantaiFoxQuoteFromReply(replyText: String): String {
-    val compact = replyText
-        .lineSequence()
-        .map { it.trim() }
-        .firstOrNull { it.isNotBlank() }
-        .orEmpty()
-        .ifBlank { "小白狐看见了这个小发现。" }
-    return compact.take(80)
+    return xiaozhantaiNormalizeFoxQuote(replyText)
 }
 
 internal fun XiaozhantaiItem.toJson(): JSONObject {
@@ -82,12 +102,11 @@ internal fun XiaozhantaiItem.toJson(): JSONObject {
 internal fun xiaozhantaiItemFromJson(json: JSONObject): XiaozhantaiItem? {
     val id = json.optString("id").takeIf { it.isNotBlank() } ?: return null
     val photoUri = json.optString("photoUri").takeIf { it.isNotBlank() } ?: return null
-    val name = json.optString("name").takeIf { it.isNotBlank() } ?: return null
     return XiaozhantaiItem(
         id = id,
         photoUri = photoUri,
-        name = name,
-        foxQuote = json.optString("foxQuote"),
+        name = xiaozhantaiNormalizeName(json.optString("name")),
+        foxQuote = xiaozhantaiNormalizeFoxQuote(json.optString("foxQuote")),
         createdAt = json.optLong("createdAt", 0L),
         source = json.optString("source").ifBlank { SOURCE_CHILD_CAMERA },
         isDeleted = json.optBoolean("isDeleted", false),

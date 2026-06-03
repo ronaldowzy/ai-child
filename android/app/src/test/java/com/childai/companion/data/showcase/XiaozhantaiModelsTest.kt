@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class XiaozhantaiModelsTest {
 
@@ -56,6 +57,7 @@ class XiaozhantaiModelsTest {
     @Test
     fun displayNameIsDynamicAndEllipsized() {
         assertEquals("小石头", xiaozhantaiDisplayName("  小石头  "))
+        assertEquals("小发现", xiaozhantaiDisplayName(" \n\t "))
         assertEquals("很长很长…", xiaozhantaiDisplayName("很长很长的小发现名字", maxLength = 5))
     }
 
@@ -66,10 +68,32 @@ class XiaozhantaiModelsTest {
     }
 
     @Test
+    fun normalizeNameHandlesBlankLongAndWhitespace() {
+        assertEquals("小发现", xiaozhantaiNormalizeName(""))
+        assertEquals("小 棉花", xiaozhantaiNormalizeName("  小\n棉花  "))
+        assertEquals("很长很长的小发现", xiaozhantaiNormalizeName("很长很长的小发现名字", maxLength = 8))
+    }
+
+    @Test
     fun foxQuoteUsesFirstLineOnly() {
         assertEquals(
             "我看到小石头啦",
             xiaozhantaiFoxQuoteFromReply("我看到小石头啦\n像一颗安静的小星球\n要不要给它起个名字？"),
         )
+        assertEquals("小白狐看见了这个小发现。", xiaozhantaiFoxQuoteFromReply(""))
+    }
+
+    @Test
+    fun itemFromJsonFallsBackNameAndFoxQuote() {
+        val item = xiaozhantaiItemFromJson(
+            JSONObject()
+                .put("id", "stand_item_001")
+                .put("photoUri", "/tmp/photo.jpg")
+                .put("name", "")
+                .put("foxQuote", ""),
+        )
+
+        assertEquals("小发现", item!!.name)
+        assertEquals("小白狐看见了这个小发现。", item.foxQuote)
     }
 }

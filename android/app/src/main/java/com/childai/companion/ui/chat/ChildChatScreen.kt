@@ -1073,6 +1073,13 @@ private fun LocalImagePreviewCard(
                 )
             }
         }
+        preview.xiaozhantaiError?.takeIf { it.isNotBlank() }?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelMedium,
+                color = contentColor.copy(alpha = 0.72f),
+            )
+        }
     }
 }
 

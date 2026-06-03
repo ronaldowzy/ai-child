@@ -8,6 +8,8 @@ import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.data.growth.GrowthEvent
+import com.childai.companion.data.growth.GrowthEventRepository
 import com.childai.companion.data.showcase.XiaozhantaiItem
 import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
@@ -211,6 +213,40 @@ class ChatViewModelImageAttachmentTest {
     }
 
     @Test
+    fun savedShowcaseItemRecordsGrowthEventWhenRepositoryProvided() {
+        val attachmentRepository = HoldingAttachmentRepository()
+        val showcaseRepository = CapturingXiaozhantaiRepository()
+        val growthEventRepository = CapturingGrowthEventRepository()
+        val viewModel = viewModel(
+            repository = attachmentRepository,
+            showcaseRepository = showcaseRepository,
+            growthEventRepository = growthEventRepository,
+        )
+
+        viewModel.submitCapturedPhoto(photoPayload())
+        val childMessage = viewModel.uiState.value.messages.last()
+        attachmentRepository.resumeSuccess(
+            attachmentResponse(
+                replyText = "我看到小石头啦",
+            ),
+        )
+        viewModel.requestSavePhotoToXiaozhantai(childMessage.id)
+        viewModel.updateXiaozhantaiSaveName("小石头")
+        viewModel.confirmXiaozhantaiSave()
+
+        val event = growthEventRepository.appendedEvent
+        assertNotNull(event)
+        assertEquals("showcase_item_saved", event!!.type)
+        assertEquals("xiaozhantai", event.source)
+        assertEquals("stand_item_saved", event.relatedItemId)
+        assertEquals("/tmp/stand_item_saved.jpg", event.relatedPhotoUri)
+        assertEquals(
+            "孩子把「小石头」放进了小展台。小白狐当时说：我看到小石头啦",
+            event.summary,
+        )
+    }
+
+    @Test
     fun confirmShowcaseSaveIgnoresDuplicateClicksWhileSaving() {
         val attachmentRepository = HoldingAttachmentRepository()
         val showcaseRepository = HoldingXiaozhantaiRepository()
@@ -272,10 +308,12 @@ class ChatViewModelImageAttachmentTest {
     private fun viewModel(
         repository: AttachmentRepository,
         showcaseRepository: XiaozhantaiRepository? = null,
+        growthEventRepository: GrowthEventRepository? = null,
     ): ChatViewModel {
         return ChatViewModel(
             attachmentRepository = repository,
             xiaozhantaiRepository = showcaseRepository,
+            growthEventRepository = growthEventRepository,
             sendDispatcher = Dispatchers.Unconfined,
             requestOpeningOnInit = false,
         )
@@ -420,5 +458,14 @@ private class HoldingXiaozhantaiRepository : XiaozhantaiRepository() {
 private class ThrowingXiaozhantaiRepository : XiaozhantaiRepository() {
     override suspend fun saveCapturedPhoto(request: XiaozhantaiSaveRequest): XiaozhantaiItem {
         throw RuntimeException("save failed")
+    }
+}
+
+private class CapturingGrowthEventRepository : GrowthEventRepository() {
+    var appendedEvent: GrowthEvent? = null
+
+    override suspend fun append(event: GrowthEvent): GrowthEvent {
+        appendedEvent = event
+        return event
     }
 }

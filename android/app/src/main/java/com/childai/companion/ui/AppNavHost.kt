@@ -19,6 +19,7 @@ import com.childai.companion.data.conversation.ConversationRepository
 import com.childai.companion.data.conversation.ConversationStreamClient
 import com.childai.companion.data.debug.HouseObjectDebugApiClient
 import com.childai.companion.data.debug.HouseObjectDebugRepository
+import com.childai.companion.data.growth.LocalGrowthEventRepository
 import com.childai.companion.data.parent.ParentPolicyApiClient
 import com.childai.companion.data.parent.ParentPolicyRepository
 import com.childai.companion.data.parent.ParentReportApiClient
@@ -83,6 +84,9 @@ fun AppNavHost(
     val xiaozhantaiRepository = remember(session.childId) {
         LocalXiaozhantaiRepository(appContext)
     }
+    val growthEventRepository = remember(session.childId) {
+        LocalGrowthEventRepository(appContext)
+    }
     val parentCredentialVerifier = remember(authRepository, session.username) {
         ParentCredentialVerifier(authRepository)
     }
@@ -109,6 +113,7 @@ fun AppNavHost(
                         ),
                         attachmentRepository = attachmentRepository,
                         xiaozhantaiRepository = xiaozhantaiRepository,
+                        growthEventRepository = growthEventRepository,
                         childId = session.childId,
                     )
                 },

@@ -13,6 +13,8 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.conversation.ConversationUiAction
+import com.childai.companion.data.growth.GrowthEventRepository
+import com.childai.companion.data.showcase.SaveXiaozhantaiItemUseCase
 import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
 import com.childai.companion.data.showcase.suggestedXiaozhantaiItemName
@@ -64,6 +66,7 @@ class ChatViewModel(
         ConversationRepositoryMessageSender(),
     private val attachmentRepository: AttachmentRepository = AttachmentRepository(),
     private val xiaozhantaiRepository: XiaozhantaiRepository? = null,
+    growthEventRepository: GrowthEventRepository? = null,
     private var ttsController: TtsController = NoOpTtsController,
     private var speechInputController: SpeechInputController? = null,
     private val speechInputControllerFactory: (File) -> SpeechInputController = { cacheDirectory ->
@@ -96,6 +99,12 @@ class ChatViewModel(
     private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
     private val xiaozhantaiSaveCandidates = mutableMapOf<String, XiaozhantaiSaveCandidate>()
     private var latestXiaozhantaiSaveCandidateMessageId: String? = null
+    private val saveXiaozhantaiItemUseCase = xiaozhantaiRepository?.let {
+        SaveXiaozhantaiItemUseCase(
+            xiaozhantaiRepository = it,
+            growthEventRepository = growthEventRepository,
+        )
+    }
 
     private val _uiState = MutableStateFlow(
         run {
@@ -734,7 +743,7 @@ class ChatViewModel(
     }
 
     fun confirmXiaozhantaiSave() {
-        val repository = xiaozhantaiRepository ?: return
+        val saveUseCase = saveXiaozhantaiItemUseCase ?: return
         val draft = _uiState.value.xiaozhantaiSaveDraft ?: return
         if (draft.isSaving) return
         val candidate = xiaozhantaiSaveCandidates[draft.messageId] ?: return
@@ -759,7 +768,7 @@ class ChatViewModel(
         }
         viewModelScope.launch(sendDispatcher) {
             runCatching {
-                repository.saveCapturedPhoto(
+                saveUseCase.saveCapturedPhoto(
                     XiaozhantaiSaveRequest(
                         childId = childId,
                         photoBytes = candidate.payload.bytes,

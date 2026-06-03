@@ -12,6 +12,10 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.conversation.ConversationUiAction
+import com.childai.companion.data.showcase.XiaozhantaiRepository
+import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
+import com.childai.companion.data.showcase.suggestedXiaozhantaiItemName
+import com.childai.companion.data.showcase.xiaozhantaiFoxQuoteFromReply
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.voice.AudioSegment
@@ -56,6 +60,7 @@ class ChatViewModel(
     private val conversationSender: ConversationMessageSender =
         ConversationRepositoryMessageSender(),
     private val attachmentRepository: AttachmentRepository = AttachmentRepository(),
+    private val xiaozhantaiRepository: XiaozhantaiRepository? = null,
     private var ttsController: TtsController = NoOpTtsController,
     private var speechInputController: SpeechInputController? = null,
     private val speechInputControllerFactory: (File) -> SpeechInputController = { cacheDirectory ->
@@ -87,6 +92,7 @@ class ChatViewModel(
     private var lastRecorder: AndroidWavAudioRecorder? = null
     private var pendingDeferredQuickActionId: String? = null
     private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
+    private val xiaozhantaiSaveCandidates = mutableMapOf<String, XiaozhantaiSaveCandidate>()
 
     private val _uiState = MutableStateFlow(
         run {
@@ -504,10 +510,20 @@ class ChatViewModel(
             }.onSuccess { attachmentResponse ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_done status=ok")
                 pendingUploadPayloads.remove(childPhotoMessageId)
+                val defaultItemName = suggestedXiaozhantaiItemName(
+                    attachmentResponse.recognizedContent.text,
+                )
+                xiaozhantaiSaveCandidates[childPhotoMessageId] = XiaozhantaiSaveCandidate(
+                    payload = payload,
+                    defaultName = defaultItemName,
+                    foxQuote = xiaozhantaiFoxQuoteFromReply(attachmentResponse.reply.text),
+                )
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = childPhotoMessageId,
                     status = LocalImagePreviewStatus.Sent,
+                    canSaveToXiaozhantai = xiaozhantaiRepository != null,
+                    defaultShowcaseName = defaultItemName,
                 )
             }.onFailure { error ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_failed error=${error::class.simpleName}")
@@ -569,10 +585,20 @@ class ChatViewModel(
                 )
             }.onSuccess { attachmentResponse ->
                 pendingUploadPayloads.remove(messageId)
+                val defaultItemName = suggestedXiaozhantaiItemName(
+                    attachmentResponse.recognizedContent.text,
+                )
+                xiaozhantaiSaveCandidates[messageId] = XiaozhantaiSaveCandidate(
+                    payload = payload,
+                    defaultName = defaultItemName,
+                    foxQuote = xiaozhantaiFoxQuoteFromReply(attachmentResponse.reply.text),
+                )
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = messageId,
                     status = LocalImagePreviewStatus.Sent,
+                    canSaveToXiaozhantai = xiaozhantaiRepository != null,
+                    defaultShowcaseName = defaultItemName,
                 )
             }.onFailure {
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
@@ -599,6 +625,7 @@ class ChatViewModel(
 
     fun dismissFailedPhoto(messageId: String) {
         pendingUploadPayloads.remove(messageId)
+        xiaozhantaiSaveCandidates.remove(messageId)
         _uiState.update { state ->
             state.copy(
                 imagePreviewCards = state.imagePreviewCards - messageId,
@@ -609,14 +636,139 @@ class ChatViewModel(
     private fun updateImagePreviewStatus(
         messageId: String,
         status: LocalImagePreviewStatus,
+        canSaveToXiaozhantai: Boolean? = null,
+        defaultShowcaseName: String? = null,
     ) {
         _uiState.update { state ->
             val card = state.imagePreviewCards[messageId] ?: return@update state
             state.copy(
                 imagePreviewCards = state.imagePreviewCards + (
-                    messageId to card.copy(status = status)
+                    messageId to card.copy(
+                        status = status,
+                        canSaveToXiaozhantai = canSaveToXiaozhantai ?: card.canSaveToXiaozhantai,
+                        defaultShowcaseName = defaultShowcaseName ?: card.defaultShowcaseName,
+                    )
                     ),
             )
+        }
+    }
+
+    fun requestSavePhotoToXiaozhantai(messageId: String) {
+        val candidate = xiaozhantaiSaveCandidates[messageId] ?: return
+        val card = _uiState.value.imagePreviewCards[messageId] ?: return
+        if (!card.canSaveToXiaozhantai || card.savedToXiaozhantai) return
+        _uiState.update { state ->
+            state.copy(
+                xiaozhantaiSaveDraft = XiaozhantaiSaveDraftUiState(
+                    messageId = messageId,
+                    name = candidate.defaultName,
+                    defaultName = candidate.defaultName,
+                    previewBytes = candidate.payload.previewBytes,
+                    isSaving = false,
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    fun updateXiaozhantaiSaveName(name: String) {
+        _uiState.update { state ->
+            val draft = state.xiaozhantaiSaveDraft ?: return@update state
+            state.copy(
+                xiaozhantaiSaveDraft = draft.copy(
+                    name = name.take(24),
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    fun cancelXiaozhantaiSave() {
+        _uiState.update { state ->
+            state.copy(xiaozhantaiSaveDraft = null)
+        }
+    }
+
+    fun confirmXiaozhantaiSave() {
+        val repository = xiaozhantaiRepository ?: return
+        val draft = _uiState.value.xiaozhantaiSaveDraft ?: return
+        val candidate = xiaozhantaiSaveCandidates[draft.messageId] ?: return
+        val itemName = draft.name.trim().ifBlank { draft.defaultName }.take(24)
+        if (itemName.isBlank()) {
+            _uiState.update { state ->
+                state.copy(
+                    xiaozhantaiSaveDraft = draft.copy(
+                        errorMessage = "可以给它一个短短的名字",
+                    ),
+                )
+            }
+            return
+        }
+        _uiState.update { state ->
+            state.copy(
+                xiaozhantaiSaveDraft = draft.copy(
+                    name = itemName,
+                    isSaving = true,
+                    errorMessage = null,
+                ),
+                imagePreviewCards = state.imagePreviewCards + (
+                    draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
+                        isSavingToXiaozhantai = true,
+                        xiaozhantaiError = null,
+                    ) ?: return@update state)
+                    ),
+            )
+        }
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                repository.saveCapturedPhoto(
+                    XiaozhantaiSaveRequest(
+                        childId = childId,
+                        photoBytes = candidate.payload.bytes,
+                        name = itemName,
+                        foxQuote = candidate.foxQuote.ifBlank {
+                            _uiState.value.agentReplyText
+                        },
+                    ),
+                )
+            }.onSuccess { item ->
+                xiaozhantaiSaveCandidates.remove(draft.messageId)
+                _uiState.update { state ->
+                    state.copy(
+                        xiaozhantaiSaveDraft = null,
+                        xiaozhantaiSavedItemIdForNavigation = item.id,
+                        imagePreviewCards = state.imagePreviewCards + (
+                            draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
+                                canSaveToXiaozhantai = false,
+                                isSavingToXiaozhantai = false,
+                                savedToXiaozhantai = true,
+                                xiaozhantaiError = null,
+                            ) ?: return@update state)
+                            ),
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update { state ->
+                    state.copy(
+                        xiaozhantaiSaveDraft = state.xiaozhantaiSaveDraft?.copy(
+                            isSaving = false,
+                            errorMessage = "刚才没有放好，可以再试一次",
+                        ),
+                        imagePreviewCards = state.imagePreviewCards + (
+                            draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
+                                isSavingToXiaozhantai = false,
+                                xiaozhantaiError = error.message.orEmpty().take(80),
+                            ) ?: return@update state)
+                            ),
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumeXiaozhantaiSaveNavigation() {
+        _uiState.update { state ->
+            state.copy(xiaozhantaiSavedItemIdForNavigation = null)
         }
     }
 
@@ -1593,6 +1745,8 @@ data class ChatUiState(
     val childTurnPhaseHint: ChildTurnUiPhase? = null,
     val pendingImageContext: PendingImageContextUiState? = null,
     val imagePreviewCards: Map<String, LocalImagePreviewCardUiState> = emptyMap(),
+    val xiaozhantaiSaveDraft: XiaozhantaiSaveDraftUiState? = null,
+    val xiaozhantaiSavedItemIdForNavigation: String? = null,
 ) {
     val interactionPresentation: ChildInteractionPresentation
         get() = childInteractionPresentation(
@@ -1603,6 +1757,15 @@ data class ChatUiState(
             fallbackAgent = agent,
         )
 }
+
+data class XiaozhantaiSaveDraftUiState(
+    val messageId: String,
+    val name: String,
+    val defaultName: String,
+    val previewBytes: ByteArray?,
+    val isSaving: Boolean,
+    val errorMessage: String?,
+)
 
 data class QuickActionUi(
     val id: String,
@@ -1636,6 +1799,11 @@ data class LocalImagePreviewCardUiState(
     val sizeBytes: Int,
     val previewBytes: ByteArray?,
     val status: LocalImagePreviewStatus = LocalImagePreviewStatus.Uploading,
+    val canSaveToXiaozhantai: Boolean = false,
+    val isSavingToXiaozhantai: Boolean = false,
+    val savedToXiaozhantai: Boolean = false,
+    val defaultShowcaseName: String? = null,
+    val xiaozhantaiError: String? = null,
 ) {
     val displayMimeType: String
         get() = when (mimeType.lowercase()) {
@@ -1666,6 +1834,12 @@ data class LocalImagePreviewCardUiState(
         }
     }
 }
+
+private data class XiaozhantaiSaveCandidate(
+    val payload: PhotoUploadPayload,
+    val defaultName: String,
+    val foxQuote: String,
+)
 
 const val IMAGE_PURPOSE_SHARE = "share"
 const val IMAGE_PURPOSE_HOMEWORK = "learning_homework"

@@ -58,4 +58,18 @@ class XiaozhantaiModelsTest {
         assertEquals("小石头", xiaozhantaiDisplayName("  小石头  "))
         assertEquals("很长很长…", xiaozhantaiDisplayName("很长很长的小发现名字", maxLength = 5))
     }
+
+    @Test
+    fun suggestedNameRemovesImagePrefix() {
+        assertEquals("积木城堡", suggestedXiaozhantaiItemName("图片里有一个积木城堡，旁边有小灯。"))
+        assertEquals("小发现", suggestedXiaozhantaiItemName(""))
+    }
+
+    @Test
+    fun foxQuoteUsesFirstLineOnly() {
+        assertEquals(
+            "我看到小石头啦",
+            xiaozhantaiFoxQuoteFromReply("我看到小石头啦\n像一颗安静的小星球\n要不要给它起个名字？"),
+        )
+    }
 }

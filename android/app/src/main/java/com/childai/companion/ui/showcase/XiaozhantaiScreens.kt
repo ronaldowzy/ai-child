@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -37,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +64,9 @@ import com.childai.companion.data.showcase.xiaozhantaiDisplayName
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import java.io.File
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -94,6 +100,10 @@ fun XiaozhantaiDetailScreen(
     XiaozhantaiDetailContent(
         item = selected,
         onBack = onBack,
+        onDelete = { item ->
+            viewModel.softDeleteItem(item.id)
+            onBack()
+        },
         modifier = modifier,
     )
 }
@@ -153,8 +163,10 @@ internal fun XiaozhantaiListContent(
 internal fun XiaozhantaiDetailContent(
     item: XiaozhantaiItem?,
     onBack: () -> Unit,
+    onDelete: (XiaozhantaiItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var showDeleteConfirm by remember { androidx.compose.runtime.mutableStateOf(false) }
     XiaozhantaiScaffold(
         title = "小展台里的一件小发现",
         onBack = onBack,
@@ -191,7 +203,39 @@ internal fun XiaozhantaiDetailContent(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            item {
+                Text(
+                    text = "留下时间：${xiaozhantaiDateLabel(item.createdAt)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF6A7B88).copy(alpha = 0.72f),
+                )
+            }
+            item {
+                TextButton(onClick = { showDeleteConfirm = true }) {
+                    Text(
+                        text = "先从小展台收起来",
+                        color = Color(0xFF6A7B88),
+                    )
+                }
+            }
         }
+    }
+    if (item != null && showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(text = "先收起来吗？") },
+            text = { Text(text = "它会从小展台里移走，照片不会出现在列表里。") },
+            confirmButton = {
+                Button(onClick = { onDelete(item) }) {
+                    Text(text = "先收起来")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(text = "还放着")
+                }
+            },
+        )
     }
 }
 
@@ -572,4 +616,9 @@ private fun xiaozhantaiPreviewItems(): List<XiaozhantaiItem> {
             createdAt = 1_760_000_100_000L,
         ),
     )
+}
+
+private fun xiaozhantaiDateLabel(createdAt: Long): String {
+    if (createdAt <= 0L) return "刚刚"
+    return SimpleDateFormat("M月d日", Locale.CHINA).format(Date(createdAt))
 }

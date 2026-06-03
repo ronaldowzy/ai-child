@@ -64,6 +64,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -146,6 +147,13 @@ fun ChildChatScreen(
     LaunchedEffect(viewModel) {
         viewModel.requestOpeningGreeting()
     }
+    LaunchedEffect(uiState.xiaozhantaiSavedItemIdForNavigation) {
+        val savedItemId = uiState.xiaozhantaiSavedItemIdForNavigation
+        if (!savedItemId.isNullOrBlank()) {
+            onOpenXiaozhantai()
+            viewModel.consumeXiaozhantaiSaveNavigation()
+        }
+    }
 
     ChildChatScreenContent(
         uiState = uiState,
@@ -163,6 +171,10 @@ fun ChildChatScreen(
         onPhotoCaptureFailed = viewModel::onPhotoCaptureFailed,
         onImageRetry = viewModel::retryPhotoUpload,
         onImageDismiss = viewModel::dismissFailedPhoto,
+        onImageSaveToXiaozhantai = viewModel::requestSavePhotoToXiaozhantai,
+        onXiaozhantaiNameChange = viewModel::updateXiaozhantaiSaveName,
+        onXiaozhantaiSaveConfirm = viewModel::confirmXiaozhantaiSave,
+        onXiaozhantaiSaveDismiss = viewModel::cancelXiaozhantaiSave,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
         onOpenXiaozhantai = onOpenXiaozhantai,
@@ -186,6 +198,10 @@ private fun ChildChatScreenContent(
     onPhotoCaptureFailed: (String) -> Unit,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
+    onImageSaveToXiaozhantai: (String) -> Unit = {},
+    onXiaozhantaiNameChange: (String) -> Unit = {},
+    onXiaozhantaiSaveConfirm: () -> Unit = {},
+    onXiaozhantaiSaveDismiss: () -> Unit = {},
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
     onOpenXiaozhantai: () -> Unit,
@@ -359,6 +375,14 @@ private fun ChildChatScreenContent(
             onDismiss = { showHouseObjectDebugPanel = false },
         )
     }
+    uiState.xiaozhantaiSaveDraft?.let { draft ->
+        XiaozhantaiSaveDialog(
+            draft = draft,
+            onNameChange = onXiaozhantaiNameChange,
+            onConfirm = onXiaozhantaiSaveConfirm,
+            onDismiss = onXiaozhantaiSaveDismiss,
+        )
+    }
     pendingImageSourcePurpose?.let { imagePurpose ->
         CompanionImageSourceDialog(
             showGalleryEntry = showGalleryEntry,
@@ -437,6 +461,7 @@ private fun ChildChatScreenContent(
                         companionObject = effectiveCompanionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
+                        onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
                         modifier = Modifier
                             .weight(layoutWeights.agent)
                             .fillMaxHeight(),
@@ -511,6 +536,7 @@ private fun ChildChatScreenContent(
                         companionObject = effectiveCompanionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
+                        onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -608,6 +634,7 @@ private fun ChatConversationPanel(
     onQuickAction: (QuickActionUi) -> Unit,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
+    onImageSaveToXiaozhantai: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val visibleQuickActions = childCompanionVisibleQuickActions(uiState)
@@ -618,6 +645,7 @@ private fun ChatConversationPanel(
             maxVisibleMessages = companionRecentMessageLimit(isLandscape),
             onImageRetry = onImageRetry,
             onImageDismiss = onImageDismiss,
+            onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
             modifier = Modifier.weight(1f),
         )
         if (visibleQuickActions.isNotEmpty()) {
@@ -652,6 +680,7 @@ private fun ChatMessageListWithPreviews(
     maxVisibleMessages: Int,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
+    onImageSaveToXiaozhantai: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val visibleMessages = remember(messages, maxVisibleMessages) {
@@ -686,6 +715,7 @@ private fun ChatMessageListWithPreviews(
                     imagePreview = imagePreviewCards[message.id],
                     onImageRetry = onImageRetry,
                     onImageDismiss = onImageDismiss,
+                    onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
                 )
             }
         }
@@ -698,6 +728,7 @@ private fun ChatMessageBubbleWithPreview(
     imagePreview: LocalImagePreviewCardUiState?,
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
+    onImageSaveToXiaozhantai: (String) -> Unit = {},
 ) {
     val isChild = message.author == MessageAuthor.Child
     val bubbleShape = RoundedCornerShape(if (isChild) 20.dp else 22.dp)
@@ -750,6 +781,7 @@ private fun ChatMessageBubbleWithPreview(
                     modifier = Modifier.padding(top = 8.dp),
                     onRetry = { onImageRetry(message.id) },
                     onDismiss = { onImageDismiss(message.id) },
+                    onSaveToXiaozhantai = { onImageSaveToXiaozhantai(message.id) },
                 )
             }
             Text(
@@ -770,6 +802,7 @@ private fun CompanionFloatingConversationBubbles(
     pinnedMessageId: String?,
     onImageRetry: (String) -> Unit,
     onImageDismiss: (String) -> Unit,
+    onImageSaveToXiaozhantai: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visibleMessages = remember(messages) {
@@ -818,6 +851,7 @@ private fun CompanionFloatingConversationBubbles(
                     imagePreview = imagePreviewCards[message.id],
                     onImageRetry = { onImageRetry(message.id) },
                     onImageDismiss = { onImageDismiss(message.id) },
+                    onImageSaveToXiaozhantai = { onImageSaveToXiaozhantai(message.id) },
                 )
             }
         }
@@ -830,6 +864,7 @@ private fun FloatingConversationBubble(
     imagePreview: LocalImagePreviewCardUiState?,
     onImageRetry: () -> Unit,
     onImageDismiss: () -> Unit,
+    onImageSaveToXiaozhantai: () -> Unit,
 ) {
     val isChild = message.author == MessageAuthor.Child
     val bubbleShape = RoundedCornerShape(24.dp)
@@ -869,6 +904,7 @@ private fun FloatingConversationBubble(
                     modifier = Modifier.padding(top = 8.dp),
                     onRetry = onImageRetry,
                     onDismiss = onImageDismiss,
+                    onSaveToXiaozhantai = onImageSaveToXiaozhantai,
                 )
             }
         }
@@ -882,6 +918,7 @@ private fun LocalImagePreviewCard(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
     onDismiss: (() -> Unit)? = null,
+    onSaveToXiaozhantai: (() -> Unit)? = null,
 ) {
     val previewBitmap = remember(preview.previewBytes) {
         preview.previewBytes?.let { bytes ->
@@ -952,7 +989,97 @@ private fun LocalImagePreviewCard(
                 )
             }
         }
+        if (preview.status == LocalImagePreviewStatus.Sent) {
+            when {
+                preview.savedToXiaozhantai -> Text(
+                    text = "已放入小展台",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.72f),
+                )
+                preview.isSavingToXiaozhantai -> Text(
+                    text = "正在轻轻放进去",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.72f),
+                )
+                preview.canSaveToXiaozhantai -> LocalImagePreviewActionButton(
+                    text = "放入小展台",
+                    primary = true,
+                    onClick = { onSaveToXiaozhantai?.invoke() },
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun XiaozhantaiSaveDialog(
+    draft: XiaozhantaiSaveDraftUiState,
+    onNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val previewBitmap = remember(draft.previewBytes) {
+        draft.previewBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    AlertDialog(
+        onDismissRequest = {
+            if (!draft.isSaving) onDismiss()
+        },
+        title = { Text(text = "放进小展台") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (previewBitmap != null) {
+                    Image(
+                        bitmap = previewBitmap,
+                        contentDescription = "准备放入小展台的图片",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(132.dp)
+                            .clip(RoundedCornerShape(18.dp)),
+                    )
+                }
+                Text(
+                    text = "给这个小发现起个名字",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF52667B),
+                )
+                TextField(
+                    value = draft.name,
+                    onValueChange = onNameChange,
+                    enabled = !draft.isSaving,
+                    singleLine = true,
+                    placeholder = { Text(text = draft.defaultName) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                draft.errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !draft.isSaving,
+            ) {
+                Text(text = if (draft.isSaving) "正在放好" else "留下")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !draft.isSaving,
+            ) {
+                Text(text = "先不放")
+            }
+        },
+    )
 }
 
 @Composable
@@ -1711,6 +1838,7 @@ private fun AgentPanel(
     companionObject: CompanionObjectMeta? = null,
     onImageRetry: (String) -> Unit,
     onImageDismiss: (String) -> Unit,
+    onImageSaveToXiaozhantai: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var debugMascotStateId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1738,6 +1866,7 @@ private fun AgentPanel(
                     pinnedMessageId = pinnedBubbleMessageId,
                     onImageRetry = onImageRetry,
                     onImageDismiss = onImageDismiss,
+                    onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
                     modifier = Modifier.matchParentSize(),
                 )
             }

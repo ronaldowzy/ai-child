@@ -38,6 +38,15 @@ class XiaozhantaiViewModel(
             }
         }
     }
+
+    fun softDeleteItem(itemId: String) {
+        viewModelScope.launch {
+            repository.softDelete(childId, itemId)
+            _uiState.update { state ->
+                state.copy(selectedItem = null)
+            }
+        }
+    }
 }
 
 data class XiaozhantaiUiState(

@@ -6,6 +6,9 @@ import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.attachment.RecognizedContent
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.data.showcase.XiaozhantaiItem
+import com.childai.companion.data.showcase.XiaozhantaiRepository
+import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -107,9 +110,52 @@ class ChatViewModelImageAttachmentTest {
         assertEquals("1 KB", card.displaySize)
     }
 
-    private fun viewModel(repository: AttachmentRepository): ChatViewModel {
+    @Test
+    fun savedShowcaseItemUsesCapturedPhotoAndCurrentFoxQuote() {
+        val attachmentRepository = HoldingAttachmentRepository()
+        val showcaseRepository = CapturingXiaozhantaiRepository()
+        val viewModel = viewModel(
+            repository = attachmentRepository,
+            showcaseRepository = showcaseRepository,
+        )
+        val payload = photoPayload(
+            bytes = byteArrayOf(11, 12, 13),
+            previewBytes = byteArrayOf(3, 2, 1),
+        )
+
+        viewModel.submitCapturedPhoto(payload)
+        val childMessage = viewModel.uiState.value.messages.last()
+        attachmentRepository.resumeSuccess(
+            attachmentResponse(
+                replyText = "它看起来像一颗安静的小星球。",
+            ),
+        )
+
+        val sentCard = viewModel.uiState.value.imagePreviewCards.getValue(childMessage.id)
+        assertTrue(sentCard.canSaveToXiaozhantai)
+
+        viewModel.requestSavePhotoToXiaozhantai(childMessage.id)
+        viewModel.updateXiaozhantaiSaveName("小石头")
+        viewModel.confirmXiaozhantaiSave()
+
+        assertEquals("小石头", showcaseRepository.savedRequest!!.name)
+        assertArrayEquals(byteArrayOf(11, 12, 13), showcaseRepository.savedRequest!!.photoBytes)
+        assertEquals("它看起来像一颗安静的小星球。", showcaseRepository.savedRequest!!.foxQuote)
+        assertTrue(
+            viewModel.uiState.value.imagePreviewCards
+                .getValue(childMessage.id)
+                .savedToXiaozhantai,
+        )
+        assertEquals("stand_item_saved", viewModel.uiState.value.xiaozhantaiSavedItemIdForNavigation)
+    }
+
+    private fun viewModel(
+        repository: AttachmentRepository,
+        showcaseRepository: XiaozhantaiRepository? = null,
+    ): ChatViewModel {
         return ChatViewModel(
             attachmentRepository = repository,
+            xiaozhantaiRepository = showcaseRepository,
             sendDispatcher = Dispatchers.Unconfined,
             requestOpeningOnInit = false,
         )
@@ -128,7 +174,9 @@ class ChatViewModelImageAttachmentTest {
         )
     }
 
-    private fun attachmentResponse(): AttachmentCreateResponse {
+    private fun attachmentResponse(
+        replyText: String = "我看到图里像是一个积木城堡。你想先讲讲它哪里最有意思吗？",
+    ): AttachmentCreateResponse {
         return AttachmentCreateResponse(
             attachmentId = "att_image_test",
             recognizedContent = RecognizedContent(
@@ -142,7 +190,7 @@ class ChatViewModelImageAttachmentTest {
             ),
             reply = ConversationReply(
                 type = "agent_message",
-                text = "我看到图里像是一个积木城堡。你想先讲讲它哪里最有意思吗？",
+                text = replyText,
                 voiceEnabled = false,
                 audioUrl = null,
                 emotion = "encourage",
@@ -199,5 +247,22 @@ private class ThrowingAttachmentRepository : AttachmentRepository() {
         childCaption: String,
     ): AttachmentCreateResponse {
         throw RuntimeException("network down")
+    }
+}
+
+private class CapturingXiaozhantaiRepository : XiaozhantaiRepository() {
+    var savedRequest: XiaozhantaiSaveRequest? = null
+
+    override suspend fun saveCapturedPhoto(request: XiaozhantaiSaveRequest): XiaozhantaiItem {
+        savedRequest = request
+        return XiaozhantaiItem(
+            id = "stand_item_saved",
+            photoUri = "/tmp/stand_item_saved.jpg",
+            name = request.name,
+            foxQuote = request.foxQuote,
+            createdAt = 1760000000000L,
+            source = request.source,
+            isDeleted = false,
+        )
     }
 }

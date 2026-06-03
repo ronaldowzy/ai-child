@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -22,7 +23,7 @@ import com.childai.companion.data.parent.ParentPolicyApiClient
 import com.childai.companion.data.parent.ParentPolicyRepository
 import com.childai.companion.data.parent.ParentReportApiClient
 import com.childai.companion.data.parent.ParentReportRepository
-import com.childai.companion.data.showcase.XiaozhantaiRepository
+import com.childai.companion.data.showcase.LocalXiaozhantaiRepository
 import com.childai.companion.ui.auth.AuthScreen
 import com.childai.companion.ui.auth.AuthViewModel
 import com.childai.companion.ui.chat.ChildChatScreen
@@ -49,6 +50,7 @@ fun AppNavHost(
     }
 
     val session = authState.session
+    val appContext = LocalContext.current.applicationContext
     val authTokenProvider = remember(authRepository) {
         { authRepository.authToken() }
     }
@@ -79,7 +81,7 @@ fun AppNavHost(
         )
     }
     val xiaozhantaiRepository = remember(session.childId) {
-        XiaozhantaiRepository()
+        LocalXiaozhantaiRepository(appContext)
     }
     val parentCredentialVerifier = remember(authRepository, session.username) {
         ParentCredentialVerifier(authRepository)
@@ -106,6 +108,7 @@ fun AppNavHost(
                             repository = conversationRepository,
                         ),
                         attachmentRepository = attachmentRepository,
+                        xiaozhantaiRepository = xiaozhantaiRepository,
                         childId = session.childId,
                     )
                 },

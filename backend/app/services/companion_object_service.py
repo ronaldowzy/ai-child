@@ -411,6 +411,25 @@ class CompanionObjectService:
     def get_by_id(self, companion_id: str) -> CompanionObject | None:
         return self._get(companion_id)
 
+    def retire_for_child(self, child_id: str) -> int:
+        """Retire current child's companion objects.
+
+        Intended for dev-only visual QA reset tools. It deliberately does not
+        delete rows so recall/history persistence can still be inspected.
+        """
+        now = self._now()
+        retired_count = 0
+        for companion in self._list_by_child(child_id):
+            if companion.status == CompanionObjectStatus.RETIRED:
+                continue
+            retired = companion.model_copy(
+                update={"status": CompanionObjectStatus.RETIRED, "updated_at": now},
+                deep=True,
+            )
+            self._save(retired)
+            retired_count += 1
+        return retired_count
+
     def is_faded_out(self, companion: CompanionObject) -> bool:
         """Check if companion has faded out (7 days without mention)."""
         if companion.status == CompanionObjectStatus.ACTIVE:
@@ -503,8 +522,18 @@ class CompanionObjectService:
     def _get_active_or_paused_by_child(
         self, child_id: str
     ) -> CompanionObject | None:
+        items = self._list_by_child(child_id)
+        for item in items:
+            if item.status in (
+                CompanionObjectStatus.ACTIVE,
+                CompanionObjectStatus.PAUSED,
+            ):
+                return item
+        return None
+
+    def _list_by_child(self, child_id: str) -> list[CompanionObject]:
         try:
-            items = self._repository.list_by_child(child_id)
+            return self._repository.list_by_child(child_id)
         except (CompanionObjectRepositoryUnavailable, Exception) as exc:
             logger.warning(
                 "companion_repository_fallback",
@@ -516,14 +545,7 @@ class CompanionObjectService:
             )
             if not self._fallback_to_memory:
                 raise
-            items = self._fallback_repository.list_by_child(child_id)
-        for item in items:
-            if item.status in (
-                CompanionObjectStatus.ACTIVE,
-                CompanionObjectStatus.PAUSED,
-            ):
-                return item
-        return None
+            return self._fallback_repository.list_by_child(child_id)
 
 
 _companion_service = CompanionObjectService()

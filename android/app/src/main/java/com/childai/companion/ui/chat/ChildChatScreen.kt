@@ -90,6 +90,7 @@ import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationSessionState
+import com.childai.companion.data.debug.HouseObjectDebugRepository
 import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.parent.ParentEntryCredentialDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
@@ -109,6 +110,7 @@ fun ChildChatScreen(
     viewModel: ChatViewModel = viewModel(),
     requireParentCredential: Boolean = false,
     verifyParentCredential: suspend (String) -> Boolean = { false },
+    houseObjectDebugRepository: HouseObjectDebugRepository? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -160,6 +162,7 @@ fun ChildChatScreen(
         onOpenParentReport = onOpenParentReport,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
+        houseObjectDebugRepository = houseObjectDebugRepository,
         modifier = modifier,
     )
 }
@@ -181,6 +184,7 @@ private fun ChildChatScreenContent(
     onOpenParentReport: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
+    houseObjectDebugRepository: HouseObjectDebugRepository?,
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -191,6 +195,14 @@ private fun ChildChatScreenContent(
     var parentEntryHint by rememberSaveable { mutableStateOf<String?>(null) }
     var showParentEntryChoices by rememberSaveable { mutableStateOf(false) }
     var pendingImageSourcePurpose by rememberSaveable { mutableStateOf<String?>(null) }
+    var showHouseObjectDebugPanel by rememberSaveable { mutableStateOf(false) }
+    var houseObjectDebugVisualKind by rememberSaveable { mutableStateOf("star") }
+    var houseObjectDebugState by rememberSaveable { mutableStateOf("co_create") }
+    var houseObjectDebugLocation by rememberSaveable { mutableStateOf("窗边") }
+    var houseObjectDebugStatus by rememberSaveable { mutableStateOf<String?>(null) }
+    var houseObjectDebugBusy by rememberSaveable { mutableStateOf(false) }
+    var houseObjectDebugPreview by remember { mutableStateOf<CompanionObjectMeta?>(null) }
+    val showHouseObjectDebugEntry = DevSettings.houseObjectDebugToolsEnabled
     val imageInputLaunchers = rememberImageInputLaunchers(
         onCaptured = onPhotoCaptured,
         onFailed = onPhotoCaptureFailed,
@@ -262,7 +274,82 @@ private fun ChildChatScreenContent(
     if (showParentEntryChoices) {
         ParentEntryTargetDialog(
             onOpenTarget = ::openParentGate,
+            showHouseObjectDebugEntry = showHouseObjectDebugEntry,
+            onOpenHouseObjectDebug = {
+                showParentEntryChoices = false
+                showHouseObjectDebugPanel = true
+            },
             onDismiss = { showParentEntryChoices = false },
+        )
+    }
+    if (showHouseObjectDebugPanel) {
+        HouseObjectDebugDialog(
+            visualKind = houseObjectDebugVisualKind,
+            state = houseObjectDebugState,
+            lightLocation = houseObjectDebugLocation,
+            statusText = houseObjectDebugStatus,
+            isBusy = houseObjectDebugBusy,
+            canUseRemoteDebug = houseObjectDebugRepository != null,
+            onVisualKindChange = { houseObjectDebugVisualKind = it },
+            onStateChange = { houseObjectDebugState = it },
+            onLightLocationChange = { houseObjectDebugLocation = it },
+            onPreview = {
+                houseObjectDebugPreview = houseObjectDebugBuildPreviewMeta(
+                    visualKind = houseObjectDebugVisualKind,
+                    state = houseObjectDebugState,
+                    lightLocation = houseObjectDebugLocation,
+                )
+                houseObjectDebugStatus = if (houseObjectDebugPreview == null) {
+                    "本地预览已清空"
+                } else {
+                    "本地预览已更新，不写入数据库"
+                }
+            },
+            onCreateRemote = {
+                val repository = houseObjectDebugRepository
+                if (
+                    repository != null &&
+                    houseObjectDebugCanPersist(houseObjectDebugState) &&
+                    !houseObjectDebugBusy
+                ) {
+                    houseObjectDebugBusy = true
+                    houseObjectDebugStatus = "正在创建测试小客人"
+                    coroutineScope.launch {
+                        runCatching {
+                            repository.create(
+                                visualKind = houseObjectDebugVisualKind,
+                                state = houseObjectDebugState,
+                                lightLocation = houseObjectDebugLocation,
+                            )
+                        }.onSuccess { response ->
+                            houseObjectDebugPreview = response.companionObject
+                            houseObjectDebugStatus = "已真实落库，并显示当前测试状态"
+                        }.onFailure { error ->
+                            houseObjectDebugStatus = "真实创建失败：${error.message.orEmpty().take(80)}"
+                        }
+                        houseObjectDebugBusy = false
+                    }
+                }
+            },
+            onResetRemote = {
+                val repository = houseObjectDebugRepository
+                if (repository != null && !houseObjectDebugBusy) {
+                    houseObjectDebugBusy = true
+                    houseObjectDebugStatus = "正在重置当前 child"
+                    coroutineScope.launch {
+                        runCatching {
+                            repository.reset()
+                        }.onSuccess { response ->
+                            houseObjectDebugPreview = null
+                            houseObjectDebugStatus = "已 retired ${response.retiredCount} 个小客人"
+                        }.onFailure { error ->
+                            houseObjectDebugStatus = "重置失败：${error.message.orEmpty().take(80)}"
+                        }
+                        houseObjectDebugBusy = false
+                    }
+                }
+            },
+            onDismiss = { showHouseObjectDebugPanel = false },
         )
     }
     pendingImageSourcePurpose?.let { imagePurpose ->
@@ -305,6 +392,8 @@ private fun ChildChatScreenContent(
                 maxHeight = maxHeight,
                 viewportClass = viewportClass,
             )
+            val effectiveCompanionObject = houseObjectDebugPreview
+                ?: uiState.sessionState?.companionObject
 
             CompanionRoomBackground(viewportClass = viewportClass)
             CompanionAmbientGlows(
@@ -338,7 +427,7 @@ private fun ChildChatScreenContent(
                         pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = compactLandscape,
-                        companionObject = uiState.sessionState?.companionObject,
+                        companionObject = effectiveCompanionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
                         modifier = Modifier
@@ -410,7 +499,7 @@ private fun ChildChatScreenContent(
                         pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = false,
-                        companionObject = uiState.sessionState?.companionObject,
+                        companionObject = effectiveCompanionObject,
                         onImageRetry = onImageRetry,
                         onImageDismiss = onImageDismiss,
                         modifier = Modifier
@@ -1502,6 +1591,8 @@ private fun ParentEntryHintBar(
 @Composable
 private fun ParentEntryTargetDialog(
     onOpenTarget: (ParentEntryTarget) -> Unit,
+    showHouseObjectDebugEntry: Boolean,
+    onOpenHouseObjectDebug: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -1523,6 +1614,11 @@ private fun ParentEntryTargetDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (showHouseObjectDebugEntry) {
+                    TextButton(onClick = onOpenHouseObjectDebug) {
+                        Text(text = "开发调试")
+                    }
+                }
                 TextButton(onClick = { onOpenTarget(ParentEntryTarget.Settings) }) {
                     Text(text = ParentEntryTarget.Settings.label)
                 }
@@ -1751,6 +1847,7 @@ private fun ChildChatScreenPortraitPreview() {
             onOpenParentReport = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
+            houseObjectDebugRepository = null,
         )
     }
 }
@@ -1785,6 +1882,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onOpenParentReport = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
+            houseObjectDebugRepository = null,
         )
     }
 }
@@ -1828,6 +1926,7 @@ private fun ChildChatScreenLandscapePreview() {
             onOpenParentReport = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
+            houseObjectDebugRepository = null,
         )
     }
 }

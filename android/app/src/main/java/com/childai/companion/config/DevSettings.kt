@@ -6,6 +6,7 @@ object DevSettings {
     const val CHILD_ID = "child_demo_001"
     const val TIMEZONE = "Asia/Shanghai"
     const val SHOW_SESSION_STATE_DEBUG = false
+    const val SHOW_HOUSE_OBJECT_DEBUG_TOOLS = true
     const val FOX_ASSET_MODE = "auto"
     const val FOX_RENDER_MODE = "animation_v1"
     const val FOX_ANIMATION_ENABLED = true
@@ -23,4 +24,7 @@ object DevSettings {
     const val NATURAL_WAITING_TIMEOUT_MS = 5_000L
 
     val conversationApiBaseUrl: String = BuildConfig.CONVERSATION_API_BASE_URL
+    val debugToolsToken: String = BuildConfig.DEBUG_TOOLS_TOKEN
+    val houseObjectDebugToolsEnabled: Boolean =
+        BuildConfig.DEBUG && SHOW_HOUSE_OBJECT_DEBUG_TOOLS
 }

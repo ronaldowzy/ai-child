@@ -16,6 +16,8 @@ import com.childai.companion.data.auth.AuthRepository
 import com.childai.companion.data.conversation.ConversationApiClient
 import com.childai.companion.data.conversation.ConversationRepository
 import com.childai.companion.data.conversation.ConversationStreamClient
+import com.childai.companion.data.debug.HouseObjectDebugApiClient
+import com.childai.companion.data.debug.HouseObjectDebugRepository
 import com.childai.companion.data.parent.ParentPolicyApiClient
 import com.childai.companion.data.parent.ParentPolicyRepository
 import com.childai.companion.data.parent.ParentReportApiClient
@@ -67,6 +69,11 @@ fun AppNavHost(
             ParentReportApiClient(authTokenProvider = authTokenProvider),
         )
     }
+    val houseObjectDebugRepository = remember(session.childId) {
+        HouseObjectDebugRepository(
+            HouseObjectDebugApiClient(authTokenProvider = authTokenProvider),
+        )
+    }
     val parentCredentialVerifier = remember(authRepository, session.username) {
         ParentCredentialVerifier(authRepository)
     }
@@ -92,6 +99,7 @@ fun AppNavHost(
                 viewModel = chatViewModel,
                 requireParentCredential = true,
                 verifyParentCredential = parentCredentialVerifier::verify,
+                houseObjectDebugRepository = houseObjectDebugRepository,
             )
         }
         AppDestination.ParentSettings -> {

@@ -16,6 +16,10 @@ val appVersionProperties = Properties().apply {
 
 val conversationApiBaseUrl: String =
     providers.gradleProperty("conversationApiBaseUrl").orNull ?: "http://192.168.0.101:8000/"
+val debugToolsToken: String =
+    providers.gradleProperty("debugToolsToken").orNull
+        ?: System.getenv("CHILD_AI_DEBUG_TOOLS_TOKEN")
+        ?: "local-dev-debug"
 val releaseStoreFilePath: String? =
     providers.gradleProperty("releaseStoreFile").orNull ?: System.getenv("CHILD_AI_RELEASE_STORE_FILE")
 val releaseStorePassword: String? =
@@ -47,6 +51,11 @@ android {
             "String",
             "CONVERSATION_API_BASE_URL",
             "\"$conversationApiBaseUrl\"",
+        )
+        buildConfigField(
+            "String",
+            "DEBUG_TOOLS_TOKEN",
+            "\"${debugToolsToken.replace("\"", "\\\"")}\"",
         )
     }
 

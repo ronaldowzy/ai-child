@@ -12,6 +12,7 @@ from app.api.v1.conversation_attachment import router as conversation_attachment
 from app.api.v1.conversation import router as conversation_router
 from app.api.v1.conversation_opening import router as conversation_opening_router
 from app.api.v1.conversation_stream import router as conversation_stream_router
+from app.api.v1.debug_house_object import router as debug_house_object_router
 from app.api.v1.health import router as health_router
 from app.api.v1.memories import router as memories_router
 from app.api.v1.parent_report import router as parent_report_router
@@ -97,6 +98,7 @@ app.include_router(tts_router, prefix=settings.api_v1_prefix)
 app.include_router(asr_router, prefix=settings.api_v1_prefix)
 app.include_router(version_router, prefix=settings.api_v1_prefix)
 app.include_router(fox_assets_router, prefix=settings.api_v1_prefix)
+app.include_router(debug_house_object_router, prefix=settings.api_v1_prefix)
 
 
 @app.on_event("startup")

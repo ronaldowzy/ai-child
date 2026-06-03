@@ -50,9 +50,8 @@ fun suggestedXiaozhantaiItemName(summary: String?): String {
             "",
         )
         .trim(' ', '。', '，', ',', '.', '啦')
-    val keyword = Regex("[\\p{IsHan}A-Za-z0-9]{2,8}")
-        .findAll(compact)
-        .map { it.value }
+    val keyword = compact
+        .xiaozhantaiNameTokens()
         .firstOrNull { token ->
             token !in setOf("我看到", "看到", "这张图", "图片里", "图里", "一个", "一张", "像是")
         }
@@ -93,4 +92,32 @@ internal fun xiaozhantaiItemFromJson(json: JSONObject): XiaozhantaiItem? {
         source = json.optString("source").ifBlank { SOURCE_CHILD_CAMERA },
         isDeleted = json.optBoolean("isDeleted", false),
     )
+}
+
+private fun String.xiaozhantaiNameTokens(): List<String> {
+    val tokens = mutableListOf<String>()
+    val buffer = StringBuilder()
+    fun flush() {
+        if (buffer.length >= 2) {
+            tokens += buffer.toString().take(8)
+        }
+        buffer.clear()
+    }
+    for (char in this@xiaozhantaiNameTokens) {
+        if (char.isXiaozhantaiNameChar()) {
+            buffer.append(char)
+            if (buffer.length >= 8) flush()
+        } else {
+            flush()
+        }
+    }
+    flush()
+    return tokens
+}
+
+private fun Char.isXiaozhantaiNameChar(): Boolean {
+    return this in '\u4E00'..'\u9FFF' ||
+        this in 'A'..'Z' ||
+        this in 'a'..'z' ||
+        this in '0'..'9'
 }

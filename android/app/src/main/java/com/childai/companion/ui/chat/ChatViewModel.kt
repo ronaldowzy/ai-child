@@ -525,6 +525,11 @@ class ChatViewModel(
                     canSaveToXiaozhantai = xiaozhantaiRepository != null,
                     defaultShowcaseName = defaultItemName,
                 )
+                _uiState.update { state ->
+                    state.copy(
+                        xiaozhantaiSavePromptMessageId = childPhotoMessageId,
+                    )
+                }
             }.onFailure { error ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_failed error=${error::class.simpleName}")
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
@@ -600,6 +605,11 @@ class ChatViewModel(
                     canSaveToXiaozhantai = xiaozhantaiRepository != null,
                     defaultShowcaseName = defaultItemName,
                 )
+                _uiState.update { state ->
+                    state.copy(
+                        xiaozhantaiSavePromptMessageId = messageId,
+                    )
+                }
             }.onFailure {
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
                 _uiState.update { state ->
@@ -629,6 +639,8 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 imagePreviewCards = state.imagePreviewCards - messageId,
+                xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
+                    ?.takeUnless { it == messageId },
             )
         }
     }
@@ -737,6 +749,8 @@ class ChatViewModel(
                     state.copy(
                         xiaozhantaiSaveDraft = null,
                         xiaozhantaiSavedItemIdForNavigation = item.id,
+                        xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
+                            ?.takeUnless { it == draft.messageId },
                         imagePreviewCards = state.imagePreviewCards + (
                             draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
                                 canSaveToXiaozhantai = false,
@@ -1745,6 +1759,7 @@ data class ChatUiState(
     val childTurnPhaseHint: ChildTurnUiPhase? = null,
     val pendingImageContext: PendingImageContextUiState? = null,
     val imagePreviewCards: Map<String, LocalImagePreviewCardUiState> = emptyMap(),
+    val xiaozhantaiSavePromptMessageId: String? = null,
     val xiaozhantaiSaveDraft: XiaozhantaiSaveDraftUiState? = null,
     val xiaozhantaiSavedItemIdForNavigation: String? = null,
 ) {
@@ -1756,6 +1771,16 @@ data class ChatUiState(
             phaseHint = childTurnPhaseHint,
             fallbackAgent = agent,
         )
+
+    val xiaozhantaiSavePromptPreview: LocalImagePreviewCardUiState?
+        get() = xiaozhantaiSavePromptMessageId
+            ?.let(imagePreviewCards::get)
+            ?.takeIf {
+                it.status == LocalImagePreviewStatus.Sent &&
+                    it.canSaveToXiaozhantai &&
+                    !it.savedToXiaozhantai &&
+                    !it.isSavingToXiaozhantai
+            }
 }
 
 data class XiaozhantaiSaveDraftUiState(

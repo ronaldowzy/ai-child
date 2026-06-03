@@ -455,6 +455,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
+                        xiaozhantaiSavePromptPreview = uiState.xiaozhantaiSavePromptPreview,
                         pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = compactLandscape,
@@ -530,6 +531,7 @@ private fun ChildChatScreenContent(
                         presentation = uiState.interactionPresentation,
                         messages = uiState.messages,
                         imagePreviewCards = uiState.imagePreviewCards,
+                        xiaozhantaiSavePromptPreview = uiState.xiaozhantaiSavePromptPreview,
                         pinnedBubbleMessageId = pinnedBubbleMessageId,
                         viewportClass = viewportClass,
                         compactLandscape = false,
@@ -906,6 +908,73 @@ private fun FloatingConversationBubble(
                     onDismiss = onImageDismiss,
                     onSaveToXiaozhantai = onImageSaveToXiaozhantai,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun XiaozhantaiSavePromptBubble(
+    preview: LocalImagePreviewCardUiState?,
+    isLandscape: Boolean,
+    onSaveToXiaozhantai: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val card = preview ?: return
+    val previewBitmap = remember(card.previewBytes) {
+        card.previewBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    Box(modifier = modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(
+                    start = if (isLandscape) 32.dp else 26.dp,
+                    bottom = if (isLandscape) 26.dp else 30.dp,
+                )
+                .sizeIn(maxWidth = if (isLandscape) 280.dp else 300.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White.copy(alpha = 0.82f),
+            shadowElevation = 3.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.62f),
+            ),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (previewBitmap != null) {
+                    Image(
+                        bitmap = previewBitmap,
+                        contentDescription = "可放入小展台的照片",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Text(
+                        text = "照片可以放进小展台",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF42546A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    LocalImagePreviewActionButton(
+                        text = "放入小展台",
+                        primary = true,
+                        onClick = { onSaveToXiaozhantai(card.messageId) },
+                    )
+                }
             }
         }
     }
@@ -1707,6 +1776,7 @@ private fun ParentEntryHintBar(
     ) {
         XiaozhantaiEntranceButton(
             onClick = onOpenXiaozhantai,
+            modifier = Modifier.padding(start = 24.dp, top = 12.dp),
         )
         Spacer(modifier = Modifier.width(8.dp))
         if (!parentEntryHint.isNullOrBlank()) {
@@ -1832,6 +1902,7 @@ private fun AgentPanel(
     presentation: ChildInteractionPresentation,
     messages: List<ChatMessage>,
     imagePreviewCards: Map<String, LocalImagePreviewCardUiState>,
+    xiaozhantaiSavePromptPreview: LocalImagePreviewCardUiState?,
     pinnedBubbleMessageId: String?,
     viewportClass: CompanionRoomViewportClass,
     compactLandscape: Boolean,
@@ -1867,6 +1938,12 @@ private fun AgentPanel(
                     onImageRetry = onImageRetry,
                     onImageDismiss = onImageDismiss,
                     onImageSaveToXiaozhantai = onImageSaveToXiaozhantai,
+                    modifier = Modifier.matchParentSize(),
+                )
+                XiaozhantaiSavePromptBubble(
+                    preview = xiaozhantaiSavePromptPreview,
+                    isLandscape = isLandscape,
+                    onSaveToXiaozhantai = onImageSaveToXiaozhantai,
                     modifier = Modifier.matchParentSize(),
                 )
             }

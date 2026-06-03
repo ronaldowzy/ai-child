@@ -661,8 +661,6 @@ private fun CompanionLightPointBackdrop(
         companionObject = companionObject,
         viewportClass = viewportClass,
     ) ?: return
-    val assetResId = renderState.assetResourceName?.let { companionObjectAssetResId(it) }
-    if (assetResId != null) return
 
     val backdropAlpha = (renderState.alpha * renderState.emphasis.backdropAlphaMultiplier)
         .coerceIn(0f, 0.90f)

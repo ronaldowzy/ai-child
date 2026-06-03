@@ -22,6 +22,7 @@ import com.childai.companion.data.parent.ParentPolicyApiClient
 import com.childai.companion.data.parent.ParentPolicyRepository
 import com.childai.companion.data.parent.ParentReportApiClient
 import com.childai.companion.data.parent.ParentReportRepository
+import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.ui.auth.AuthScreen
 import com.childai.companion.ui.auth.AuthViewModel
 import com.childai.companion.ui.chat.ChildChatScreen
@@ -32,6 +33,9 @@ import com.childai.companion.ui.parent.ParentReportViewModel
 import com.childai.companion.ui.parent.ParentCredentialVerifier
 import com.childai.companion.ui.parent.ParentPolicyViewModel
 import com.childai.companion.ui.parent.ParentSettingsScreen
+import com.childai.companion.ui.showcase.XiaozhantaiDetailScreen
+import com.childai.companion.ui.showcase.XiaozhantaiListScreen
+import com.childai.companion.ui.showcase.XiaozhantaiViewModel
 
 @Composable
 fun AppNavHost(
@@ -74,10 +78,23 @@ fun AppNavHost(
             HouseObjectDebugApiClient(authTokenProvider = authTokenProvider),
         )
     }
+    val xiaozhantaiRepository = remember(session.childId) {
+        XiaozhantaiRepository()
+    }
     val parentCredentialVerifier = remember(authRepository, session.username) {
         ParentCredentialVerifier(authRepository)
     }
     var destination by rememberSaveable { mutableStateOf(AppDestination.Chat) }
+    var selectedXiaozhantaiItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    val xiaozhantaiViewModel: XiaozhantaiViewModel = viewModel(
+        key = "xiaozhantai-${session.childId}",
+        factory = simpleViewModelFactory {
+            XiaozhantaiViewModel(
+                repository = xiaozhantaiRepository,
+                childId = session.childId,
+            )
+        },
+    )
 
     when (destination) {
         AppDestination.Chat -> {
@@ -85,17 +102,18 @@ fun AppNavHost(
                 key = "chat-${session.childId}",
                 factory = simpleViewModelFactory {
                     ChatViewModel(
-                    conversationSender = ConversationRepositoryMessageSender(
-                        repository = conversationRepository,
-                    ),
-                    attachmentRepository = attachmentRepository,
-                    childId = session.childId,
-                )
+                        conversationSender = ConversationRepositoryMessageSender(
+                            repository = conversationRepository,
+                        ),
+                        attachmentRepository = attachmentRepository,
+                        childId = session.childId,
+                    )
                 },
             )
             ChildChatScreen(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
+                onOpenXiaozhantai = { destination = AppDestination.XiaozhantaiList },
                 viewModel = chatViewModel,
                 requireParentCredential = true,
                 verifyParentCredential = parentCredentialVerifier::verify,
@@ -127,6 +145,24 @@ fun AppNavHost(
                 viewModel = parentReportViewModel,
             )
         }
+        AppDestination.XiaozhantaiList -> {
+            XiaozhantaiListScreen(
+                viewModel = xiaozhantaiViewModel,
+                onBack = { destination = AppDestination.Chat },
+                onOpenItem = { itemId ->
+                    selectedXiaozhantaiItemId = itemId
+                    xiaozhantaiViewModel.selectItem(itemId)
+                    destination = AppDestination.XiaozhantaiDetail
+                },
+            )
+        }
+        AppDestination.XiaozhantaiDetail -> {
+            XiaozhantaiDetailScreen(
+                viewModel = xiaozhantaiViewModel,
+                itemId = selectedXiaozhantaiItemId,
+                onBack = { destination = AppDestination.XiaozhantaiList },
+            )
+        }
     }
 }
 
@@ -134,6 +170,8 @@ private enum class AppDestination {
     Chat,
     ParentSettings,
     ParentReport,
+    XiaozhantaiList,
+    XiaozhantaiDetail,
 }
 
 private inline fun <reified T : ViewModel> simpleViewModelFactory(

@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +19,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -38,6 +41,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -107,6 +111,7 @@ fun ChildChatScreen(
     modifier: Modifier = Modifier,
     onOpenParentSettings: () -> Unit = {},
     onOpenParentReport: () -> Unit = {},
+    onOpenXiaozhantai: () -> Unit = {},
     viewModel: ChatViewModel = viewModel(),
     requireParentCredential: Boolean = false,
     verifyParentCredential: suspend (String) -> Boolean = { false },
@@ -160,6 +165,7 @@ fun ChildChatScreen(
         onImageDismiss = viewModel::dismissFailedPhoto,
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
+        onOpenXiaozhantai = onOpenXiaozhantai,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -182,6 +188,7 @@ private fun ChildChatScreenContent(
     onImageDismiss: (String) -> Unit = {},
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -448,6 +455,7 @@ private fun ChildChatScreenContent(
                             parentEntryHint = null
                             showParentEntryChoices = true
                         },
+                        onOpenXiaozhantai = onOpenXiaozhantai,
                         onSend = onSend,
                         onQuickAction = ::handleQuickAction,
                         onStopTts = onStopTts,
@@ -488,6 +496,7 @@ private fun ChildChatScreenContent(
                             parentEntryHint = null
                             showParentEntryChoices = true
                         },
+                        onOpenXiaozhantai = onOpenXiaozhantai,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -996,6 +1005,7 @@ private fun LandscapeOperationPanel(
     presentation: ChildInteractionPresentation,
     onParentEntryTap: () -> Unit,
     onParentEntryLongPress: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
     onSend: (String) -> Unit,
     onQuickAction: (QuickActionUi) -> Unit,
     onStopTts: () -> Unit,
@@ -1037,6 +1047,7 @@ private fun LandscapeOperationPanel(
                 parentEntryHint = parentEntryHint,
                 onParentEntryTap = onParentEntryTap,
                 onParentEntryLongPress = onParentEntryLongPress,
+                onOpenXiaozhantai = onOpenXiaozhantai,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -1559,6 +1570,7 @@ private fun ParentEntryHintBar(
     parentEntryHint: String?,
     onParentEntryTap: () -> Unit,
     onParentEntryLongPress: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -1566,6 +1578,10 @@ private fun ParentEntryHintBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End,
     ) {
+        XiaozhantaiEntranceButton(
+            onClick = onOpenXiaozhantai,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         if (!parentEntryHint.isNullOrBlank()) {
             Text(
                 text = parentEntryHint,
@@ -1585,6 +1601,60 @@ private fun ParentEntryHintBar(
             onTap = onParentEntryTap,
             onLongPress = onParentEntryLongPress,
         )
+    }
+}
+
+@Composable
+private fun XiaozhantaiEntranceButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = tween(durationMillis = 160),
+        label = "xiaozhantaiEntranceScale",
+    )
+    Surface(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.66f),
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.60f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.xzt_entrance_icon),
+                contentDescription = "小展台",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(34.dp),
+            )
+            Text(
+                text = "小展台",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF52667B),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -1845,6 +1915,7 @@ private fun ChildChatScreenPortraitPreview() {
             onPhotoCaptureFailed = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
+            onOpenXiaozhantai = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -1880,6 +1951,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onPhotoCaptureFailed = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
+            onOpenXiaozhantai = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -1924,6 +1996,7 @@ private fun ChildChatScreenLandscapePreview() {
             onPhotoCaptureFailed = {},
             onOpenParentSettings = {},
             onOpenParentReport = {},
+            onOpenXiaozhantai = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

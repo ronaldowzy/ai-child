@@ -64,7 +64,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -172,7 +171,6 @@ fun ChildChatScreen(
         onImageRetry = viewModel::retryPhotoUpload,
         onImageDismiss = viewModel::dismissFailedPhoto,
         onImageSaveToXiaozhantai = viewModel::requestSavePhotoToXiaozhantai,
-        onXiaozhantaiNameChange = viewModel::updateXiaozhantaiSaveName,
         onXiaozhantaiSaveConfirm = viewModel::confirmXiaozhantaiSave,
         onXiaozhantaiSaveDismiss = viewModel::cancelXiaozhantaiSave,
         onOpenParentSettings = onOpenParentSettings,
@@ -199,7 +197,6 @@ private fun ChildChatScreenContent(
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
     onImageSaveToXiaozhantai: (String) -> Unit = {},
-    onXiaozhantaiNameChange: (String) -> Unit = {},
     onXiaozhantaiSaveConfirm: () -> Unit = {},
     onXiaozhantaiSaveDismiss: () -> Unit = {},
     onOpenParentSettings: () -> Unit,
@@ -378,7 +375,6 @@ private fun ChildChatScreenContent(
     uiState.xiaozhantaiSaveDraft?.let { draft ->
         XiaozhantaiSaveDialog(
             draft = draft,
-            onNameChange = onXiaozhantaiNameChange,
             onConfirm = onXiaozhantaiSaveConfirm,
             onDismiss = onXiaozhantaiSaveDismiss,
         )
@@ -1083,7 +1079,6 @@ private fun LocalImagePreviewCard(
 @Composable
 private fun XiaozhantaiSaveDialog(
     draft: XiaozhantaiSaveDraftUiState,
-    onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1111,18 +1106,28 @@ private fun XiaozhantaiSaveDialog(
                     )
                 }
                 Text(
-                    text = "给这个小发现起个名字",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "名字",
+                    style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFF52667B),
                 )
-                TextField(
-                    value = draft.name,
-                    onValueChange = onNameChange,
-                    enabled = !draft.isSaving,
-                    singleLine = true,
-                    placeholder = { Text(text = draft.defaultName) },
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color.White.copy(alpha = 0.78f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.66f),
+                    ),
+                ) {
+                    Text(
+                        text = draft.name.ifBlank { draft.defaultName },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF40546A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    )
+                }
                 draft.errorMessage?.let { message ->
                     Text(
                         text = message,

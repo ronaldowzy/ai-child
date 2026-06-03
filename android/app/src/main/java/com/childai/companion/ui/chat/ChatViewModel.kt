@@ -6,6 +6,7 @@ import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.AttachmentCreateResponse
 import com.childai.companion.data.attachment.AttachmentRepository
 import com.childai.companion.data.attachment.PhotoUploadPayload
+import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationRepository
 import com.childai.companion.data.conversation.ConversationReply
@@ -90,9 +91,9 @@ class ChatViewModel(
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
-    private var pendingDeferredQuickActionId: String? = null
     private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
     private val xiaozhantaiSaveCandidates = mutableMapOf<String, XiaozhantaiSaveCandidate>()
+    private var latestXiaozhantaiSaveCandidateMessageId: String? = null
 
     private val _uiState = MutableStateFlow(
         run {
@@ -169,8 +170,6 @@ class ChatViewModel(
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
-        val effectiveQuickActionId = quickActionId ?: pendingDeferredQuickActionId
-        pendingDeferredQuickActionId = null
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
@@ -182,7 +181,7 @@ class ChatViewModel(
         sendTextWithAttachments(
             trimmedText,
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
-            quickActionId = effectiveQuickActionId,
+            quickActionId = quickActionId,
         )
     }
 
@@ -425,9 +424,6 @@ class ChatViewModel(
 
     fun onQuickAction(action: QuickActionUi) {
         Log.d(TAG, "onQuickAction: id=${action.id}, label=${action.label}")
-        if (action.id !in setOf("companion_name", "give_name", "image_naming", "companion_friend_name")) {
-            pendingDeferredQuickActionId = null
-        }
         when (action.id) {
             "take_photo", "share_photo" -> {
                 stopCurrentTts(restoreBaseAgent = true)
@@ -446,24 +442,10 @@ class ChatViewModel(
             "give_name",
             "image_naming",
             "companion_friend_name" -> {
-                pendingDeferredQuickActionId = normalizedQuickActionId(action.id)
-                stopCurrentTts(restoreBaseAgent = true)
-                _uiState.update { state ->
-                    val nextVoice = state.voice.copy(
-                        inputMode = VoiceInputMode.WaitingForChild,
-                        pendingTranscript = "",
-                        errorMessage = null,
-                    )
-                    state.copy(
-                        quickActions = emptyList(),
-                        childTurnPhaseHint = null,
-                        voice = nextVoice,
-                        agent = childInteractionPresentation(
-                            voice = nextVoice,
-                            fallbackAgent = baseAgentState,
-                        ).agent,
-                    )
-                }
+                sendText(
+                    action.label,
+                    quickActionId = normalizedQuickActionId(action.id),
+                )
             }
             else -> sendText(
                 action.label,
@@ -535,6 +517,7 @@ class ChatViewModel(
                     defaultName = defaultItemName,
                     foxQuote = xiaozhantaiFoxQuoteFromReply(attachmentResponse.reply.text),
                 )
+                latestXiaozhantaiSaveCandidateMessageId = childPhotoMessageId
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = childPhotoMessageId,
@@ -615,6 +598,7 @@ class ChatViewModel(
                     defaultName = defaultItemName,
                     foxQuote = xiaozhantaiFoxQuoteFromReply(attachmentResponse.reply.text),
                 )
+                latestXiaozhantaiSaveCandidateMessageId = messageId
                 handleAttachmentResponse(attachmentResponse)
                 updateImagePreviewStatus(
                     messageId = messageId,
@@ -653,6 +637,7 @@ class ChatViewModel(
     fun dismissFailedPhoto(messageId: String) {
         pendingUploadPayloads.remove(messageId)
         xiaozhantaiSaveCandidates.remove(messageId)
+        clearLatestXiaozhantaiCandidateIfNeeded(messageId)
         _uiState.update { state ->
             state.copy(
                 imagePreviewCards = state.imagePreviewCards - messageId,
@@ -682,6 +667,36 @@ class ChatViewModel(
         }
     }
 
+    private fun rememberXiaozhantaiCompanionName(companionObject: CompanionObjectMeta?) {
+        val companionName = companionObject
+            ?.takeIf { it.state == "active" && it.action == "co_create" }
+            ?.name
+            ?.trim()
+            ?.take(24)
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        val messageId = latestXiaozhantaiSaveCandidateMessageId
+            ?.takeIf { xiaozhantaiSaveCandidates.containsKey(it) }
+            ?: xiaozhantaiSaveCandidates.keys.lastOrNull()
+            ?: return
+        val candidate = xiaozhantaiSaveCandidates[messageId] ?: return
+        xiaozhantaiSaveCandidates[messageId] = candidate.copy(confirmedName = companionName)
+        _uiState.update { state ->
+            val card = state.imagePreviewCards[messageId] ?: return@update state
+            state.copy(
+                imagePreviewCards = state.imagePreviewCards + (
+                    messageId to card.copy(defaultShowcaseName = companionName)
+                    ),
+            )
+        }
+    }
+
+    private fun clearLatestXiaozhantaiCandidateIfNeeded(messageId: String) {
+        if (latestXiaozhantaiSaveCandidateMessageId == messageId) {
+            latestXiaozhantaiSaveCandidateMessageId = xiaozhantaiSaveCandidates.keys.lastOrNull()
+        }
+    }
+
     fun requestSavePhotoToXiaozhantai(messageId: String) {
         val candidate = xiaozhantaiSaveCandidates[messageId] ?: return
         val card = _uiState.value.imagePreviewCards[messageId] ?: return
@@ -690,7 +705,7 @@ class ChatViewModel(
             state.copy(
                 xiaozhantaiSaveDraft = XiaozhantaiSaveDraftUiState(
                     messageId = messageId,
-                    name = candidate.defaultName,
+                    name = candidate.saveName,
                     defaultName = candidate.defaultName,
                     previewBytes = candidate.payload.previewBytes,
                     isSaving = false,
@@ -762,6 +777,7 @@ class ChatViewModel(
                 )
             }.onSuccess { item ->
                 xiaozhantaiSaveCandidates.remove(draft.messageId)
+                clearLatestXiaozhantaiCandidateIfNeeded(draft.messageId)
                 _uiState.update { state ->
                     state.copy(
                         xiaozhantaiSaveDraft = null,
@@ -1115,6 +1131,7 @@ class ChatViewModel(
         pendingImageContext: PendingImageContextUiState? = _uiState.value.pendingImageContext,
         replaceMessageId: String? = null,
     ) {
+        rememberXiaozhantaiCompanionName(sessionState.companionObject)
         if (replaceMessageId.isNullOrBlank()) {
             appendAgentMessage(reply.text)
         } else {
@@ -1222,7 +1239,7 @@ class ChatViewModel(
 
     private fun applyStreamRoute(event: ConversationStreamEvent) {
         val activeScene = event.activeScene ?: "conversation.open"
-        val nextSessionState = ConversationSessionState(
+        val routeSessionState = ConversationSessionState(
             baseScene = event.payload.optString("baseScene", event.payload.optString("base_scene", activeScene)),
             activeScene = activeScene,
             needsInput = event.payload.optString("needsInput").takeIf { it.isNotBlank() }
@@ -1231,7 +1248,9 @@ class ChatViewModel(
             companionObject = event.payload.optJSONObject("companion_object")?.let {
                 com.childai.companion.data.conversation.CompanionObjectMeta.fromJson(it)
             },
-        ).mergeWith(_uiState.value.sessionState)
+        )
+        rememberXiaozhantaiCompanionName(routeSessionState.companionObject)
+        val nextSessionState = routeSessionState.mergeWith(_uiState.value.sessionState)
         val nextAgentState = ConversationReply(
             type = "agent_message",
             text = "",
@@ -1881,7 +1900,11 @@ private data class XiaozhantaiSaveCandidate(
     val payload: PhotoUploadPayload,
     val defaultName: String,
     val foxQuote: String,
-)
+    val confirmedName: String? = null,
+) {
+    val saveName: String
+        get() = confirmedName?.takeIf { it.isNotBlank() } ?: defaultName
+}
 
 const val IMAGE_PURPOSE_SHARE = "share"
 const val IMAGE_PURPOSE_HOMEWORK = "learning_homework"

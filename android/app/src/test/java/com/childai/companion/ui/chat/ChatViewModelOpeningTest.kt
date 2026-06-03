@@ -144,15 +144,13 @@ class ChatViewModelOpeningTest {
         )
 
         viewModel.onQuickAction(QuickActionUi(id = "companion_name", label = "起个名字"))
-        assertTrue(sender.sentTexts.isEmpty())
-        assertTrue(sender.sentQuickActionIds.isEmpty())
-        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
-        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
+        assertEquals(listOf("起个名字"), sender.sentTexts)
+        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
 
         viewModel.sendText("叫小棉花")
 
-        assertEquals(listOf("叫小棉花"), sender.sentTexts)
-        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
+        assertEquals(listOf("起个名字", "叫小棉花"), sender.sentTexts)
+        assertEquals(listOf("companion_name", null), sender.sentQuickActionIds)
     }
 
     @Test
@@ -164,19 +162,17 @@ class ChatViewModelOpeningTest {
         )
 
         viewModel.onQuickAction(QuickActionUi(id = "give_name", label = "起个名字"))
-        assertTrue(sender.sentTexts.isEmpty())
-        assertTrue(sender.sentQuickActionIds.isEmpty())
-        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
-        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
+        assertEquals(listOf("起个名字"), sender.sentTexts)
+        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
 
         viewModel.sendText("叫小棉花")
 
-        assertEquals(listOf("叫小棉花"), sender.sentTexts)
-        assertEquals(listOf("companion_name"), sender.sentQuickActionIds)
+        assertEquals(listOf("起个名字", "叫小棉花"), sender.sentTexts)
+        assertEquals(listOf("companion_name", null), sender.sentQuickActionIds)
     }
 
     @Test
-    fun companionFriendNameQuickActionDefersUntilChildSpeaks() {
+    fun companionFriendNameQuickActionReportsActionIdToBackend() {
         val sender = OpeningSender()
         val viewModel = ChatViewModel(
             conversationSender = sender,
@@ -184,15 +180,13 @@ class ChatViewModelOpeningTest {
         )
 
         viewModel.onQuickAction(QuickActionUi(id = "companion_friend_name", label = "说个名字"))
-        assertTrue(sender.sentTexts.isEmpty())
-        assertTrue(sender.sentQuickActionIds.isEmpty())
-        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
-        assertEquals(VoiceInputMode.WaitingForChild, viewModel.uiState.value.voice.inputMode)
+        assertEquals(listOf("说个名字"), sender.sentTexts)
+        assertEquals(listOf("companion_friend_name"), sender.sentQuickActionIds)
 
         viewModel.sendText("叫小云朵")
 
-        assertEquals(listOf("叫小云朵"), sender.sentTexts)
-        assertEquals(listOf("companion_friend_name"), sender.sentQuickActionIds)
+        assertEquals(listOf("说个名字", "叫小云朵"), sender.sentTexts)
+        assertEquals(listOf("companion_friend_name", null), sender.sentQuickActionIds)
     }
 
     @Test

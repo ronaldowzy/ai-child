@@ -4,6 +4,8 @@ import com.childai.companion.data.attachment.AttachmentCreateResponse
 import com.childai.companion.data.attachment.AttachmentRepository
 import com.childai.companion.data.attachment.PhotoUploadPayload
 import com.childai.companion.data.attachment.RecognizedContent
+import com.childai.companion.data.conversation.CompanionObjectMeta
+import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.showcase.XiaozhantaiItem
@@ -147,6 +149,65 @@ class ChatViewModelImageAttachmentTest {
                 .savedToXiaozhantai,
         )
         assertEquals("stand_item_saved", viewModel.uiState.value.xiaozhantaiSavedItemIdForNavigation)
+    }
+
+    @Test
+    fun savedShowcaseItemUsesChildNamedCompanionNameWhenAvailable() {
+        val attachmentRepository = HoldingAttachmentRepository()
+        val showcaseRepository = CapturingXiaozhantaiRepository()
+        val viewModel = viewModel(
+            repository = attachmentRepository,
+            showcaseRepository = showcaseRepository,
+        )
+        val payload = photoPayload(
+            bytes = byteArrayOf(21, 22, 23),
+            previewBytes = byteArrayOf(7, 8, 9),
+        )
+
+        viewModel.submitCapturedPhoto(payload)
+        val childMessage = viewModel.uiState.value.messages.last()
+        attachmentRepository.resumeSuccess(
+            attachmentResponse(
+                replyText = "我看到小黄星啦\n像一盏小小的灯",
+            ),
+        )
+        viewModel.renderAgentReply(
+            ConversationMessageResponse(
+                reply = ConversationReply(
+                    type = "agent_message",
+                    text = "小棉花，软软的名字\n它轻轻落到窗边啦",
+                    voiceEnabled = false,
+                    audioUrl = null,
+                    emotion = "warm",
+                    agentMotion = "gentle_idle",
+                ),
+                uiActions = emptyList(),
+                sessionState = ConversationSessionState(
+                    baseScene = "conversation.open",
+                    activeScene = "conversation.open",
+                    needsInput = null,
+                    requiresParentAttention = false,
+                    companionObject = CompanionObjectMeta(
+                        id = "co_saved_name",
+                        name = "小棉花",
+                        objectType = "star",
+                        lightLocation = "窗边",
+                        state = "active",
+                        action = "co_create",
+                        visualKind = "star",
+                    ),
+                ),
+            ),
+        )
+
+        viewModel.requestSavePhotoToXiaozhantai(childMessage.id)
+        assertEquals("小棉花", viewModel.uiState.value.xiaozhantaiSaveDraft!!.name)
+
+        viewModel.confirmXiaozhantaiSave()
+
+        assertEquals("小棉花", showcaseRepository.savedRequest!!.name)
+        assertArrayEquals(byteArrayOf(21, 22, 23), showcaseRepository.savedRequest!!.photoBytes)
+        assertEquals("我看到小黄星啦", showcaseRepository.savedRequest!!.foxQuote)
     }
 
     private fun viewModel(

@@ -13,6 +13,10 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.conversation.ConversationUiAction
+import com.childai.companion.data.growth.GROWTH_EVENT_SHOWCASE_RECALL_TITLE
+import com.childai.companion.data.growth.GROWTH_EVENT_SOURCE_XIAOZHANTAI
+import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED
+import com.childai.companion.data.growth.GrowthEvent
 import com.childai.companion.data.growth.GrowthEventRepository
 import com.childai.companion.data.showcase.SaveXiaozhantaiItemUseCase
 import com.childai.companion.data.showcase.XiaozhantaiRepository
@@ -21,6 +25,7 @@ import com.childai.companion.data.showcase.suggestedXiaozhantaiItemName
 import com.childai.companion.data.showcase.xiaozhantaiFoxQuoteFromReply
 import com.childai.companion.data.showcase.xiaozhantaiNormalizeFoxQuote
 import com.childai.companion.data.showcase.xiaozhantaiNormalizeName
+import com.childai.companion.data.growth.showcaseItemRecalledGrowthSummary
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.voice.AudioSegment
@@ -52,6 +57,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val TAG = "ChatViewModel"
+private const val XIAOZHANTAI_RECALL_EVENT_DEDUPE_MS = 10_000L
 
 private val SCENES_NO_WAITING = setOf(
     "daily.bedtime_reflection",
@@ -66,7 +72,7 @@ class ChatViewModel(
         ConversationRepositoryMessageSender(),
     private val attachmentRepository: AttachmentRepository = AttachmentRepository(),
     private val xiaozhantaiRepository: XiaozhantaiRepository? = null,
-    growthEventRepository: GrowthEventRepository? = null,
+    private val growthEventRepository: GrowthEventRepository? = null,
     private var ttsController: TtsController = NoOpTtsController,
     private var speechInputController: SpeechInputController? = null,
     private val speechInputControllerFactory: (File) -> SpeechInputController = { cacheDirectory ->
@@ -82,6 +88,7 @@ class ChatViewModel(
     private val childId: String = DevSettings.CHILD_ID,
     private val naturalWaitingEnabled: Boolean = DevSettings.NATURAL_WAITING_ENABLED,
     private val naturalWaitingTimeoutMs: Long = DevSettings.NATURAL_WAITING_TIMEOUT_MS,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
     private var nextMessageIndex = 0
@@ -100,6 +107,7 @@ class ChatViewModel(
     private val xiaozhantaiSaveCandidates = mutableMapOf<String, XiaozhantaiSaveCandidate>()
     private var latestXiaozhantaiSaveCandidateMessageId: String? = null
     private var pendingXiaozhantaiRecallContext: XiaozhantaiRecallContext? = null
+    private val lastXiaozhantaiRecallEventAtByItemId = mutableMapOf<String, Long>()
     private val saveXiaozhantaiItemUseCase = xiaozhantaiRepository?.let {
         SaveXiaozhantaiItemUseCase(
             xiaozhantaiRepository = it,
@@ -224,6 +232,42 @@ class ChatViewModel(
                 isSending = false,
                 childTurnPhaseHint = null,
             )
+        }
+        recordXiaozhantaiRecallGrowthEvent(
+            rawContext = context,
+            normalizedContext = normalizedContext,
+        )
+    }
+
+    private fun recordXiaozhantaiRecallGrowthEvent(
+        rawContext: XiaozhantaiRecallContext,
+        normalizedContext: XiaozhantaiRecallContext,
+    ) {
+        val repository = growthEventRepository ?: return
+        val createdAt = nowMillis()
+        val lastCreatedAt = lastXiaozhantaiRecallEventAtByItemId[normalizedContext.itemId]
+        if (lastCreatedAt != null && createdAt - lastCreatedAt in 0L until XIAOZHANTAI_RECALL_EVENT_DEDUPE_MS) {
+            return
+        }
+        lastXiaozhantaiRecallEventAtByItemId[normalizedContext.itemId] = createdAt
+        viewModelScope.launch(sendDispatcher) {
+            runCatching {
+                repository.append(
+                    GrowthEvent(
+                        id = "growth_event_recall_${normalizedContext.itemId}_$createdAt",
+                        childId = childId,
+                        type = GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED,
+                        title = GROWTH_EVENT_SHOWCASE_RECALL_TITLE,
+                        summary = showcaseItemRecalledGrowthSummary(rawContext.name),
+                        relatedItemId = normalizedContext.itemId,
+                        relatedPhotoUri = normalizedContext.photoUri.takeIf { it.isNotBlank() },
+                        createdAt = createdAt,
+                        source = GROWTH_EVENT_SOURCE_XIAOZHANTAI,
+                    ),
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "recordXiaozhantaiRecallGrowthEvent: failed", error)
+            }
         }
     }
 

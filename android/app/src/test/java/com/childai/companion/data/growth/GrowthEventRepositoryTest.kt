@@ -48,6 +48,18 @@ class GrowthEventRepositoryTest {
     }
 
     @Test
+    fun showcaseRecallSummaryUsesGentleFallbacks() {
+        assertEquals(
+            "孩子又和小白狐聊起了「小石头」。",
+            showcaseItemRecalledGrowthSummary("小石头"),
+        )
+        assertEquals(
+            "孩子又和小白狐聊起了一个小发现。",
+            showcaseItemRecalledGrowthSummary(" \n "),
+        )
+    }
+
+    @Test
     fun localRepositoryRestoresEventsAfterRestart() = runTest {
         val root = temporaryFolder.newFolder("growth_events")
         val repository = LocalGrowthEventRepository(root)

@@ -3,8 +3,10 @@ package com.childai.companion.data.growth
 import org.json.JSONObject
 
 const val GROWTH_EVENT_TYPE_SHOWCASE_ITEM_SAVED = "showcase_item_saved"
+const val GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED = "showcase_item_recalled"
 const val GROWTH_EVENT_SOURCE_XIAOZHANTAI = "xiaozhantai"
 const val GROWTH_EVENT_SHOWCASE_TITLE = "留下了一个小发现"
+const val GROWTH_EVENT_SHOWCASE_RECALL_TITLE = "又看了一个小发现"
 
 data class GrowthEvent(
     val id: String,
@@ -39,11 +41,7 @@ fun showcaseItemSavedGrowthSummary(
     name: String?,
     foxQuote: String?,
 ): String {
-    val compactName = name
-        ?.replace(Regex("[\\r\\n\\t]+"), " ")
-        ?.replace(Regex("\\s+"), " ")
-        ?.trim()
-        .orEmpty()
+    val compactName = compactGrowthEventName(name)
     val compactQuote = foxQuote
         ?.lineSequence()
         ?.map { it.trim() }
@@ -59,6 +57,14 @@ fun showcaseItemSavedGrowthSummary(
     } else {
         "孩子把「${compactName.take(24)}」放进了小展台。小白狐当时说：$compactQuote"
     }
+}
+
+fun showcaseItemRecalledGrowthSummary(name: String?): String {
+    val compactName = compactGrowthEventName(name)
+    if (compactName.isBlank()) {
+        return "孩子又和小白狐聊起了一个小发现。"
+    }
+    return "孩子又和小白狐聊起了「${compactName.take(24)}」。"
 }
 
 internal fun GrowthEvent.toJson(): JSONObject {
@@ -80,7 +86,7 @@ internal fun growthEventFromJson(json: JSONObject): GrowthEvent? {
     val childId = json.optString("childId").takeIf { it.isNotBlank() } ?: return null
     val type = json.optString("type").takeIf { it.isNotBlank() } ?: return null
     val source = json.optString("source").takeIf { it.isNotBlank() } ?: return null
-    val title = json.optString("title").ifBlank { GROWTH_EVENT_SHOWCASE_TITLE }
+    val title = json.optString("title").ifBlank { defaultGrowthEventTitle(type) }
     val summary = json.optString("summary").takeIf { it.isNotBlank() } ?: return null
     return GrowthEvent(
         id = id,
@@ -94,6 +100,21 @@ internal fun growthEventFromJson(json: JSONObject): GrowthEvent? {
         source = source,
         isDeleted = json.optBoolean("isDeleted", false),
     )
+}
+
+private fun defaultGrowthEventTitle(type: String): String {
+    return when (type) {
+        GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED -> GROWTH_EVENT_SHOWCASE_RECALL_TITLE
+        else -> GROWTH_EVENT_SHOWCASE_TITLE
+    }
+}
+
+private fun compactGrowthEventName(name: String?): String {
+    return name
+        ?.replace(Regex("[\\r\\n\\t]+"), " ")
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        .orEmpty()
 }
 
 private fun JSONObject.optNullableString(name: String): String? {

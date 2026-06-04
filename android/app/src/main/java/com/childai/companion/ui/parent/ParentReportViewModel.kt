@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.growth.GROWTH_EVENT_SOURCE_XIAOZHANTAI
+import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED
 import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_SAVED
 import com.childai.companion.data.growth.GrowthEvent
 import com.childai.companion.data.growth.GrowthEventRepository
@@ -145,7 +146,7 @@ internal fun parentReportRecentDiscoveries(
         .asSequence()
         .filter {
             !it.isDeleted &&
-                it.type == GROWTH_EVENT_TYPE_SHOWCASE_ITEM_SAVED &&
+                it.type in PARENT_REPORT_XIAOZHANTAI_EVENT_TYPES &&
                 it.source == GROWTH_EVENT_SOURCE_XIAOZHANTAI &&
                 it.createdAt >= earliestCreatedAt
         }
@@ -170,6 +171,10 @@ private fun todayDateText(): String {
 }
 
 private val DATE_PATTERN = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+private val PARENT_REPORT_XIAOZHANTAI_EVENT_TYPES = setOf(
+    GROWTH_EVENT_TYPE_SHOWCASE_ITEM_SAVED,
+    GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED,
+)
 
 internal const val REPORT_TIMEOUT_MS = 30_000L
 internal const val PARENT_REPORT_TIMEOUT_MESSAGE = "今天的小结还没整理好，可以稍后再看。"

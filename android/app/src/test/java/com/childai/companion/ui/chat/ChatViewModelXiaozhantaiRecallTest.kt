@@ -4,6 +4,11 @@ import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
+import com.childai.companion.data.growth.GROWTH_EVENT_SHOWCASE_RECALL_TITLE
+import com.childai.companion.data.growth.GROWTH_EVENT_SOURCE_XIAOZHANTAI
+import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED
+import com.childai.companion.data.growth.GrowthEvent
+import com.childai.companion.data.growth.GrowthEventRepository
 import com.childai.companion.data.showcase.XiaozhantaiItem
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -97,6 +102,85 @@ class ChatViewModelXiaozhantaiRecallTest {
     }
 
     @Test
+    fun recallContextRecordsGrowthEvent() {
+        val growthRepository = CapturingRecallGrowthEventRepository()
+        val viewModel = viewModel(
+            growthEventRepository = growthRepository,
+            nowMillis = { 1760000000000L },
+        )
+
+        viewModel.recallXiaozhantaiItem(
+            XiaozhantaiRecallContext(
+                itemId = "stand_item_001",
+                name = "小石头",
+                photoUri = "/tmp/photo.jpg",
+                foxQuote = "它看起来像一颗安静的小星球。",
+                createdAt = 1759990000000L,
+            ),
+        )
+
+        val event = growthRepository.appendedEvents.single()
+        assertEquals("growth_event_recall_stand_item_001_1760000000000", event.id)
+        assertEquals("child_001", event.childId)
+        assertEquals(GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED, event.type)
+        assertEquals(GROWTH_EVENT_SHOWCASE_RECALL_TITLE, event.title)
+        assertEquals("孩子又和小白狐聊起了「小石头」。", event.summary)
+        assertEquals("stand_item_001", event.relatedItemId)
+        assertEquals("/tmp/photo.jpg", event.relatedPhotoUri)
+        assertEquals(1760000000000L, event.createdAt)
+        assertEquals(GROWTH_EVENT_SOURCE_XIAOZHANTAI, event.source)
+    }
+
+    @Test
+    fun recallGrowthEventUsesFallbackSummaryWhenNameIsBlank() {
+        val growthRepository = CapturingRecallGrowthEventRepository()
+        val viewModel = viewModel(
+            growthEventRepository = growthRepository,
+            nowMillis = { 1760000000001L },
+        )
+
+        viewModel.recallXiaozhantaiItem(
+            XiaozhantaiRecallContext(
+                itemId = "stand_item_blank",
+                name = "  \n ",
+                photoUri = "/tmp/missing.jpg",
+                foxQuote = "",
+                createdAt = 1759990000000L,
+            ),
+        )
+
+        assertEquals(
+            "孩子又和小白狐聊起了一个小发现。",
+            growthRepository.appendedEvents.single().summary,
+        )
+    }
+
+    @Test
+    fun duplicateRecallWithinTenSecondsDoesNotRecordAnotherGrowthEvent() {
+        var now = 1760000000000L
+        val growthRepository = CapturingRecallGrowthEventRepository()
+        val viewModel = viewModel(
+            conversationSender = CapturingConversationSender(),
+            growthEventRepository = growthRepository,
+            nowMillis = { now },
+        )
+        val context = XiaozhantaiRecallContext(
+            itemId = "stand_item_001",
+            name = "小石头",
+            photoUri = "/tmp/photo.jpg",
+            foxQuote = "它看起来像一颗安静的小星球。",
+            createdAt = 1759990000000L,
+        )
+
+        viewModel.recallXiaozhantaiItem(context)
+        viewModel.sendText("我还记得它")
+        now += 5_000L
+        viewModel.recallXiaozhantaiItem(context)
+
+        assertEquals(1, growthRepository.appendedEvents.size)
+    }
+
+    @Test
     fun nextChildMessageSendsRecallContextToBackendButKeepsVisibleTextClean() {
         val sender = CapturingConversationSender()
         val viewModel = viewModel(sender)
@@ -122,9 +206,14 @@ class ChatViewModelXiaozhantaiRecallTest {
 
     private fun viewModel(
         conversationSender: ConversationMessageSender = CapturingConversationSender(),
+        growthEventRepository: GrowthEventRepository? = null,
+        nowMillis: () -> Long = System::currentTimeMillis,
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = conversationSender,
+            growthEventRepository = growthEventRepository,
+            childId = "child_001",
+            nowMillis = nowMillis,
             sendDispatcher = Dispatchers.Unconfined,
             requestOpeningOnInit = false,
         )
@@ -144,6 +233,15 @@ class ChatViewModelXiaozhantaiRecallTest {
             foxQuote = foxQuote,
             createdAt = createdAt,
         )
+    }
+}
+
+private class CapturingRecallGrowthEventRepository : GrowthEventRepository() {
+    val appendedEvents = mutableListOf<GrowthEvent>()
+
+    override suspend fun append(event: GrowthEvent): GrowthEvent {
+        appendedEvents += event
+        return super.append(event)
     }
 }
 

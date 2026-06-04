@@ -22,6 +22,7 @@ class XiaozhantaiViewModel(
                 _uiState.update {
                     it.copy(
                         items = items,
+                        itemsLoaded = true,
                         selectedItem = it.selectedItem?.let { selected ->
                             items.firstOrNull { item -> item.id == selected.id }
                         },
@@ -53,4 +54,5 @@ class XiaozhantaiViewModel(
 data class XiaozhantaiUiState(
     val items: List<XiaozhantaiItem> = emptyList(),
     val selectedItem: XiaozhantaiItem? = null,
+    val itemsLoaded: Boolean = false,
 )

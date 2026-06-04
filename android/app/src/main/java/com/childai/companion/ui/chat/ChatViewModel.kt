@@ -99,6 +99,7 @@ class ChatViewModel(
     private val pendingUploadPayloads = mutableMapOf<String, Pair<PhotoUploadPayload, String>>()
     private val xiaozhantaiSaveCandidates = mutableMapOf<String, XiaozhantaiSaveCandidate>()
     private var latestXiaozhantaiSaveCandidateMessageId: String? = null
+    private var pendingXiaozhantaiRecallContext: XiaozhantaiRecallContext? = null
     private val saveXiaozhantaiItemUseCase = xiaozhantaiRepository?.let {
         SaveXiaozhantaiItemUseCase(
             xiaozhantaiRepository = it,
@@ -194,6 +195,36 @@ class ChatViewModel(
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
             quickActionId = quickActionId,
         )
+    }
+
+    fun recallXiaozhantaiItem(context: XiaozhantaiRecallContext) {
+        val normalizedContext = context.normalized()
+        if (normalizedContext.itemId.isBlank()) return
+        val currentMessages = _uiState.value.messages
+        if (currentMessages.lastOrNull()?.xiaozhantaiRecallCard?.itemId == normalizedContext.itemId) {
+            return
+        }
+
+        childInteractionStarted = true
+        cancelNaturalWaitingTimeout()
+        cancelSlowHints()
+        val recallText = xiaozhantaiRecallMessageText(normalizedContext)
+        val recallMessage = ChatMessage(
+            id = nextMessageId("agent-xzt-recall"),
+            author = MessageAuthor.Agent,
+            text = recallText,
+            xiaozhantaiRecallCard = normalizedContext.toRecallCardUiState(),
+        )
+        pendingXiaozhantaiRecallContext = normalizedContext
+        _uiState.update { state ->
+            state.copy(
+                messages = state.messages + recallMessage,
+                agentReplyText = recallText,
+                quickActions = emptyList(),
+                isSending = false,
+                childTurnPhaseHint = null,
+            )
+        }
     }
 
     fun startVoiceRecording(cacheDirectory: File) {
@@ -359,6 +390,10 @@ class ChatViewModel(
         if (_uiState.value.isSending) return
 
         Log.d(TAG, "[LatencyTrace] stage=request_send textLen=${text.length}")
+        val requestText = consumeXiaozhantaiRecallRequestText(
+            childText = text,
+            attachments = attachments,
+        )
         val wasSpeaking = _uiState.value.tts.isSpeaking || _uiState.value.tts.isSpeakingPending
         childInteractionStarted = true
         waitingAttemptedThisTurn = false
@@ -381,7 +416,7 @@ class ChatViewModel(
             if (DevSettings.USE_STREAMING_CONVERSATION) {
                 val streamed = runCatching {
                     streamTextWithAttachments(
-                        text = text,
+                        text = requestText,
                         attachments = attachments,
                         quickActionId = quickActionId,
                     )
@@ -393,7 +428,7 @@ class ChatViewModel(
                 conversationSender.sendTextMessage(
                     childId = childId,
                     sessionId = sessionId,
-                    text = text,
+                    text = requestText,
                     attachments = attachments,
                     quickActionId = quickActionId,
                 )
@@ -431,6 +466,25 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    private fun consumeXiaozhantaiRecallRequestText(
+        childText: String,
+        attachments: List<String>,
+    ): String {
+        val context = pendingXiaozhantaiRecallContext
+        if (context == null) {
+            return childText
+        }
+        if (attachments.isNotEmpty()) {
+            pendingXiaozhantaiRecallContext = null
+            return childText
+        }
+        pendingXiaozhantaiRecallContext = null
+        return xiaozhantaiRecallRequestText(
+            context = context,
+            childText = childText,
+        )
     }
 
     fun onQuickAction(action: QuickActionUi) {
@@ -472,6 +526,7 @@ class ChatViewModel(
         if (_uiState.value.isSending || payload.bytes.isEmpty()) return
         Log.d(TAG, "[LatencyTrace] stage=image_local_selected purpose=$imagePurpose size=${payload.bytes.size}")
         Log.d(TAG, "submitCapturedPhoto: purpose=$imagePurpose, size=${payload.bytes.size}bytes, mime=${payload.mimeType}")
+        pendingXiaozhantaiRecallContext = null
         stopCurrentTts(restoreBaseAgent = true)
         childInteractionStarted = true
         val childPhotoMessageId = nextMessageId("child-photo")

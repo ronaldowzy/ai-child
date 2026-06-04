@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -93,14 +94,21 @@ fun XiaozhantaiDetailScreen(
     viewModel: XiaozhantaiViewModel,
     itemId: String?,
     onBack: () -> Unit,
+    onRecallWithXiaobaohu: (XiaozhantaiItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selected = uiState.selectedItem
         ?: itemId?.let { id -> uiState.items.firstOrNull { it.id == id } }
+    LaunchedEffect(itemId, uiState.itemsLoaded, selected?.id) {
+        if (uiState.itemsLoaded && itemId != null && selected == null) {
+            onBack()
+        }
+    }
     XiaozhantaiDetailContent(
         item = selected,
         onBack = onBack,
+        onRecallWithXiaobaohu = onRecallWithXiaobaohu,
         onDelete = { item ->
             viewModel.softDeleteItem(item.id, onDeleted = onBack)
         },
@@ -163,6 +171,7 @@ internal fun XiaozhantaiListContent(
 internal fun XiaozhantaiDetailContent(
     item: XiaozhantaiItem?,
     onBack: () -> Unit,
+    onRecallWithXiaobaohu: (XiaozhantaiItem) -> Unit = {},
     onDelete: (XiaozhantaiItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -202,6 +211,18 @@ internal fun XiaozhantaiDetailContent(
                     quote = item.foxQuote,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            item {
+                OutlinedButton(
+                    onClick = { onRecallWithXiaobaohu(item) },
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, Color(0xFFB9D3E9).copy(alpha = 0.50f)),
+                ) {
+                    Text(
+                        text = "和小白狐再聊聊它",
+                        color = Color(0xFF52667B),
+                    )
+                }
             }
             item {
                 Text(

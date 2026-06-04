@@ -2,6 +2,7 @@ package com.childai.companion.ui.chat
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
@@ -67,9 +68,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -78,6 +81,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -103,8 +107,12 @@ import com.childai.companion.ui.theme.ChildAiCompanionTheme
 import com.childai.companion.voice.MediaPlayerAudioUrlPlayer
 import com.childai.companion.voice.NoOpTtsController
 import com.childai.companion.voice.RemoteAudioTtsController
+import java.io.File
+import java.net.URL
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ChildChatScreen(
@@ -782,6 +790,12 @@ private fun ChatMessageBubbleWithPreview(
                     onSaveToXiaozhantai = { onImageSaveToXiaozhantai(message.id) },
                 )
             }
+            message.xiaozhantaiRecallCard?.let { recallCard ->
+                XiaozhantaiRecallChatCard(
+                    card = recallCard,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
             Text(
                 text = message.text,
                 style = MaterialTheme.typography.bodyLarge,
@@ -905,6 +919,117 @@ private fun FloatingConversationBubble(
                     onSaveToXiaozhantai = onImageSaveToXiaozhantai,
                 )
             }
+            message.xiaozhantaiRecallCard?.let { recallCard ->
+                XiaozhantaiRecallChatCard(
+                    card = recallCard,
+                    compact = true,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun XiaozhantaiRecallChatCard(
+    card: XiaozhantaiRecallCardUiState,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val bitmap by rememberXiaozhantaiRecallPhotoBitmap(card.photoUri)
+    val shape = RoundedCornerShape(if (compact) 14.dp else 16.dp)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        color = Color(0xFFF7FBFF).copy(alpha = 0.78f),
+        border = BorderStroke(1.dp, companionSoftBorderColor(alpha = 0.46f)),
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(if (compact) 8.dp else 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            XiaozhantaiRecallThumbnail(
+                bitmap = bitmap,
+                compact = compact,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    text = card.name,
+                    style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF4F6072),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "来自小展台",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF6A7B88).copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun XiaozhantaiRecallThumbnail(
+    bitmap: ImageBitmap?,
+    compact: Boolean,
+) {
+    val shape = RoundedCornerShape(if (compact) 10.dp else 12.dp)
+    val modifier = Modifier
+        .size(if (compact) 46.dp else 58.dp)
+        .clip(shape)
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
+        )
+    } else {
+        Box(
+            modifier = modifier.background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFFFF7E8),
+                        Color(0xFFEAF5FF),
+                    ),
+                ),
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "照片",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF7A8998).copy(alpha = 0.76f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberXiaozhantaiRecallPhotoBitmap(photoUri: String): State<ImageBitmap?> {
+    val context = LocalContext.current
+    return produceState<ImageBitmap?>(initialValue = null, photoUri, context) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val uri = Uri.parse(photoUri)
+                val bitmap = when (uri.scheme?.lowercase()) {
+                    "content" -> context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+                    "file" -> BitmapFactory.decodeFile(uri.path)
+                    "http", "https" -> URL(photoUri).openStream().use(BitmapFactory::decodeStream)
+                    else -> BitmapFactory.decodeFile(File(photoUri).absolutePath)
+                }
+                bitmap?.asImageBitmap()
+            }.getOrNull()
         }
     }
 }

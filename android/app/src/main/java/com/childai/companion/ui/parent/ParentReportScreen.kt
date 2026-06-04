@@ -134,6 +134,7 @@ private fun ParentReportScreenContent(
                     else -> ReportFailed(onRetry = onLoad)
                 }
             }
+            ReportRecentInsights(insights = uiState.recentInsights)
             ReportRecentDiscoveries(events = uiState.recentDiscoveries)
         }
     }
@@ -146,6 +147,43 @@ private fun ReportMaterialInsufficient() {
             text = PARENT_REPORT_INSUFFICIENT_MESSAGE,
             style = MaterialTheme.typography.bodyLarge,
         )
+    }
+}
+
+@Composable
+private fun ReportRecentInsights(insights: List<ParentReportGrowthInsightUi>) {
+    if (insights.isEmpty()) return
+    ReportSection(title = "最近成长线索") {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            insights.forEach { insight ->
+                ParentReportGrowthInsightCard(insight = insight)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentReportGrowthInsightCard(insight: ParentReportGrowthInsightUi) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(
+                text = insight.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = insight.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -342,6 +380,13 @@ private fun ParentReportScreenPreview() {
                     avoidFollowup = emptyList(),
                     generationStatus = "model_generated",
                     generatedBy = "model",
+                ),
+                recentInsights = listOf(
+                    ParentReportGrowthInsightUi(
+                        id = "growth_insight_preview",
+                        title = "最近留下的小发现",
+                        summary = "孩子最近留下了 3 个小发现，比如「小石头」「小云朵」「小纸船」。",
+                    ),
                 ),
                 recentDiscoveries = listOf(
                     ParentReportGrowthEventUi(

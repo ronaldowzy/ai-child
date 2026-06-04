@@ -8,6 +8,8 @@ import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLE
 import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_SAVED
 import com.childai.companion.data.growth.GrowthEvent
 import com.childai.companion.data.growth.GrowthEventRepository
+import com.childai.companion.data.growth.GrowthInsight
+import com.childai.companion.data.growth.buildGrowthInsights
 import com.childai.companion.data.parent.ParentReport
 import com.childai.companion.data.parent.ParentReportRepository
 import java.time.LocalDate
@@ -107,11 +109,17 @@ class ParentReportViewModel(
     private fun observeGrowthEvents() {
         viewModelScope.launch {
             growthEventRepository.observeEvents(childId).collect { events ->
+                val now = nowMillis()
                 _uiState.update {
                     it.copy(
                         recentDiscoveries = parentReportRecentDiscoveries(
                             events = events,
-                            nowMillis = nowMillis(),
+                            nowMillis = now,
+                        ),
+                        recentInsights = parentReportRecentInsights(
+                            childId = childId,
+                            events = events,
+                            nowMillis = now,
                         ),
                     )
                 }
@@ -125,7 +133,14 @@ data class ParentReportUiState(
     val report: ParentReport? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val recentInsights: List<ParentReportGrowthInsightUi> = emptyList(),
     val recentDiscoveries: List<ParentReportGrowthEventUi> = emptyList(),
+)
+
+data class ParentReportGrowthInsightUi(
+    val id: String,
+    val title: String,
+    val summary: String,
 )
 
 data class ParentReportGrowthEventUi(
@@ -162,6 +177,28 @@ internal fun parentReportRecentDiscoveries(
             )
         }
         .toList()
+}
+
+internal fun parentReportRecentInsights(
+    childId: String,
+    events: List<GrowthEvent>,
+    nowMillis: Long,
+): List<ParentReportGrowthInsightUi> {
+    return buildGrowthInsights(
+        childId = childId,
+        events = events,
+        nowMillis = nowMillis,
+    ).map { insight ->
+        insight.toParentReportGrowthInsightUi()
+    }
+}
+
+private fun GrowthInsight.toParentReportGrowthInsightUi(): ParentReportGrowthInsightUi {
+    return ParentReportGrowthInsightUi(
+        id = id,
+        title = title,
+        summary = summary,
+    )
 }
 
 private fun todayDateText(): String {

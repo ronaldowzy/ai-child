@@ -51,6 +51,34 @@ class ParentReportViewModelTest {
     }
 
     @Test
+    fun outputsRecentInsightsForParentReport() {
+        val viewModel = viewModel(
+            events = listOf(
+                growthEvent(
+                    id = "saved",
+                    relatedItemId = "stand_item_001",
+                    summary = "孩子把「小石头」放进了小展台。",
+                    createdAt = now - 2_000L,
+                ),
+                growthEvent(
+                    id = "recalled",
+                    type = GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLED,
+                    title = GROWTH_EVENT_SHOWCASE_RECALL_TITLE,
+                    relatedItemId = "stand_item_001",
+                    summary = "孩子又和小白狐聊起了「小石头」。",
+                    createdAt = now - 1_000L,
+                ),
+            ),
+        )
+
+        val insights = viewModel.uiState.value.recentInsights
+
+        assertTrue(insights.any { it.title == "最近留下的小发现" })
+        assertTrue(insights.any { it.title == "孩子又想起了一个小发现" })
+        assertTrue(insights.any { it.summary == "孩子最近又和小白狐聊起了「小石头」。" })
+    }
+
+    @Test
     fun onlyShowsXiaozhantaiShowcaseEvents() {
         val viewModel = viewModel(
             events = listOf(
@@ -182,6 +210,7 @@ class ParentReportViewModelTest {
         title: String = GROWTH_EVENT_SHOWCASE_TITLE,
         source: String = GROWTH_EVENT_SOURCE_XIAOZHANTAI,
         summary: String = "孩子把「小石头」放进了小展台。",
+        relatedItemId: String? = "stand_item_001",
         relatedPhotoUri: String? = "/tmp/photo.jpg",
         createdAt: Long = now - 1_000L,
         isDeleted: Boolean = false,
@@ -192,7 +221,7 @@ class ParentReportViewModelTest {
             type = type,
             title = title,
             summary = summary,
-            relatedItemId = "stand_item_001",
+            relatedItemId = relatedItemId,
             relatedPhotoUri = relatedPhotoUri,
             createdAt = createdAt,
             source = source,

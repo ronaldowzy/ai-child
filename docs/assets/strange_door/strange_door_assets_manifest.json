@@ -1,0 +1,419 @@
+{
+  "manifest_version": "2026-06-04-s1",
+  "source_directory": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604",
+  "android_resource_directory": "android/app/src/main/res/drawable-nodpi",
+  "preview_path": "docs/assets/strange_door/strange_door_assets_preview.png",
+  "all_assets_usable": true,
+  "assets": [
+    {
+      "asset_key": "DoorClosed",
+      "file_name": "strange_door_closed.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/01_strange_door_closed.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_closed.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 1024,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        132,
+        155,
+        892,
+        869
+      ],
+      "transparent_margins_px": {
+        "left": 132,
+        "top": 155,
+        "right": 132,
+        "bottom": 155
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "DoorCracked",
+      "file_name": "strange_door_cracked.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/02_strange_door_cracked.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_cracked.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 1024,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        132,
+        141,
+        892,
+        883
+      ],
+      "transparent_margins_px": {
+        "left": 132,
+        "top": 141,
+        "right": 132,
+        "bottom": 141
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "DoorAlmostOpen",
+      "file_name": "strange_door_almost_open.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/03_strange_door_almost_open.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_almost_open.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 1024,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        112,
+        146,
+        912,
+        878
+      ],
+      "transparent_margins_px": {
+        "left": 112,
+        "top": 146,
+        "right": 112,
+        "bottom": 146
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "DoorOpen",
+      "file_name": "strange_door_open.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/04_strange_door_open.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_open.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 1024,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        102,
+        169,
+        922,
+        855
+      ],
+      "transparent_margins_px": {
+        "left": 102,
+        "top": 169,
+        "right": 102,
+        "bottom": 169
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "RoundLock",
+      "file_name": "strange_door_round_lock.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/05_round_lock.png",
+      "width": 512,
+      "height": 512,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_round_lock.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 512,
+      "expected_height": 512,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        76,
+        84,
+        436,
+        427
+      ],
+      "transparent_margins_px": {
+        "left": 76,
+        "top": 84,
+        "right": 76,
+        "bottom": 85
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": -0.5
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "TransformGlow",
+      "file_name": "strange_door_transform_glow.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/06_transform_glow.png",
+      "width": 512,
+      "height": 512,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_transform_glow.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 512,
+      "expected_height": 512,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        56,
+        135,
+        456,
+        376
+      ],
+      "transparent_margins_px": {
+        "left": 56,
+        "top": 135,
+        "right": 56,
+        "bottom": 136
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": -0.5
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "DoorSuccessGlow",
+      "file_name": "strange_door_success_glow.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/07_door_success_glow.png",
+      "width": 512,
+      "height": 512,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_success_glow.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 512,
+      "expected_height": 512,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        71,
+        140,
+        441,
+        372
+      ],
+      "transparent_margins_px": {
+        "left": 71,
+        "top": 140,
+        "right": 71,
+        "bottom": 140
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "RiddlePanel",
+      "file_name": "strange_door_riddle_panel.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/08_riddle_bubble_panel.png",
+      "width": 1024,
+      "height": 512,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_riddle_panel.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 512,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        62,
+        136,
+        962,
+        375
+      ],
+      "transparent_margins_px": {
+        "left": 62,
+        "top": 136,
+        "right": 62,
+        "bottom": 137
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": -0.5
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "ToolCardPanel",
+      "file_name": "strange_door_tool_card_panel.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/09_tool_card_panel.png",
+      "width": 1024,
+      "height": 768,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_tool_card_panel.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 768,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        62,
+        173,
+        962,
+        594
+      ],
+      "transparent_margins_px": {
+        "left": 62,
+        "top": 173,
+        "right": 62,
+        "bottom": 174
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": -0.5
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    },
+    {
+      "asset_key": "GroundShadow",
+      "file_name": "strange_door_ground_shadow.webp",
+      "source_file": "/Users/wzy/Downloads/ai-child-strange-door-assets-final-20260604/10_door_ground_shadow.png",
+      "width": 1024,
+      "height": 512,
+      "transparent_background": true,
+      "android_resource_path": "android/app/src/main/res/drawable-nodpi/strange_door_ground_shadow.webp",
+      "status": "usable",
+      "source_format": "png_rgba",
+      "android_format": "webp_lossless_alpha",
+      "expected_width": 1024,
+      "expected_height": 512,
+      "size_ok": true,
+      "webp_alpha_ok": true,
+      "alpha_bbox": [
+        132,
+        200,
+        892,
+        311
+      ],
+      "transparent_margins_px": {
+        "left": 132,
+        "top": 200,
+        "right": 132,
+        "bottom": 201
+      },
+      "center_offset_px": {
+        "x": 0.0,
+        "y": -0.5
+      },
+      "touches_edge": false,
+      "visual_review": {
+        "subject_centered": true,
+        "transparent_edge_padding": true,
+        "no_visible_text_or_watermark": true,
+        "no_visible_background": true,
+        "no_visible_person_or_xiaobaohu": true,
+        "no_visible_treasure_or_reward_style": true
+      }
+    }
+  ]
+}

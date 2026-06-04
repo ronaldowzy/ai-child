@@ -145,6 +145,7 @@ fun AppNavHost(
             val parentReportViewModel = remember(session.childId) {
                 ParentReportViewModel(
                     repository = parentReportRepository,
+                    growthEventRepository = growthEventRepository,
                     childId = session.childId,
                 )
             }

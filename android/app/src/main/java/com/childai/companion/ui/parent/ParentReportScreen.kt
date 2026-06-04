@@ -1,15 +1,18 @@
 package com.childai.companion.ui.parent
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -20,12 +23,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +43,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.data.parent.ParentReport
 import com.childai.companion.ui.theme.ChildAiCompanionTheme
+import java.io.File
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ParentReportScreen(
@@ -117,6 +134,7 @@ private fun ParentReportScreenContent(
                     else -> ReportFailed(onRetry = onLoad)
                 }
             }
+            ReportRecentDiscoveries(events = uiState.recentDiscoveries)
         }
     }
 }
@@ -129,6 +147,103 @@ private fun ReportMaterialInsufficient() {
             style = MaterialTheme.typography.bodyLarge,
         )
     }
+}
+
+@Composable
+private fun ReportRecentDiscoveries(events: List<ParentReportGrowthEventUi>) {
+    ReportSection(title = "最近的小发现") {
+        if (events.isEmpty()) {
+            Text(
+                text = PARENT_REPORT_NO_RECENT_DISCOVERIES_MESSAGE,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                events.forEach { event ->
+                    ParentReportGrowthEventCard(event = event)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentReportGrowthEventCard(event: ParentReportGrowthEventUi) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            event.relatedPhotoUri?.let { photoUri ->
+                ParentReportGrowthEventThumbnail(photoUri = photoUri)
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = event.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = parentReportGrowthEventTimeLabel(event.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentReportGrowthEventThumbnail(photoUri: String) {
+    val bitmap by rememberParentReportPhotoBitmap(photoUri)
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap!!,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(58.dp)
+                .clip(MaterialTheme.shapes.medium),
+        )
+    }
+}
+
+@Composable
+private fun rememberParentReportPhotoBitmap(photoUri: String): androidx.compose.runtime.State<ImageBitmap?> {
+    val context = LocalContext.current
+    return produceState<ImageBitmap?>(initialValue = null, photoUri, context) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val uri = Uri.parse(photoUri)
+                val bitmap = when (uri.scheme?.lowercase()) {
+                    "content" -> context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+                    "file" -> BitmapFactory.decodeFile(uri.path)
+                    "http", "https" -> URL(photoUri).openStream().use(BitmapFactory::decodeStream)
+                    else -> BitmapFactory.decodeFile(File(photoUri).absolutePath)
+                }
+                bitmap?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+}
+
+private fun parentReportGrowthEventTimeLabel(createdAt: Long): String {
+    if (createdAt <= 0L) return ""
+    return SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(createdAt))
 }
 
 @Composable
@@ -227,6 +342,15 @@ private fun ParentReportScreenPreview() {
                     avoidFollowup = emptyList(),
                     generationStatus = "model_generated",
                     generatedBy = "model",
+                ),
+                recentDiscoveries = listOf(
+                    ParentReportGrowthEventUi(
+                        id = "growth_event_preview",
+                        title = "留下了一个小发现",
+                        summary = "孩子把「小石头」放进了小展台。小白狐当时说：它看起来像一颗安静的小星球。",
+                        createdAt = 1760000000000L,
+                        relatedPhotoUri = null,
+                    ),
                 ),
             ),
             onBack = {},

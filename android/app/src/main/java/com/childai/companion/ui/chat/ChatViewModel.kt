@@ -28,6 +28,10 @@ import com.childai.companion.data.showcase.xiaozhantaiNormalizeName
 import com.childai.companion.data.growth.showcaseItemRecalledGrowthSummary
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDoorStateReducer
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
@@ -100,6 +104,7 @@ class ChatViewModel(
     private var waitingAttemptedThisTurn = false
     private var ttsSlowHintJob: Job? = null
     private var openingRequested = false
+    private var openingDeferredByStrangeDoor = false
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
@@ -184,6 +189,85 @@ class ChatViewModel(
     init {
         if (requestOpeningOnInit) {
             requestOpeningGreeting()
+        }
+    }
+
+    fun activateStrangeDoorDemo() {
+        if (_uiState.value.strangeDoorDemo != null) return
+        openingDeferredByStrangeDoor = !openingRequested
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = StrangeDoorDoorStateReducer.reset(),
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                pendingImageContext = null,
+                isSending = false,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
+    fun chooseStrangeDoorPhotoMethod() {
+        updateStrangeDoorDemoState(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+            method = StrangeDoorDemoMethod.Photo,
+        )
+    }
+
+    fun chooseStrangeDoorRiddleMethod() {
+        updateStrangeDoorDemoState(
+            demoState = StrangeDoorDemoState.RiddlePrompt,
+            method = StrangeDoorDemoMethod.Riddle,
+        )
+    }
+
+    fun returnToStrangeDoorMethodChoice() {
+        updateStrangeDoorDemoState(
+            demoState = StrangeDoorDemoState.ChoosingMethod,
+            method = null,
+        )
+    }
+
+    fun exitStrangeDoorDemoAndRequestOpening() {
+        if (_uiState.value.strangeDoorDemo == null) return
+        _uiState.update { state ->
+            state.copy(strangeDoorDemo = null)
+        }
+        if (openingDeferredByStrangeDoor || !openingRequested) {
+            openingDeferredByStrangeDoor = false
+            requestOpeningGreeting()
+        }
+    }
+
+    private fun updateStrangeDoorDemoState(
+        demoState: StrangeDoorDemoState,
+        method: StrangeDoorDemoMethod?,
+    ) {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
+        openingDeferredByStrangeDoor = !openingRequested
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = snapshot.copy(
+                    demoState = demoState,
+                    lastMethod = method,
+                ),
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                isSending = false,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
         }
     }
 
@@ -1699,6 +1783,11 @@ class ChatViewModel(
     }
 
     fun requestOpeningGreeting() {
+        if (_uiState.value.strangeDoorDemo != null) {
+            openingDeferredByStrangeDoor = true
+            Log.d(TAG, "[LatencyTrace] stage=opening_deferred reason=strange_door_demo")
+            return
+        }
         if (openingRequested) return
         openingRequested = true
         Log.d(TAG, "[LatencyTrace] stage=opening_start")
@@ -1898,6 +1987,7 @@ data class ChatUiState(
     val xiaozhantaiSavePromptMessageId: String? = null,
     val xiaozhantaiSaveDraft: XiaozhantaiSaveDraftUiState? = null,
     val xiaozhantaiSavedItemIdForNavigation: String? = null,
+    val strangeDoorDemo: StrangeDoorDemoSnapshot? = null,
 ) {
     val interactionPresentation: ChildInteractionPresentation
         get() = childInteractionPresentation(

@@ -26,6 +26,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -88,6 +90,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -100,6 +103,14 @@ import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.debug.HouseObjectDebugRepository
 import com.childai.companion.mascot.MascotState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorAndroidResources
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorAssetKey
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventAction
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventActionId
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventPanel
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventUiModel
+import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.ui.parent.ParentEntryCredentialDialog
 import com.childai.companion.ui.parent.ParentEntryTarget
 import com.childai.companion.ui.parent.ParentCredentialGate
@@ -152,7 +163,7 @@ fun ChildChatScreen(
         }
     }
     LaunchedEffect(viewModel) {
-        viewModel.requestOpeningGreeting()
+        viewModel.activateStrangeDoorDemo()
     }
     LaunchedEffect(uiState.xiaozhantaiSavedItemIdForNavigation) {
         val savedItemId = uiState.xiaozhantaiSavedItemIdForNavigation
@@ -184,6 +195,9 @@ fun ChildChatScreen(
         onOpenParentSettings = onOpenParentSettings,
         onOpenParentReport = onOpenParentReport,
         onOpenXiaozhantai = onOpenXiaozhantai,
+        onStrangeDoorChoosePhoto = viewModel::chooseStrangeDoorPhotoMethod,
+        onStrangeDoorChooseRiddle = viewModel::chooseStrangeDoorRiddleMethod,
+        onStrangeDoorSwitchMethod = viewModel::returnToStrangeDoorMethodChoice,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -210,6 +224,9 @@ private fun ChildChatScreenContent(
     onOpenParentSettings: () -> Unit,
     onOpenParentReport: () -> Unit,
     onOpenXiaozhantai: () -> Unit,
+    onStrangeDoorChoosePhoto: () -> Unit,
+    onStrangeDoorChooseRiddle: () -> Unit,
+    onStrangeDoorSwitchMethod: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -436,7 +453,27 @@ private fun ChildChatScreenContent(
                 compactLandscape = compactLandscape,
             )
 
-            if (isLandscape) {
+            val strangeDoorSnapshot = uiState.strangeDoorDemo
+            if (strangeDoorSnapshot != null) {
+                StrangeDoorHomeEventScreen(
+                    snapshot = strangeDoorSnapshot,
+                    viewportClass = viewportClass,
+                    compactLandscape = compactLandscape,
+                    parentEntryHint = parentEntryHint,
+                    onParentEntryTap = {
+                        parentEntryHint = parentEntryTapHint()
+                    },
+                    onParentEntryLongPress = {
+                        parentEntryHint = null
+                        showParentEntryChoices = true
+                    },
+                    onOpenXiaozhantai = onOpenXiaozhantai,
+                    onChoosePhoto = onStrangeDoorChoosePhoto,
+                    onChooseRiddle = onStrangeDoorChooseRiddle,
+                    onSwitchMethod = onStrangeDoorSwitchMethod,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (isLandscape) {
                 // Landscape: keep the room and mascot as the scene, with controls only as a light rail.
                 val layoutWeights = companionLayoutWeights(viewportClass = viewportClass)
                 val layoutMetrics = companionLandscapeLayoutMetrics(
@@ -577,6 +614,425 @@ private fun ChildChatScreenContent(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorHomeEventScreen(
+    snapshot: StrangeDoorDemoSnapshot,
+    viewportClass: CompanionRoomViewportClass,
+    compactLandscape: Boolean,
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
+    onChoosePhoto: () -> Unit,
+    onChooseRiddle: () -> Unit,
+    onSwitchMethod: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val model = remember(snapshot) {
+        snapshot.toHomeEventUiModel()
+    }
+
+    fun handleAction(action: StrangeDoorHomeEventAction) {
+        when (action.id) {
+            StrangeDoorHomeEventActionId.ChoosePhoto -> onChoosePhoto()
+            StrangeDoorHomeEventActionId.ChooseRiddle -> onChooseRiddle()
+            StrangeDoorHomeEventActionId.SwitchMethod -> onSwitchMethod()
+            StrangeDoorHomeEventActionId.OpenPhotoCapture -> Unit
+        }
+    }
+
+    if (!StrangeDoorAndroidResources.allRequiredResourcesReady()) {
+        StrangeDoorAssetBlockedNotice(modifier = modifier)
+        return
+    }
+
+    BoxWithConstraints(modifier = modifier) {
+        val isLandscape = viewportClass.isLandscape
+        val horizontalPadding = if (isLandscape) 28.dp else 18.dp
+        val verticalPadding = if (isLandscape) 18.dp else 12.dp
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                horizontalArrangement = Arrangement.spacedBy(if (compactLandscape) 14.dp else 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(0.62f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    StrangeDoorEventTitle(model.title, compact = compactLandscape)
+                    Spacer(modifier = Modifier.height(if (compactLandscape) 6.dp else 10.dp))
+                    StrangeDoorEventScene(
+                        model = model,
+                        viewportClass = viewportClass,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(0.38f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    ParentEntryHintBar(
+                        parentEntryHint = parentEntryHint,
+                        onParentEntryTap = onParentEntryTap,
+                        onParentEntryLongPress = onParentEntryLongPress,
+                        onOpenXiaozhantai = onOpenXiaozhantai,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    StrangeDoorPromptPanel(
+                        model = model,
+                        compact = compactLandscape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 14.dp))
+                    StrangeDoorActionRow(
+                        actions = model.actions,
+                        compact = compactLandscape,
+                        onAction = ::handleAction,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ParentEntryHintBar(
+                    parentEntryHint = parentEntryHint,
+                    onParentEntryTap = onParentEntryTap,
+                    onParentEntryLongPress = onParentEntryLongPress,
+                    onOpenXiaozhantai = onOpenXiaozhantai,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                StrangeDoorEventTitle(model.title, compact = false)
+                Spacer(modifier = Modifier.height(8.dp))
+                StrangeDoorEventScene(
+                    model = model,
+                    viewportClass = viewportClass,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                StrangeDoorPromptPanel(
+                    model = model,
+                    compact = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 520.dp),
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                StrangeDoorActionRow(
+                    actions = model.actions,
+                    compact = false,
+                    onAction = ::handleAction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 520.dp)
+                        .navigationBarsPadding(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorAssetBlockedNotice(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color(0xFFFFF7F2).copy(alpha = 0.92f),
+            border = BorderStroke(1.dp, Color(0xFFE9A690).copy(alpha = 0.60f)),
+        ) {
+            Text(
+                text = "开发期错误：奇怪小门素材缺失，D2 验收阻塞",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF8A4A3A),
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorEventTitle(
+    title: String,
+    compact: Boolean,
+) {
+    Text(
+        text = title,
+        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = Color(0xFF3F4A3F),
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun StrangeDoorEventScene(
+    model: StrangeDoorHomeEventUiModel,
+    viewportClass: CompanionRoomViewportClass,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val isLandscape = viewportClass.isLandscape
+        val doorSize = minOf(
+            maxWidth * if (isLandscape) 0.48f else 0.58f,
+            maxHeight * if (isLandscape) 0.86f else 0.72f,
+        ).coerceIn(
+            minimumValue = if (isLandscape) 190.dp else 170.dp,
+            maximumValue = if (isLandscape) 430.dp else 360.dp,
+        )
+        val foxSize = minOf(
+            maxWidth * if (isLandscape) 0.42f else 0.52f,
+            maxHeight * if (isLandscape) 0.74f else 0.58f,
+        ).coerceIn(
+            minimumValue = if (isLandscape) 170.dp else 150.dp,
+            maximumValue = if (isLandscape) 380.dp else 310.dp,
+        )
+        val doorAlignment = if (isLandscape) Alignment.BottomEnd else Alignment.BottomEnd
+        val foxAlignment = if (isLandscape) Alignment.BottomStart else Alignment.BottomStart
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(
+                    id = StrangeDoorAndroidResources.drawableResId(StrangeDoorAssetKey.GroundShadow),
+                ),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .align(doorAlignment)
+                    .offset(y = 12.dp)
+                    .size(width = doorSize * 0.92f, height = doorSize * 0.24f),
+            )
+            CartoonAgentView(
+                agent = FoxAgentUiState(
+                    mood = FoxMood.Warm,
+                    motion = FoxMotion.GentleIdle,
+                    statusText = "",
+                ),
+                debugMascotState = MascotState.Idle,
+                visualScaleMultiplier = if (isLandscape) 1.04f else 0.96f,
+                modifier = Modifier
+                    .align(foxAlignment)
+                    .offset(
+                        x = if (isLandscape) 6.dp else (-8).dp,
+                        y = if (isLandscape) 8.dp else 6.dp,
+                    )
+                    .size(foxSize),
+            )
+            Box(
+                modifier = Modifier
+                    .align(doorAlignment)
+                    .size(doorSize),
+            ) {
+                Image(
+                    painter = painterResource(
+                        id = StrangeDoorAndroidResources.drawableResId(model.doorAssetKey),
+                    ),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Image(
+                    painter = painterResource(
+                        id = StrangeDoorAndroidResources.drawableResId(StrangeDoorAssetKey.RoundLock),
+                    ),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = doorSize * 0.03f)
+                        .size(doorSize * 0.22f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorPromptPanel(
+    model: StrangeDoorHomeEventUiModel,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    when (model.panel) {
+        StrangeDoorHomeEventPanel.SpeechBubble -> StrangeDoorSpeechBubble(
+            lines = model.bubbleLines,
+            compact = compact,
+            modifier = modifier,
+        )
+
+        StrangeDoorHomeEventPanel.ToolCard -> StrangeDoorImagePanel(
+            backgroundKey = StrangeDoorAssetKey.ToolCardPanel,
+            text = model.bubbleLines.joinToString(separator = "\n"),
+            compact = compact,
+            aspectRatio = 4f / 3f,
+            modifier = modifier,
+        )
+
+        StrangeDoorHomeEventPanel.Riddle -> StrangeDoorImagePanel(
+            backgroundKey = StrangeDoorAssetKey.RiddlePanel,
+            text = model.question.orEmpty(),
+            compact = compact,
+            aspectRatio = 2f,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun StrangeDoorSpeechBubble(
+    lines: List<String>,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(if (compact) 20.dp else 24.dp),
+        color = Color.White.copy(alpha = 0.82f),
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.64f)),
+    ) {
+        Text(
+            text = lines.joinToString(separator = "\n"),
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            color = Color(0xFF3F4A3F),
+            modifier = Modifier.padding(
+                horizontal = if (compact) 14.dp else 18.dp,
+                vertical = if (compact) 12.dp else 15.dp,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun StrangeDoorImagePanel(
+    backgroundKey: StrangeDoorAssetKey,
+    text: String,
+    compact: Boolean,
+    aspectRatio: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .aspectRatio(aspectRatio)
+            .sizeIn(maxHeight = if (compact) 170.dp else 210.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(id = StrangeDoorAndroidResources.drawableResId(backgroundKey)),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Text(
+            text = text,
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            color = Color(0xFF3F4A3F),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun StrangeDoorActionRow(
+    actions: List<StrangeDoorHomeEventAction>,
+    compact: Boolean,
+    onAction: (StrangeDoorHomeEventAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val useColumn = maxWidth < 360.dp
+        val gap = if (compact) 8.dp else 10.dp
+        if (useColumn) {
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                actions.forEachIndexed { index, action ->
+                    StrangeDoorActionButton(
+                        action = action,
+                        primary = index == 0,
+                        onClick = { onAction(action) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                actions.forEachIndexed { index, action ->
+                    StrangeDoorActionButton(
+                        action = action,
+                        primary = index == 0,
+                        onClick = { onAction(action) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorActionButton(
+    action: StrangeDoorHomeEventAction,
+    primary: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (primary) {
+        Button(
+            onClick = onClick,
+            enabled = action.enabled,
+            shape = RoundedCornerShape(26.dp),
+            modifier = modifier.heightIn(min = 54.dp),
+        ) {
+            Text(
+                text = action.label,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = action.enabled,
+            shape = RoundedCornerShape(26.dp),
+            modifier = modifier.heightIn(min = 54.dp),
+        ) {
+            Text(
+                text = action.label,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -1737,6 +2193,10 @@ internal fun childCompanionVisibleQuickActions(uiState: ChatUiState): List<Quick
         ?: emptyList()
 }
 
+internal fun strangeDoorShouldShowNormalInputBar(uiState: ChatUiState): Boolean {
+    return uiState.strangeDoorDemo == null
+}
+
 private fun normalizeImageQuickAction(action: QuickActionUi): QuickActionUi {
     return when (action.id) {
         "give_name", "image_naming" -> action.copy(id = "companion_name", label = "起个名字")
@@ -2259,6 +2719,9 @@ private fun ChildChatScreenPortraitPreview() {
             onOpenParentSettings = {},
             onOpenParentReport = {},
             onOpenXiaozhantai = {},
+            onStrangeDoorChoosePhoto = {},
+            onStrangeDoorChooseRiddle = {},
+            onStrangeDoorSwitchMethod = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2295,6 +2758,9 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onOpenParentSettings = {},
             onOpenParentReport = {},
             onOpenXiaozhantai = {},
+            onStrangeDoorChoosePhoto = {},
+            onStrangeDoorChooseRiddle = {},
+            onStrangeDoorSwitchMethod = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2340,6 +2806,9 @@ private fun ChildChatScreenLandscapePreview() {
             onOpenParentSettings = {},
             onOpenParentReport = {},
             onOpenXiaozhantai = {},
+            onStrangeDoorChoosePhoto = {},
+            onStrangeDoorChooseRiddle = {},
+            onStrangeDoorSwitchMethod = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

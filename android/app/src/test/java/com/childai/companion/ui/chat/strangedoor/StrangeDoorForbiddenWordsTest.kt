@@ -24,7 +24,8 @@ class StrangeDoorForbiddenWordsTest {
             "解锁奖励",
         )
         val approvedCopy = StrangeDoorPhotoTransformMapper.approvedChildFacingCopy() +
-            StrangeDoorRiddleEvaluator.approvedChildFacingCopy()
+            StrangeDoorRiddleEvaluator.approvedChildFacingCopy() +
+            StrangeDoorHomeEventCopy.approvedChildFacingCopy()
 
         approvedCopy.forEach { line ->
             forbiddenWords.forEach { forbidden ->

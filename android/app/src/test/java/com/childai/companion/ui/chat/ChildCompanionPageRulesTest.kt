@@ -2,9 +2,11 @@ package com.childai.companion.ui.chat
 
 import androidx.compose.ui.graphics.Color
 import com.childai.companion.mascot.MascotState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChildCompanionPageRulesTest {
@@ -128,6 +130,16 @@ class ChildCompanionPageRulesTest {
                 manufacturer = "Google",
                 brand = "google",
                 model = "Pixel",
+            ),
+        )
+    }
+
+    @Test
+    fun strangeDoorDemoDeemphasizesNormalInputBar() {
+        assertTrue(strangeDoorShouldShowNormalInputBar(ChatUiState()))
+        assertFalse(
+            strangeDoorShouldShowNormalInputBar(
+                ChatUiState(strangeDoorDemo = StrangeDoorDemoSnapshot()),
             ),
         )
     }

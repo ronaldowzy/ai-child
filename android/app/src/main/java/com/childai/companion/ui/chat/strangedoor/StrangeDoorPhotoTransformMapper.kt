@@ -37,11 +37,20 @@ object StrangeDoorPhotoTransformMapper {
     private const val LINE_TRANSFORMED = "它变成了："
     private const val TRANSFORM_ACTION_TURN = "把它轻轻一转"
     private const val FOX_ACTION_TURN = "小白狐把它轻轻一转"
-    private const val DOOR_EFFECT_ROUND = "门上的圆锁咔哒一下松开了"
-    private const val DOOR_EFFECT_KNOCK = "小门被敲得愣了一下"
-    private const val DOOR_EFFECT_GAP = "露出了一条小缝"
-    private const val DOOR_EFFECT_NOT_FULLY_OPEN = "门没有完全打开"
+    private const val DOOR_EFFECT_LIGHT_TURN = "门上的圆锁轻轻转了一小下"
+    private const val DOOR_EFFECT_WARM_WIND = "门缝里冒出一点暖风"
+    private const val DOOR_EFFECT_WOBBLE = "小门被它逗得晃了一下"
+    private const val DOOR_EFFECT_TINY_GAP = "门边露出一条小小的缝"
+    private const val DOOR_EFFECT_YAWN = "圆锁像打哈欠一样松了一点"
+    private const val DOOR_EFFECT_FOX_LOOK = "小白狐往后退了一小步，又凑过去看"
+    private const val DOOR_EFFECT_NOT_FULLY_OPEN = "小门没有完全打开"
     private const val DOOR_EFFECT_SNEEZE = "但是它打了个喷嚏，露出一条小缝"
+    private const val DOOR_EFFECT_THINK = "小门歪着想了想，好像有点相信"
+    private const val DOOR_EFFECT_ODD = "这个东西有点奇怪，小门看了好久"
+    private const val DOOR_EFFECT_FOX_TRY = "小白狐说：也许可以试试"
+    private const val DOOR_EFFECT_OPEN_CLICK = "小门终于咔哒一下打开了"
+    private const val DOOR_EFFECT_OPEN_WIND = "门后面有一点暖暖的风"
+    private const val DOOR_EFFECT_OPEN_LIGHT = "小白狐轻轻走过去，看见了一点光"
 
     private val blockedTypes = setOf(
         "privacy_sensitive",
@@ -77,9 +86,63 @@ object StrangeDoorPhotoTransformMapper {
     )
     private val partialKeywords = listOf(
         "铅笔",
+        "勺",
+        "纸",
+        "垫",
+        "杆",
+        "棒",
         "弯弯",
         "半圆",
         "直直",
+    )
+    private val roundToolNames = listOf(
+        "小月亮盾牌",
+        "蓝盖盖转轮",
+        "咕噜圆盘",
+        "圆滚滚按钮",
+        "眨眼门铃",
+        "杯口小旋风",
+        "纽扣小眼睛",
+        "圆圆开门盘",
+        "小饼干转轮",
+        "月亮小按钮",
+    )
+    private val partialToolNames = listOf(
+        "半圆冲撞器",
+        "直直敲门棒",
+        "弯弯撬门勺",
+        "纸角小铲子",
+        "软软开门垫",
+        "歪歪小推板",
+        "瘦长敲敲杆",
+        "小斜坡垫子",
+    )
+    private val unknownToolNames = listOf(
+        "这个小东西",
+        "迷糊开门垫",
+        "软软试试看",
+        "小小帮忙块",
+        "糊糊门铃",
+    )
+    private val lightDoorEffects = listOf(
+        DOOR_EFFECT_LIGHT_TURN,
+        DOOR_EFFECT_WARM_WIND,
+        DOOR_EFFECT_WOBBLE,
+        DOOR_EFFECT_TINY_GAP,
+        DOOR_EFFECT_YAWN,
+        DOOR_EFFECT_FOX_LOOK,
+    )
+    private val oddDoorEffects = listOf(
+        DOOR_EFFECT_NOT_FULLY_OPEN,
+        DOOR_EFFECT_SNEEZE,
+        DOOR_EFFECT_THINK,
+        DOOR_EFFECT_ODD,
+        DOOR_EFFECT_FOX_TRY,
+    )
+    private val openDoorEffects = listOf(
+        DOOR_EFFECT_OPEN_CLICK,
+        DOOR_EFFECT_OPEN_WIND,
+        DOOR_EFFECT_OPEN_LIGHT,
     )
 
     fun map(recognition: StrangeDoorPhotoRecognition): StrangeDoorPhotoTransform {
@@ -118,7 +181,10 @@ object StrangeDoorPhotoTransformMapper {
         }
     }
 
-    fun feedbackLines(transform: StrangeDoorPhotoTransform): List<String> {
+    fun feedbackLines(
+        transform: StrangeDoorPhotoTransform,
+        doorState: StrangeDoorState? = null,
+    ): List<String> {
         if (!transform.isUsable) {
             return listOf(NOT_SUITABLE_LINE_1, NOT_SUITABLE_LINE_2)
         }
@@ -131,7 +197,12 @@ object StrangeDoorPhotoTransformMapper {
         if (transform.transformedAction == TRANSFORM_ACTION_TURN) {
             lines += FOX_ACTION_TURN
         }
-        transform.doorEffect
+        val doorEffect = if (doorState == StrangeDoorState.Open) {
+            openDoorEffects.joinToString(separator = "\n")
+        } else {
+            transform.doorEffect
+        }
+        doorEffect
             ?.split('\n')
             ?.filter { it.isNotBlank() }
             ?.let(lines::addAll)
@@ -146,23 +217,9 @@ object StrangeDoorPhotoTransformMapper {
             LINE_SEE,
             LINE_WORLD,
             LINE_TRANSFORMED,
-            "小月亮盾牌",
-            "半圆冲撞器",
-            "咕噜圆盘",
-            "蓝盖盖转轮",
-            "软软开门垫",
-            "星星小钥匙",
-            "眨眼门铃",
-            "圆滚滚按钮",
-            "直直敲门棒",
             TRANSFORM_ACTION_TURN,
             FOX_ACTION_TURN,
-            DOOR_EFFECT_ROUND,
-            DOOR_EFFECT_KNOCK,
-            DOOR_EFFECT_GAP,
-            DOOR_EFFECT_NOT_FULLY_OPEN,
-            DOOR_EFFECT_SNEEZE,
-        )
+        ) + roundToolNames + partialToolNames + unknownToolNames + lightDoorEffects + oddDoorEffects + openDoorEffects
     }
 
     private fun roundTransform(
@@ -171,8 +228,11 @@ object StrangeDoorPhotoTransformMapper {
     ): StrangeDoorPhotoTransform {
         val transformedName = when {
             objectName.contains("瓶盖") || objectName.contains("盖子") -> "蓝盖盖转轮"
-            objectName.contains("球") -> "圆滚滚按钮"
-            objectName.contains("纽扣") -> "眨眼门铃"
+            objectName.contains("杯") -> "杯口小旋风"
+            objectName.contains("球") -> "咕噜圆盘"
+            objectName.contains("纽扣") -> "纽扣小眼睛"
+            objectName.contains("饼干") -> "小饼干转轮"
+            objectName.contains("圆盘") || objectName.contains("圆形") -> "圆圆开门盘"
             else -> "小月亮盾牌"
         }
         return StrangeDoorPhotoTransform(
@@ -181,9 +241,9 @@ object StrangeDoorPhotoTransformMapper {
             isUsable = true,
             transformedName = transformedName,
             transformedAction = TRANSFORM_ACTION_TURN,
-            doorEffect = DOOR_EFFECT_ROUND,
+            doorEffect = DOOR_EFFECT_LIGHT_TURN,
             canSaveToShowcase = canSaveToShowcase,
-            advanceSignal = StrangeDoorDoorAdvanceSignal.Open,
+            advanceSignal = StrangeDoorDoorAdvanceSignal.AdvanceOneStep,
         )
     }
 
@@ -195,13 +255,9 @@ object StrangeDoorPhotoTransformMapper {
             objectName = objectName,
             shapeHint = StrangeDoorShapeHint.Partial,
             isUsable = true,
-            transformedName = if (objectName.contains("铅笔")) {
-                "直直敲门棒"
-            } else {
-                "半圆冲撞器"
-            },
+            transformedName = partialToolNameFor(objectName),
             transformedAction = null,
-            doorEffect = "$DOOR_EFFECT_KNOCK\n$DOOR_EFFECT_GAP",
+            doorEffect = "$DOOR_EFFECT_TINY_GAP\n$DOOR_EFFECT_THINK",
             canSaveToShowcase = canSaveToShowcase,
             advanceSignal = StrangeDoorDoorAdvanceSignal.AdvanceOneStep,
         )
@@ -215,7 +271,11 @@ object StrangeDoorPhotoTransformMapper {
             objectName = objectName,
             shapeHint = StrangeDoorShapeHint.Unknown,
             isUsable = true,
-            transformedName = "软软开门垫",
+            transformedName = if (objectName == DEFAULT_OBJECT_NAME) {
+                DEFAULT_OBJECT_NAME
+            } else {
+                pickFrom(unknownToolNames, objectName)
+            },
             transformedAction = null,
             doorEffect = "$DOOR_EFFECT_NOT_FULLY_OPEN\n$DOOR_EFFECT_SNEEZE",
             canSaveToShowcase = canSaveToShowcase,
@@ -257,5 +317,26 @@ object StrangeDoorPhotoTransformMapper {
             ?.take(12)
             ?.ifBlank { DEFAULT_OBJECT_NAME }
             ?: DEFAULT_OBJECT_NAME
+    }
+
+    private fun partialToolNameFor(objectName: String): String {
+        return when {
+            objectName.contains("铅笔") || objectName.contains("直直") || objectName.contains("棒") -> "直直敲门棒"
+            objectName.contains("弯弯") || objectName.contains("勺") -> "弯弯撬门勺"
+            objectName.contains("纸") -> "纸角小铲子"
+            objectName.contains("垫") -> "软软开门垫"
+            objectName.contains("杆") -> "瘦长敲敲杆"
+            objectName.contains("半圆") -> "半圆冲撞器"
+            else -> pickFrom(partialToolNames, objectName)
+        }
+    }
+
+    private fun pickFrom(pool: List<String>, seed: String): String {
+        val index = seed.hashCode().floorMod(pool.size)
+        return pool[index]
+    }
+
+    private fun Int.floorMod(divisor: Int): Int {
+        return ((this % divisor) + divisor) % divisor
     }
 }

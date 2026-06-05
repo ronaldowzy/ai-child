@@ -54,7 +54,7 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
-    fun photoResultShowsTransformFeedbackAndD3Actions() {
+    fun photoResultShowsTransformFeedbackAndR1ActionOrder() {
         val transform = StrangeDoorPhotoTransformMapper.map(
             StrangeDoorPhotoRecognition(
                 recognizedType = "image_observation",
@@ -70,6 +70,40 @@ class StrangeDoorHomeEventUiModelTest {
         val model = snapshot.toHomeEventUiModel()
 
         assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
+        assertEquals(StrangeDoorAssetKey.DoorCracked, model.doorAssetKey)
+        assertEquals(
+            listOf(
+                "我看见了：蓝色瓶盖",
+                "在小白狐的世界里",
+                "它变成了：蓝盖盖转轮",
+                "小白狐把它轻轻一转",
+                "门上的圆锁轻轻转了一小下",
+            ),
+            model.bubbleLines,
+        )
+        assertEquals(
+            listOf("再找一个", "动脑试试", "放进小展台"),
+            model.actions.map { it.label },
+        )
+        assertTrue(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
+    }
+
+    @Test
+    fun photoResultAfterAlmostOpenUsesOpenDoorFeedback() {
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个蓝色瓶盖",
+                confidence = 0.92,
+            ),
+        )
+        val snapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = StrangeDoorDemoSnapshot(doorState = StrangeDoorState.AlmostOpen),
+            transform = transform,
+            photoMessageId = "child-photo-3",
+        )
+        val model = snapshot.toHomeEventUiModel()
+
         assertEquals(StrangeDoorAssetKey.DoorOpen, model.doorAssetKey)
         assertEquals(
             listOf(
@@ -77,15 +111,16 @@ class StrangeDoorHomeEventUiModelTest {
                 "在小白狐的世界里",
                 "它变成了：蓝盖盖转轮",
                 "小白狐把它轻轻一转",
-                "门上的圆锁咔哒一下松开了",
+                "小门终于咔哒一下打开了",
+                "门后面有一点暖暖的风",
+                "小白狐轻轻走过去，看见了一点光",
             ),
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "放进小展台", "动脑试试"),
+            listOf("再找一个", "动脑试试", "放进小展台"),
             model.actions.map { it.label },
         )
-        assertTrue(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
     }
 
     @Test

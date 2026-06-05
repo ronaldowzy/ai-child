@@ -102,7 +102,7 @@ class ChatViewModelStrangeDoorShowcaseTest {
         assertArrayEquals(byteArrayOf(1, 2, 3), request.photoBytes)
         assertTrue(request.foxQuote.contains("蓝盖盖转轮"))
         assertTrue(request.foxQuote.contains("小白狐把它轻轻一转"))
-        assertTrue(request.foxQuote.contains("门上的圆锁咔哒一下松开了"))
+        assertTrue(request.foxQuote.contains("门上的圆锁轻轻转了一小下"))
         assertEquals("showcase_item_saved", growthRepository.appendedEvent?.type)
         assertEquals("xiaozhantai", growthRepository.appendedEvent?.source)
         assertNull(viewModel.uiState.value.xiaozhantaiSavedItemIdForNavigation)

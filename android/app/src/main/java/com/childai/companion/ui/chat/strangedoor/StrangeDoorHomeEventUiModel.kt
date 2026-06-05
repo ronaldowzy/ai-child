@@ -181,20 +181,20 @@ private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoor
         return StrangeDoorHomeEventUiModel(
             title = StrangeDoorHomeEventCopy.title,
             panel = StrangeDoorHomeEventPanel.ToolCard,
-            bubbleLines = StrangeDoorPhotoTransformMapper.feedbackLines(transform),
+            bubbleLines = StrangeDoorPhotoTransformMapper.feedbackLines(transform, doorState = doorState),
             actions = listOf(
                 StrangeDoorHomeEventAction(
                     id = StrangeDoorHomeEventActionId.FindAnother,
                     label = StrangeDoorHomeEventCopy.findAnotherLabel,
                 ),
                 StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.ChooseRiddle,
+                    label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+                ),
+                StrangeDoorHomeEventAction(
                     id = StrangeDoorHomeEventActionId.SaveToShowcase,
                     label = StrangeDoorHomeEventCopy.saveToShowcaseLabel,
                     enabled = transform.canSaveToShowcase && !showcaseSaveIntentRequested,
-                ),
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.ChooseRiddle,
-                    label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
                 ),
             ),
             doorAssetKey = doorState.toAssetKey(),

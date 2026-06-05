@@ -42,7 +42,7 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
     }
 
     @Test
-    fun roundRecognizedContentGoesThroughMapperAndOpensDoor() {
+    fun roundRecognizedContentGoesThroughMapperAndAdvancesOneStep() {
         val viewModel = viewModel(
             attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
                 response = attachmentResponse(
@@ -59,13 +59,41 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
 
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
         val transform = requireNotNull(snapshot.lastPhotoTransform)
-        assertEquals(StrangeDoorDemoState.Completed, snapshot.demoState)
-        assertEquals(StrangeDoorState.Open, snapshot.doorState)
+        assertEquals(StrangeDoorDemoState.PhotoResult, snapshot.demoState)
+        assertEquals(StrangeDoorState.Cracked, snapshot.doorState)
         assertEquals(StrangeDoorShapeHint.Round, transform.shapeHint)
         assertEquals("蓝色瓶盖", transform.objectName)
         assertEquals("蓝盖盖转轮", transform.transformedName)
         assertTrue(transform.canSaveToShowcase)
         assertFalse(viewModel.uiState.value.isSending)
+    }
+
+    @Test
+    fun repeatedValidPhotosAdvanceToAlmostOpenThenOpen() {
+        val viewModel = viewModel(
+            attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
+                response = attachmentResponse(
+                    recognizedType = "image_observation",
+                    recognizedText = "图片里有一个蓝色瓶盖",
+                    confidence = 0.92,
+                ),
+            ),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        assertEquals(StrangeDoorState.Cracked, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        assertEquals(StrangeDoorState.AlmostOpen, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorState.Open, snapshot.doorState)
+        assertEquals(StrangeDoorDemoState.Completed, snapshot.demoState)
     }
 
     @Test

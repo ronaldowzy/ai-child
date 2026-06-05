@@ -43,7 +43,7 @@ class StrangeDoorStateContractTest {
     }
 
     @Test
-    fun doorReducerOpensForHighMatchInput() {
+    fun doorReducerOpensForExplicitOpenSignal() {
         assertEquals(
             StrangeDoorState.Open,
             StrangeDoorDoorStateReducer.nextDoorState(
@@ -54,7 +54,7 @@ class StrangeDoorStateContractTest {
     }
 
     @Test
-    fun photoResultUpdatesSnapshotWithoutPersistingProgressContract() {
+    fun roundPhotoResultAdvancesFromClosedToCrackedOnly() {
         val transform = StrangeDoorPhotoTransformMapper.map(
             StrangeDoorPhotoRecognition(
                 recognizedType = "image_observation",
@@ -63,20 +63,56 @@ class StrangeDoorStateContractTest {
             ),
         )
 
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, transform.advanceSignal)
         val next = StrangeDoorDoorStateReducer.applyPhotoResult(
             snapshot = StrangeDoorDemoSnapshot(),
             transform = transform,
             photoMessageId = "child-photo-1",
         )
 
-        assertTrue(next.isCompleted)
-        assertEquals(StrangeDoorDemoState.Completed, next.demoState)
-        assertEquals(StrangeDoorState.Open, next.doorState)
+        assertFalse(next.isCompleted)
+        assertEquals(StrangeDoorDemoState.PhotoResult, next.demoState)
+        assertEquals(StrangeDoorState.Cracked, next.doorState)
         assertEquals(1, next.attemptsCount)
         assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
         assertEquals("蓝色瓶盖", next.lastObjectName)
         assertEquals("蓝盖盖转轮", next.lastTransformedName)
         assertEquals("child-photo-1", next.lastPhotoMessageId)
+    }
+
+    @Test
+    fun repeatedValidPhotosAdvanceToAlmostOpenThenOpen() {
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个蓝色瓶盖",
+                confidence = 0.92,
+            ),
+        )
+
+        val first = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = StrangeDoorDemoSnapshot(),
+            transform = transform,
+            photoMessageId = "child-photo-1",
+        )
+        val second = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = first,
+            transform = transform,
+            photoMessageId = "child-photo-2",
+        )
+        val third = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = second,
+            transform = transform,
+            photoMessageId = "child-photo-3",
+        )
+
+        assertEquals(StrangeDoorState.Cracked, first.doorState)
+        assertEquals(StrangeDoorDemoState.PhotoResult, first.demoState)
+        assertEquals(StrangeDoorState.AlmostOpen, second.doorState)
+        assertEquals(StrangeDoorDemoState.PhotoResult, second.demoState)
+        assertEquals(StrangeDoorState.Open, third.doorState)
+        assertEquals(StrangeDoorDemoState.Completed, third.demoState)
+        assertTrue(third.isCompleted)
     }
 
     @Test

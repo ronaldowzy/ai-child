@@ -10,8 +10,12 @@ class StrangeDoorForbiddenWordsTest {
             "任务",
             "今日任务",
             "通关奖励",
+            "通关成功",
             "获得道具",
+            "领取道具",
             "装备",
+            "神器",
+            "武器",
             "战斗力",
             "稀有",
             "史诗",
@@ -29,6 +33,12 @@ class StrangeDoorForbiddenWordsTest {
             "图鉴",
             "背包",
             "通关",
+            "闯关",
+            "胜利",
+            "等级",
+            "地图",
+            "签到",
+            "宝物",
         )
         val approvedCopy = StrangeDoorPhotoTransformMapper.approvedChildFacingCopy() +
             StrangeDoorRiddleEvaluator.approvedChildFacingCopy() +

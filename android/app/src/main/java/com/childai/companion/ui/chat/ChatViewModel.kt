@@ -37,6 +37,7 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransform
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorRiddleEvaluator
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
 import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
@@ -1287,6 +1288,7 @@ class ChatViewModel(
             photoMessageId = photoMessageId,
             payload = payload,
             transform = transform,
+            doorState = nextSnapshot.doorState,
         )
         _uiState.update { state ->
             state.copy(
@@ -1312,12 +1314,13 @@ class ChatViewModel(
         photoMessageId: String,
         payload: PhotoUploadPayload,
         transform: StrangeDoorPhotoTransform,
+        doorState: StrangeDoorState,
     ) {
         if (!transform.canSaveToShowcase || xiaozhantaiRepository == null) return
         xiaozhantaiSaveCandidates[photoMessageId] = XiaozhantaiSaveCandidate(
             payload = payload,
             defaultName = transform.transformedName ?: transform.objectName,
-            foxQuote = strangeDoorShowcaseFoxQuote(transform),
+            foxQuote = strangeDoorShowcaseFoxQuote(transform, doorState),
         )
         latestXiaozhantaiSaveCandidateMessageId = photoMessageId
     }
@@ -1329,8 +1332,11 @@ class ChatViewModel(
             xiaozhantaiRepository != null
     }
 
-    private fun strangeDoorShowcaseFoxQuote(transform: StrangeDoorPhotoTransform): String {
-        return StrangeDoorPhotoTransformMapper.feedbackLines(transform)
+    private fun strangeDoorShowcaseFoxQuote(
+        transform: StrangeDoorPhotoTransform,
+        doorState: StrangeDoorState,
+    ): String {
+        return StrangeDoorPhotoTransformMapper.feedbackLines(transform, doorState = doorState)
             .drop(2)
             .joinToString(separator = " ")
     }

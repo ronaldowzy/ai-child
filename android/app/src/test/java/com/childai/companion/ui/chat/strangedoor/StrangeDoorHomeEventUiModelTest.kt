@@ -85,6 +85,8 @@ class StrangeDoorHomeEventUiModelTest {
             listOf("再找一个", "动脑试试", "放进小展台"),
             model.actions.map { it.label },
         )
+        assertTrue(model.showPhotoResultCard)
+        assertTrue(model.showDoorSuccessGlow)
         assertTrue(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
     }
 
@@ -121,6 +123,8 @@ class StrangeDoorHomeEventUiModelTest {
             listOf("再找一个", "动脑试试", "放进小展台"),
             model.actions.map { it.label },
         )
+        assertTrue(model.showPhotoResultCard)
+        assertTrue(model.showDoorSuccessGlow)
     }
 
     @Test
@@ -146,7 +150,36 @@ class StrangeDoorHomeEventUiModelTest {
             ),
             model.bubbleLines,
         )
+        assertFalse(model.showPhotoResultCard)
+        assertFalse(model.showDoorSuccessGlow)
         assertFalse(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
+    }
+
+    @Test
+    fun doorStateMapsToExpectedDoorAssetKey() {
+        assertEquals(StrangeDoorAssetKey.DoorClosed, StrangeDoorState.Closed.toAssetKey())
+        assertEquals(StrangeDoorAssetKey.DoorCracked, StrangeDoorState.Cracked.toAssetKey())
+        assertEquals(StrangeDoorAssetKey.DoorAlmostOpen, StrangeDoorState.AlmostOpen.toAssetKey())
+        assertEquals(StrangeDoorAssetKey.DoorOpen, StrangeDoorState.Open.toAssetKey())
+    }
+
+    @Test
+    fun nonPhotoResultStatesDoNotShowPhotoGlow() {
+        val choosing = StrangeDoorDemoSnapshot().toHomeEventUiModel()
+        val photoPrompt = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+        ).toHomeEventUiModel()
+        val riddleOpen = StrangeDoorDoorStateReducer.applyRiddleResult(
+            snapshot = StrangeDoorDemoSnapshot(
+                demoState = StrangeDoorDemoState.RiddlePrompt,
+            ),
+            evaluation = StrangeDoorRiddleEvaluator.evaluate("水"),
+        ).toHomeEventUiModel()
+
+        listOf(choosing, photoPrompt, riddleOpen).forEach { model ->
+            assertFalse(model.showPhotoResultCard)
+            assertFalse(model.showDoorSuccessGlow)
+        }
     }
 
     @Test

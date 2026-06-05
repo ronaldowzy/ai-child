@@ -6,6 +6,10 @@ import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDoorStateReducer
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
+import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -210,5 +214,39 @@ class ChildCompanionPageRulesTest {
                 mapOf("photo-1" to preview),
             ),
         )
+    }
+
+    @Test
+    fun strangeDoorPhotoResultKeepsThumbnailWithResultPanel() {
+        val preview = LocalImagePreviewCardUiState(
+            messageId = "photo-1",
+            mimeType = "image/jpeg",
+            sizeBytes = 3,
+            previewBytes = byteArrayOf(1, 2, 3),
+            status = LocalImagePreviewStatus.Sent,
+        )
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个蓝色瓶盖",
+                confidence = 0.92,
+            ),
+        )
+        val snapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = StrangeDoorDemoSnapshot(),
+            transform = transform,
+            photoMessageId = "photo-1",
+        )
+
+        assertEquals(preview, strangeDoorPhotoPreview(snapshot, mapOf("photo-1" to preview)))
+        assertTrue(snapshot.toHomeEventUiModel().showPhotoResultCard)
+    }
+
+    @Test
+    fun strangeDoorPhotoResultLayoutKeepsThumbnailSecondary() {
+        assertTrue(strangeDoorPhotoResultThumbnailSize(compact = true) <= 76.dp)
+        assertTrue(strangeDoorPhotoResultThumbnailSize(compact = false) <= 96.dp)
+        assertFalse(strangeDoorPhotoResultUsesHorizontalLayout(360.dp))
+        assertTrue(strangeDoorPhotoResultUsesHorizontalLayout(520.dp))
     }
 }

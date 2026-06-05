@@ -32,6 +32,8 @@ data class StrangeDoorHomeEventUiModel(
     val doorAssetKey: StrangeDoorAssetKey,
     val showNormalInputBar: Boolean = false,
     val showRiddleVoiceControl: Boolean = false,
+    val showPhotoResultCard: Boolean = false,
+    val showDoorSuccessGlow: Boolean = false,
 )
 
 object StrangeDoorHomeEventCopy {
@@ -198,6 +200,8 @@ private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoor
                 ),
             ),
             doorAssetKey = doorState.toAssetKey(),
+            showPhotoResultCard = transform.isUsable,
+            showDoorSuccessGlow = transform.isUsable && doorState != StrangeDoorState.Closed,
         )
     }
     lastRiddleEvaluation?.let { evaluation ->

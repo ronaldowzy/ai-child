@@ -753,16 +753,19 @@ private fun StrangeDoorHomeEventScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    photoPreview?.let { preview ->
-                        StrangeDoorPhotoPreviewCard(
-                            preview = preview,
-                            compact = compactLandscape,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 10.dp))
-                    }
+                    photoPreview
+                        ?.takeUnless { model.showPhotoResultCard }
+                        ?.let { preview ->
+                            StrangeDoorPhotoPreviewCard(
+                                preview = preview,
+                                compact = compactLandscape,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 10.dp))
+                        }
                     StrangeDoorPromptPanel(
                         model = model,
+                        photoPreview = photoPreview,
                         compact = compactLandscape,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -810,18 +813,21 @@ private fun StrangeDoorHomeEventScreen(
                         .weight(1f),
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                photoPreview?.let { preview ->
-                    StrangeDoorPhotoPreviewCard(
-                        preview = preview,
-                        compact = false,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 520.dp),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+                photoPreview
+                    ?.takeUnless { model.showPhotoResultCard }
+                    ?.let { preview ->
+                        StrangeDoorPhotoPreviewCard(
+                            preview = preview,
+                            compact = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 520.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 StrangeDoorPromptPanel(
                     model = model,
+                    photoPreview = photoPreview,
                     compact = false,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -915,11 +921,6 @@ private fun StrangeDoorPhotoPreviewCard(
     compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val previewBitmap = remember(preview.previewBytes) {
-        preview.previewBytes?.let { bytes ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }
-    }
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
@@ -932,16 +933,11 @@ private fun StrangeDoorPhotoPreviewCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (previewBitmap != null) {
-                Image(
-                    bitmap = previewBitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(if (compact) 54.dp else 68.dp)
-                        .clip(RoundedCornerShape(14.dp)),
-                )
-            }
+            StrangeDoorPhotoThumbnail(
+                preview = preview,
+                compact = compact,
+                modifier = Modifier.size(if (compact) 54.dp else 68.dp),
+            )
             Text(
                 text = localImagePreviewStatusText(preview.status),
                 style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
@@ -950,6 +946,51 @@ private fun StrangeDoorPhotoPreviewCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorPhotoThumbnail(
+    preview: LocalImagePreviewCardUiState,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val previewBitmap = remember(preview.previewBytes) {
+        preview.previewBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(if (compact) 14.dp else 16.dp),
+        color = Color.White.copy(alpha = 0.70f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)),
+        shadowElevation = 1.dp,
+    ) {
+        if (previewBitmap != null) {
+            Image(
+                bitmap = previewBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = localImagePreviewStatusText(preview.status),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF4F5E4F),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -1025,6 +1066,35 @@ private fun StrangeDoorEventScene(
         )
         val doorXOffset = doorSize * placement.doorXOffsetFraction
         val foxXOffset = doorSize * placement.foxXOffsetFraction
+        var doorPulseActive by remember(model.doorAssetKey, model.showDoorSuccessGlow) {
+            mutableStateOf(false)
+        }
+        LaunchedEffect(model.doorAssetKey, model.showDoorSuccessGlow) {
+            if (model.showDoorSuccessGlow) {
+                doorPulseActive = true
+                delay(280)
+                doorPulseActive = false
+            }
+        }
+        val doorPulseScale by animateFloatAsState(
+            targetValue = if (doorPulseActive) 1.035f else 1f,
+            animationSpec = tween(durationMillis = 260),
+            label = "strangeDoorPulseScale",
+        )
+        val doorPulseRotation by animateFloatAsState(
+            targetValue = if (doorPulseActive && model.doorAssetKey != StrangeDoorAssetKey.DoorOpen) {
+                -0.8f
+            } else {
+                0f
+            },
+            animationSpec = tween(durationMillis = 220),
+            label = "strangeDoorPulseRotation",
+        )
+        val glowAlpha by animateFloatAsState(
+            targetValue = if (model.showDoorSuccessGlow) 0.46f else 0f,
+            animationSpec = tween(durationMillis = 240),
+            label = "strangeDoorSuccessGlowAlpha",
+        )
 
         Box(modifier = Modifier.fillMaxSize()) {
             Image(
@@ -1058,8 +1128,28 @@ private fun StrangeDoorEventScene(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(x = doorXOffset)
-                    .size(doorSize),
+                    .size(doorSize)
+                    .graphicsLayer {
+                        scaleX = doorPulseScale
+                        scaleY = doorPulseScale
+                        rotationZ = doorPulseRotation
+                    },
             ) {
+                if (glowAlpha > 0f) {
+                    Image(
+                        painter = painterResource(
+                            id = StrangeDoorAndroidResources.drawableResId(StrangeDoorAssetKey.DoorSuccessGlow),
+                        ),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(doorSize * 1.08f)
+                            .graphicsLayer {
+                                alpha = glowAlpha
+                            },
+                    )
+                }
                 Image(
                     painter = painterResource(
                         id = StrangeDoorAndroidResources.drawableResId(model.doorAssetKey),
@@ -1087,6 +1177,7 @@ private fun StrangeDoorEventScene(
 @Composable
 private fun StrangeDoorPromptPanel(
     model: StrangeDoorHomeEventUiModel,
+    photoPreview: LocalImagePreviewCardUiState?,
     compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -1097,13 +1188,22 @@ private fun StrangeDoorPromptPanel(
             modifier = modifier,
         )
 
-        StrangeDoorHomeEventPanel.ToolCard -> StrangeDoorImagePanel(
-            backgroundKey = StrangeDoorAssetKey.ToolCardPanel,
-            text = model.bubbleLines.joinToString(separator = "\n"),
-            compact = compact,
-            aspectRatio = 4f / 3f,
-            modifier = modifier,
-        )
+        StrangeDoorHomeEventPanel.ToolCard -> if (model.showPhotoResultCard && photoPreview != null) {
+            StrangeDoorPhotoResultPanel(
+                model = model,
+                preview = photoPreview,
+                compact = compact,
+                modifier = modifier,
+            )
+        } else {
+            StrangeDoorImagePanel(
+                backgroundKey = StrangeDoorAssetKey.ToolCardPanel,
+                text = model.bubbleLines.joinToString(separator = "\n"),
+                compact = compact,
+                aspectRatio = 4f / 3f,
+                modifier = modifier,
+            )
+        }
 
         StrangeDoorHomeEventPanel.Riddle -> StrangeDoorImagePanel(
             backgroundKey = StrangeDoorAssetKey.RiddlePanel,
@@ -1112,6 +1212,71 @@ private fun StrangeDoorPromptPanel(
             aspectRatio = 2f,
             modifier = modifier,
         )
+    }
+}
+
+internal fun strangeDoorPhotoResultThumbnailSize(compact: Boolean): Dp {
+    return if (compact) 72.dp else 88.dp
+}
+
+internal fun strangeDoorPhotoResultUsesHorizontalLayout(width: Dp): Boolean {
+    return width >= 430.dp
+}
+
+@Composable
+private fun StrangeDoorPhotoResultPanel(
+    model: StrangeDoorHomeEventUiModel,
+    preview: LocalImagePreviewCardUiState,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val panelText = model.bubbleLines.joinToString(separator = "\n")
+    BoxWithConstraints(modifier = modifier) {
+        val thumbnailSize = strangeDoorPhotoResultThumbnailSize(compact)
+        val useHorizontal = strangeDoorPhotoResultUsesHorizontalLayout(maxWidth)
+        val gap = if (compact) 8.dp else 10.dp
+
+        if (useHorizontal) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StrangeDoorPhotoThumbnail(
+                    preview = preview,
+                    compact = compact,
+                    modifier = Modifier.size(thumbnailSize),
+                )
+                StrangeDoorImagePanel(
+                    backgroundKey = StrangeDoorAssetKey.ToolCardPanel,
+                    text = panelText,
+                    compact = compact,
+                    aspectRatio = 4f / 3f,
+                    modifier = Modifier.weight(1f),
+                    maxHeight = if (compact) 172.dp else 218.dp,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                StrangeDoorPhotoThumbnail(
+                    preview = preview,
+                    compact = compact,
+                    modifier = Modifier.size(thumbnailSize),
+                )
+                StrangeDoorImagePanel(
+                    backgroundKey = StrangeDoorAssetKey.ToolCardPanel,
+                    text = panelText,
+                    compact = compact,
+                    aspectRatio = 4f / 3f,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxHeight = if (compact) 170.dp else 210.dp,
+                )
+            }
+        }
     }
 }
 
@@ -1278,11 +1443,12 @@ private fun StrangeDoorImagePanel(
     compact: Boolean,
     aspectRatio: Float,
     modifier: Modifier = Modifier,
+    maxHeight: Dp = if (compact) 170.dp else 210.dp,
 ) {
     Box(
         modifier = modifier
             .aspectRatio(aspectRatio)
-            .sizeIn(maxHeight = if (compact) 170.dp else 210.dp),
+            .sizeIn(maxHeight = maxHeight),
         contentAlignment = Alignment.Center,
     ) {
         Image(

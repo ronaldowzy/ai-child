@@ -57,6 +57,8 @@ object StrangeDoorHomeEventCopy {
     const val switchMethodLabel = "先换个办法"
     const val findAnotherLabel = "再找一个"
     const val saveToShowcaseLabel = "放进小展台"
+    const val showcaseSavedSuffix = "，放好啦"
+    const val showcaseSavedSecondLine = "以后可以在小展台里看到它"
 
     fun approvedChildFacingCopy(): List<String> {
         return listOf(
@@ -68,6 +70,8 @@ object StrangeDoorHomeEventCopy {
             switchMethodLabel,
             findAnotherLabel,
             saveToShowcaseLabel,
+            showcaseSavedSuffix,
+            showcaseSavedSecondLine,
         ) + choosingBubbleLines + photoPromptLines
     }
 }
@@ -76,6 +80,7 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
     return when (demoState) {
         StrangeDoorDemoState.PhotoResult,
         StrangeDoorDemoState.Completed -> resultUiModelOrChoosingMethod()
+        StrangeDoorDemoState.ShowcaseSaved -> showcaseSavedUiModelOrChoosingMethod()
 
         StrangeDoorDemoState.PhotoPrompt,
         StrangeDoorDemoState.PhotoUploading -> StrangeDoorHomeEventUiModel(
@@ -139,6 +144,29 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
         StrangeDoorDemoState.NotStarted,
         StrangeDoorDemoState.ChoosingMethod -> choosingMethodUiModel()
     }
+}
+
+private fun StrangeDoorDemoSnapshot.showcaseSavedUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {
+    val savedName = showcaseSavedName?.takeIf { it.isNotBlank() } ?: return resultUiModelOrChoosingMethod()
+    return StrangeDoorHomeEventUiModel(
+        title = StrangeDoorHomeEventCopy.title,
+        panel = StrangeDoorHomeEventPanel.ToolCard,
+        bubbleLines = listOf(
+            savedName + StrangeDoorHomeEventCopy.showcaseSavedSuffix,
+            StrangeDoorHomeEventCopy.showcaseSavedSecondLine,
+        ),
+        actions = listOf(
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.FindAnother,
+                label = StrangeDoorHomeEventCopy.findAnotherLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ChooseRiddle,
+                label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+            ),
+        ),
+        doorAssetKey = doorState.toAssetKey(),
+    )
 }
 
 private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {

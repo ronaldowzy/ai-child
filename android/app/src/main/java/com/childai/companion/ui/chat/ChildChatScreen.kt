@@ -68,6 +68,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -201,6 +202,7 @@ fun ChildChatScreen(
         onImageRetry = viewModel::retryPhotoUpload,
         onImageDismiss = viewModel::dismissFailedPhoto,
         onImageSaveToXiaozhantai = viewModel::requestSavePhotoToXiaozhantai,
+        onXiaozhantaiSaveNameChange = viewModel::updateXiaozhantaiSaveName,
         onXiaozhantaiSaveConfirm = viewModel::confirmXiaozhantaiSave,
         onXiaozhantaiSaveDismiss = viewModel::cancelXiaozhantaiSave,
         onOpenParentSettings = onOpenParentSettings,
@@ -233,6 +235,7 @@ private fun ChildChatScreenContent(
     onImageRetry: (String) -> Unit = {},
     onImageDismiss: (String) -> Unit = {},
     onImageSaveToXiaozhantai: (String) -> Unit = {},
+    onXiaozhantaiSaveNameChange: (String) -> Unit = {},
     onXiaozhantaiSaveConfirm: () -> Unit = {},
     onXiaozhantaiSaveDismiss: () -> Unit = {},
     onOpenParentSettings: () -> Unit,
@@ -417,6 +420,7 @@ private fun ChildChatScreenContent(
     uiState.xiaozhantaiSaveDraft?.let { draft ->
         XiaozhantaiSaveDialog(
             draft = draft,
+            onNameChange = onXiaozhantaiSaveNameChange,
             onConfirm = onXiaozhantaiSaveConfirm,
             onDismiss = onXiaozhantaiSaveDismiss,
         )
@@ -1844,6 +1848,7 @@ private fun LocalImagePreviewCard(
 @Composable
 private fun XiaozhantaiSaveDialog(
     draft: XiaozhantaiSaveDraftUiState,
+    onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1856,7 +1861,17 @@ private fun XiaozhantaiSaveDialog(
         onDismissRequest = {
             if (!draft.isSaving) onDismiss()
         },
-        title = { Text(text = "放进小展台") },
+        title = {
+            Text(
+                text = if (draft.stage == XiaozhantaiSaveDraftStage.Confirm &&
+                    draft.source == XiaozhantaiSaveDraftSource.StrangeDoor
+                ) {
+                    "要不要把这个小发现放进小展台？"
+                } else {
+                    "给它起个名字吧"
+                },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (previewBitmap != null) {
@@ -1870,27 +1885,17 @@ private fun XiaozhantaiSaveDialog(
                             .clip(RoundedCornerShape(18.dp)),
                     )
                 }
-                Text(
-                    text = "名字",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF52667B),
-                )
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.White.copy(alpha = 0.78f),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.66f),
-                    ),
-                ) {
-                    Text(
-                        text = draft.name.ifBlank { draft.defaultName },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF40546A),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                if (draft.stage == XiaozhantaiSaveDraftStage.Naming) {
+                    OutlinedTextField(
+                        value = draft.name.ifBlank { draft.defaultName },
+                        onValueChange = onNameChange,
+                        enabled = !draft.isSaving,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.titleMedium,
+                        label = {
+                            Text(text = "名字")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 draft.errorMessage?.let { message ->

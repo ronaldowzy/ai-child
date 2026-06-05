@@ -25,6 +25,10 @@ class StrangeDoorForbiddenWordsTest {
             "错了",
             "正确答案是",
             "这个很简单",
+            "百宝箱",
+            "图鉴",
+            "背包",
+            "通关",
         )
         val approvedCopy = StrangeDoorPhotoTransformMapper.approvedChildFacingCopy() +
             StrangeDoorRiddleEvaluator.approvedChildFacingCopy() +

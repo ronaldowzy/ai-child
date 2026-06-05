@@ -34,6 +34,7 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDoorStateReducer
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransform
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorRiddleEvaluator
 import com.childai.companion.voice.AudioSegment
@@ -255,10 +256,39 @@ class ChatViewModel(
     fun requestStrangeDoorShowcaseSaveIntent() {
         val snapshot = _uiState.value.strangeDoorDemo ?: return
         val transform = snapshot.lastPhotoTransform ?: return
+        val messageId = snapshot.lastPhotoMessageId ?: return
         if (!transform.canSaveToShowcase || snapshot.showcaseSaveIntentRequested) return
+        val candidate = xiaozhantaiSaveCandidates[messageId]
+        val card = _uiState.value.imagePreviewCards[messageId]
+        if (candidate == null ||
+            card == null ||
+            saveXiaozhantaiItemUseCase == null ||
+            !card.canSaveToXiaozhantai ||
+            card.savedToXiaozhantai ||
+            card.isSavingToXiaozhantai
+        ) {
+            _uiState.update { state ->
+                state.copy(
+                    strangeDoorDemo = snapshot.copy(
+                        showcaseSaveIntentRequested = true,
+                    ),
+                )
+            }
+            return
+        }
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = snapshot.copy(showcaseSaveIntentRequested = true),
+                xiaozhantaiSaveDraft = XiaozhantaiSaveDraftUiState(
+                    messageId = messageId,
+                    name = candidate.saveName,
+                    defaultName = candidate.defaultName,
+                    previewBytes = candidate.payload.previewBytes,
+                    isSaving = false,
+                    errorMessage = null,
+                    stage = XiaozhantaiSaveDraftStage.Confirm,
+                    source = XiaozhantaiSaveDraftSource.StrangeDoor,
+                ),
             )
         }
     }
@@ -289,6 +319,31 @@ class ChatViewModel(
                 ),
             )
         }
+        return true
+    }
+
+    fun submitStrangeDoorShowcaseName(name: String): Boolean {
+        val itemName = name.trim()
+        if (itemName.isBlank()) return false
+        val draft = _uiState.value.xiaozhantaiSaveDraft ?: return false
+        if (draft.source != XiaozhantaiSaveDraftSource.StrangeDoor ||
+            draft.stage != XiaozhantaiSaveDraftStage.Naming
+        ) {
+            return false
+        }
+        _uiState.update { state ->
+            state.copy(
+                isSending = false,
+                childTurnPhaseHint = null,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        updateXiaozhantaiSaveName(itemName)
+        confirmXiaozhantaiSave()
         return true
     }
 
@@ -324,6 +379,7 @@ class ChatViewModel(
                     } else {
                         snapshot.lastRiddleEvaluation
                     },
+                    showcaseSavedName = null,
                     showcaseSaveIntentRequested = false,
                 ),
                 quickActions = emptyList(),
@@ -341,6 +397,7 @@ class ChatViewModel(
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
+        if (submitStrangeDoorShowcaseName(trimmedText)) return
         if (answerStrangeDoorRiddle(trimmedText)) return
 
         val imageContext = _uiState.value.pendingImageContext
@@ -552,6 +609,7 @@ class ChatViewModel(
             }
             return
         }
+        if (submitStrangeDoorShowcaseName(transcript)) return
         if (answerStrangeDoorRiddle(transcript)) return
         clearVoiceInputState()
         sendText(transcript)
@@ -787,12 +845,14 @@ class ChatViewModel(
                 if (handleStrangeDoorAttachmentResponseIfActive(
                         attachmentResponse = attachmentResponse,
                         photoMessageId = childPhotoMessageId,
+                        payload = payload,
                     )
                 ) {
                     updateImagePreviewStatus(
                         messageId = childPhotoMessageId,
                         status = LocalImagePreviewStatus.Sent,
-                        canSaveToXiaozhantai = false,
+                        canSaveToXiaozhantai = strangeDoorPhotoCanSaveToShowcase(childPhotoMessageId),
+                        defaultShowcaseName = _uiState.value.strangeDoorDemo?.lastTransformedName,
                     )
                     return@onSuccess
                 }
@@ -898,12 +958,14 @@ class ChatViewModel(
                 if (handleStrangeDoorAttachmentResponseIfActive(
                         attachmentResponse = attachmentResponse,
                         photoMessageId = messageId,
+                        payload = payload,
                     )
                 ) {
                     updateImagePreviewStatus(
                         messageId = messageId,
                         status = LocalImagePreviewStatus.Sent,
-                        canSaveToXiaozhantai = false,
+                        canSaveToXiaozhantai = strangeDoorPhotoCanSaveToShowcase(messageId),
+                        defaultShowcaseName = _uiState.value.strangeDoorDemo?.lastTransformedName,
                     )
                     return@onSuccess
                 }
@@ -1051,8 +1113,16 @@ class ChatViewModel(
     }
 
     fun cancelXiaozhantaiSave() {
+        val draft = _uiState.value.xiaozhantaiSaveDraft
         _uiState.update { state ->
-            state.copy(xiaozhantaiSaveDraft = null)
+            state.copy(
+                xiaozhantaiSaveDraft = null,
+                strangeDoorDemo = if (draft?.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
+                    state.strangeDoorDemo?.copy(showcaseSaveIntentRequested = false)
+                } else {
+                    state.strangeDoorDemo
+                },
+            )
         }
     }
 
@@ -1060,6 +1130,17 @@ class ChatViewModel(
         val saveUseCase = saveXiaozhantaiItemUseCase ?: return
         val draft = _uiState.value.xiaozhantaiSaveDraft ?: return
         if (draft.isSaving) return
+        if (draft.stage == XiaozhantaiSaveDraftStage.Confirm) {
+            _uiState.update { state ->
+                state.copy(
+                    xiaozhantaiSaveDraft = draft.copy(
+                        stage = XiaozhantaiSaveDraftStage.Naming,
+                        errorMessage = null,
+                    ),
+                )
+            }
+            return
+        }
         val candidate = xiaozhantaiSaveCandidates[draft.messageId] ?: return
         val itemName = xiaozhantaiNormalizeName(draft.name.ifBlank { draft.defaultName })
         val foxQuote = xiaozhantaiNormalizeFoxQuote(
@@ -1096,7 +1177,20 @@ class ChatViewModel(
                 _uiState.update { state ->
                     state.copy(
                         xiaozhantaiSaveDraft = null,
-                        xiaozhantaiSavedItemIdForNavigation = item.id,
+                        xiaozhantaiSavedItemIdForNavigation = if (draft.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
+                            null
+                        } else {
+                            item.id
+                        },
+                        strangeDoorDemo = if (draft.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
+                            state.strangeDoorDemo?.copy(
+                                demoState = StrangeDoorDemoState.ShowcaseSaved,
+                                showcaseSaveIntentRequested = false,
+                                showcaseSavedName = itemName,
+                            )
+                        } else {
+                            state.strangeDoorDemo
+                        },
                         xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
                             ?.takeUnless { it == draft.messageId },
                         imagePreviewCards = state.imagePreviewCards + (
@@ -1164,6 +1258,7 @@ class ChatViewModel(
     private fun handleStrangeDoorAttachmentResponseIfActive(
         attachmentResponse: AttachmentCreateResponse,
         photoMessageId: String,
+        payload: PhotoUploadPayload,
     ): Boolean {
         val snapshot = _uiState.value.strangeDoorDemo ?: return false
         if (attachmentResponse.recognizedContent.imagePurpose != IMAGE_PURPOSE_SHARE) {
@@ -1176,6 +1271,11 @@ class ChatViewModel(
             snapshot = snapshot,
             transform = transform,
             photoMessageId = photoMessageId,
+        )
+        registerStrangeDoorShowcaseCandidate(
+            photoMessageId = photoMessageId,
+            payload = payload,
+            transform = transform,
         )
         _uiState.update { state ->
             state.copy(
@@ -1194,6 +1294,33 @@ class ChatViewModel(
             )
         }
         return true
+    }
+
+    private fun registerStrangeDoorShowcaseCandidate(
+        photoMessageId: String,
+        payload: PhotoUploadPayload,
+        transform: StrangeDoorPhotoTransform,
+    ) {
+        if (!transform.canSaveToShowcase || xiaozhantaiRepository == null) return
+        xiaozhantaiSaveCandidates[photoMessageId] = XiaozhantaiSaveCandidate(
+            payload = payload,
+            defaultName = transform.transformedName ?: transform.objectName,
+            foxQuote = strangeDoorShowcaseFoxQuote(transform),
+        )
+        latestXiaozhantaiSaveCandidateMessageId = photoMessageId
+    }
+
+    private fun strangeDoorPhotoCanSaveToShowcase(photoMessageId: String): Boolean {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return false
+        return snapshot.lastPhotoMessageId == photoMessageId &&
+            snapshot.lastPhotoTransform?.canSaveToShowcase == true &&
+            xiaozhantaiRepository != null
+    }
+
+    private fun strangeDoorShowcaseFoxQuote(transform: StrangeDoorPhotoTransform): String {
+        return StrangeDoorPhotoTransformMapper.feedbackLines(transform)
+            .drop(2)
+            .joinToString(separator = " ")
     }
 
     private suspend fun handleAttachmentResponse(
@@ -1309,6 +1436,7 @@ class ChatViewModel(
                 if (!voiceConfirmBeforeSend) {
                     val transcript = result.text.trim()
                     if (transcript.isNotEmpty()) {
+                        if (submitStrangeDoorShowcaseName(transcript)) return
                         if (answerStrangeDoorRiddle(transcript)) return
                         _uiState.update { state ->
                             state.copy(
@@ -2187,7 +2315,19 @@ data class XiaozhantaiSaveDraftUiState(
     val previewBytes: ByteArray?,
     val isSaving: Boolean,
     val errorMessage: String?,
+    val stage: XiaozhantaiSaveDraftStage = XiaozhantaiSaveDraftStage.Naming,
+    val source: XiaozhantaiSaveDraftSource = XiaozhantaiSaveDraftSource.StandardPhoto,
 )
+
+enum class XiaozhantaiSaveDraftStage {
+    Confirm,
+    Naming,
+}
+
+enum class XiaozhantaiSaveDraftSource {
+    StandardPhoto,
+    StrangeDoor,
+}
 
 data class QuickActionUi(
     val id: String,

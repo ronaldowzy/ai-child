@@ -8,6 +8,7 @@ enum class StrangeDoorDemoState {
     PhotoResult,
     RiddlePrompt,
     RiddleHint,
+    ShowcaseSaved,
     Completed,
 }
 
@@ -40,6 +41,7 @@ data class StrangeDoorDemoSnapshot(
     val lastRiddleEvaluation: StrangeDoorRiddleEvaluation? = null,
     val lastPhotoMessageId: String? = null,
     val showcaseSaveIntentRequested: Boolean = false,
+    val showcaseSavedName: String? = null,
     val riddleAttempts: Int = 0,
 ) {
     val isCompleted: Boolean
@@ -84,6 +86,7 @@ object StrangeDoorDoorStateReducer {
             lastRiddleEvaluation = null,
             lastPhotoMessageId = photoMessageId ?: snapshot.lastPhotoMessageId,
             showcaseSaveIntentRequested = false,
+            showcaseSavedName = null,
         )
     }
 
@@ -107,6 +110,7 @@ object StrangeDoorDoorStateReducer {
             lastRiddleEvaluation = evaluation,
             riddleAttempts = snapshot.riddleAttempts + 1,
             showcaseSaveIntentRequested = false,
+            showcaseSavedName = null,
         )
     }
 

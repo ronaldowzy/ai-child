@@ -190,6 +190,27 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
+    fun showcaseSavedStateUsesApprovedCompletionCopy() {
+        val model = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.ShowcaseSaved,
+            showcaseSavedName = "蓝盖盖转轮",
+        ).toHomeEventUiModel()
+
+        assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
+        assertEquals(
+            listOf(
+                "蓝盖盖转轮，放好啦",
+                "以后可以在小展台里看到它",
+            ),
+            model.bubbleLines,
+        )
+        assertEquals(
+            listOf("再找一个", "动脑试试"),
+            model.actions.map { it.label },
+        )
+    }
+
+    @Test
     fun allRequiredAndroidResourcesResolveToDrawableIds() {
         assertTrue(StrangeDoorAndroidResources.allRequiredResourcesReady())
         StrangeDoorAssetContract.requiredAssets.forEach { key ->

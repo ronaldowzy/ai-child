@@ -7,6 +7,7 @@ enum class StrangeDoorHomeEventActionId {
     SwitchMethod,
     FindAnother,
     SaveToShowcase,
+    RetryRiddle,
 }
 
 data class StrangeDoorHomeEventAction(
@@ -29,6 +30,7 @@ data class StrangeDoorHomeEventUiModel(
     val actions: List<StrangeDoorHomeEventAction>,
     val doorAssetKey: StrangeDoorAssetKey,
     val showNormalInputBar: Boolean = false,
+    val showRiddleVoiceControl: Boolean = false,
 )
 
 object StrangeDoorHomeEventCopy {
@@ -73,29 +75,7 @@ object StrangeDoorHomeEventCopy {
 fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
     return when (demoState) {
         StrangeDoorDemoState.PhotoResult,
-        StrangeDoorDemoState.Completed -> lastPhotoTransform?.let { transform ->
-            StrangeDoorHomeEventUiModel(
-                title = StrangeDoorHomeEventCopy.title,
-                panel = StrangeDoorHomeEventPanel.ToolCard,
-                bubbleLines = StrangeDoorPhotoTransformMapper.feedbackLines(transform),
-                actions = listOf(
-                    StrangeDoorHomeEventAction(
-                        id = StrangeDoorHomeEventActionId.FindAnother,
-                        label = StrangeDoorHomeEventCopy.findAnotherLabel,
-                    ),
-                    StrangeDoorHomeEventAction(
-                        id = StrangeDoorHomeEventActionId.SaveToShowcase,
-                        label = StrangeDoorHomeEventCopy.saveToShowcaseLabel,
-                        enabled = transform.canSaveToShowcase && !showcaseSaveIntentRequested,
-                    ),
-                    StrangeDoorHomeEventAction(
-                        id = StrangeDoorHomeEventActionId.ChooseRiddle,
-                        label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
-                    ),
-                ),
-                doorAssetKey = doorState.toAssetKey(),
-            )
-        } ?: choosingMethodUiModel()
+        StrangeDoorDemoState.Completed -> resultUiModelOrChoosingMethod()
 
         StrangeDoorDemoState.PhotoPrompt,
         StrangeDoorDemoState.PhotoUploading -> StrangeDoorHomeEventUiModel(
@@ -117,27 +97,84 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
         )
 
         StrangeDoorDemoState.RiddlePrompt,
-        StrangeDoorDemoState.RiddleHint -> StrangeDoorHomeEventUiModel(
-            title = StrangeDoorHomeEventCopy.title,
-            panel = StrangeDoorHomeEventPanel.Riddle,
-            bubbleLines = emptyList(),
-            question = StrangeDoorHomeEventCopy.riddleQuestion,
-            actions = listOf(
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.ChoosePhoto,
-                    label = StrangeDoorHomeEventCopy.choosePhotoLabel,
+        StrangeDoorDemoState.RiddleHint -> if (demoState == StrangeDoorDemoState.RiddleHint) {
+            val evaluation = lastRiddleEvaluation ?: StrangeDoorRiddleEvaluator.evaluate("")
+            StrangeDoorHomeEventUiModel(
+                title = StrangeDoorHomeEventCopy.title,
+                panel = StrangeDoorHomeEventPanel.Riddle,
+                bubbleLines = evaluation.feedbackLines,
+                actions = listOf(
+                    StrangeDoorHomeEventAction(
+                        id = StrangeDoorHomeEventActionId.RetryRiddle,
+                        label = StrangeDoorRiddleEvaluator.ACTION_RETRY,
+                    ),
+                    StrangeDoorHomeEventAction(
+                        id = StrangeDoorHomeEventActionId.ChoosePhoto,
+                        label = StrangeDoorRiddleEvaluator.ACTION_PHOTO,
+                    ),
                 ),
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.SwitchMethod,
-                    label = StrangeDoorHomeEventCopy.switchMethodLabel,
+                doorAssetKey = doorState.toAssetKey(),
+            )
+        } else {
+            StrangeDoorHomeEventUiModel(
+                title = StrangeDoorHomeEventCopy.title,
+                panel = StrangeDoorHomeEventPanel.Riddle,
+                bubbleLines = emptyList(),
+                question = StrangeDoorHomeEventCopy.riddleQuestion,
+                actions = listOf(
+                    StrangeDoorHomeEventAction(
+                        id = StrangeDoorHomeEventActionId.ChoosePhoto,
+                        label = StrangeDoorHomeEventCopy.choosePhotoLabel,
+                    ),
+                    StrangeDoorHomeEventAction(
+                        id = StrangeDoorHomeEventActionId.SwitchMethod,
+                        label = StrangeDoorHomeEventCopy.switchMethodLabel,
+                    ),
                 ),
-            ),
-            doorAssetKey = doorState.toAssetKey(),
-        )
+                doorAssetKey = doorState.toAssetKey(),
+                showRiddleVoiceControl = true,
+            )
+        }
 
         StrangeDoorDemoState.NotStarted,
         StrangeDoorDemoState.ChoosingMethod -> choosingMethodUiModel()
     }
+}
+
+private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {
+    lastPhotoTransform?.let { transform ->
+        return StrangeDoorHomeEventUiModel(
+            title = StrangeDoorHomeEventCopy.title,
+            panel = StrangeDoorHomeEventPanel.ToolCard,
+            bubbleLines = StrangeDoorPhotoTransformMapper.feedbackLines(transform),
+            actions = listOf(
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.FindAnother,
+                    label = StrangeDoorHomeEventCopy.findAnotherLabel,
+                ),
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.SaveToShowcase,
+                    label = StrangeDoorHomeEventCopy.saveToShowcaseLabel,
+                    enabled = transform.canSaveToShowcase && !showcaseSaveIntentRequested,
+                ),
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.ChooseRiddle,
+                    label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+                ),
+            ),
+            doorAssetKey = doorState.toAssetKey(),
+        )
+    }
+    lastRiddleEvaluation?.let { evaluation ->
+        return StrangeDoorHomeEventUiModel(
+            title = StrangeDoorHomeEventCopy.title,
+            panel = StrangeDoorHomeEventPanel.Riddle,
+            bubbleLines = evaluation.feedbackLines,
+            actions = emptyList(),
+            doorAssetKey = doorState.toAssetKey(),
+        )
+    }
+    return choosingMethodUiModel()
 }
 
 private fun StrangeDoorDemoSnapshot.choosingMethodUiModel(): StrangeDoorHomeEventUiModel {

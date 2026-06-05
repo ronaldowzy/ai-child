@@ -1,11 +1,15 @@
 package com.childai.companion.ui.chat
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -17,6 +21,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -83,9 +88,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -96,6 +106,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.childai.companion.R
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.childai.companion.config.DevSettings
 import com.childai.companion.data.attachment.PhotoUploadPayload
@@ -200,6 +211,7 @@ fun ChildChatScreen(
         onStrangeDoorSwitchMethod = viewModel::returnToStrangeDoorMethodChoice,
         onStrangeDoorFindAnother = viewModel::requestAnotherStrangeDoorPhoto,
         onStrangeDoorSaveIntent = viewModel::requestStrangeDoorShowcaseSaveIntent,
+        onStrangeDoorRetryRiddle = viewModel::retryStrangeDoorRiddle,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -231,6 +243,7 @@ private fun ChildChatScreenContent(
     onStrangeDoorSwitchMethod: () -> Unit,
     onStrangeDoorFindAnother: () -> Unit,
     onStrangeDoorSaveIntent: () -> Unit,
+    onStrangeDoorRetryRiddle: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -461,6 +474,12 @@ private fun ChildChatScreenContent(
             if (strangeDoorSnapshot != null) {
                 StrangeDoorHomeEventScreen(
                     snapshot = strangeDoorSnapshot,
+                    voice = uiState.voice,
+                    presentation = uiState.interactionPresentation.copy(
+                        showImageInput = false,
+                        showStopSpeaking = false,
+                        showMuteToggle = false,
+                    ),
                     viewportClass = viewportClass,
                     compactLandscape = compactLandscape,
                     parentEntryHint = parentEntryHint,
@@ -480,6 +499,7 @@ private fun ChildChatScreenContent(
                     onSwitchMethod = onStrangeDoorSwitchMethod,
                     onFindAnother = onStrangeDoorFindAnother,
                     onSaveIntent = onStrangeDoorSaveIntent,
+                    onRetryRiddle = onStrangeDoorRetryRiddle,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else if (isLandscape) {
@@ -630,6 +650,8 @@ private fun ChildChatScreenContent(
 @Composable
 private fun StrangeDoorHomeEventScreen(
     snapshot: StrangeDoorDemoSnapshot,
+    voice: VoiceUiState,
+    presentation: ChildInteractionPresentation,
     viewportClass: CompanionRoomViewportClass,
     compactLandscape: Boolean,
     parentEntryHint: String?,
@@ -642,6 +664,7 @@ private fun StrangeDoorHomeEventScreen(
     onSwitchMethod: () -> Unit,
     onFindAnother: () -> Unit,
     onSaveIntent: () -> Unit,
+    onRetryRiddle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val model = remember(snapshot) {
@@ -656,6 +679,7 @@ private fun StrangeDoorHomeEventScreen(
             StrangeDoorHomeEventActionId.OpenPhotoCapture -> onOpenPhotoCapture()
             StrangeDoorHomeEventActionId.FindAnother -> onFindAnother()
             StrangeDoorHomeEventActionId.SaveToShowcase -> onSaveIntent()
+            StrangeDoorHomeEventActionId.RetryRiddle -> onRetryRiddle()
         }
     }
 
@@ -712,6 +736,15 @@ private fun StrangeDoorHomeEventScreen(
                         compact = compactLandscape,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (model.showRiddleVoiceControl) {
+                        Spacer(modifier = Modifier.height(if (compactLandscape) 8.dp else 10.dp))
+                        StrangeDoorRiddleVoiceControl(
+                            voice = voice,
+                            presentation = presentation,
+                            enabled = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 14.dp))
                     StrangeDoorActionRow(
                         actions = model.actions,
@@ -754,6 +787,17 @@ private fun StrangeDoorHomeEventScreen(
                         .fillMaxWidth()
                         .widthIn(max = 520.dp),
                 )
+                if (model.showRiddleVoiceControl) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    StrangeDoorRiddleVoiceControl(
+                        voice = voice,
+                        presentation = presentation,
+                        enabled = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 520.dp),
+                    )
+                }
                 Spacer(modifier = Modifier.height(10.dp))
                 StrangeDoorActionRow(
                     actions = model.actions,
@@ -914,11 +958,130 @@ private fun StrangeDoorPromptPanel(
 
         StrangeDoorHomeEventPanel.Riddle -> StrangeDoorImagePanel(
             backgroundKey = StrangeDoorAssetKey.RiddlePanel,
-            text = model.question.orEmpty(),
+            text = model.riddlePanelText(),
             compact = compact,
             aspectRatio = 2f,
             modifier = modifier,
         )
+    }
+}
+
+private fun StrangeDoorHomeEventUiModel.riddlePanelText(): String {
+    return if (bubbleLines.isNotEmpty()) {
+        bubbleLines.joinToString(separator = "\n")
+    } else {
+        question.orEmpty()
+    }
+}
+
+@Composable
+private fun StrangeDoorRiddleVoiceControl(
+    voice: VoiceUiState,
+    presentation: ChildInteractionPresentation,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            voice.actions.onPermissionDenied()
+        }
+    }
+
+    fun startVoiceRecordingWithPermission() {
+        val isGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    Button(
+        onClick = {
+            if (voice.isRecording) {
+                voice.actions.onStopRecordingAndUpload()
+            } else {
+                startVoiceRecordingWithPermission()
+            }
+        },
+        enabled = inputBarPrimaryVoiceButtonEnabled(
+            enabled = enabled,
+            presentation = presentation,
+        ),
+        shape = RoundedCornerShape(26.dp),
+        modifier = modifier.heightIn(min = 52.dp),
+    ) {
+        StrangeDoorVoiceGlyph(
+            isRecording = voice.isRecording,
+            isUploading = voice.isUploading,
+            modifier = Modifier.size(28.dp),
+        )
+    }
+}
+
+@Composable
+private fun StrangeDoorVoiceGlyph(
+    isRecording: Boolean,
+    isUploading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 2.8.dp.toPx()
+        val iconColor = Color.White.copy(alpha = if (isUploading) 0.72f else 0.96f)
+        if (isRecording) {
+            val squareSize = size.minDimension * 0.48f
+            drawRoundRect(
+                color = iconColor,
+                topLeft = Offset(
+                    x = (size.width - squareSize) / 2f,
+                    y = (size.height - squareSize) / 2f,
+                ),
+                size = Size(squareSize, squareSize),
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+            )
+        } else {
+            val micWidth = size.width * 0.34f
+            val micHeight = size.height * 0.52f
+            val micLeft = (size.width - micWidth) / 2f
+            val micTop = size.height * 0.12f
+            drawRoundRect(
+                color = iconColor,
+                topLeft = Offset(micLeft, micTop),
+                size = Size(micWidth, micHeight),
+                cornerRadius = CornerRadius(micWidth / 2f, micWidth / 2f),
+            )
+            drawArc(
+                color = iconColor,
+                startAngle = 20f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = Offset(size.width * 0.22f, size.height * 0.30f),
+                size = Size(size.width * 0.56f, size.height * 0.46f),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(size.width / 2f, size.height * 0.74f),
+                end = Offset(size.width / 2f, size.height * 0.88f),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(size.width * 0.34f, size.height * 0.88f),
+                end = Offset(size.width * 0.66f, size.height * 0.88f),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
 
@@ -2740,6 +2903,7 @@ private fun ChildChatScreenPortraitPreview() {
             onStrangeDoorSwitchMethod = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorSaveIntent = {},
+            onStrangeDoorRetryRiddle = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2781,6 +2945,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onStrangeDoorSwitchMethod = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorSaveIntent = {},
+            onStrangeDoorRetryRiddle = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2831,6 +2996,7 @@ private fun ChildChatScreenLandscapePreview() {
             onStrangeDoorSwitchMethod = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorSaveIntent = {},
+            onStrangeDoorRetryRiddle = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

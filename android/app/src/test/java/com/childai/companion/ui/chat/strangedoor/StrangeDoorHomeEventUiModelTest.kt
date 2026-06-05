@@ -122,10 +122,71 @@ class StrangeDoorHomeEventUiModelTest {
 
         assertEquals(StrangeDoorHomeEventPanel.Riddle, model.panel)
         assertEquals("什么东西越洗越脏？", model.question)
+        assertTrue(model.showRiddleVoiceControl)
         assertEquals(
             listOf("找东西帮忙", "先换个办法"),
             model.actions.map { it.label },
         )
+    }
+
+    @Test
+    fun wrongRiddleResultShowsHintAndD4Actions() {
+        val snapshot = StrangeDoorDoorStateReducer.applyRiddleResult(
+            snapshot = StrangeDoorDemoSnapshot(
+                demoState = StrangeDoorDemoState.RiddlePrompt,
+            ),
+            evaluation = StrangeDoorRiddleEvaluator.evaluate("毛巾"),
+        )
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(StrangeDoorHomeEventPanel.Riddle, model.panel)
+        assertFalse(model.showRiddleVoiceControl)
+        assertEquals(
+            listOf(
+                "这个答案有点勇敢",
+                "小门差点相信了",
+                "",
+                "我给你一个提示",
+                "它常常在杯子里、河里、盆里",
+            ),
+            model.bubbleLines,
+        )
+        assertEquals(
+            listOf("再答一次", "找东西帮忙"),
+            model.actions.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                StrangeDoorHomeEventActionId.RetryRiddle,
+                StrangeDoorHomeEventActionId.ChoosePhoto,
+            ),
+            model.actions.map { it.id },
+        )
+    }
+
+    @Test
+    fun correctRiddleResultShowsFeedbackAndOpenDoor() {
+        val snapshot = StrangeDoorDoorStateReducer.applyRiddleResult(
+            snapshot = StrangeDoorDemoSnapshot(
+                demoState = StrangeDoorDemoState.RiddlePrompt,
+            ),
+            evaluation = StrangeDoorRiddleEvaluator.evaluate("水"),
+        )
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(StrangeDoorHomeEventPanel.Riddle, model.panel)
+        assertEquals(StrangeDoorAssetKey.DoorOpen, model.doorAssetKey)
+        assertEquals(
+            listOf(
+                "对，是水",
+                "",
+                "小门被你说得愣住了",
+                "它低头想了三秒",
+                "然后咔哒一下打开了",
+            ),
+            model.bubbleLines,
+        )
+        assertTrue(model.actions.isEmpty())
     }
 
     @Test

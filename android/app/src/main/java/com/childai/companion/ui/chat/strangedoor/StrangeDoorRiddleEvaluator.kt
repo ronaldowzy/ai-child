@@ -16,6 +16,7 @@ object StrangeDoorRiddleEvaluator {
 
     private val correctFeedbackLines = listOf(
         "对，是水",
+        "",
         "小门被你说得愣住了",
         "它低头想了三秒",
         "然后咔哒一下打开了",
@@ -24,6 +25,7 @@ object StrangeDoorRiddleEvaluator {
     private val wrongFeedbackLines = listOf(
         "这个答案有点勇敢",
         "小门差点相信了",
+        "",
         "我给你一个提示",
         "它常常在杯子里、河里、盆里",
     )
@@ -57,15 +59,7 @@ object StrangeDoorRiddleEvaluator {
     private fun isCorrectAnswer(answerText: String): Boolean {
         val normalized = answerText
             .replace(Regex("[\\s，。！？、,.!?]+"), "")
-            .replace("答案", "")
-            .replace("应该", "")
-            .replace("就是", "")
-            .replace("是", "")
-            .replace("呀", "")
-            .replace("啊", "")
-            .replace("呢", "")
-            .replace("啦", "")
             .trim()
-        return normalized == ANSWER
+        return normalized.contains(ANSWER)
     }
 }

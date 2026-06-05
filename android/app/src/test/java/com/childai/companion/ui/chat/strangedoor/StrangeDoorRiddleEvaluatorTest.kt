@@ -8,7 +8,7 @@ import org.junit.Test
 class StrangeDoorRiddleEvaluatorTest {
     @Test
     fun waterAnswerOpensDoor() {
-        val result = StrangeDoorRiddleEvaluator.evaluate("是水呀")
+        val result = StrangeDoorRiddleEvaluator.evaluate("我觉得是水呀")
 
         assertTrue(result.isCorrect)
         assertEquals(StrangeDoorDemoState.Completed, result.nextDemoState)
@@ -16,6 +16,7 @@ class StrangeDoorRiddleEvaluatorTest {
         assertEquals(
             listOf(
                 "对，是水",
+                "",
                 "小门被你说得愣住了",
                 "它低头想了三秒",
                 "然后咔哒一下打开了",
@@ -36,6 +37,7 @@ class StrangeDoorRiddleEvaluatorTest {
             listOf(
                 "这个答案有点勇敢",
                 "小门差点相信了",
+                "",
                 "我给你一个提示",
                 "它常常在杯子里、河里、盆里",
             ),

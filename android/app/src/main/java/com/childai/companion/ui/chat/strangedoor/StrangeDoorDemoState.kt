@@ -37,6 +37,7 @@ data class StrangeDoorDemoSnapshot(
     val lastObjectName: String? = null,
     val lastTransformedName: String? = null,
     val lastPhotoTransform: StrangeDoorPhotoTransform? = null,
+    val lastRiddleEvaluation: StrangeDoorRiddleEvaluation? = null,
     val lastPhotoMessageId: String? = null,
     val showcaseSaveIntentRequested: Boolean = false,
     val riddleAttempts: Int = 0,
@@ -80,6 +81,7 @@ object StrangeDoorDoorStateReducer {
             lastObjectName = transform.objectName,
             lastTransformedName = transform.transformedName,
             lastPhotoTransform = transform,
+            lastRiddleEvaluation = null,
             lastPhotoMessageId = photoMessageId ?: snapshot.lastPhotoMessageId,
             showcaseSaveIntentRequested = false,
         )
@@ -99,7 +101,12 @@ object StrangeDoorDoorStateReducer {
             doorState = nextDoorState,
             attemptsCount = snapshot.attemptsCount + 1,
             lastMethod = StrangeDoorDemoMethod.Riddle,
+            lastObjectName = null,
+            lastTransformedName = null,
+            lastPhotoTransform = null,
+            lastRiddleEvaluation = evaluation,
             riddleAttempts = snapshot.riddleAttempts + 1,
+            showcaseSaveIntentRequested = false,
         )
     }
 

@@ -35,6 +35,7 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDoorStateReducer
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorRiddleEvaluator
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
@@ -230,6 +231,13 @@ class ChatViewModel(
         )
     }
 
+    fun retryStrangeDoorRiddle() {
+        updateStrangeDoorDemoState(
+            demoState = StrangeDoorDemoState.RiddlePrompt,
+            method = StrangeDoorDemoMethod.Riddle,
+        )
+    }
+
     fun returnToStrangeDoorMethodChoice() {
         updateStrangeDoorDemoState(
             demoState = StrangeDoorDemoState.ChoosingMethod,
@@ -253,6 +261,35 @@ class ChatViewModel(
                 strangeDoorDemo = snapshot.copy(showcaseSaveIntentRequested = true),
             )
         }
+    }
+
+    fun answerStrangeDoorRiddle(answerText: String): Boolean {
+        val transcript = answerText.trim()
+        if (transcript.isBlank()) return false
+        val snapshot = _uiState.value.strangeDoorDemo ?: return false
+        if (snapshot.demoState != StrangeDoorDemoState.RiddlePrompt) return false
+        val evaluation = StrangeDoorRiddleEvaluator.evaluate(transcript)
+        val nextSnapshot = StrangeDoorDoorStateReducer.applyRiddleResult(
+            snapshot = snapshot,
+            evaluation = evaluation,
+        )
+        childInteractionStarted = true
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = nextSnapshot,
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                isSending = false,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        return true
     }
 
     fun exitStrangeDoorDemoAndRequestOpening() {
@@ -279,6 +316,14 @@ class ChatViewModel(
                 strangeDoorDemo = snapshot.copy(
                     demoState = demoState,
                     lastMethod = method,
+                    lastPhotoTransform = if (method == StrangeDoorDemoMethod.Riddle) null else snapshot.lastPhotoTransform,
+                    lastRiddleEvaluation = if (method == StrangeDoorDemoMethod.Photo ||
+                        demoState == StrangeDoorDemoState.RiddlePrompt
+                    ) {
+                        null
+                    } else {
+                        snapshot.lastRiddleEvaluation
+                    },
                     showcaseSaveIntentRequested = false,
                 ),
                 quickActions = emptyList(),
@@ -296,6 +341,7 @@ class ChatViewModel(
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
+        if (answerStrangeDoorRiddle(trimmedText)) return
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
@@ -506,6 +552,7 @@ class ChatViewModel(
             }
             return
         }
+        if (answerStrangeDoorRiddle(transcript)) return
         clearVoiceInputState()
         sendText(transcript)
     }
@@ -1262,6 +1309,7 @@ class ChatViewModel(
                 if (!voiceConfirmBeforeSend) {
                     val transcript = result.text.trim()
                     if (transcript.isNotEmpty()) {
+                        if (answerStrangeDoorRiddle(transcript)) return
                         _uiState.update { state ->
                             state.copy(
                                 isSending = false,

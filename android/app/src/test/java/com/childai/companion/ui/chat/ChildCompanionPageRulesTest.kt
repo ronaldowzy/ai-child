@@ -1,8 +1,11 @@
 package com.childai.companion.ui.chat
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.childai.companion.mascot.MascotState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -148,5 +151,64 @@ class ChildCompanionPageRulesTest {
     fun strangeDoorPhotoEntryUsesExistingShareImagePurpose() {
         assertEquals(IMAGE_PURPOSE_SHARE, strangeDoorPhotoCaptureImagePurpose())
         assertFalse(strangeDoorPhotoCaptureImagePurpose().contains("strange_door"))
+    }
+
+    @Test
+    fun strangeDoorSceneKeepsFoxBehindDoorInsteadOfBesideIt() {
+        listOf(false, true).forEach { isLandscape ->
+            val placement = strangeDoorScenePlacementSpec(isLandscape)
+            val centerGap = kotlin.math.abs(
+                placement.doorXOffsetFraction - placement.foxXOffsetFraction,
+            )
+
+            assertTrue("door should be the dominant foreground visual", placement.doorWidthFraction >= 0.56f)
+            assertTrue("fox should stay close to the door center", centerGap <= 0.03f)
+            assertTrue("fox should be large enough to peek from behind", placement.foxSizeFractionOfDoor >= 0.90f)
+            assertTrue("fox should remain behind the door foreground", placement.foxYOffset >= 10.dp)
+        }
+    }
+
+    @Test
+    fun strangeDoorShowcaseNamingUsesVoiceInput() {
+        val strangeDoorNamingDraft = XiaozhantaiSaveDraftUiState(
+            messageId = "photo-1",
+            name = "小月亮盾牌",
+            defaultName = "小月亮盾牌",
+            previewBytes = null,
+            isSaving = false,
+            errorMessage = null,
+            stage = XiaozhantaiSaveDraftStage.Naming,
+            source = XiaozhantaiSaveDraftSource.StrangeDoor,
+        )
+        val standardNamingDraft = strangeDoorNamingDraft.copy(
+            source = XiaozhantaiSaveDraftSource.StandardPhoto,
+        )
+
+        assertEquals(XiaozhantaiSaveNameInputMode.Voice, xiaozhantaiSaveNameInputMode(strangeDoorNamingDraft))
+        assertEquals(XiaozhantaiSaveNameInputMode.Text, xiaozhantaiSaveNameInputMode(standardNamingDraft))
+    }
+
+    @Test
+    fun strangeDoorPhotoUploadingShowsCurrentPhotoPreview() {
+        val preview = LocalImagePreviewCardUiState(
+            messageId = "photo-1",
+            mimeType = "image/jpeg",
+            sizeBytes = 3,
+            previewBytes = byteArrayOf(1, 2, 3),
+            status = LocalImagePreviewStatus.Uploading,
+        )
+        val snapshot = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.PhotoUploading,
+            lastMethod = StrangeDoorDemoMethod.Photo,
+            lastPhotoMessageId = "photo-1",
+        )
+
+        assertEquals(preview, strangeDoorPhotoPreview(snapshot, mapOf("photo-1" to preview)))
+        assertNull(
+            strangeDoorPhotoPreview(
+                snapshot.copy(lastMethod = StrangeDoorDemoMethod.Riddle),
+                mapOf("photo-1" to preview),
+            ),
+        )
     }
 }

@@ -47,6 +47,7 @@ fun xiaozhantaiNormalizeName(name: String?, maxLength: Int = 24): String {
         ?.replace(Regex("[\\r\\n\\t]+"), " ")
         ?.replace(Regex("\\s+"), " ")
         ?.trim()
+        ?.trim(' ', '。', '，', ',', '.', '、', '！', '!', '？', '?')
         .orEmpty()
     return compact
         .take(maxLength.coerceAtLeast(1))

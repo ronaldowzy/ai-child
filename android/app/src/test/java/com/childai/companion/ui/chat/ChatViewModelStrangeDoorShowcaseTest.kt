@@ -17,6 +17,10 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventActionId
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorShapeHint
 import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
+import com.childai.companion.voice.SpeechInputController
+import com.childai.companion.voice.SpeechInputResult
+import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -126,6 +130,35 @@ class ChatViewModelStrangeDoorShowcaseTest {
     }
 
     @Test
+    fun voiceNameInNamingStateSavesWithoutConversationAndStaysCompleted() {
+        val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
+        val sender = CapturingStrangeDoorShowcaseConversationSender()
+        val viewModel = saveablePhotoViewModel(
+            showcaseRepository = showcaseRepository,
+            conversationSender = sender,
+            speech = ShowcaseNameSpeechInputController(
+                SpeechInputResult.Transcript("杯子小盾牌。"),
+            ),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        viewModel.requestStrangeDoorShowcaseSaveIntent()
+        viewModel.confirmXiaozhantaiSave()
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals("杯子小盾牌", showcaseRepository.savedRequest?.name)
+        assertEquals(StrangeDoorDemoState.ShowcaseSaved, snapshot.demoState)
+        assertEquals("杯子小盾牌", snapshot.showcaseSavedName)
+        assertEquals(0, sender.sendCalls)
+        assertEquals(0, sender.streamCalls)
+        assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
+    }
+
+    @Test
     fun savedShowcaseFeedbackStaysOnDemoPage() {
         val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
         val viewModel = saveablePhotoViewModel(showcaseRepository = showcaseRepository)
@@ -149,7 +182,7 @@ class ChatViewModelStrangeDoorShowcaseTest {
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "动脑试试"),
+            listOf("再找一个", "动脑试试", "先聊别的"),
             model.actions.map { it.label },
         )
         assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
@@ -159,6 +192,7 @@ class ChatViewModelStrangeDoorShowcaseTest {
         showcaseRepository: XiaozhantaiRepository = CapturingStrangeDoorShowcaseRepository(),
         growthEventRepository: GrowthEventRepository? = null,
         conversationSender: ConversationMessageSender = CapturingStrangeDoorShowcaseConversationSender(),
+        speech: SpeechInputController = ShowcaseNameSpeechInputController(),
     ): ChatViewModel {
         return viewModel(
             attachmentRepository = ImmediateShowcaseAttachmentRepository(
@@ -167,6 +201,7 @@ class ChatViewModelStrangeDoorShowcaseTest {
             showcaseRepository = showcaseRepository,
             growthEventRepository = growthEventRepository,
             conversationSender = conversationSender,
+            speech = speech,
         )
     }
 
@@ -175,12 +210,14 @@ class ChatViewModelStrangeDoorShowcaseTest {
         showcaseRepository: XiaozhantaiRepository? = null,
         growthEventRepository: GrowthEventRepository? = null,
         conversationSender: ConversationMessageSender = CapturingStrangeDoorShowcaseConversationSender(),
+        speech: SpeechInputController = ShowcaseNameSpeechInputController(),
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = conversationSender,
             attachmentRepository = attachmentRepository,
             xiaozhantaiRepository = showcaseRepository,
             growthEventRepository = growthEventRepository,
+            speechInputController = speech,
             sendDispatcher = Dispatchers.Unconfined,
             requestOpeningOnInit = false,
         )
@@ -230,6 +267,10 @@ class ChatViewModelStrangeDoorShowcaseTest {
             sizeBytes = 3,
         )
     }
+
+    private fun tempDir(): File {
+        return Files.createTempDirectory("strange-door-showcase-test").toFile()
+    }
 }
 
 private class ImmediateShowcaseAttachmentRepository(
@@ -272,6 +313,24 @@ private class CapturingStrangeDoorGrowthRepository : GrowthEventRepository() {
         appendedEvent = event
         return event
     }
+}
+
+private class ShowcaseNameSpeechInputController(
+    private val result: SpeechInputResult = SpeechInputResult.Transcript("蓝盖盖转轮"),
+) : SpeechInputController {
+    override suspend fun startRecording() = Unit
+
+    override suspend fun stopAndTranscribe(
+        childId: String,
+        sessionId: String,
+        timezone: String,
+    ): SpeechInputResult {
+        return result
+    }
+
+    override suspend fun cancel() = Unit
+
+    override fun shutdown() = Unit
 }
 
 private class CapturingStrangeDoorShowcaseConversationSender : ConversationMessageSender {

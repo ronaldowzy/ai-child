@@ -8,6 +8,7 @@ enum class StrangeDoorHomeEventActionId {
     FindAnother,
     SaveToShowcase,
     RetryRiddle,
+    ExitDemo,
 }
 
 data class StrangeDoorHomeEventAction(
@@ -57,6 +58,7 @@ object StrangeDoorHomeEventCopy {
     const val switchMethodLabel = "先换个办法"
     const val findAnotherLabel = "再找一个"
     const val saveToShowcaseLabel = "放进小展台"
+    const val exitDemoLabel = "先聊别的"
     const val showcaseSavedSuffix = "，放好啦"
     const val showcaseSavedSecondLine = "以后可以在小展台里看到它"
 
@@ -70,6 +72,7 @@ object StrangeDoorHomeEventCopy {
             switchMethodLabel,
             findAnotherLabel,
             saveToShowcaseLabel,
+            exitDemoLabel,
             showcaseSavedSuffix,
             showcaseSavedSecondLine,
         ) + choosingBubbleLines + photoPromptLines
@@ -164,6 +167,10 @@ private fun StrangeDoorDemoSnapshot.showcaseSavedUiModelOrChoosingMethod(): Stra
                 id = StrangeDoorHomeEventActionId.ChooseRiddle,
                 label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
             ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ExitDemo,
+                label = StrangeDoorHomeEventCopy.exitDemoLabel,
+            ),
         ),
         doorAssetKey = doorState.toAssetKey(),
     )
@@ -198,7 +205,16 @@ private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoor
             title = StrangeDoorHomeEventCopy.title,
             panel = StrangeDoorHomeEventPanel.Riddle,
             bubbleLines = evaluation.feedbackLines,
-            actions = emptyList(),
+            actions = listOf(
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.FindAnother,
+                    label = StrangeDoorHomeEventCopy.findAnotherLabel,
+                ),
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.ExitDemo,
+                    label = StrangeDoorHomeEventCopy.exitDemoLabel,
+                ),
+            ),
             doorAssetKey = doorState.toAssetKey(),
         )
     }

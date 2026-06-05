@@ -4,9 +4,13 @@ import com.childai.companion.data.conversation.ConversationMessageResponse
 import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
+import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
+import com.childai.companion.voice.TtsCallbacks
+import com.childai.companion.voice.TtsController
+import com.childai.companion.voice.TtsRequest
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,6 +80,46 @@ class ChatViewModelStrangeDoorDemoTest {
         assertEquals(StrangeDoorDemoMethod.Riddle, riddleSnapshot.lastMethod)
         assertTrue(viewModel.uiState.value.quickActions.isEmpty())
     }
+
+    @Test
+    fun strangeDoorLocalStatesUseExistingTtsForVisibleCopy() {
+        val feedbackTts = StrangeDoorDemoFeedbackTts()
+        val tts = StrangeDoorDemoRecordingTts()
+        val viewModel = ChatViewModel(
+            conversationSender = StrangeDoorDemoSender(),
+            feedbackTtsAudioGenerator = feedbackTts,
+            ttsController = tts,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorRiddleMethod()
+
+        assertEquals(2, feedbackTts.requestedTexts.size)
+        assertTrue(feedbackTts.requestedTexts[0].contains("奇怪小门挡住了小白狐"))
+        assertTrue(feedbackTts.requestedTexts[0].contains("我被这扇奇怪小门挡住了"))
+        assertFalse(feedbackTts.requestedTexts[1].contains("奇怪小门挡住了小白狐"))
+        assertTrue(feedbackTts.requestedTexts[1].contains("什么东西越洗越脏？"))
+        assertEquals(feedbackTts.requestedTexts, tts.requests.map { it.text })
+    }
+
+    @Test
+    fun strangeDoorLocalTtsRetriesOnceWhenAudioGenerationFails() {
+        val feedbackTts = StrangeDoorDemoFailOnceFeedbackTts()
+        val tts = StrangeDoorDemoRecordingTts()
+        val viewModel = ChatViewModel(
+            conversationSender = StrangeDoorDemoSender(),
+            feedbackTtsAudioGenerator = feedbackTts,
+            ttsController = tts,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+
+        assertEquals(2, feedbackTts.attempts)
+        assertEquals(1, tts.requests.size)
+        assertTrue(tts.requests.first().text.contains("我被这扇奇怪小门挡住了"))
+    }
 }
 
 private class StrangeDoorDemoSender : ConversationMessageSender {
@@ -133,4 +177,38 @@ private fun strangeDoorDemoResponse(text: String): ConversationMessageResponse {
         ),
         uiActions = emptyList(),
     )
+}
+
+private class StrangeDoorDemoFeedbackTts : XiaobaohuTtsAudioGenerator {
+    val requestedTexts = mutableListOf<String>()
+
+    override suspend fun generateAudioUrl(text: String, emotion: String): String? {
+        requestedTexts += text
+        return "/media/tts/strange-door-${requestedTexts.size}.wav"
+    }
+}
+
+private class StrangeDoorDemoFailOnceFeedbackTts : XiaobaohuTtsAudioGenerator {
+    var attempts = 0
+
+    override suspend fun generateAudioUrl(text: String, emotion: String): String? {
+        attempts += 1
+        if (attempts == 1) error("temporary tts failure")
+        return "/media/tts/retry-ok.wav"
+    }
+}
+
+private class StrangeDoorDemoRecordingTts : TtsController {
+    val requests = mutableListOf<TtsRequest>()
+
+    override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
+        requests += request
+        callbacks.onStart()
+        callbacks.onDone()
+        return true
+    }
+
+    override fun stop() = Unit
+
+    override fun shutdown() = Unit
 }

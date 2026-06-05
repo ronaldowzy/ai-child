@@ -37,6 +37,7 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransform
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorRiddleEvaluator
+import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
@@ -110,6 +111,7 @@ class ChatViewModel(
     private var ttsSlowHintJob: Job? = null
     private var openingRequested = false
     private var openingDeferredByStrangeDoor = false
+    private var lastStrangeDoorNarrationText: String? = null
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
@@ -216,6 +218,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakCurrentStrangeDoorState(force = true)
     }
 
     fun chooseStrangeDoorPhotoMethod() {
@@ -259,21 +262,9 @@ class ChatViewModel(
         val messageId = snapshot.lastPhotoMessageId ?: return
         if (!transform.canSaveToShowcase || snapshot.showcaseSaveIntentRequested) return
         val candidate = xiaozhantaiSaveCandidates[messageId]
-        val card = _uiState.value.imagePreviewCards[messageId]
         if (candidate == null ||
-            card == null ||
-            saveXiaozhantaiItemUseCase == null ||
-            !card.canSaveToXiaozhantai ||
-            card.savedToXiaozhantai ||
-            card.isSavingToXiaozhantai
+            saveXiaozhantaiItemUseCase == null
         ) {
-            _uiState.update { state ->
-                state.copy(
-                    strangeDoorDemo = snapshot.copy(
-                        showcaseSaveIntentRequested = true,
-                    ),
-                )
-            }
             return
         }
         _uiState.update { state ->
@@ -291,6 +282,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakAgentFeedback("要不要把这个小发现放进小展台？")
     }
 
     fun answerStrangeDoorRiddle(answerText: String): Boolean {
@@ -319,6 +311,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakStrangeDoorSnapshot(nextSnapshot)
         return true
     }
 
@@ -352,6 +345,7 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(strangeDoorDemo = null)
         }
+        lastStrangeDoorNarrationText = null
         if (openingDeferredByStrangeDoor || !openingRequested) {
             openingDeferredByStrangeDoor = false
             requestOpeningGreeting()
@@ -392,6 +386,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakCurrentStrangeDoorState()
     }
 
     fun sendText(text: String, quickActionId: String? = null) {
@@ -826,6 +821,9 @@ class ChatViewModel(
                 ),
             )
         }
+        if (isStrangeDoorPhoto) {
+            speakAgentFeedback(localImagePreviewStatusText(LocalImagePreviewStatus.Uploading))
+        }
 
         viewModelScope.launch(sendDispatcher) {
             Log.d(TAG, "[LatencyTrace] stage=image_upload_start")
@@ -940,6 +938,9 @@ class ChatViewModel(
                     phaseHint = ChildTurnUiPhase.ImageProcessing,
                 ).agent,
             )
+        }
+        if (isStrangeDoorPhoto) {
+            speakAgentFeedback(localImagePreviewStatusText(LocalImagePreviewStatus.Uploading))
         }
 
         viewModelScope.launch(sendDispatcher) {
@@ -1139,6 +1140,7 @@ class ChatViewModel(
                     ),
                 )
             }
+            speakAgentFeedback("给它起个名字吧")
             return
         }
         val candidate = xiaozhantaiSaveCandidates[draft.messageId] ?: return
@@ -1147,18 +1149,21 @@ class ChatViewModel(
             candidate.foxQuote.ifBlank { _uiState.value.agentReplyText },
         )
         _uiState.update { state ->
+            val updatedPreviewCards = state.imagePreviewCards[draft.messageId]?.let { card ->
+                state.imagePreviewCards + (
+                    draft.messageId to card.copy(
+                        isSavingToXiaozhantai = true,
+                        xiaozhantaiError = null,
+                    )
+                    )
+            } ?: state.imagePreviewCards
             state.copy(
                 xiaozhantaiSaveDraft = draft.copy(
                     name = itemName,
                     isSaving = true,
                     errorMessage = null,
                 ),
-                imagePreviewCards = state.imagePreviewCards + (
-                    draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
-                        isSavingToXiaozhantai = true,
-                        xiaozhantaiError = null,
-                    ) ?: return@update state)
-                    ),
+                imagePreviewCards = updatedPreviewCards,
             )
         }
         viewModelScope.launch(sendDispatcher) {
@@ -1175,6 +1180,16 @@ class ChatViewModel(
                 xiaozhantaiSaveCandidates.remove(draft.messageId)
                 clearLatestXiaozhantaiCandidateIfNeeded(draft.messageId)
                 _uiState.update { state ->
+                    val updatedPreviewCards = state.imagePreviewCards[draft.messageId]?.let { card ->
+                        state.imagePreviewCards + (
+                            draft.messageId to card.copy(
+                                canSaveToXiaozhantai = false,
+                                isSavingToXiaozhantai = false,
+                                savedToXiaozhantai = true,
+                                xiaozhantaiError = null,
+                            )
+                            )
+                    } ?: state.imagePreviewCards
                     state.copy(
                         xiaozhantaiSaveDraft = null,
                         xiaozhantaiSavedItemIdForNavigation = if (draft.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
@@ -1193,15 +1208,11 @@ class ChatViewModel(
                         },
                         xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
                             ?.takeUnless { it == draft.messageId },
-                        imagePreviewCards = state.imagePreviewCards + (
-                            draft.messageId to (state.imagePreviewCards[draft.messageId]?.copy(
-                                canSaveToXiaozhantai = false,
-                                isSavingToXiaozhantai = false,
-                                savedToXiaozhantai = true,
-                                xiaozhantaiError = null,
-                            ) ?: return@update state)
-                            ),
+                        imagePreviewCards = updatedPreviewCards,
                     )
+                }
+                if (draft.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
+                    speakCurrentStrangeDoorState(force = true)
                 }
             }.onFailure {
                 _uiState.update { state ->
@@ -1293,6 +1304,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakStrangeDoorSnapshot(nextSnapshot)
         return true
     }
 
@@ -1543,6 +1555,7 @@ class ChatViewModel(
                 ),
             )
         }
+        speakCurrentStrangeDoorState(force = true)
     }
 
     fun stopTtsPlayback() {
@@ -1914,12 +1927,11 @@ class ChatViewModel(
             return
         }
         viewModelScope.launch(sendDispatcher) {
-            val audioUrl = runCatching {
-                feedbackTtsAudioGenerator.generateAudioUrl(
-                    text = trimmedText,
-                    emotion = "encourage",
-                )
-            }.getOrNull()
+            val audioUrl = generateFeedbackAudioUrlWithRetry(trimmedText)
+            if (audioUrl.isNullOrBlank()) {
+                Log.w(TAG, "speakAgentFeedback: audioUrl missing after retry")
+                return@launch
+            }
             maybeAutoReadReply(
                 ConversationReply(
                     type = "agent_message",
@@ -1931,6 +1943,52 @@ class ChatViewModel(
                 ),
             )
         }
+    }
+
+    private suspend fun generateFeedbackAudioUrlWithRetry(text: String): String? {
+        repeat(2) { attemptIndex ->
+            val audioUrl = runCatching {
+                feedbackTtsAudioGenerator.generateAudioUrl(
+                    text = text,
+                    emotion = "encourage",
+                )
+            }.onFailure { error ->
+                Log.w(
+                    TAG,
+                    "generateFeedbackAudioUrl failed attempt=${attemptIndex + 1}",
+                    error,
+                )
+            }.getOrNull()
+            if (!audioUrl.isNullOrBlank()) return audioUrl
+        }
+        return null
+    }
+
+    private fun speakCurrentStrangeDoorState(force: Boolean = false) {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
+        speakStrangeDoorSnapshot(snapshot, force = force)
+    }
+
+    private fun speakStrangeDoorSnapshot(
+        snapshot: StrangeDoorDemoSnapshot,
+        force: Boolean = false,
+    ) {
+        val model = snapshot.toHomeEventUiModel()
+        val lines = buildList {
+            if (snapshot.demoState == StrangeDoorDemoState.ChoosingMethod) {
+                add(model.title)
+            }
+            if (model.bubbleLines.isNotEmpty()) {
+                addAll(model.bubbleLines)
+            } else {
+                model.question?.takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }
+        val text = lines.joinToString(separator = "\n").trim()
+        if (text.isBlank()) return
+        if (!force && lastStrangeDoorNarrationText == text) return
+        lastStrangeDoorNarrationText = text
+        speakAgentFeedback(text)
     }
 
     private fun nextMessageId(prefix: String): String {

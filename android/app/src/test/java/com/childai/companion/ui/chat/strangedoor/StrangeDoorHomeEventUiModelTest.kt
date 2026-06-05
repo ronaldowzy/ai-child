@@ -186,7 +186,10 @@ class StrangeDoorHomeEventUiModelTest {
             ),
             model.bubbleLines,
         )
-        assertTrue(model.actions.isEmpty())
+        assertEquals(
+            listOf("再找一个", "先聊别的"),
+            model.actions.map { it.label },
+        )
     }
 
     @Test
@@ -205,7 +208,7 @@ class StrangeDoorHomeEventUiModelTest {
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "动脑试试"),
+            listOf("再找一个", "动脑试试", "先聊别的"),
             model.actions.map { it.label },
         )
     }

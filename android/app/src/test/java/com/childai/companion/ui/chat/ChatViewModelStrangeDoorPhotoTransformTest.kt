@@ -128,7 +128,7 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
     }
 
     @Test
-    fun saveToShowcaseButtonOnlyRecordsLocalIntentInD3() {
+    fun saveToShowcaseButtonDoesNotRecordIntentWhenShowcaseCandidateIsMissing() {
         val viewModel = viewModel(
             attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
                 response = attachmentResponse(
@@ -143,7 +143,7 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
         viewModel.requestStrangeDoorShowcaseSaveIntent()
 
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
-        assertTrue(snapshot.showcaseSaveIntentRequested)
+        assertFalse(snapshot.showcaseSaveIntentRequested)
         assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
         assertNull(viewModel.uiState.value.xiaozhantaiSavedItemIdForNavigation)
     }

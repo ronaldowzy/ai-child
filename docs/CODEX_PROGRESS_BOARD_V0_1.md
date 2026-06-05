@@ -1,4 +1,4 @@
-# Codex 进度看板 v0.8
+# Codex 进度看板 v0.9
 
 用途：手动跟踪当前版本开发进度。每次执行会话完成任务并推送到远程主分支后更新。
 
@@ -10,7 +10,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：奇怪小门 Demo：D2 首页事件 UI 已落地，下一步启动 D3 拍照变身路径。
+当前阶段：奇怪小门 Demo：D3 拍照变身路径已落地，下一步启动 D4 怪问题路径。
 
 下一阶段主方向：
 儿童端吸引力试玩原型：奇怪小门 Demo。
@@ -32,7 +32,7 @@
 6. 变身反馈先用确定性模板 + 少量映射，不先做复杂模型生成。
 7. 不新增复杂后端成长系统，不新增多关卡持久化。
 8. 小展台只做结果承接，不做主玩法。
-9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI。
+9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈。
 10. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
 
 当前事实源：
@@ -81,9 +81,9 @@ docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
 | D0 | 开发计划评审 | done | `1681737` | 已明确 Android 本地状态为主、图片复用 attachment、反馈用确定性模板、素材未确认前不做正式 UI |
 | D1 | 本地状态与合同 | done | `3cb2013` | 已新增 StrangeDoorDemoState、StrangeDoorState、door reducer、PhotoTransform mapper、Riddle evaluator、资源合同和禁止词测试 |
 | S1 | 素材整理与接入准备 | done | `3e7755f` | 10 个透明 WebP 素材已落位 drawable-nodpi，manifest 和预览图已生成，允许 D2 正式 UI 编码 |
-| D2 | Android 首页事件 UI | done | 本提交 | 已接入首页事件 UI：普通 opening 延后，首屏显示 closed 小门、圆锁、地面阴影、小白狐和两个本地入口 |
-| D3 | 拍照变身路径 | todo | 待 D2 合入 | 复用现有 attachment 链路，image_purpose=share，不新增后端 endpoint |
-| D4 | 怪问题路径 | todo | 待 D2/D3 状态接入 | 首版以语音回答为主，可在 DevSettings 保留文字调试入口 |
+| D2 | Android 首页事件 UI | done | `a3764a6` | 已接入首页事件 UI：普通 opening 延后，首屏显示 closed 小门、圆锁、地面阴影、小白狐和两个本地入口 |
+| D3 | 拍照变身路径 | done | 本提交 | 已复用现有 attachment 链路和 image_purpose=share，将 recognizedContent 接入 mapper，展示变身反馈并推进本地门状态 |
+| D4 | 怪问题路径 | todo | 待 D3 合入 | 首版以语音回答为主，可在 DevSettings 保留文字调试入口 |
 | D5 | 小展台承接 | todo | 待 D3 结果结构稳定 | 只复用现有小展台保存和 showcase_item_saved 本地 GrowthEvent，不新增成长系统 |
 | Q1 | 真机试玩验收 | todo | 待 D2-D5 合入 | Redmi K60 / Honor Pad 5 验证第一眼事件感和“再找一个”动机 |
 

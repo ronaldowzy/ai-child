@@ -31,7 +31,7 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
-    fun photoPromptUsesApprovedCopyWithoutStartingRealPhotoFlow() {
+    fun photoPromptUsesApprovedCopyAndEnabledPhotoEntry() {
         val model = StrangeDoorDemoSnapshot(
             demoState = StrangeDoorDemoState.PhotoPrompt,
         ).toHomeEventUiModel()
@@ -49,7 +49,69 @@ class StrangeDoorHomeEventUiModelTest {
             listOf("拍给小白狐看", "先换个办法"),
             model.actions.map { it.label },
         )
-        assertFalse(model.actions.first().enabled)
+        assertTrue(model.actions.first().enabled)
+        assertEquals(StrangeDoorHomeEventActionId.OpenPhotoCapture, model.actions.first().id)
+    }
+
+    @Test
+    fun photoResultShowsTransformFeedbackAndD3Actions() {
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个蓝色瓶盖",
+                confidence = 0.92,
+            ),
+        )
+        val snapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = StrangeDoorDemoSnapshot(),
+            transform = transform,
+            photoMessageId = "child-photo-1",
+        )
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
+        assertEquals(StrangeDoorAssetKey.DoorOpen, model.doorAssetKey)
+        assertEquals(
+            listOf(
+                "我看见了：蓝色瓶盖",
+                "在小白狐的世界里",
+                "它变成了：蓝盖盖转轮",
+                "小白狐把它轻轻一转",
+                "门上的圆锁咔哒一下松开了",
+            ),
+            model.bubbleLines,
+        )
+        assertEquals(
+            listOf("再找一个", "放进小展台", "动脑试试"),
+            model.actions.map { it.label },
+        )
+        assertTrue(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
+    }
+
+    @Test
+    fun blockedPhotoResultKeepsSaveActionDisabled() {
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "privacy_sensitive",
+                recognizedText = "图片里有学校地址",
+                confidence = 0.92,
+            ),
+        )
+        val snapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = StrangeDoorDemoSnapshot(),
+            transform = transform,
+            photoMessageId = "child-photo-1",
+        )
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(
+            listOf(
+                "这张图不太适合变成开门道具",
+                "我们换一个小东西试试",
+            ),
+            model.bubbleLines,
+        )
+        assertFalse(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
     }
 
     @Test

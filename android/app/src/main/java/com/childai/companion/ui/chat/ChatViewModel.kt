@@ -28,10 +28,13 @@ import com.childai.companion.data.showcase.xiaozhantaiNormalizeName
 import com.childai.companion.data.growth.showcaseItemRecalledGrowthSummary
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
+import com.childai.companion.data.attachment.RecognizedContent
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDoorStateReducer
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
 import com.childai.companion.voice.AudioSegment
 import com.childai.companion.voice.AudioSegmentQueueCallbacks
 import com.childai.companion.voice.AudioSegmentQueuePlayer
@@ -234,6 +237,24 @@ class ChatViewModel(
         )
     }
 
+    fun requestAnotherStrangeDoorPhoto() {
+        updateStrangeDoorDemoState(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+            method = StrangeDoorDemoMethod.Photo,
+        )
+    }
+
+    fun requestStrangeDoorShowcaseSaveIntent() {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
+        val transform = snapshot.lastPhotoTransform ?: return
+        if (!transform.canSaveToShowcase || snapshot.showcaseSaveIntentRequested) return
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = snapshot.copy(showcaseSaveIntentRequested = true),
+            )
+        }
+    }
+
     fun exitStrangeDoorDemoAndRequestOpening() {
         if (_uiState.value.strangeDoorDemo == null) return
         _uiState.update { state ->
@@ -258,6 +279,7 @@ class ChatViewModel(
                 strangeDoorDemo = snapshot.copy(
                     demoState = demoState,
                     lastMethod = method,
+                    showcaseSaveIntentRequested = false,
                 ),
                 quickActions = emptyList(),
                 childTurnPhaseHint = null,
@@ -666,11 +688,23 @@ class ChatViewModel(
             ),
         )
         pendingUploadPayloads[childPhotoMessageId] = payload to imagePurpose
+        val isStrangeDoorPhoto = _uiState.value.strangeDoorDemo != null &&
+            imagePurpose == IMAGE_PURPOSE_SHARE
         _uiState.update {
             it.copy(
                 isSending = true,
                 childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
                 quickActions = emptyList(),
+                strangeDoorDemo = if (isStrangeDoorPhoto) {
+                    it.strangeDoorDemo?.copy(
+                        demoState = StrangeDoorDemoState.PhotoUploading,
+                        lastMethod = StrangeDoorDemoMethod.Photo,
+                        lastPhotoMessageId = childPhotoMessageId,
+                        showcaseSaveIntentRequested = false,
+                    )
+                } else {
+                    it.strangeDoorDemo
+                },
                 imagePreviewCards = it.imagePreviewCards + (
                     childPhotoMessageId to LocalImagePreviewCardUiState.fromPayload(
                         messageId = childPhotoMessageId,
@@ -703,6 +737,18 @@ class ChatViewModel(
             }.onSuccess { attachmentResponse ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_done status=ok")
                 pendingUploadPayloads.remove(childPhotoMessageId)
+                if (handleStrangeDoorAttachmentResponseIfActive(
+                        attachmentResponse = attachmentResponse,
+                        photoMessageId = childPhotoMessageId,
+                    )
+                ) {
+                    updateImagePreviewStatus(
+                        messageId = childPhotoMessageId,
+                        status = LocalImagePreviewStatus.Sent,
+                        canSaveToXiaozhantai = false,
+                    )
+                    return@onSuccess
+                }
                 val defaultItemName = suggestedXiaozhantaiItemName(
                     attachmentResponse.recognizedContent.text,
                 )
@@ -746,6 +792,14 @@ class ChatViewModel(
                             motion = FoxMotion.NetworkError,
                             statusText = "这张图还没看到",
                         ),
+                        strangeDoorDemo = if (isStrangeDoorPhoto) {
+                            it.strangeDoorDemo?.copy(
+                                demoState = StrangeDoorDemoState.PhotoPrompt,
+                                showcaseSaveIntentRequested = false,
+                            )
+                        } else {
+                            it.strangeDoorDemo
+                        },
                     )
                 }
             }
@@ -755,11 +809,21 @@ class ChatViewModel(
     fun retryPhotoUpload(messageId: String) {
         val (payload, imagePurpose) = pendingUploadPayloads[messageId] ?: return
         if (_uiState.value.isSending) return
+        val isStrangeDoorPhoto = _uiState.value.strangeDoorDemo?.lastPhotoMessageId == messageId &&
+            imagePurpose == IMAGE_PURPOSE_SHARE
 
         _uiState.update { state ->
             state.copy(
                 isSending = true,
                 childTurnPhaseHint = ChildTurnUiPhase.ImageProcessing,
+                strangeDoorDemo = if (isStrangeDoorPhoto) {
+                    state.strangeDoorDemo?.copy(
+                        demoState = StrangeDoorDemoState.PhotoUploading,
+                        showcaseSaveIntentRequested = false,
+                    )
+                } else {
+                    state.strangeDoorDemo
+                },
                 imagePreviewCards = state.imagePreviewCards + (
                     messageId to (state.imagePreviewCards[messageId]?.copy(
                         status = LocalImagePreviewStatus.Uploading,
@@ -784,6 +848,18 @@ class ChatViewModel(
                 )
             }.onSuccess { attachmentResponse ->
                 pendingUploadPayloads.remove(messageId)
+                if (handleStrangeDoorAttachmentResponseIfActive(
+                        attachmentResponse = attachmentResponse,
+                        photoMessageId = messageId,
+                    )
+                ) {
+                    updateImagePreviewStatus(
+                        messageId = messageId,
+                        status = LocalImagePreviewStatus.Sent,
+                        canSaveToXiaozhantai = false,
+                    )
+                    return@onSuccess
+                }
                 val defaultItemName = suggestedXiaozhantaiItemName(
                     attachmentResponse.recognizedContent.text,
                 )
@@ -821,6 +897,14 @@ class ChatViewModel(
                                 motion = FoxMotion.NetworkError,
                                 statusText = "这张图还没看到",
                             ),
+                            strangeDoorDemo = if (isStrangeDoorPhoto) {
+                                state.strangeDoorDemo?.copy(
+                                    demoState = StrangeDoorDemoState.PhotoPrompt,
+                                    showcaseSaveIntentRequested = false,
+                                )
+                            } else {
+                                state.strangeDoorDemo
+                            },
                         )
                     } else state
                 }
@@ -1017,6 +1101,10 @@ class ChatViewModel(
             it.copy(
                 isSending = false,
                 childTurnPhaseHint = ChildTurnUiPhase.ServiceError,
+                strangeDoorDemo = it.strangeDoorDemo?.copy(
+                    demoState = StrangeDoorDemoState.PhotoPrompt,
+                    showcaseSaveIntentRequested = false,
+                ),
                 agent = FoxAgentUiState(
                     mood = FoxMood.NetworkError,
                     motion = FoxMotion.NetworkError,
@@ -1024,6 +1112,41 @@ class ChatViewModel(
                 ),
             )
         }
+    }
+
+    private fun handleStrangeDoorAttachmentResponseIfActive(
+        attachmentResponse: AttachmentCreateResponse,
+        photoMessageId: String,
+    ): Boolean {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return false
+        if (attachmentResponse.recognizedContent.imagePurpose != IMAGE_PURPOSE_SHARE) {
+            return false
+        }
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            attachmentResponse.recognizedContent.toStrangeDoorPhotoRecognition(),
+        )
+        val nextSnapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
+            snapshot = snapshot,
+            transform = transform,
+            photoMessageId = photoMessageId,
+        )
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = nextSnapshot,
+                isSending = false,
+                childTurnPhaseHint = null,
+                quickActions = emptyList(),
+                pendingImageContext = null,
+                xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
+                    ?.takeUnless { it == photoMessageId },
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        return true
     }
 
     private suspend fun handleAttachmentResponse(
@@ -2145,6 +2268,14 @@ private fun AttachmentCreateResponse.toPendingImageContext(): PendingImageContex
         summary = summary,
         imagePurpose = recognizedContent.imagePurpose,
         recognizedType = recognizedContent.type,
+    )
+}
+
+private fun RecognizedContent.toStrangeDoorPhotoRecognition(): StrangeDoorPhotoRecognition {
+    return StrangeDoorPhotoRecognition(
+        recognizedType = type,
+        recognizedText = text,
+        confidence = confidence,
     )
 }
 

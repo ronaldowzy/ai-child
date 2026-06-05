@@ -103,4 +103,22 @@ class StrangeDoorPhotoTransformMapperTest {
             )
         }
     }
+
+    @Test
+    fun forbiddenTextSignalsDoNotBecomeDoorTools() {
+        listOf("图片里有一道作业题目", "画面里有学校地址", "图片里有人脸和证件").forEach { text ->
+            val transform = StrangeDoorPhotoTransformMapper.map(
+                StrangeDoorPhotoRecognition(
+                    recognizedType = "image_observation",
+                    recognizedText = text,
+                    confidence = 0.93,
+                ),
+            )
+
+            assertEquals(StrangeDoorShapeHint.Blocked, transform.shapeHint)
+            assertFalse(transform.isUsable)
+            assertFalse(transform.canSaveToShowcase)
+            assertEquals(StrangeDoorDoorAdvanceSignal.None, transform.advanceSignal)
+        }
+    }
 }

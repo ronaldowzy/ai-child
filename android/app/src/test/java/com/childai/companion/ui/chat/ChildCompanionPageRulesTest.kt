@@ -143,4 +143,10 @@ class ChildCompanionPageRulesTest {
             ),
         )
     }
+
+    @Test
+    fun strangeDoorPhotoEntryUsesExistingShareImagePurpose() {
+        assertEquals(IMAGE_PURPOSE_SHARE, strangeDoorPhotoCaptureImagePurpose())
+        assertFalse(strangeDoorPhotoCaptureImagePurpose().contains("strange_door"))
+    }
 }

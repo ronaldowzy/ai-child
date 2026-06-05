@@ -48,6 +48,19 @@ object StrangeDoorPhotoTransformMapper {
         "unsafe_unknown",
         "homework_problem",
     )
+    private val blockedTextKeywords = listOf(
+        "人脸",
+        "学校",
+        "地址",
+        "证件",
+        "隐私",
+        "医疗",
+        "暴力",
+        "惊吓",
+        "作业",
+        "题目",
+        "学习",
+    )
     private val unsaveableTypes = blockedTypes + setOf(
         "unclear",
         "low_confidence",
@@ -71,7 +84,8 @@ object StrangeDoorPhotoTransformMapper {
 
     fun map(recognition: StrangeDoorPhotoRecognition): StrangeDoorPhotoTransform {
         val type = recognition.recognizedType.trim().lowercase()
-        if (type in blockedTypes) {
+        val text = recognition.recognizedText.orEmpty()
+        if (type in blockedTypes || blockedTextKeywords.any(text::contains)) {
             return StrangeDoorPhotoTransform(
                 objectName = DEFAULT_OBJECT_NAME,
                 shapeHint = StrangeDoorShapeHint.Blocked,
@@ -84,7 +98,6 @@ object StrangeDoorPhotoTransformMapper {
             )
         }
 
-        val text = recognition.recognizedText.orEmpty()
         val objectName = extractObjectName(text)
         val shapeHint = shapeHintFor(text)
         val canSaveToShowcase = type !in unsaveableTypes && recognition.confidence >= 0.5

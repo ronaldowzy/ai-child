@@ -198,6 +198,8 @@ fun ChildChatScreen(
         onStrangeDoorChoosePhoto = viewModel::chooseStrangeDoorPhotoMethod,
         onStrangeDoorChooseRiddle = viewModel::chooseStrangeDoorRiddleMethod,
         onStrangeDoorSwitchMethod = viewModel::returnToStrangeDoorMethodChoice,
+        onStrangeDoorFindAnother = viewModel::requestAnotherStrangeDoorPhoto,
+        onStrangeDoorSaveIntent = viewModel::requestStrangeDoorShowcaseSaveIntent,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -227,6 +229,8 @@ private fun ChildChatScreenContent(
     onStrangeDoorChoosePhoto: () -> Unit,
     onStrangeDoorChooseRiddle: () -> Unit,
     onStrangeDoorSwitchMethod: () -> Unit,
+    onStrangeDoorFindAnother: () -> Unit,
+    onStrangeDoorSaveIntent: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -470,7 +474,12 @@ private fun ChildChatScreenContent(
                     onOpenXiaozhantai = onOpenXiaozhantai,
                     onChoosePhoto = onStrangeDoorChoosePhoto,
                     onChooseRiddle = onStrangeDoorChooseRiddle,
+                    onOpenPhotoCapture = {
+                        pendingImageSourcePurpose = strangeDoorPhotoCaptureImagePurpose()
+                    },
                     onSwitchMethod = onStrangeDoorSwitchMethod,
+                    onFindAnother = onStrangeDoorFindAnother,
+                    onSaveIntent = onStrangeDoorSaveIntent,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else if (isLandscape) {
@@ -629,7 +638,10 @@ private fun StrangeDoorHomeEventScreen(
     onOpenXiaozhantai: () -> Unit,
     onChoosePhoto: () -> Unit,
     onChooseRiddle: () -> Unit,
+    onOpenPhotoCapture: () -> Unit,
     onSwitchMethod: () -> Unit,
+    onFindAnother: () -> Unit,
+    onSaveIntent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val model = remember(snapshot) {
@@ -641,7 +653,9 @@ private fun StrangeDoorHomeEventScreen(
             StrangeDoorHomeEventActionId.ChoosePhoto -> onChoosePhoto()
             StrangeDoorHomeEventActionId.ChooseRiddle -> onChooseRiddle()
             StrangeDoorHomeEventActionId.SwitchMethod -> onSwitchMethod()
-            StrangeDoorHomeEventActionId.OpenPhotoCapture -> Unit
+            StrangeDoorHomeEventActionId.OpenPhotoCapture -> onOpenPhotoCapture()
+            StrangeDoorHomeEventActionId.FindAnother -> onFindAnother()
+            StrangeDoorHomeEventActionId.SaveToShowcase -> onSaveIntent()
         }
     }
 
@@ -2197,6 +2211,8 @@ internal fun strangeDoorShouldShowNormalInputBar(uiState: ChatUiState): Boolean 
     return uiState.strangeDoorDemo == null
 }
 
+internal fun strangeDoorPhotoCaptureImagePurpose(): String = IMAGE_PURPOSE_SHARE
+
 private fun normalizeImageQuickAction(action: QuickActionUi): QuickActionUi {
     return when (action.id) {
         "give_name", "image_naming" -> action.copy(id = "companion_name", label = "起个名字")
@@ -2722,6 +2738,8 @@ private fun ChildChatScreenPortraitPreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorFindAnother = {},
+            onStrangeDoorSaveIntent = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2761,6 +2779,8 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorFindAnother = {},
+            onStrangeDoorSaveIntent = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -2809,6 +2829,8 @@ private fun ChildChatScreenLandscapePreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorFindAnother = {},
+            onStrangeDoorSaveIntent = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

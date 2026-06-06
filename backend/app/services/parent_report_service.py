@@ -38,6 +38,7 @@ from app.services.parent_report_language_v4 import (
     companion_deterministic_summary,
     deterministic_narrative_v4,
     parent_report_system_prompt_v4,
+    tonight_parent_bridge_v4,
 )
 from app.services.relationship_memory import (
     memory_relationship_next_hook,
@@ -305,22 +306,6 @@ class ParentReportService:
         has_unfinished = any(
             self._memory_relationship_type(memory) == "unfinished_thread"
             for memory in memories
-        )
-
-        child_texts = [
-            message.normalized_text or ""
-            for message in conversation_messages
-            if message.actor == "child"
-        ]
-        has_topic_change = any(
-            self._contains_any(
-                text,
-                ("换个话题", "聊点别的", "别聊这个", "不说了", "算了"),
-            )
-            for text in child_texts
-        )
-        has_sports_fatigue = any(
-            self._has_sports_fatigue_expression(text) for text in child_texts
         )
 
         narrative = deterministic_narrative_v4(

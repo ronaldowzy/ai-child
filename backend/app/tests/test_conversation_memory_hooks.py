@@ -909,7 +909,6 @@ def test_parent_report_support_style_offer_two_choices_tailors_actions() -> None
 
 
 def test_parent_report_support_style_ask_fewer_questions_tailors_actions() -> None:
-    child_id = "child_report_ask_fewer"
     repository = InMemoryMemoryRepository()
     memory_service = MemoryService(
         repository=repository,

@@ -292,7 +292,6 @@ def test_report_json_does_not_expose_raw_transcript() -> None:
 
 def test_prompt_json_examples_use_straight_quotes() -> None:
     """System prompt JSON examples must use straight ASCII double quotes, not curly quotes."""
-    import re
     from app.services.parent_report_language_v4 import parent_report_system_prompt_v4
 
     prompt = parent_report_system_prompt_v4()

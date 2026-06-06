@@ -146,7 +146,7 @@ class SqlAlchemyCompanionObjectRepository:
         record.updated_at = companion.updated_at
 
     def _to_domain(self, record: CompanionObjectRecord) -> CompanionObject:
-        from app.domain.companion_object import VisualKind, resolve_visual_kind
+        from app.domain.companion_object import resolve_visual_kind
 
         visual_kind = record.visual_kind
         if not visual_kind:

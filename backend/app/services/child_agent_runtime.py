@@ -14,23 +14,22 @@ from app.domain.enums import RiskLevel
 from app.domain.model_types import ModelMessage, ModelRequest, ModelTaskType
 from app.domain.prompt import PromptVersion
 from app.domain.scene import SceneAction, SceneId
-
-_FAST_PATH_BLOCKED_INTENTS = frozenset({
-    "learning_help",
-    "homework_problem",
-    "safety_risk",
-    "privacy_question",
-})
 from app.services.age_band_policy import (
     AgeBandReplyPolicy,
     derive_age_band_reply_policy,
 )
 from app.services.light_co_creation_service import (
-    CoCreationType,
     LightCoCreationService,
     get_light_co_creation_service,
 )
-from app.services.modality_manager import _imagination_phrase, _strip_image_detail_labels, _looks_private_for_child_detail, _first_child_safe_clause, _strip_image_lead_in, _looks_too_vague_for_child_detail
+from app.services.modality_manager import (
+    _first_child_safe_clause,
+    _imagination_phrase,
+    _looks_private_for_child_detail,
+    _looks_too_vague_for_child_detail,
+    _strip_image_detail_labels,
+    _strip_image_lead_in,
+)
 from app.services.model_registry import ModelRegistry, get_model_registry
 from app.services.prompt_manager import PromptManager, get_prompt_manager
 from app.services.safety_engine import SafetyEngine, get_safety_engine
@@ -38,6 +37,13 @@ from app.services.turn_guidance_builder import (
     TurnGuidanceBuilder,
     TurnGuidanceContext,
 )
+
+_FAST_PATH_BLOCKED_INTENTS = frozenset({
+    "learning_help",
+    "homework_problem",
+    "safety_risk",
+    "privacy_question",
+})
 
 logger = logging.getLogger("app.child_agent_runtime")
 

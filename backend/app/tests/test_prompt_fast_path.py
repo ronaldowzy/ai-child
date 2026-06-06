@@ -2,11 +2,9 @@ from datetime import datetime, timezone
 
 from app.domain.agent_runtime import (
     AgentRuntimeRequest,
-    AgentRuntimeSource,
 )
 from app.domain.enums import IntentType, RiskLevel
 from app.domain.model_types import (
-    ModelMessage,
     ModelRequest,
     ModelResponse,
     ModelTaskType,
@@ -19,7 +17,6 @@ from app.domain.scene import (
 )
 from app.domain.time import TimeContext, TimePeriod
 from app.services.child_agent_runtime import ChildAgentRuntime
-from app.services.model_registry import ModelRegistry
 
 
 class CapturingModelRegistry:

@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.domain.companion_object import (
-    LIGHT_LOCATIONS,
     CompanionObjectCreateRequest,
     CompanionObjectSource,
     CompanionObjectStatus,
@@ -152,7 +151,6 @@ class TestCreate:
         svc = _make_service()
         companion = svc.create(_make_request())
         # Directly save a companion with long summary to test truncation
-        from app.domain.companion_object import CompanionObject
 
         long_summary = "长" * 300
         raw = companion.model_copy(

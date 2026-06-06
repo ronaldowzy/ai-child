@@ -16,11 +16,9 @@ Tests cover:
 import pytest
 
 from app.services.light_co_creation_service import (
-    CoCreationDecision,
     CoCreationState,
     CoCreationType,
     LightCoCreationService,
-    SessionCoCreationState,
 )
 
 

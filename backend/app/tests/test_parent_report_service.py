@@ -92,11 +92,6 @@ class SuccessfulParentReportModelRegistry:
             for item in memories
             if item.get("type") == MemoryType.EXPRESSION_PATTERN.value
         ]
-        emotion = [
-            item["content"]
-            for item in memories
-            if item.get("type") == MemoryType.EMOTION_OBSERVATION.value
-        ]
         safety = [
             item["content"]
             for item in memories

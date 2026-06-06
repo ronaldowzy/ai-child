@@ -144,7 +144,7 @@ class ChatViewModelStreamTest {
 
         assertEquals(1, ttsController.requests.size)
         assertEquals(
-            ChildTurnUiPhase.Ready,
+            ChildTurnUiPhase.WaitingChild,
             viewModel.uiState.value.interactionPresentation.phase,
         )
         assertEquals("/media/tts/segment.wav", ttsController.requests.first().audioUrl)

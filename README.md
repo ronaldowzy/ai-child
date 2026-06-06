@@ -1,5 +1,9 @@
 # 儿童 AI 成长陪伴 App：ai-child
 
+`ai-child` is an open-source reference implementation for a child-safe AI
+companion app: Android client, FastAPI backend, local-first ASR, backend-only
+model/TTS/vision provider calls, parent controls, and safety guardrails.
+
 `ai-child` 是面向 5-10 岁儿童的 AI 成长陪伴 App，首发面向中国大陆家庭内测，优先 Android。当前角色形象为“小白狐”。
 
 产品目标不是做开放式儿童聊天机器人，而是提供一个由家长配置和治理的、安全、可控、可逐步扩展的儿童 AI 陪伴入口。
@@ -75,6 +79,17 @@
 
 ## 3. 文档入口
 
+公开仓库优先阅读：
+
+```text
+docs/SAFETY_AND_PRIVACY.md
+docs/ARCHITECTURE.md
+docs/ROADMAP.md
+docs/PUBLIC_RELEASE_CHECKLIST.md
+CONTRIBUTING.md
+SECURITY.md
+```
+
 新会话或代码执行会话优先阅读：
 
 ```text
@@ -132,6 +147,9 @@ docs/提示词与文案归属规则_V0_1.md
 ```
 
 完整规则以 `AGENTS.md`、`docs/PRODUCT_DECISIONS_V0_1.md` 和 `docs/下一阶段产品进化计划_V0_1.md` 为准。
+
+公开仓库不应包含真实儿童身份信息、真实家庭 Prompt、原始音频/照片、私有截图、API key、`.env`、本地数据库、模型权重或生成的 TTS cache。公开前检查见
+`docs/PUBLIC_RELEASE_CHECKLIST.md`。
 
 ---
 

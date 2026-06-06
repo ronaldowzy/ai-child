@@ -44,7 +44,7 @@ Create or extend a synthetic scenario harness/test that simulates:
 
 ```text
 1. Parent registers/has a child profile:
-   - nickname: 航航
+   - nickname: 小禾
    - age: 7
    - gender: boy
    - interests: 跑步比赛, 画画

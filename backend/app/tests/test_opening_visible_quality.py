@@ -89,7 +89,7 @@ def _make_memory(
 def _make_parent_policy(**overrides: Any) -> ParentPolicy:
     base: dict[str, Any] = {
         "child_id": CHILD_ID,
-        "child_nickname": "航航",
+        "child_nickname": "小禾",
         "child_display_name": None,
         "parent_message_raw": None,
         "communication_preferences": {
@@ -159,7 +159,7 @@ def test_profile_only_opening_uses_nickname_and_interest_no_labels() -> None:
 
     text = _build_opening(memory_service=memory_service)
 
-    assert "航航" in text, f"Should use nickname: {text}"
+    assert "小禾" in text, f"Should use nickname: {text}"
     assert "画画" in text, f"Should mention interest: {text}"
     for label in FORBIDDEN_LABELS:
         assert label not in text, f"Should not contain label '{label}': {text}"
@@ -359,7 +359,7 @@ def test_show_and_tell_memory_opening() -> None:
     text = _build_opening(memory_service=memory_service)
 
     assert "小狐狸" in text or "画" in text, f"Should reference show-and-tell: {text}"
-    assert "航航" in text, f"Should use nickname: {text}"
+    assert "小禾" in text, f"Should use nickname: {text}"
 
 
 def test_generic_show_and_tell_hook_falls_back_to_interest_topic() -> None:
@@ -396,7 +396,7 @@ def test_default_greeting_mode() -> None:
 
     text = _build_opening(opening_policy=opening_policy, memory_service=memory_service)
 
-    assert "航航" in text, f"Should use nickname: {text}"
+    assert "小禾" in text, f"Should use nickname: {text}"
     assert any(
         phrase in text
         for phrase in ("慢慢说", "我在这里", "小白狐在这里", "回来啦", "想聊什么都可以")

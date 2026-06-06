@@ -21,11 +21,9 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.domain.companion_object import (
-    EXCITING_TYPES,
     FORBIDDEN_SUMMARY_MARKERS,
     LIGHT_LOCATIONS,
     SAFE_SUMMARY_MAX_LENGTH,
-    VisualKind,
     CompanionObject,
     CompanionObjectCreateRequest,
     CompanionObjectSource,

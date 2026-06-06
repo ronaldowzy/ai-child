@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 
 from app.domain.model_types import ModelMessage
 from app.services.light_co_creation_service import (
-    CoCreationType,
     get_light_co_creation_service,
 )
 from app.services.topic_seed_service import TopicSeedService

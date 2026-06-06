@@ -4,7 +4,6 @@ from concurrent.futures import (
     Future,
     ThreadPoolExecutor,
     TimeoutError as FutureTimeoutError,
-    as_completed,
 )
 from contextvars import copy_context
 from dataclasses import dataclass
@@ -212,7 +211,6 @@ class ConversationStreamService:
             yield builder.event("sentence_ready", self._sentence_ready_payload(segment))
 
         # 阶段2: 并行生成 TTS，首段完成立即下发 audio_ready（不等后续段）
-        tts_results: list[_TtsSegmentResult] = []
         if should_generate_tts and segments:
             first_tts_start_ms = self._elapsed_ms(started_at)
             self._trace("tts_batch_start", request, extra={"segment_count": len(segments)})
@@ -483,7 +481,6 @@ class ConversationStreamService:
 
         timeout_ms = self._settings.conversation_stream_tts_soft_timeout_ms
         max_workers = min(len(segments), 4)
-        base_context = copy_context()
         executor = ThreadPoolExecutor(
             max_workers=max_workers,
             thread_name_prefix="stream-tts-parallel",

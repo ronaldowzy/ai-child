@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi.testclient import TestClient
 
@@ -89,7 +89,7 @@ def test_parent_report_today_endpoint_returns_high_risk_report() -> None:
 
     # Use date endpoint with local date to match memory created_at
     report_response = client.get(
-        f"/api/v1/parent/reports/child_parent_report_high_risk_api_test",
+        "/api/v1/parent/reports/child_parent_report_high_risk_api_test",
         params={"date": _today()},
     )
 

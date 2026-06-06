@@ -14,7 +14,6 @@ from app.domain.companion_object import (
 from app.domain.schemas.auth import AuthAccountProfile
 from app.domain.schemas.conversation import CompanionObjectMeta
 from app.services.companion_object_service import (
-    CompanionObjectService,
     get_companion_object_service,
 )
 

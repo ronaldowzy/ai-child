@@ -9,7 +9,7 @@ import time
 
 from app.core.config import Settings, get_settings
 from app.domain.schemas.tts import XiaobaihuTtsRequest
-from app.domain.tts import TtsEmotion, TtsVoiceVersion
+from app.domain.tts import TtsVoiceVersion
 from app.services.tts_service import TtsService, get_tts_service
 
 

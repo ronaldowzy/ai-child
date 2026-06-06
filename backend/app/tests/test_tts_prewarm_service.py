@@ -6,7 +6,7 @@ from app.services.tts_prewarm_service import (
     TtsPrewarmService,
 )
 from app.domain.schemas.tts import XiaobaihuTtsResponse
-from app.domain.tts import TtsEmotion, TtsProviderName, TtsVoiceVersion
+from app.domain.tts import TtsProviderName, TtsVoiceVersion
 
 
 class RecordingTtsService:

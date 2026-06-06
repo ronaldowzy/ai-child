@@ -15,7 +15,6 @@ from app.domain.memory import (
     MemoryType,
 )
 from app.domain.model_types import ModelResponse, ModelTaskType
-from app.domain.parent_report import ParentReportGenerationStatus
 from app.repositories.conversation_persistence_repository import ConversationReportMessage
 from app.repositories.memory_repository import InMemoryMemoryRepository
 from app.services.memory_service import MemoryService
@@ -341,8 +340,6 @@ def test_no_companion_signal_in_model_payload_when_absent():
 
 def test_companion_in_fingerprint_changes_staleness():
     """Verify companion signal affects material fingerprint."""
-    from hashlib import sha256
-    import json as json_mod
 
     companion = _make_companion()
     service_with = _build_service(companion=companion)

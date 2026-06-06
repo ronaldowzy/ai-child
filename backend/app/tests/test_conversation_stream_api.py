@@ -380,9 +380,14 @@ def test_stream_service_emits_audio_ready_for_sentence_tts_segments() -> None:
     assert _event_index(events, "audio_ready") < _event_index(events, "text_final")
     assert events[-1]["type"] == "done"
 
-    sentence_ready_0 = _event_index(events, "sentence_ready", sentence_index=0)
-    assert events[sentence_ready_0 + 1]["type"] == "tts_started"
-    assert events[sentence_ready_0 + 1]["payload"]["sentence_index"] == 0
+    for started_event in tts_started:
+        sentence_index = started_event["payload"]["sentence_index"]
+        assert _event_index(events, "sentence_ready", sentence_index=sentence_index) < (
+            _event_index(events, "tts_started", sentence_index=sentence_index)
+        )
+        assert _event_index(events, "tts_started", sentence_index=sentence_index) < (
+            _event_index(events, "audio_ready", sentence_index=sentence_index)
+        )
 
     final_event = next(event for event in events if event["type"] == "text_final")
     assert final_event["payload"]["text"] == _text_from_deltas(events)
@@ -915,7 +920,7 @@ def test_tts_parallel_timing_log_emitted(caplog) -> None:
         tts_enabled=True,
     )
 
-    events = _events_from_service(
+    _events_from_service(
         service,
         _payload(text="并行日志测试", include_tts=True),
     )

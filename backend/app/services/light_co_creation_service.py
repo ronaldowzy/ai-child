@@ -16,7 +16,7 @@ Key rules:
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 logger = logging.getLogger("app.light_co_creation")

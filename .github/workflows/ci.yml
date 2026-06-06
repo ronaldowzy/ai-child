@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "oss-*"]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend test and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: python -m pip install -e "backend[dev]"
+
+      - name: Run backend tests
+        env:
+          PYTHON_BIN: python
+        run: bash scripts/test_backend.sh
+
+      - name: Run backend lint
+        env:
+          PYTHON_BIN: python
+        run: bash scripts/lint_backend.sh
+
+  android:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Android tests
+        run: bash scripts/android_gradle.sh test

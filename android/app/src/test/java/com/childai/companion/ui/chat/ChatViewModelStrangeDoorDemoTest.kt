@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,6 +39,23 @@ class ChatViewModelStrangeDoorDemoTest {
         assertEquals(1, sender.openingCalls)
         assertEquals("豆豆，回来啦。", viewModel.uiState.value.messages.first().text)
         assertEquals(null, viewModel.uiState.value.strangeDoorDemo)
+    }
+
+    @Test
+    fun exitDemoRestoresOpeningAndPreventsAutomaticReactivationInCurrentLifecycle() {
+        val sender = StrangeDoorDemoSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.exitStrangeDoorDemoAndRequestOpening()
+        viewModel.activateStrangeDoorDemo()
+
+        assertEquals(1, sender.openingCalls)
+        assertNull(viewModel.uiState.value.strangeDoorDemo)
+        assertTrue(strangeDoorShouldShowNormalInputBar(viewModel.uiState.value))
     }
 
     @Test
@@ -79,6 +97,33 @@ class ChatViewModelStrangeDoorDemoTest {
         assertEquals(StrangeDoorDemoState.RiddlePrompt, riddleSnapshot.demoState)
         assertEquals(StrangeDoorDemoMethod.Riddle, riddleSnapshot.lastMethod)
         assertTrue(viewModel.uiState.value.quickActions.isEmpty())
+    }
+
+    @Test
+    fun replayDemoResetsToChoosingMethodAndClosedDoor() {
+        val viewModel = ChatViewModel(
+            conversationSender = StrangeDoorDemoSender(),
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorRiddleMethod()
+        viewModel.answerStrangeDoorRiddle("水")
+        val completed = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.Completed, completed.demoState)
+        assertEquals(StrangeDoorState.Open, completed.doorState)
+        assertEquals(1, completed.attemptsCount)
+
+        viewModel.replayStrangeDoorDemo()
+
+        val replayed = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.ChoosingMethod, replayed.demoState)
+        assertEquals(StrangeDoorState.Closed, replayed.doorState)
+        assertEquals(0, replayed.attemptsCount)
+        assertNull(replayed.lastPhotoTransform)
+        assertNull(replayed.lastRiddleEvaluation)
+        assertNull(replayed.lastPhotoMessageId)
+        assertNull(replayed.showcaseSavedName)
     }
 
     @Test

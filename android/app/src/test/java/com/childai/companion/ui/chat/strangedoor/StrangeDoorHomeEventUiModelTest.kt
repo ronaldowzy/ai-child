@@ -95,7 +95,7 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
-    fun photoResultAfterAlmostOpenUsesOpenDoorFeedback() {
+    fun photoResultAfterAlmostOpenUsesS3CompletedCopyAndActions() {
         val transform = StrangeDoorPhotoTransformMapper.map(
             StrangeDoorPhotoRecognition(
                 recognizedType = "image_observation",
@@ -113,22 +113,29 @@ class StrangeDoorHomeEventUiModelTest {
         assertEquals(StrangeDoorAssetKey.DoorOpen, model.doorAssetKey)
         assertEquals(
             listOf(
-                "我看见了：蓝色瓶盖",
-                "在小白狐的世界里",
-                "它变成了：蓝盖盖转轮",
-                "小白狐把它轻轻一转",
-                "小门终于咔哒一下打开了",
+                "开啦",
+                "你真的帮到我了",
+                "",
                 "门后面有一点暖暖的风",
-                "小白狐轻轻走过去，看见了一点光",
+                "我们先看到这里",
             ),
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "动脑试试", "放进小展台"),
+            listOf("再玩一次", "再找一个", "去小展台看看", "先聊别的"),
             model.actions.map { it.label },
         )
-        assertTrue(model.showPhotoResultCard)
-        assertTrue(model.showDoorSuccessGlow)
+        assertEquals(
+            listOf(
+                StrangeDoorHomeEventActionId.ReplayDemo,
+                StrangeDoorHomeEventActionId.FindAnother,
+                StrangeDoorHomeEventActionId.OpenShowcase,
+                StrangeDoorHomeEventActionId.ExitDemo,
+            ),
+            model.actions.map { it.id },
+        )
+        assertFalse(model.showPhotoResultCard)
+        assertFalse(model.showDoorSuccessGlow)
     }
 
     @Test
@@ -237,7 +244,7 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
-    fun correctRiddleResultShowsFeedbackAndOpenDoor() {
+    fun correctRiddleResultShowsS3CompletedCopyAndOpenDoor() {
         val snapshot = StrangeDoorDoorStateReducer.applyRiddleResult(
             snapshot = StrangeDoorDemoSnapshot(
                 demoState = StrangeDoorDemoState.RiddlePrompt,
@@ -246,20 +253,20 @@ class StrangeDoorHomeEventUiModelTest {
         )
         val model = snapshot.toHomeEventUiModel()
 
-        assertEquals(StrangeDoorHomeEventPanel.Riddle, model.panel)
+        assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
         assertEquals(StrangeDoorAssetKey.DoorOpen, model.doorAssetKey)
         assertEquals(
             listOf(
-                "对，是水",
+                "开啦",
+                "你真的帮到我了",
                 "",
-                "小门被你说得愣住了",
-                "它低头想了三秒",
-                "然后咔哒一下打开了",
+                "门后面有一点暖暖的风",
+                "我们先看到这里",
             ),
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "先聊别的"),
+            listOf("再玩一次", "再找一个", "去小展台看看", "先聊别的"),
             model.actions.map { it.label },
         )
     }
@@ -280,8 +287,16 @@ class StrangeDoorHomeEventUiModelTest {
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "动脑试试", "先聊别的"),
+            listOf("去小展台看看", "再找一个", "先聊别的"),
             model.actions.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                StrangeDoorHomeEventActionId.OpenShowcase,
+                StrangeDoorHomeEventActionId.FindAnother,
+                StrangeDoorHomeEventActionId.ExitDemo,
+            ),
+            model.actions.map { it.id },
         )
     }
 

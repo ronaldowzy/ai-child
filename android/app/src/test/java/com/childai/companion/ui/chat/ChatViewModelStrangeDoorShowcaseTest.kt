@@ -182,10 +182,32 @@ class ChatViewModelStrangeDoorShowcaseTest {
             model.bubbleLines,
         )
         assertEquals(
-            listOf("再找一个", "动脑试试", "先聊别的"),
+            listOf("去小展台看看", "再找一个", "先聊别的"),
             model.actions.map { it.label },
         )
         assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
+    }
+
+    @Test
+    fun replayAfterShowcaseSaveDoesNotDeleteSavedShowcaseContent() {
+        val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
+        val viewModel = saveablePhotoViewModel(showcaseRepository = showcaseRepository)
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        viewModel.requestStrangeDoorShowcaseSaveIntent()
+        viewModel.confirmXiaozhantaiSave()
+        viewModel.updateXiaozhantaiSaveName("蓝盖盖转轮")
+        viewModel.confirmXiaozhantaiSave()
+        val savedRequest = requireNotNull(showcaseRepository.savedRequest)
+
+        viewModel.replayStrangeDoorDemo()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.ChoosingMethod, snapshot.demoState)
+        assertEquals(savedRequest, showcaseRepository.savedRequest)
+        assertEquals(0, showcaseRepository.softDeleteCalls)
     }
 
     private fun saveablePhotoViewModel(
@@ -291,6 +313,7 @@ private class ImmediateShowcaseAttachmentRepository(
 
 private class CapturingStrangeDoorShowcaseRepository : XiaozhantaiRepository() {
     var savedRequest: XiaozhantaiSaveRequest? = null
+    var softDeleteCalls = 0
 
     override suspend fun saveCapturedPhoto(request: XiaozhantaiSaveRequest): XiaozhantaiItem {
         savedRequest = request
@@ -303,6 +326,10 @@ private class CapturingStrangeDoorShowcaseRepository : XiaozhantaiRepository() {
             source = request.source,
             isDeleted = false,
         )
+    }
+
+    override suspend fun softDelete(childId: String, itemId: String) {
+        softDeleteCalls += 1
     }
 }
 

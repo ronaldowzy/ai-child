@@ -8,6 +8,8 @@ enum class StrangeDoorHomeEventActionId {
     FindAnother,
     SaveToShowcase,
     RetryRiddle,
+    ReplayDemo,
+    OpenShowcase,
     ExitDemo,
 }
 
@@ -59,11 +61,20 @@ object StrangeDoorHomeEventCopy {
     const val chooseRiddleLabel = "动脑试试"
     const val openPhotoCaptureLabel = "拍给小白狐看"
     const val switchMethodLabel = "先换个办法"
+    const val replayDemoLabel = "再玩一次"
     const val findAnotherLabel = "再找一个"
     const val saveToShowcaseLabel = "放进小展台"
+    const val openShowcaseLabel = "去小展台看看"
     const val exitDemoLabel = "先聊别的"
     const val showcaseSavedSuffix = "，放好啦"
     const val showcaseSavedSecondLine = "以后可以在小展台里看到它"
+    val completedLines = listOf(
+        "开啦",
+        "你真的帮到我了",
+        "",
+        "门后面有一点暖暖的风",
+        "我们先看到这里",
+    )
 
     fun approvedChildFacingCopy(): List<String> {
         return listOf(
@@ -73,19 +84,21 @@ object StrangeDoorHomeEventCopy {
             chooseRiddleLabel,
             openPhotoCaptureLabel,
             switchMethodLabel,
+            replayDemoLabel,
             findAnotherLabel,
             saveToShowcaseLabel,
+            openShowcaseLabel,
             exitDemoLabel,
             showcaseSavedSuffix,
             showcaseSavedSecondLine,
-        ) + choosingBubbleLines + photoPromptLines
+        ) + choosingBubbleLines + photoPromptLines + completedLines
     }
 }
 
 fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
     return when (demoState) {
-        StrangeDoorDemoState.PhotoResult,
-        StrangeDoorDemoState.Completed -> resultUiModelOrChoosingMethod()
+        StrangeDoorDemoState.Completed -> completedUiModel()
+        StrangeDoorDemoState.PhotoResult -> resultUiModelOrChoosingMethod()
         StrangeDoorDemoState.ShowcaseSaved -> showcaseSavedUiModelOrChoosingMethod()
 
         StrangeDoorDemoState.PhotoPrompt,
@@ -163,12 +176,12 @@ private fun StrangeDoorDemoSnapshot.showcaseSavedUiModelOrChoosingMethod(): Stra
         ),
         actions = listOf(
             StrangeDoorHomeEventAction(
-                id = StrangeDoorHomeEventActionId.FindAnother,
-                label = StrangeDoorHomeEventCopy.findAnotherLabel,
+                id = StrangeDoorHomeEventActionId.OpenShowcase,
+                label = StrangeDoorHomeEventCopy.openShowcaseLabel,
             ),
             StrangeDoorHomeEventAction(
-                id = StrangeDoorHomeEventActionId.ChooseRiddle,
-                label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+                id = StrangeDoorHomeEventActionId.FindAnother,
+                label = StrangeDoorHomeEventCopy.findAnotherLabel,
             ),
             StrangeDoorHomeEventAction(
                 id = StrangeDoorHomeEventActionId.ExitDemo,
@@ -176,6 +189,33 @@ private fun StrangeDoorDemoSnapshot.showcaseSavedUiModelOrChoosingMethod(): Stra
             ),
         ),
         doorAssetKey = doorState.toAssetKey(),
+    )
+}
+
+private fun StrangeDoorDemoSnapshot.completedUiModel(): StrangeDoorHomeEventUiModel {
+    return StrangeDoorHomeEventUiModel(
+        title = StrangeDoorHomeEventCopy.title,
+        panel = StrangeDoorHomeEventPanel.ToolCard,
+        bubbleLines = StrangeDoorHomeEventCopy.completedLines,
+        actions = listOf(
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ReplayDemo,
+                label = StrangeDoorHomeEventCopy.replayDemoLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.FindAnother,
+                label = StrangeDoorHomeEventCopy.findAnotherLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.OpenShowcase,
+                label = StrangeDoorHomeEventCopy.openShowcaseLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ExitDemo,
+                label = StrangeDoorHomeEventCopy.exitDemoLabel,
+            ),
+        ),
+        doorAssetKey = StrangeDoorState.Open.toAssetKey(),
     )
 }
 

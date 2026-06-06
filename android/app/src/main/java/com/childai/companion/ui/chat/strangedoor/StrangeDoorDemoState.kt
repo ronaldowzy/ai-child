@@ -115,4 +115,22 @@ object StrangeDoorDoorStateReducer {
     }
 
     fun reset(): StrangeDoorDemoSnapshot = StrangeDoorDemoSnapshot()
+
+    fun replay(): StrangeDoorDemoSnapshot = reset()
+
+    fun requestAnotherPhoto(snapshot: StrangeDoorDemoSnapshot): StrangeDoorDemoSnapshot {
+        if (snapshot.doorState != StrangeDoorState.Open) {
+            return snapshot.copy(
+                demoState = StrangeDoorDemoState.PhotoPrompt,
+                lastMethod = StrangeDoorDemoMethod.Photo,
+                lastRiddleEvaluation = null,
+                showcaseSaveIntentRequested = false,
+                showcaseSavedName = null,
+            )
+        }
+        return reset().copy(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+            lastMethod = StrangeDoorDemoMethod.Photo,
+        )
+    }
 }

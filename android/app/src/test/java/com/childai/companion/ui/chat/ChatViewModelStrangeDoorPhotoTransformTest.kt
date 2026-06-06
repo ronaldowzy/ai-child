@@ -97,6 +97,61 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
     }
 
     @Test
+    fun findAnotherKeepsNonOpenDoorStateAndReturnsToPhotoPrompt() {
+        val viewModel = viewModel(
+            attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
+                response = attachmentResponse(
+                    recognizedType = "image_observation",
+                    recognizedText = "图片里有一个蓝色瓶盖",
+                    confidence = 0.92,
+                ),
+            ),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        assertEquals(StrangeDoorState.Cracked, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.PhotoPrompt, snapshot.demoState)
+        assertEquals(StrangeDoorState.Cracked, snapshot.doorState)
+    }
+
+    @Test
+    fun findAnotherAfterOpenRestartsFromClosedPhotoPrompt() {
+        val viewModel = viewModel(
+            attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
+                response = attachmentResponse(
+                    recognizedType = "image_observation",
+                    recognizedText = "图片里有一个蓝色瓶盖",
+                    confidence = 0.92,
+                ),
+            ),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        repeat(3) { index ->
+            if (index > 0) viewModel.requestAnotherStrangeDoorPhoto()
+            viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        }
+        assertEquals(StrangeDoorState.Open, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.PhotoPrompt, snapshot.demoState)
+        assertEquals(StrangeDoorState.Closed, snapshot.doorState)
+        assertEquals(0, snapshot.attemptsCount)
+        assertNull(snapshot.lastPhotoTransform)
+        assertNull(snapshot.lastRiddleEvaluation)
+        assertNull(snapshot.lastPhotoMessageId)
+    }
+
+    @Test
     fun partialAndUnknownObjectsAdvanceOneStepOnly() {
         val partialViewModel = viewModel(
             attachmentRepository = ImmediateStrangeDoorAttachmentRepository(

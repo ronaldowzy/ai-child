@@ -124,4 +124,38 @@ class StrangeDoorStateContractTest {
         assertEquals(StrangeDoorState.Closed, reset.doorState)
         assertEquals(0, reset.attemptsCount)
     }
+
+    @Test
+    fun requestAnotherPhotoKeepsNonOpenDoorState() {
+        val snapshot = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.PhotoResult,
+            doorState = StrangeDoorState.AlmostOpen,
+            attemptsCount = 2,
+        )
+
+        val next = StrangeDoorDoorStateReducer.requestAnotherPhoto(snapshot)
+
+        assertEquals(StrangeDoorDemoState.PhotoPrompt, next.demoState)
+        assertEquals(StrangeDoorState.AlmostOpen, next.doorState)
+        assertEquals(2, next.attemptsCount)
+        assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
+    }
+
+    @Test
+    fun requestAnotherPhotoAfterOpenRestartsFromClosed() {
+        val snapshot = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.Completed,
+            doorState = StrangeDoorState.Open,
+            attemptsCount = 3,
+            lastPhotoMessageId = "child-photo-3",
+        )
+
+        val next = StrangeDoorDoorStateReducer.requestAnotherPhoto(snapshot)
+
+        assertEquals(StrangeDoorDemoState.PhotoPrompt, next.demoState)
+        assertEquals(StrangeDoorState.Closed, next.doorState)
+        assertEquals(0, next.attemptsCount)
+        assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
+        assertEquals(null, next.lastPhotoMessageId)
+    }
 }

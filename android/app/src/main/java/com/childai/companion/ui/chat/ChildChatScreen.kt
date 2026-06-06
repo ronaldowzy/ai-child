@@ -213,7 +213,9 @@ fun ChildChatScreen(
         onStrangeDoorChoosePhoto = viewModel::chooseStrangeDoorPhotoMethod,
         onStrangeDoorChooseRiddle = viewModel::chooseStrangeDoorRiddleMethod,
         onStrangeDoorSwitchMethod = viewModel::returnToStrangeDoorMethodChoice,
+        onStrangeDoorReplayDemo = viewModel::replayStrangeDoorDemo,
         onStrangeDoorFindAnother = viewModel::requestAnotherStrangeDoorPhoto,
+        onStrangeDoorOpenShowcase = onOpenXiaozhantai,
         onStrangeDoorSaveIntent = viewModel::requestStrangeDoorShowcaseSaveIntent,
         onStrangeDoorRetryRiddle = viewModel::retryStrangeDoorRiddle,
         onStrangeDoorExitDemo = viewModel::exitStrangeDoorDemoAndRequestOpening,
@@ -247,7 +249,9 @@ private fun ChildChatScreenContent(
     onStrangeDoorChoosePhoto: () -> Unit,
     onStrangeDoorChooseRiddle: () -> Unit,
     onStrangeDoorSwitchMethod: () -> Unit,
+    onStrangeDoorReplayDemo: () -> Unit,
     onStrangeDoorFindAnother: () -> Unit,
+    onStrangeDoorOpenShowcase: () -> Unit,
     onStrangeDoorSaveIntent: () -> Unit,
     onStrangeDoorRetryRiddle: () -> Unit,
     onStrangeDoorExitDemo: () -> Unit,
@@ -515,7 +519,9 @@ private fun ChildChatScreenContent(
                         pendingImageSourcePurpose = strangeDoorPhotoCaptureImagePurpose()
                     },
                     onSwitchMethod = onStrangeDoorSwitchMethod,
+                    onReplayDemo = onStrangeDoorReplayDemo,
                     onFindAnother = onStrangeDoorFindAnother,
+                    onOpenShowcase = onStrangeDoorOpenShowcase,
                     onSaveIntent = onStrangeDoorSaveIntent,
                     onRetryRiddle = onStrangeDoorRetryRiddle,
                     onExitDemo = onStrangeDoorExitDemo,
@@ -682,7 +688,9 @@ private fun StrangeDoorHomeEventScreen(
     onChooseRiddle: () -> Unit,
     onOpenPhotoCapture: () -> Unit,
     onSwitchMethod: () -> Unit,
+    onReplayDemo: () -> Unit,
     onFindAnother: () -> Unit,
+    onOpenShowcase: () -> Unit,
     onSaveIntent: () -> Unit,
     onRetryRiddle: () -> Unit,
     onExitDemo: () -> Unit,
@@ -698,7 +706,9 @@ private fun StrangeDoorHomeEventScreen(
             StrangeDoorHomeEventActionId.ChooseRiddle -> onChooseRiddle()
             StrangeDoorHomeEventActionId.SwitchMethod -> onSwitchMethod()
             StrangeDoorHomeEventActionId.OpenPhotoCapture -> onOpenPhotoCapture()
+            StrangeDoorHomeEventActionId.ReplayDemo -> onReplayDemo()
             StrangeDoorHomeEventActionId.FindAnother -> onFindAnother()
+            StrangeDoorHomeEventActionId.OpenShowcase -> onOpenShowcase()
             StrangeDoorHomeEventActionId.SaveToShowcase -> onSaveIntent()
             StrangeDoorHomeEventActionId.RetryRiddle -> onRetryRiddle()
             StrangeDoorHomeEventActionId.ExitDemo -> onExitDemo()
@@ -3497,7 +3507,9 @@ private fun ChildChatScreenPortraitPreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
+            onStrangeDoorOpenShowcase = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
@@ -3540,7 +3552,9 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
+            onStrangeDoorOpenShowcase = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
@@ -3592,7 +3606,9 @@ private fun ChildChatScreenLandscapePreview() {
             onStrangeDoorChoosePhoto = {},
             onStrangeDoorChooseRiddle = {},
             onStrangeDoorSwitchMethod = {},
+            onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
+            onStrangeDoorOpenShowcase = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},

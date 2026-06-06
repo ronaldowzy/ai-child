@@ -112,6 +112,7 @@ class ChatViewModel(
     private var ttsSlowHintJob: Job? = null
     private var openingRequested = false
     private var openingDeferredByStrangeDoor = false
+    private var strangeDoorDemoDismissed = false
     private var lastStrangeDoorNarrationText: String? = null
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
@@ -202,6 +203,7 @@ class ChatViewModel(
 
     fun activateStrangeDoorDemo() {
         if (_uiState.value.strangeDoorDemo != null) return
+        if (strangeDoorDemoDismissed) return
         openingDeferredByStrangeDoor = !openingRequested
         cancelNaturalWaitingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
@@ -220,6 +222,32 @@ class ChatViewModel(
             )
         }
         speakCurrentStrangeDoorState(force = true)
+    }
+
+    fun replayStrangeDoorDemo() {
+        if (_uiState.value.strangeDoorDemo == null) return
+        strangeDoorDemoDismissed = false
+        openingDeferredByStrangeDoor = !openingRequested
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        val nextSnapshot = StrangeDoorDoorStateReducer.replay()
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = nextSnapshot,
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                pendingImageContext = null,
+                isSending = false,
+                xiaozhantaiSaveDraft = null,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        lastStrangeDoorNarrationText = null
+        speakStrangeDoorSnapshot(nextSnapshot, force = true)
     }
 
     fun chooseStrangeDoorPhotoMethod() {
@@ -251,10 +279,27 @@ class ChatViewModel(
     }
 
     fun requestAnotherStrangeDoorPhoto() {
-        updateStrangeDoorDemoState(
-            demoState = StrangeDoorDemoState.PhotoPrompt,
-            method = StrangeDoorDemoMethod.Photo,
-        )
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
+        openingDeferredByStrangeDoor = !openingRequested
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        val nextSnapshot = StrangeDoorDoorStateReducer.requestAnotherPhoto(snapshot)
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = nextSnapshot,
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                pendingImageContext = null,
+                isSending = false,
+                xiaozhantaiSaveDraft = null,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        speakStrangeDoorSnapshot(nextSnapshot)
     }
 
     fun requestStrangeDoorShowcaseSaveIntent() {
@@ -343,8 +388,12 @@ class ChatViewModel(
 
     fun exitStrangeDoorDemoAndRequestOpening() {
         if (_uiState.value.strangeDoorDemo == null) return
+        strangeDoorDemoDismissed = true
         _uiState.update { state ->
-            state.copy(strangeDoorDemo = null)
+            state.copy(
+                strangeDoorDemo = null,
+                xiaozhantaiSaveDraft = null,
+            )
         }
         lastStrangeDoorNarrationText = null
         if (openingDeferredByStrangeDoor || !openingRequested) {

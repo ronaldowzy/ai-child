@@ -81,6 +81,25 @@ class ChatViewModelStrangeDoorShowcaseTest {
     }
 
     @Test
+    fun photoTransformDoesNotAutoSaveToShowcase() {
+        val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
+        val viewModel = saveablePhotoViewModel(showcaseRepository = showcaseRepository)
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(StrangeDoorDemoState.PhotoResult, snapshot.demoState)
+        assertTrue(snapshot.lastPhotoTransform?.canSaveToShowcase == true)
+        assertFalse(snapshot.showcaseSaveIntentRequested)
+        assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
+        assertNull(viewModel.uiState.value.xiaozhantaiSavedItemIdForNavigation)
+        assertNull(showcaseRepository.savedRequest)
+        assertEquals(0, showcaseRepository.softDeleteCalls)
+    }
+
+    @Test
     fun namingThenConfirmUsesExistingShowcaseSaveUseCase() {
         val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
         val growthRepository = CapturingStrangeDoorGrowthRepository()

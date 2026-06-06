@@ -26,10 +26,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,7 +37,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +69,56 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal object XiaozhantaiGalleryCopy {
+    const val entrance = "小展台"
+    const val title = "我的小展台"
+    const val emptyLineOne = "这里还空空的"
+    const val emptyLineTwo = "等你和小白狐放进一个小发现"
+    const val foxQuoteLabel = "小白狐那时说"
+    const val close = "关上"
+
+    fun approvedChildFacingCopy(): List<String> {
+        return listOf(
+            entrance,
+            title,
+            emptyLineOne,
+            emptyLineTwo,
+            foxQuoteLabel,
+            close,
+        )
+    }
+}
+
+internal data class XiaozhantaiGalleryCardUiModel(
+    val id: String,
+    val photoUri: String,
+    val name: String,
+    val savedAtLabel: String,
+)
+
+internal data class XiaozhantaiGalleryDetailUiModel(
+    val photoUri: String,
+    val name: String,
+    val foxQuote: String,
+)
+
+internal fun XiaozhantaiItem.toGalleryCardUiModel(): XiaozhantaiGalleryCardUiModel {
+    return XiaozhantaiGalleryCardUiModel(
+        id = id,
+        photoUri = photoUri,
+        name = xiaozhantaiDisplayName(name),
+        savedAtLabel = xiaozhantaiDateLabel(createdAt),
+    )
+}
+
+internal fun XiaozhantaiItem.toGalleryDetailUiModel(): XiaozhantaiGalleryDetailUiModel {
+    return XiaozhantaiGalleryDetailUiModel(
+        photoUri = photoUri,
+        name = xiaozhantaiDisplayName(name, maxLength = 14),
+        foxQuote = xiaozhantaiNormalizeFoxQuote(foxQuote),
+    )
+}
+
 @Composable
 fun XiaozhantaiListScreen(
     viewModel: XiaozhantaiViewModel,
@@ -94,7 +140,6 @@ fun XiaozhantaiDetailScreen(
     viewModel: XiaozhantaiViewModel,
     itemId: String?,
     onBack: () -> Unit,
-    onRecallWithXiaobaohu: (XiaozhantaiItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -108,10 +153,6 @@ fun XiaozhantaiDetailScreen(
     XiaozhantaiDetailContent(
         item = selected,
         onBack = onBack,
-        onRecallWithXiaobaohu = onRecallWithXiaobaohu,
-        onDelete = { item ->
-            viewModel.softDeleteItem(item.id, onDeleted = onBack)
-        },
         modifier = modifier,
     )
 }
@@ -124,7 +165,7 @@ internal fun XiaozhantaiListContent(
     modifier: Modifier = Modifier,
 ) {
     XiaozhantaiScaffold(
-        title = "小白狐的小展台",
+        title = XiaozhantaiGalleryCopy.title,
         onBack = onBack,
         modifier = modifier,
     ) { contentPadding ->
@@ -152,7 +193,7 @@ internal fun XiaozhantaiListContent(
                     ) {
                         row.forEach { item ->
                             XiaozhantaiThumbCard(
-                                item = item,
+                                card = item.toGalleryCardUiModel(),
                                 onClick = { onOpenItem(item.id) },
                                 modifier = Modifier.weight(1f),
                             )
@@ -171,13 +212,10 @@ internal fun XiaozhantaiListContent(
 internal fun XiaozhantaiDetailContent(
     item: XiaozhantaiItem?,
     onBack: () -> Unit,
-    onRecallWithXiaobaohu: (XiaozhantaiItem) -> Unit = {},
-    onDelete: (XiaozhantaiItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var showDeleteConfirm by remember { androidx.compose.runtime.mutableStateOf(false) }
     XiaozhantaiScaffold(
-        title = "小展台里的一件小发现",
+        title = XiaozhantaiGalleryCopy.title,
         onBack = onBack,
         modifier = modifier,
     ) { contentPadding ->
@@ -189,6 +227,7 @@ internal fun XiaozhantaiDetailContent(
             )
             return@XiaozhantaiScaffold
         }
+        val detail = item.toGalleryDetailUiModel()
         LazyColumn(
             modifier = Modifier
                 .padding(contentPadding)
@@ -198,65 +237,21 @@ internal fun XiaozhantaiDetailContent(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
-                XiaozhantaiDetailPhoto(item = item)
+                XiaozhantaiDetailPhoto(photoUri = detail.photoUri)
             }
             item {
                 XiaozhantaiNamePlate(
-                    name = item.name,
+                    name = detail.name,
                     modifier = Modifier.widthIn(max = 280.dp),
                 )
             }
             item {
                 XiaozhantaiFoxQuote(
-                    quote = item.foxQuote,
+                    quote = detail.foxQuote,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item {
-                OutlinedButton(
-                    onClick = { onRecallWithXiaobaohu(item) },
-                    shape = RoundedCornerShape(22.dp),
-                    border = BorderStroke(1.dp, Color(0xFFB9D3E9).copy(alpha = 0.50f)),
-                ) {
-                    Text(
-                        text = "和小白狐再聊聊它",
-                        color = Color(0xFF52667B),
-                    )
-                }
-            }
-            item {
-                Text(
-                    text = "留下时间：${xiaozhantaiDateLabel(item.createdAt)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF6A7B88).copy(alpha = 0.72f),
-                )
-            }
-            item {
-                TextButton(onClick = { showDeleteConfirm = true }) {
-                    Text(
-                        text = "先从小展台收起来",
-                        color = Color(0xFF6A7B88),
-                    )
-                }
-            }
         }
-    }
-    if (item != null && showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(text = "先收起来吗？") },
-            text = { Text(text = "它会从小展台里移走，照片不会出现在列表里。") },
-            confirmButton = {
-                Button(onClick = { onDelete(item) }) {
-                    Text(text = "先收起来")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text(text = "还放着")
-                }
-            },
-        )
     }
 }
 
@@ -282,7 +277,7 @@ private fun XiaozhantaiScaffold(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onBack) {
-                        Text(text = "返回")
+                        Text(text = XiaozhantaiGalleryCopy.close)
                     }
                     Text(
                         text = title,
@@ -321,9 +316,17 @@ private fun XiaozhantaiEmptyState(
         )
         Spacer(modifier = Modifier.height(18.dp))
         Text(
-            text = "这里还空空的，等你把喜欢的小发现放进来。",
-            style = MaterialTheme.typography.bodyLarge,
+            text = XiaozhantaiGalleryCopy.emptyLineOne,
+            style = MaterialTheme.typography.titleMedium,
             color = Color(0xFF52667B),
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = XiaozhantaiGalleryCopy.emptyLineTwo,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color(0xFF52667B).copy(alpha = 0.86f),
             textAlign = TextAlign.Center,
             lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
         )
@@ -332,14 +335,14 @@ private fun XiaozhantaiEmptyState(
 
 @Composable
 private fun XiaozhantaiThumbCard(
-    item: XiaozhantaiItem,
+    card: XiaozhantaiGalleryCardUiModel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val cardAlpha = remember(item.id) { Animatable(0f) }
-    val cardOffsetY = remember(item.id) { Animatable(with(density) { 12.dp.toPx() }) }
-    LaunchedEffect(item.id) {
+    val cardAlpha = remember(card.id) { Animatable(0f) }
+    val cardOffsetY = remember(card.id) { Animatable(with(density) { 12.dp.toPx() }) }
+    LaunchedEffect(card.id) {
         launch {
             cardAlpha.animateTo(
                 targetValue = 1f,
@@ -368,16 +371,24 @@ private fun XiaozhantaiThumbCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             XiaozhantaiThumbPhoto(
-                item = item,
+                photoUri = card.photoUri,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
             )
             Spacer(modifier = Modifier.height(8.dp))
             XiaozhantaiNamePlate(
-                name = item.name,
+                name = card.name,
                 modifier = Modifier.fillMaxWidth(),
                 compact = true,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = card.savedAtLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF6A7B88).copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -385,12 +396,12 @@ private fun XiaozhantaiThumbCard(
 
 @Composable
 private fun XiaozhantaiThumbPhoto(
-    item: XiaozhantaiItem,
+    photoUri: String,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         XiaozhantaiPhotoImage(
-            photoUri = item.photoUri,
+            photoUri = photoUri,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(28.dp)
@@ -407,7 +418,7 @@ private fun XiaozhantaiThumbPhoto(
 
 @Composable
 private fun XiaozhantaiDetailPhoto(
-    item: XiaozhantaiItem,
+    photoUri: String,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -425,7 +436,7 @@ private fun XiaozhantaiDetailPhoto(
             contentAlignment = Alignment.Center,
         ) {
             XiaozhantaiPhotoImage(
-                photoUri = item.photoUri,
+                photoUri = photoUri,
                 modifier = Modifier
                     .width(238.dp)
                     .height(144.dp)
@@ -464,16 +475,7 @@ private fun XiaozhantaiPhotoImage(
                     ),
                 ),
             ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "照片暂时看不到",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF7A8998).copy(alpha = 0.72f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
+        )
     }
 }
 
@@ -538,7 +540,7 @@ private fun XiaozhantaiFoxQuote(
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
             Text(
-                text = "小白狐当时说",
+                text = XiaozhantaiGalleryCopy.foxQuoteLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFF7A8998),
             )
@@ -648,7 +650,7 @@ private fun xiaozhantaiPreviewItems(): List<XiaozhantaiItem> {
     )
 }
 
-private fun xiaozhantaiDateLabel(createdAt: Long): String {
+internal fun xiaozhantaiDateLabel(createdAt: Long): String {
     if (createdAt <= 0L) return "刚刚"
     return SimpleDateFormat("M月d日", Locale.CHINA).format(Date(createdAt))
 }

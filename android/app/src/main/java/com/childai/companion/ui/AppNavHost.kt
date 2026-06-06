@@ -1,7 +1,6 @@
 package com.childai.companion.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +30,6 @@ import com.childai.companion.ui.auth.AuthViewModel
 import com.childai.companion.ui.chat.ChildChatScreen
 import com.childai.companion.ui.chat.ChatViewModel
 import com.childai.companion.ui.chat.ConversationRepositoryMessageSender
-import com.childai.companion.ui.chat.XiaozhantaiRecallContext
 import com.childai.companion.ui.parent.ParentReportScreen
 import com.childai.companion.ui.parent.ParentReportViewModel
 import com.childai.companion.ui.parent.ParentCredentialVerifier
@@ -40,7 +38,6 @@ import com.childai.companion.ui.parent.ParentSettingsScreen
 import com.childai.companion.ui.showcase.XiaozhantaiDetailScreen
 import com.childai.companion.ui.showcase.XiaozhantaiListScreen
 import com.childai.companion.ui.showcase.XiaozhantaiViewModel
-import com.childai.companion.ui.chat.toRecallContext
 
 @Composable
 fun AppNavHost(
@@ -95,7 +92,6 @@ fun AppNavHost(
     }
     var destination by rememberSaveable { mutableStateOf(AppDestination.Chat) }
     var selectedXiaozhantaiItemId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingXiaozhantaiRecallContext by remember { mutableStateOf<XiaozhantaiRecallContext?>(null) }
     val xiaozhantaiViewModel: XiaozhantaiViewModel = viewModel(
         key = "xiaozhantai-${session.childId}",
         factory = simpleViewModelFactory {
@@ -122,13 +118,6 @@ fun AppNavHost(
                     )
                 },
             )
-            val recallContext = pendingXiaozhantaiRecallContext
-            LaunchedEffect(chatViewModel, recallContext?.itemId, recallContext?.createdAt) {
-                if (recallContext != null) {
-                    chatViewModel.recallXiaozhantaiItem(recallContext)
-                    pendingXiaozhantaiRecallContext = null
-                }
-            }
             ChildChatScreen(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
@@ -181,10 +170,6 @@ fun AppNavHost(
                 viewModel = xiaozhantaiViewModel,
                 itemId = selectedXiaozhantaiItemId,
                 onBack = { destination = AppDestination.XiaozhantaiList },
-                onRecallWithXiaobaohu = { item ->
-                    pendingXiaozhantaiRecallContext = item.toRecallContext()
-                    destination = AppDestination.Chat
-                },
             )
         }
     }

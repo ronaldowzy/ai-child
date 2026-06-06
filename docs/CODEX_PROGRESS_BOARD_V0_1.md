@@ -10,7 +10,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：奇怪小门 Demo：D5 小展台承接已落地，下一步启动 Q1 真机试玩验收。
+当前阶段：奇怪小门 Demo：S2 我的小展台列表与详情已落地；R1-C 仍为 CODE PASS / 待真机视觉验收，真机视觉验收延期到后续合并真机测试。
 
 下一阶段主方向：
 儿童端吸引力试玩原型：奇怪小门 Demo。
@@ -31,8 +31,8 @@
 5. 图片上传继续走现有 attachment 链路，image_purpose=share。
 6. 变身反馈先用确定性模板 + 少量映射，不先做复杂模型生成。
 7. 不新增复杂后端成长系统，不新增多关卡持久化。
-8. 小展台只做结果承接，不做主玩法。
-9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果。
+8. 小展台只做结果承接和只读回看，不做主玩法。
+9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看。
 10. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
 
 当前事实源：
@@ -45,6 +45,7 @@ docs/child_engagement_strange_door_demo.md
 docs/奇怪小门儿童吸引力试玩原型深化设计_2026_06_04_V0_1.md
 docs/奇怪小门Demo实施总计划_2026_06_04_V0_1.md
 docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
+docs/session_process/handoffs/20260606_S2_xiaozhantai_gallery_plan.md
 ```
 
 ---
@@ -84,8 +85,12 @@ docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
 | D2 | Android 首页事件 UI | done | `a3764a6` | 已接入首页事件 UI：普通 opening 延后，首屏显示 closed 小门、圆锁、地面阴影、小白狐和两个本地入口 |
 | D3 | 拍照变身路径 | done | `d10f8d2` | 已复用现有 attachment 链路和 image_purpose=share，将 recognizedContent 接入 mapper，展示变身反馈并推进本地门状态 |
 | D4 | 怪问题路径 | done | `0f60696` | 已接通“动脑试试 -> 语音回答 -> 本地判断 -> 小门反馈 -> 门状态变化”，不调用普通 conversation |
-| D5 | 小展台承接 | done | 本提交 | 已接通“放进小展台 -> 确认 -> 起名 -> 现有小展台保存”，保留 showcase_item_saved 本地 GrowthEvent |
-| Q1 | 真机试玩验收 | todo | 待 D5 合入 | Redmi K60 / Honor Pad 5 验证第一眼事件感和“再找一个”动机 |
+| D5 | 小展台承接 | done | `830eb7b` | 已接通“放进小展台 -> 确认 -> 起名 -> 现有小展台保存”，保留 showcase_item_saved 本地 GrowthEvent |
+| R1-A | 词池、门状态节奏与按钮优先级优化 | done | `5e3634f` | 有效拍照按一步推进，扩充主控 R1 词池，拍照结果按钮顺序为“再找一个 / 动脑试试 / 放进小展台” |
+| R1-B | 拍照结果视觉增强 | done | `7081bf9` | 拍照结果页展示刚拍缩略图、变身道具卡和门状态变化，未新增功能、素材、后端或文案 |
+| R1-C | 首屏视觉层级与“小白狐被门挡住”表现优化 | done / pending-device-visual | `ce73e6e` | 首屏事件感代码侧优化已完成；当前无真机测试条件，视觉验收延期到后续合并真机测试 |
+| S2 | 我的小展台列表与详情 | done | 本提交 | 已复用现有本地小展台数据能力，实现只读列表和详情；隐藏再聊、删除 / 收起入口，不新增后端或复杂展台系统 |
+| Q1 / Q2 | 真机试玩与 R1 视觉验收 | deferred | 待后续合并真机测试 | Redmi K60 / Honor Pad 5 验证第一眼事件感、“再找一个”动机、小展台回看和 R1 视觉体感 |
 
 ---
 
@@ -100,7 +105,7 @@ docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
 6. 图片上传继续走现有 attachment 链路，image_purpose=share。
 7. 拍照变身反馈首版使用确定性模板和主控词池，不做模型生成。
 8. 怪问题首版以语音回答为主，DevSettings 可保留文字调试入口。
-9. 小展台只做结果承接；保留现有本地 showcase_item_saved GrowthEvent，不新增类型。
+9. 小展台只做结果承接和只读回看；保留现有本地 showcase_item_saved GrowthEvent，不新增类型。
 10. 素材未完成前只做状态 / 合同 / mapper / 测试，不做正式 UI。
 11. 所有儿童端文案、小白狐话术、按钮文字必须来自主控文档。
 12. 不新增奖励、积分、等级、地图、排行榜、签到、复杂道具系统或后端成长系统。
@@ -140,8 +145,9 @@ docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
 3. D3 拍照变身路径：复用现有 attachment 链路。
 4. D4 怪问题路径：本地 evaluator + voice-first 回答。
 5. D5 小展台承接：只复用现有小展台保存。
-6. Q1 真机试玩验收：验证孩子是否愿意再找一个给小白狐看。
-7. 明显 bug 修复：只修可复现问题。
+6. S2 我的小展台列表与详情：只复用现有本地小展台数据能力做只读回看。
+7. Q1 / Q2 合并真机测试：验证孩子是否愿意再找一个给小白狐看，并补做 R1-C 真机视觉验收。
+8. 明显 bug 修复：只修可复现问题。
 ```
 
 每个开发任务必须写清楚：

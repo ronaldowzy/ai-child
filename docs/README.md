@@ -2,6 +2,18 @@
 
 这个文档包用于启动 Codex 开发项目。
 
+公开仓库入口文档：
+
+```text
+SAFETY_AND_PRIVACY.md
+ARCHITECTURE.md
+ROADMAP.md
+PUBLIC_RELEASE_CHECKLIST.md
+PUBLIC_REDACTION_NOTES.md
+```
+
+真实家庭测试 Prompt、原始模型 trace、儿童身份信息、音频、照片和私有截图不属于公开文档包。
+
 建议目录：
 
 ```text

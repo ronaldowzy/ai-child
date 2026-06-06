@@ -1,6 +1,6 @@
 """Personalized child session loop integration test (Task 19).
 
-Synthetic scenario: 航航, 7-year-old boy, interests in running races and drawing,
+Synthetic scenario: 小禾, 7-year-old boy, interests in running races and drawing,
 boundary about not追问比赛输赢, concise temperament, sensitive to pressure,
 support style: offer_two_choices, ask_fewer_questions, use_shorter_sentences.
 
@@ -127,7 +127,7 @@ class _StubModelRegistry:
     def generate(self, request: Any) -> ModelResponse:
         return ModelResponse(
             task_type=request.task_type,
-            response_text="航航，下午好呀！今天想聊点什么？",
+            response_text="小禾，下午好呀！今天想聊点什么？",
             structured_output={},
             provider_name="mock",
             model_name="mock",
@@ -144,17 +144,17 @@ class _ReportModelRegistry:
             response_text="",
             structured_output={
                 "daily_report": {
-                    "summary": "航航今天聊了运动感受，分享了一幅画，后来去做英语打卡了。",
+                    "summary": "小禾今天聊了运动感受，分享了一幅画，后来去做英语打卡了。",
                     "learning_observations": [],
                     "expression_observations": [
-                        "航航能用简短的话把感受说出来。"
+                        "小禾能用简短的话把感受说出来。"
                     ],
                     "emotion_observations": [
-                        "航航提到赛前情绪，整体平稳。"
+                        "小禾提到赛前情绪，整体平稳。"
                     ],
                     "safety_alerts": [],
                     "suggested_parent_actions": [
-                        "今晚可以轻轻提一句画画，如果航航不想接就不追问。"
+                        "今晚可以轻轻提一句画画，如果小禾不想接就不追问。"
                     ],
                 }
             },
@@ -185,7 +185,7 @@ class _CapturingRuntime:
 def _build_hanghang_policy() -> ParentPolicy:
     return ParentPolicy(
         child_id=HANGHANG_CHILD_ID,
-        child_nickname="航航",
+        child_nickname="小禾",
         child_display_name=None,
         parent_message_raw=None,
         goals=["低压力表达，不查岗"],
@@ -281,7 +281,7 @@ def test_opening_uses_profile_without_forbidden_labels() -> None:
     text = response.reply.text
 
     # Must use nickname
-    assert "航航" in text, f"Opening should use nickname '航航': {text}"
+    assert "小禾" in text, f"Opening should use nickname '小禾': {text}"
 
     # Must NOT contain forbidden label phrases
     for phrase in _FORBIDDEN_LABEL_PHRASES:

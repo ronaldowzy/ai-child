@@ -69,7 +69,7 @@ class AuthViewModelTest {
         viewModel.updateMode(AuthMode.Register)
         viewModel.updateUsername("parent-one")
         viewModel.updatePassword("password123")
-        viewModel.updateChildNickname("航航")
+        viewModel.updateChildNickname("小禾")
         viewModel.updateChildAge("8")
         viewModel.updateChildGrade("二年级")
         viewModel.updateChildInterests("越野赛\n变形金刚")

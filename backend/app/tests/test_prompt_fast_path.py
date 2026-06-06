@@ -161,7 +161,7 @@ def _request(
         parent_policy={
             "version": 2,
             "communication_preferences": {
-                "child_nickname": "航航",
+                "child_nickname": "小禾",
                 "child_age": 8,
                 "child_grade": 2,
                 "child_gender": "boy",

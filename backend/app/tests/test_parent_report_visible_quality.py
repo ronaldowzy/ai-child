@@ -91,7 +91,7 @@ def _make_memory(
 def _make_parent_policy(**overrides: Any) -> ParentPolicy:
     base: dict[str, Any] = {
         "child_id": CHILD_ID,
-        "child_nickname": "航航",
+        "child_nickname": "小禾",
         "child_display_name": None,
         "parent_message_raw": None,
         "communication_preferences": {

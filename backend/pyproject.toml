@@ -20,6 +20,12 @@ asr-local = [
     "numpy>=1.26,<2",
     "sherpa-onnx>=1.13.2",
 ]
+tts-local = [
+    "librosa>=0.10,<1",
+    "numpy>=1.26,<2",
+    "sherpa-onnx>=1.13.2",
+    "soundfile>=0.12,<1",
+]
 dev = [
     "httpx>=0.26.0",
     "pytest>=8.0.0",

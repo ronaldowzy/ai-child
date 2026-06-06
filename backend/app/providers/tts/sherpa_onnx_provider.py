@@ -11,10 +11,7 @@ import io
 import logging
 import threading
 from pathlib import Path
-
-import librosa
-import numpy as np
-import soundfile as sf
+from typing import Any
 
 from app.domain.tts import (
     TtsProviderName,
@@ -52,7 +49,7 @@ class SherpaOnnxTtsProvider(BaseTtsProvider):
         self._num_threads = num_threads
         self._num_steps = num_steps
         self._tts = None
-        self._reference_audio: np.ndarray | None = None
+        self._reference_audio: Any | None = None
         self._reference_sample_rate: int | None = None
         self._lock = threading.Lock()
 
@@ -115,6 +112,13 @@ class SherpaOnnxTtsProvider(BaseTtsProvider):
         self._load_reference_audio()
 
     def _load_reference_audio(self) -> None:
+        try:
+            import librosa
+        except ModuleNotFoundError as exc:
+            raise TtsProviderConfigurationError(
+                "librosa is required for sherpa-onnx TTS; install backend[tts-local]"
+            ) from exc
+
         sample_path = self._voice_sample_path
         if not sample_path.exists():
             raise TtsProviderConfigurationError(
@@ -180,8 +184,15 @@ class SherpaOnnxTtsProvider(BaseTtsProvider):
 
     @staticmethod
     def _samples_to_wav_bytes(
-        samples: np.ndarray, sample_rate: int
+        samples: Any, sample_rate: int
     ) -> bytes:
+        try:
+            import soundfile as sf
+        except ModuleNotFoundError as exc:
+            raise TtsProviderConfigurationError(
+                "soundfile is required for sherpa-onnx TTS; install backend[tts-local]"
+            ) from exc
+
         buf = io.BytesIO()
         sf.write(buf, samples, samplerate=sample_rate, format="WAV", subtype="PCM_16")
         buf.seek(0)

@@ -715,7 +715,34 @@ private fun StrangeDoorHomeEventScreen(
         val horizontalPadding = if (isLandscape) 28.dp else 18.dp
         val verticalPadding = if (isLandscape) 18.dp else 12.dp
 
-        if (isLandscape) {
+        if (model.showHomeIntroVisual && isLandscape) {
+            StrangeDoorHomeIntroLandscape(
+                model = model,
+                viewportClass = viewportClass,
+                compactLandscape = compactLandscape,
+                parentEntryHint = parentEntryHint,
+                onParentEntryTap = onParentEntryTap,
+                onParentEntryLongPress = onParentEntryLongPress,
+                onOpenXiaozhantai = onOpenXiaozhantai,
+                onAction = ::handleAction,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            )
+        } else if (model.showHomeIntroVisual) {
+            StrangeDoorHomeIntroPortrait(
+                model = model,
+                viewportClass = viewportClass,
+                parentEntryHint = parentEntryHint,
+                onParentEntryTap = onParentEntryTap,
+                onParentEntryLongPress = onParentEntryLongPress,
+                onOpenXiaozhantai = onOpenXiaozhantai,
+                onAction = ::handleAction,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            )
+        } else if (isLandscape) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -856,6 +883,142 @@ private fun StrangeDoorHomeEventScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun StrangeDoorHomeIntroLandscape(
+    model: StrangeDoorHomeEventUiModel,
+    viewportClass: CompanionRoomViewportClass,
+    compactLandscape: Boolean,
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
+    onAction: (StrangeDoorHomeEventAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        ParentEntryHintBar(
+            parentEntryHint = parentEntryHint,
+            onParentEntryTap = onParentEntryTap,
+            onParentEntryLongPress = onParentEntryLongPress,
+            onOpenXiaozhantai = onOpenXiaozhantai,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .fillMaxWidth(0.42f)
+                .graphicsLayer { alpha = strangeDoorWeakEntryAlpha(homeIntro = true) },
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = if (compactLandscape) 22.dp else 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compactLandscape) 12.dp else 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(0.64f)
+                    .fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                StrangeDoorEventTitle(model.title, compact = compactLandscape)
+                Spacer(modifier = Modifier.height(if (compactLandscape) 4.dp else 8.dp))
+                StrangeDoorEventScene(
+                    model = model,
+                    viewportClass = viewportClass,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(0.36f)
+                    .fillMaxHeight()
+                    .padding(top = if (compactLandscape) 30.dp else 42.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                StrangeDoorPromptPanel(
+                    model = model,
+                    photoPreview = null,
+                    compact = compactLandscape,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(if (compactLandscape) 10.dp else 14.dp))
+                StrangeDoorActionRow(
+                    actions = model.actions,
+                    compact = compactLandscape,
+                    homeIntro = true,
+                    onAction = onAction,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrangeDoorHomeIntroPortrait(
+    model: StrangeDoorHomeEventUiModel,
+    viewportClass: CompanionRoomViewportClass,
+    parentEntryHint: String?,
+    onParentEntryTap: () -> Unit,
+    onParentEntryLongPress: () -> Unit,
+    onOpenXiaozhantai: () -> Unit,
+    onAction: (StrangeDoorHomeEventAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ParentEntryHintBar(
+            parentEntryHint = parentEntryHint,
+            onParentEntryTap = onParentEntryTap,
+            onParentEntryLongPress = onParentEntryLongPress,
+            onOpenXiaozhantai = onOpenXiaozhantai,
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { alpha = strangeDoorWeakEntryAlpha(homeIntro = true) },
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        StrangeDoorEventTitle(model.title, compact = false)
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            StrangeDoorEventScene(
+                model = model,
+                viewportClass = viewportClass,
+                modifier = Modifier.fillMaxSize(),
+            )
+            StrangeDoorPromptPanel(
+                model = model,
+                photoPreview = null,
+                compact = false,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(0.94f)
+                    .widthIn(max = 460.dp)
+                    .padding(top = 2.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        StrangeDoorActionRow(
+            actions = model.actions,
+            compact = false,
+            homeIntro = true,
+            onAction = onAction,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .navigationBarsPadding(),
+        )
     }
 }
 
@@ -1007,11 +1170,53 @@ internal data class StrangeDoorScenePlacementSpec(
     val foxXOffsetFraction: Float,
     val foxYOffset: Dp,
     val foxVisualScaleMultiplier: Float,
+    val roundLockSizeFraction: Float,
+    val groundShadowWidthFraction: Float,
+    val groundShadowHeightFraction: Float,
     val groundShadowYOffset: Dp,
 )
 
-internal fun strangeDoorScenePlacementSpec(isLandscape: Boolean): StrangeDoorScenePlacementSpec {
-    return if (isLandscape) {
+internal fun strangeDoorScenePlacementSpec(
+    isLandscape: Boolean,
+    homeIntro: Boolean = false,
+): StrangeDoorScenePlacementSpec {
+    return if (homeIntro && isLandscape) {
+        StrangeDoorScenePlacementSpec(
+            doorWidthFraction = 0.66f,
+            doorHeightFraction = 0.94f,
+            doorMinSize = 250.dp,
+            doorMaxSize = 540.dp,
+            foxSizeFractionOfDoor = 0.96f,
+            foxMinSize = 210.dp,
+            foxMaxSize = 420.dp,
+            doorXOffsetFraction = 0.04f,
+            foxXOffsetFraction = -0.10f,
+            foxYOffset = 14.dp,
+            foxVisualScaleMultiplier = 0.86f,
+            roundLockSizeFraction = 0.28f,
+            groundShadowWidthFraction = 1.06f,
+            groundShadowHeightFraction = 0.28f,
+            groundShadowYOffset = 10.dp,
+        )
+    } else if (homeIntro) {
+        StrangeDoorScenePlacementSpec(
+            doorWidthFraction = 0.76f,
+            doorHeightFraction = 0.88f,
+            doorMinSize = 240.dp,
+            doorMaxSize = 470.dp,
+            foxSizeFractionOfDoor = 0.96f,
+            foxMinSize = 190.dp,
+            foxMaxSize = 390.dp,
+            doorXOffsetFraction = 0.03f,
+            foxXOffsetFraction = -0.11f,
+            foxYOffset = 13.dp,
+            foxVisualScaleMultiplier = 0.86f,
+            roundLockSizeFraction = 0.28f,
+            groundShadowWidthFraction = 1.06f,
+            groundShadowHeightFraction = 0.28f,
+            groundShadowYOffset = 10.dp,
+        )
+    } else if (isLandscape) {
         StrangeDoorScenePlacementSpec(
             doorWidthFraction = 0.56f,
             doorHeightFraction = 0.90f,
@@ -1024,6 +1229,9 @@ internal fun strangeDoorScenePlacementSpec(isLandscape: Boolean): StrangeDoorSce
             foxXOffsetFraction = -0.02f,
             foxYOffset = 12.dp,
             foxVisualScaleMultiplier = 0.88f,
+            roundLockSizeFraction = 0.22f,
+            groundShadowWidthFraction = 0.92f,
+            groundShadowHeightFraction = 0.24f,
             groundShadowYOffset = 12.dp,
         )
     } else {
@@ -1039,6 +1247,9 @@ internal fun strangeDoorScenePlacementSpec(isLandscape: Boolean): StrangeDoorSce
             foxXOffsetFraction = -0.02f,
             foxYOffset = 10.dp,
             foxVisualScaleMultiplier = 0.88f,
+            roundLockSizeFraction = 0.22f,
+            groundShadowWidthFraction = 0.92f,
+            groundShadowHeightFraction = 0.24f,
             groundShadowYOffset = 12.dp,
         )
     }
@@ -1052,7 +1263,10 @@ private fun StrangeDoorEventScene(
 ) {
     BoxWithConstraints(modifier = modifier) {
         val isLandscape = viewportClass.isLandscape
-        val placement = strangeDoorScenePlacementSpec(isLandscape)
+        val placement = strangeDoorScenePlacementSpec(
+            isLandscape = isLandscape,
+            homeIntro = model.showHomeIntroVisual,
+        )
         val doorSize = minOf(
             maxWidth * placement.doorWidthFraction,
             maxHeight * placement.doorHeightFraction,
@@ -1106,7 +1320,10 @@ private fun StrangeDoorEventScene(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(x = doorXOffset, y = placement.groundShadowYOffset)
-                    .size(width = doorSize * 0.92f, height = doorSize * 0.24f),
+                    .size(
+                        width = doorSize * placement.groundShadowWidthFraction,
+                        height = doorSize * placement.groundShadowHeightFraction,
+                    ),
             )
             CartoonAgentView(
                 agent = FoxAgentUiState(
@@ -1167,7 +1384,7 @@ private fun StrangeDoorEventScene(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .offset(y = doorSize * 0.03f)
-                        .size(doorSize * 0.22f),
+                        .size(doorSize * placement.roundLockSizeFraction),
                 )
             }
         }
@@ -1471,6 +1688,7 @@ private fun StrangeDoorImagePanel(
 private fun StrangeDoorActionRow(
     actions: List<StrangeDoorHomeEventAction>,
     compact: Boolean,
+    homeIntro: Boolean = false,
     onAction: (StrangeDoorHomeEventAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1483,6 +1701,7 @@ private fun StrangeDoorActionRow(
                     StrangeDoorActionButton(
                         action = action,
                         primary = index == 0,
+                        homeIntro = homeIntro,
                         onClick = { onAction(action) },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1494,6 +1713,7 @@ private fun StrangeDoorActionRow(
                     StrangeDoorActionButton(
                         action = action,
                         primary = index == 0,
+                        homeIntro = homeIntro,
                         onClick = { onAction(action) },
                         modifier = Modifier.weight(1f),
                     )
@@ -1507,19 +1727,22 @@ private fun StrangeDoorActionRow(
 private fun StrangeDoorActionButton(
     action: StrangeDoorHomeEventAction,
     primary: Boolean,
+    homeIntro: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val minHeight = strangeDoorActionButtonMinHeight(primary = primary, homeIntro = homeIntro)
     if (primary) {
         Button(
             onClick = onClick,
             enabled = action.enabled,
             shape = RoundedCornerShape(26.dp),
-            modifier = modifier.heightIn(min = 54.dp),
+            modifier = modifier.heightIn(min = minHeight),
         ) {
             Text(
                 text = action.label,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (homeIntro) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                fontWeight = if (homeIntro) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1529,7 +1752,7 @@ private fun StrangeDoorActionButton(
             onClick = onClick,
             enabled = action.enabled,
             shape = RoundedCornerShape(26.dp),
-            modifier = modifier.heightIn(min = 54.dp),
+            modifier = modifier.heightIn(min = minHeight),
         ) {
             Text(
                 text = action.label,
@@ -1539,6 +1762,21 @@ private fun StrangeDoorActionButton(
             )
         }
     }
+}
+
+internal fun strangeDoorActionButtonMinHeight(
+    primary: Boolean,
+    homeIntro: Boolean,
+): Dp {
+    return when {
+        homeIntro && primary -> 62.dp
+        homeIntro -> 52.dp
+        else -> 54.dp
+    }
+}
+
+internal fun strangeDoorWeakEntryAlpha(homeIntro: Boolean): Float {
+    return if (homeIntro) 0.58f else 1f
 }
 
 @Composable

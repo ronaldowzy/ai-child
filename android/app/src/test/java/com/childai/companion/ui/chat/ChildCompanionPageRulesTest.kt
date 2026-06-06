@@ -173,6 +173,35 @@ class ChildCompanionPageRulesTest {
     }
 
     @Test
+    fun strangeDoorHomeIntroMakesDoorLockAndShadowDominant() {
+        listOf(false, true).forEach { isLandscape ->
+            val placement = strangeDoorScenePlacementSpec(
+                isLandscape = isLandscape,
+                homeIntro = true,
+            )
+            val centerGap = kotlin.math.abs(
+                placement.doorXOffsetFraction - placement.foxXOffsetFraction,
+            )
+
+            assertTrue("home intro door should be large", placement.doorWidthFraction >= 0.66f)
+            assertTrue("round lock should be visually clear", placement.roundLockSizeFraction >= 0.28f)
+            assertTrue("ground shadow should anchor the door", placement.groundShadowWidthFraction >= 1.0f)
+            assertTrue("fox should stay tied to the door", centerGap <= 0.16f)
+            assertTrue("fox should read as blocked by the foreground door", placement.foxSizeFractionOfDoor >= 0.96f)
+        }
+    }
+
+    @Test
+    fun strangeDoorHomeIntroWeakensSecondaryEntriesAndHighlightsPhotoAction() {
+        assertTrue(strangeDoorWeakEntryAlpha(homeIntro = true) < strangeDoorWeakEntryAlpha(homeIntro = false))
+        assertTrue(
+            strangeDoorActionButtonMinHeight(primary = true, homeIntro = true) >
+                strangeDoorActionButtonMinHeight(primary = false, homeIntro = true),
+        )
+        assertEquals(54.dp, strangeDoorActionButtonMinHeight(primary = true, homeIntro = false))
+    }
+
+    @Test
     fun strangeDoorShowcaseNamingUsesVoiceInput() {
         val strangeDoorNamingDraft = XiaozhantaiSaveDraftUiState(
             messageId = "photo-1",

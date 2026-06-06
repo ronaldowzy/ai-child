@@ -28,6 +28,9 @@ class StrangeDoorHomeEventUiModelTest {
         )
         assertEquals(StrangeDoorAssetKey.DoorClosed, model.doorAssetKey)
         assertFalse(model.showNormalInputBar)
+        assertTrue(model.showHomeIntroVisual)
+        assertFalse(model.showPhotoResultCard)
+        assertFalse(model.showDoorSuccessGlow)
     }
 
     @Test
@@ -37,6 +40,7 @@ class StrangeDoorHomeEventUiModelTest {
         ).toHomeEventUiModel()
 
         assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
+        assertFalse(model.showHomeIntroVisual)
         assertEquals(
             listOf(
                 "找一个有点圆的东西就行",

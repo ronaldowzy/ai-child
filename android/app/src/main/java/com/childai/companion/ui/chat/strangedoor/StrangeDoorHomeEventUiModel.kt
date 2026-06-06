@@ -34,6 +34,7 @@ data class StrangeDoorHomeEventUiModel(
     val showRiddleVoiceControl: Boolean = false,
     val showPhotoResultCard: Boolean = false,
     val showDoorSuccessGlow: Boolean = false,
+    val showHomeIntroVisual: Boolean = false,
 )
 
 object StrangeDoorHomeEventCopy {
@@ -241,6 +242,7 @@ private fun StrangeDoorDemoSnapshot.choosingMethodUiModel(): StrangeDoorHomeEven
             ),
         ),
         doorAssetKey = doorState.toAssetKey(),
+        showHomeIntroVisual = true,
     )
 }
 

@@ -37,6 +37,7 @@ import com.childai.companion.ui.parent.ParentPolicyViewModel
 import com.childai.companion.ui.parent.ParentSettingsScreen
 import com.childai.companion.ui.showcase.XiaozhantaiDetailScreen
 import com.childai.companion.ui.showcase.XiaozhantaiListScreen
+import com.childai.companion.ui.showcase.XiaozhantaiPickScreen
 import com.childai.companion.ui.showcase.XiaozhantaiViewModel
 
 @Composable
@@ -101,27 +102,28 @@ fun AppNavHost(
             )
         },
     )
+    val chatViewModel: ChatViewModel = viewModel(
+        key = "chat-${session.childId}",
+        factory = simpleViewModelFactory {
+            ChatViewModel(
+                conversationSender = ConversationRepositoryMessageSender(
+                    repository = conversationRepository,
+                ),
+                attachmentRepository = attachmentRepository,
+                xiaozhantaiRepository = xiaozhantaiRepository,
+                growthEventRepository = growthEventRepository,
+                childId = session.childId,
+            )
+        },
+    )
 
     when (destination) {
         AppDestination.Chat -> {
-            val chatViewModel: ChatViewModel = viewModel(
-                key = "chat-${session.childId}",
-                factory = simpleViewModelFactory {
-                    ChatViewModel(
-                        conversationSender = ConversationRepositoryMessageSender(
-                            repository = conversationRepository,
-                        ),
-                        attachmentRepository = attachmentRepository,
-                        xiaozhantaiRepository = xiaozhantaiRepository,
-                        growthEventRepository = growthEventRepository,
-                        childId = session.childId,
-                    )
-                },
-            )
             ChildChatScreen(
                 onOpenParentSettings = { destination = AppDestination.ParentSettings },
                 onOpenParentReport = { destination = AppDestination.ParentReport },
                 onOpenXiaozhantai = { destination = AppDestination.XiaozhantaiList },
+                onOpenXiaozhantaiPicker = { destination = AppDestination.XiaozhantaiPickForStrangeDoor },
                 viewModel = chatViewModel,
                 requireParentCredential = true,
                 verifyParentCredential = parentCredentialVerifier::verify,
@@ -165,6 +167,19 @@ fun AppNavHost(
                 },
             )
         }
+        AppDestination.XiaozhantaiPickForStrangeDoor -> {
+            XiaozhantaiPickScreen(
+                viewModel = xiaozhantaiViewModel,
+                onBack = { destination = AppDestination.Chat },
+                onPickItem = { itemId ->
+                    val item = xiaozhantaiViewModel.uiState.value.items.firstOrNull { it.id == itemId }
+                    if (item != null) {
+                        chatViewModel.useXiaozhantaiItemForStrangeDoor(item)
+                    }
+                    destination = AppDestination.Chat
+                },
+            )
+        }
         AppDestination.XiaozhantaiDetail -> {
             XiaozhantaiDetailScreen(
                 viewModel = xiaozhantaiViewModel,
@@ -180,6 +195,7 @@ private enum class AppDestination {
     ParentSettings,
     ParentReport,
     XiaozhantaiList,
+    XiaozhantaiPickForStrangeDoor,
     XiaozhantaiDetail,
 }
 

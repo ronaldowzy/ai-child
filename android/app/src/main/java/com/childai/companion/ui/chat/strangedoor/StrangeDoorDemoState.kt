@@ -8,6 +8,7 @@ enum class StrangeDoorDemoState {
     PhotoResult,
     RiddlePrompt,
     RiddleHint,
+    ShowcaseItemResult,
     ShowcaseSaved,
     Completed,
 }
@@ -22,6 +23,7 @@ enum class StrangeDoorState(val wireName: String) {
 enum class StrangeDoorDemoMethod {
     Photo,
     Riddle,
+    Showcase,
 }
 
 enum class StrangeDoorMechanismType {
@@ -46,6 +48,7 @@ data class StrangeDoorDemoSnapshot(
     val lastTransformedName: String? = null,
     val lastPhotoTransform: StrangeDoorPhotoTransform? = null,
     val lastRiddleEvaluation: StrangeDoorRiddleEvaluation? = null,
+    val lastShowcaseAssistResult: StrangeDoorShowcaseAssistResult? = null,
     val lastPhotoMessageId: String? = null,
     val showcaseSaveIntentRequested: Boolean = false,
     val showcaseSavedName: String? = null,
@@ -91,6 +94,7 @@ object StrangeDoorDoorStateReducer {
             lastTransformedName = transform.transformedName,
             lastPhotoTransform = transform,
             lastRiddleEvaluation = null,
+            lastShowcaseAssistResult = null,
             lastPhotoMessageId = photoMessageId ?: snapshot.lastPhotoMessageId,
             showcaseSaveIntentRequested = false,
             showcaseSavedName = null,
@@ -115,7 +119,37 @@ object StrangeDoorDoorStateReducer {
             lastTransformedName = null,
             lastPhotoTransform = null,
             lastRiddleEvaluation = evaluation,
+            lastShowcaseAssistResult = null,
             riddleAttempts = snapshot.riddleAttempts + 1,
+            showcaseSaveIntentRequested = false,
+            showcaseSavedName = null,
+        )
+    }
+
+    fun applyShowcaseAssist(
+        snapshot: StrangeDoorDemoSnapshot,
+        result: StrangeDoorShowcaseAssistResult,
+    ): StrangeDoorDemoSnapshot {
+        if (snapshot.doorState == StrangeDoorState.Open) return snapshot
+        val nextDoorState = nextDoorState(
+            current = snapshot.doorState,
+            signal = StrangeDoorDoorAdvanceSignal.AdvanceOneStep,
+        )
+        return snapshot.copy(
+            demoState = if (nextDoorState == StrangeDoorState.Open) {
+                StrangeDoorDemoState.Completed
+            } else {
+                StrangeDoorDemoState.ShowcaseItemResult
+            },
+            doorState = nextDoorState,
+            attemptsCount = snapshot.attemptsCount + 1,
+            lastMethod = StrangeDoorDemoMethod.Showcase,
+            lastObjectName = result.itemName,
+            lastTransformedName = null,
+            lastPhotoTransform = null,
+            lastRiddleEvaluation = null,
+            lastShowcaseAssistResult = result,
+            lastPhotoMessageId = null,
             showcaseSaveIntentRequested = false,
             showcaseSavedName = null,
         )
@@ -133,6 +167,7 @@ object StrangeDoorDoorStateReducer {
                 demoState = StrangeDoorDemoState.PhotoPrompt,
                 lastMethod = StrangeDoorDemoMethod.Photo,
                 lastRiddleEvaluation = null,
+                lastShowcaseAssistResult = null,
                 showcaseSaveIntentRequested = false,
                 showcaseSavedName = null,
             )

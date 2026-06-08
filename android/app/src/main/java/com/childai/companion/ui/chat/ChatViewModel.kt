@@ -19,6 +19,7 @@ import com.childai.companion.data.growth.GROWTH_EVENT_TYPE_SHOWCASE_ITEM_RECALLE
 import com.childai.companion.data.growth.GrowthEvent
 import com.childai.companion.data.growth.GrowthEventRepository
 import com.childai.companion.data.showcase.SaveXiaozhantaiItemUseCase
+import com.childai.companion.data.showcase.XiaozhantaiItem
 import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
 import com.childai.companion.data.showcase.suggestedXiaozhantaiItemName
@@ -37,6 +38,7 @@ import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoRecognition
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransform
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorPhotoTransformMapper
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorRiddleEvaluator
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorShowcaseAssistMapper
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
 import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.voice.AudioSegment
@@ -302,6 +304,36 @@ class ChatViewModel(
         speakStrangeDoorSnapshot(nextSnapshot)
     }
 
+    fun useXiaozhantaiItemForStrangeDoor(item: XiaozhantaiItem) {
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
+        if (snapshot.doorState == StrangeDoorState.Open) return
+        openingDeferredByStrangeDoor = !openingRequested
+        childInteractionStarted = true
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        val result = StrangeDoorShowcaseAssistMapper.map(item)
+        val nextSnapshot = StrangeDoorDoorStateReducer.applyShowcaseAssist(
+            snapshot = snapshot,
+            result = result,
+        )
+        _uiState.update { state ->
+            state.copy(
+                strangeDoorDemo = nextSnapshot,
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                pendingImageContext = null,
+                isSending = false,
+                xiaozhantaiSaveDraft = null,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        speakStrangeDoorSnapshot(nextSnapshot)
+    }
+
     fun requestStrangeDoorShowcaseSaveIntent() {
         val snapshot = _uiState.value.strangeDoorDemo ?: return
         val transform = snapshot.lastPhotoTransform ?: return
@@ -423,6 +455,7 @@ class ChatViewModel(
                     } else {
                         snapshot.lastRiddleEvaluation
                     },
+                    lastShowcaseAssistResult = null,
                     showcaseSavedName = null,
                     showcaseSaveIntentRequested = false,
                 ),
@@ -850,6 +883,7 @@ class ChatViewModel(
                         demoState = StrangeDoorDemoState.PhotoUploading,
                         lastMethod = StrangeDoorDemoMethod.Photo,
                         lastPhotoMessageId = childPhotoMessageId,
+                        lastShowcaseAssistResult = null,
                         showcaseSaveIntentRequested = false,
                     )
                 } else {
@@ -974,6 +1008,7 @@ class ChatViewModel(
                 strangeDoorDemo = if (isStrangeDoorPhoto) {
                     state.strangeDoorDemo?.copy(
                         demoState = StrangeDoorDemoState.PhotoUploading,
+                        lastShowcaseAssistResult = null,
                         showcaseSaveIntentRequested = false,
                     )
                 } else {

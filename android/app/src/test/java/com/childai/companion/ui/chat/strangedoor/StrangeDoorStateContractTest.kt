@@ -150,6 +150,7 @@ class StrangeDoorStateContractTest {
         assertEquals(null, next.lastTransformedName)
         assertEquals(null, next.lastPhotoTransform)
         assertEquals(null, next.lastRiddleEvaluation)
+        assertEquals(null, next.lastShowcaseAssistResult)
         assertEquals(null, next.lastPhotoMessageId)
         assertFalse(next.showcaseSaveIntentRequested)
         assertEquals(null, next.showcaseSavedName)
@@ -204,5 +205,66 @@ class StrangeDoorStateContractTest {
         assertEquals(0, next.attemptsCount)
         assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
         assertEquals(null, next.lastPhotoMessageId)
+    }
+
+    @Test
+    fun showcaseAssistAdvancesClosedToCrackedAndKeepsResultLocal() {
+        val next = StrangeDoorDoorStateReducer.applyShowcaseAssist(
+            snapshot = StrangeDoorDemoSnapshot(),
+            result = StrangeDoorShowcaseAssistResult(
+                itemName = "蓝盖盖转轮",
+                doorEffect = "门上的圆锁轻轻转了一小下",
+            ),
+        )
+
+        assertEquals(StrangeDoorDemoState.ShowcaseItemResult, next.demoState)
+        assertEquals(StrangeDoorState.Cracked, next.doorState)
+        assertEquals(StrangeDoorDemoMethod.Showcase, next.lastMethod)
+        assertEquals(1, next.attemptsCount)
+        assertEquals("蓝盖盖转轮", next.lastObjectName)
+        assertEquals("蓝盖盖转轮", next.lastShowcaseAssistResult?.itemName)
+        assertEquals(null, next.lastPhotoTransform)
+        assertEquals(null, next.lastRiddleEvaluation)
+        assertEquals(null, next.lastPhotoMessageId)
+        assertFalse(next.showcaseSaveIntentRequested)
+    }
+
+    @Test
+    fun showcaseAssistAdvancesCrackedToAlmostOpen() {
+        val next = StrangeDoorDoorStateReducer.applyShowcaseAssist(
+            snapshot = StrangeDoorDemoSnapshot(
+                demoState = StrangeDoorDemoState.ShowcaseItemResult,
+                doorState = StrangeDoorState.Cracked,
+                attemptsCount = 1,
+            ),
+            result = StrangeDoorShowcaseAssistResult(
+                itemName = "蓝盖盖转轮",
+                doorEffect = "门上的圆锁轻轻转了一小下",
+            ),
+        )
+
+        assertEquals(StrangeDoorDemoState.ShowcaseItemResult, next.demoState)
+        assertEquals(StrangeDoorState.AlmostOpen, next.doorState)
+        assertEquals(2, next.attemptsCount)
+    }
+
+    @Test
+    fun showcaseAssistFromAlmostOpenFinishesInCompletedState() {
+        val next = StrangeDoorDoorStateReducer.applyShowcaseAssist(
+            snapshot = StrangeDoorDemoSnapshot(
+                demoState = StrangeDoorDemoState.ShowcaseItemResult,
+                doorState = StrangeDoorState.AlmostOpen,
+                attemptsCount = 2,
+            ),
+            result = StrangeDoorShowcaseAssistResult(
+                itemName = "蓝盖盖转轮",
+                doorEffect = "门上的圆锁轻轻转了一小下",
+            ),
+        )
+
+        assertEquals(StrangeDoorDemoState.Completed, next.demoState)
+        assertEquals(StrangeDoorState.Open, next.doorState)
+        assertTrue(next.isCompleted)
+        assertEquals(3, next.attemptsCount)
     }
 }

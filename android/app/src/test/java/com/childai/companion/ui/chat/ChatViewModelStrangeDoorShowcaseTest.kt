@@ -16,6 +16,7 @@ import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorHomeEventActionId
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorShapeHint
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
 import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.voice.SpeechInputController
 import com.childai.companion.voice.SpeechInputResult
@@ -229,6 +230,67 @@ class ChatViewModelStrangeDoorShowcaseTest {
         assertEquals(0, showcaseRepository.softDeleteCalls)
     }
 
+    @Test
+    fun usingShowcaseItemForStrangeDoorReturnsLocalResultWithoutSavingOrConversation() {
+        val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
+        val growthRepository = CapturingStrangeDoorGrowthRepository()
+        val sender = CapturingStrangeDoorShowcaseConversationSender()
+        val viewModel = saveablePhotoViewModel(
+            showcaseRepository = showcaseRepository,
+            growthEventRepository = growthRepository,
+            conversationSender = sender,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.useXiaozhantaiItemForStrangeDoor(savedItem(name = "蓝盖盖转轮"))
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        val model = snapshot.toHomeEventUiModel()
+        assertEquals(StrangeDoorDemoState.ShowcaseItemResult, snapshot.demoState)
+        assertEquals(StrangeDoorState.Cracked, snapshot.doorState)
+        assertEquals("蓝盖盖转轮", snapshot.lastShowcaseAssistResult?.itemName)
+        assertTrue(model.bubbleLines.first().contains("又来帮忙啦"))
+        assertEquals(
+            listOf("再找一个", "动脑试试"),
+            model.actions.map { it.label },
+        )
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.SaveToShowcase })
+        assertNull(showcaseRepository.savedRequest)
+        assertNull(growthRepository.appendedEvent)
+        assertEquals(0, showcaseRepository.softDeleteCalls)
+        assertEquals(0, sender.sendCalls)
+        assertEquals(0, sender.streamCalls)
+    }
+
+    @Test
+    fun repeatedShowcaseAssistAdvancesToCompletedAfterAlmostOpen() {
+        val viewModel = saveablePhotoViewModel()
+        val item = savedItem(name = "蓝盖盖转轮")
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.useXiaozhantaiItemForStrangeDoor(item)
+        assertEquals(StrangeDoorState.Cracked, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+        viewModel.useXiaozhantaiItemForStrangeDoor(item)
+        assertEquals(StrangeDoorState.AlmostOpen, requireNotNull(viewModel.uiState.value.strangeDoorDemo).doorState)
+
+        viewModel.requestAnotherStrangeDoorPhoto()
+        viewModel.useXiaozhantaiItemForStrangeDoor(item)
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(StrangeDoorDemoState.Completed, snapshot.demoState)
+        assertEquals(StrangeDoorState.Open, snapshot.doorState)
+        assertEquals(
+            listOf("再玩一次", "再找一个", "去小展台看看", "先聊别的"),
+            model.actions.map { it.label },
+        )
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.OpenShowcasePicker })
+    }
+
     private fun saveablePhotoViewModel(
         showcaseRepository: XiaozhantaiRepository = CapturingStrangeDoorShowcaseRepository(),
         growthEventRepository: GrowthEventRepository? = null,
@@ -270,6 +332,18 @@ class ChatViewModelStrangeDoorShowcaseTest {
             mimeType = "image/jpeg",
             fileName = "strange-door-showcase.jpg",
             previewBytes = byteArrayOf(4, 5),
+        )
+    }
+
+    private fun savedItem(name: String): XiaozhantaiItem {
+        return XiaozhantaiItem(
+            id = "stand_item_saved",
+            photoUri = "/tmp/synthetic-saved-item.jpg",
+            name = name,
+            foxQuote = "门上的圆锁轻轻转了一小下",
+            createdAt = 1_700_000_000L,
+            source = "strange_door",
+            isDeleted = false,
         )
     }
 

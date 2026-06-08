@@ -17,6 +17,22 @@ class XiaozhantaiGalleryContractTest {
     }
 
     @Test
+    fun pickerCopyUsesApprovedS5TextWithoutChangingGalleryTitle() {
+        assertEquals("我的小展台", XiaozhantaiGalleryCopy.title)
+        assertEquals("选一个小发现", XiaozhantaiPickCopy.title)
+        assertEquals("小展台还空空的", XiaozhantaiPickCopy.emptyLineOne)
+        assertEquals("我们先找一个东西拍给小白狐看", XiaozhantaiPickCopy.emptyLineTwo)
+        assertEquals(
+            listOf(
+                "选一个小发现",
+                "小展台还空空的",
+                "我们先找一个东西拍给小白狐看",
+            ),
+            XiaozhantaiPickCopy.approvedChildFacingCopy(),
+        )
+    }
+
+    @Test
     fun listCardModelContainsThumbnailNameAndSavedTime() {
         val item = XiaozhantaiItem(
             id = "stand_item_1",
@@ -72,6 +88,11 @@ class XiaozhantaiGalleryContractTest {
         )
 
         XiaozhantaiGalleryCopy.approvedChildFacingCopy().forEach { copy ->
+            forbidden.forEach { marker ->
+                assertFalse("$copy should not contain $marker", copy.contains(marker))
+            }
+        }
+        XiaozhantaiPickCopy.approvedChildFacingCopy().forEach { copy ->
             forbidden.forEach { marker ->
                 assertFalse("$copy should not contain $marker", copy.contains(marker))
             }

@@ -89,6 +89,20 @@ internal object XiaozhantaiGalleryCopy {
     }
 }
 
+internal object XiaozhantaiPickCopy {
+    const val title = "选一个小发现"
+    const val emptyLineOne = "小展台还空空的"
+    const val emptyLineTwo = "我们先找一个东西拍给小白狐看"
+
+    fun approvedChildFacingCopy(): List<String> {
+        return listOf(
+            title,
+            emptyLineOne,
+            emptyLineTwo,
+        )
+    }
+}
+
 internal data class XiaozhantaiGalleryCardUiModel(
     val id: String,
     val photoUri: String,
@@ -136,6 +150,26 @@ fun XiaozhantaiListScreen(
 }
 
 @Composable
+fun XiaozhantaiPickScreen(
+    viewModel: XiaozhantaiViewModel,
+    onBack: () -> Unit,
+    onPickItem: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    XiaozhantaiListContent(
+        items = uiState.items,
+        onBack = onBack,
+        onOpenItem = onPickItem,
+        modifier = modifier,
+        title = XiaozhantaiPickCopy.title,
+        emptyLineOne = XiaozhantaiPickCopy.emptyLineOne,
+        emptyLineTwo = XiaozhantaiPickCopy.emptyLineTwo,
+        showEmptyIllustration = false,
+    )
+}
+
+@Composable
 fun XiaozhantaiDetailScreen(
     viewModel: XiaozhantaiViewModel,
     itemId: String?,
@@ -163,14 +197,21 @@ internal fun XiaozhantaiListContent(
     onBack: () -> Unit,
     onOpenItem: (String) -> Unit,
     modifier: Modifier = Modifier,
+    title: String = XiaozhantaiGalleryCopy.title,
+    emptyLineOne: String = XiaozhantaiGalleryCopy.emptyLineOne,
+    emptyLineTwo: String = XiaozhantaiGalleryCopy.emptyLineTwo,
+    showEmptyIllustration: Boolean = true,
 ) {
     XiaozhantaiScaffold(
-        title = XiaozhantaiGalleryCopy.title,
+        title = title,
         onBack = onBack,
         modifier = modifier,
     ) { contentPadding ->
         if (items.isEmpty()) {
             XiaozhantaiEmptyState(
+                lineOne = emptyLineOne,
+                lineTwo = emptyLineTwo,
+                showIllustration = showEmptyIllustration,
                 modifier = Modifier
                     .padding(contentPadding)
                     .fillMaxSize(),
@@ -299,6 +340,9 @@ private fun XiaozhantaiScaffold(
 
 @Composable
 private fun XiaozhantaiEmptyState(
+    lineOne: String = XiaozhantaiGalleryCopy.emptyLineOne,
+    lineTwo: String = XiaozhantaiGalleryCopy.emptyLineTwo,
+    showIllustration: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -306,17 +350,19 @@ private fun XiaozhantaiEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.xzt_empty_display),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 260.dp),
-        )
-        Spacer(modifier = Modifier.height(18.dp))
+        if (showIllustration) {
+            Image(
+                painter = painterResource(id = R.drawable.xzt_empty_display),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 260.dp),
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+        }
         Text(
-            text = XiaozhantaiGalleryCopy.emptyLineOne,
+            text = lineOne,
             style = MaterialTheme.typography.titleMedium,
             color = Color(0xFF52667B),
             textAlign = TextAlign.Center,
@@ -324,7 +370,7 @@ private fun XiaozhantaiEmptyState(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = XiaozhantaiGalleryCopy.emptyLineTwo,
+            text = lineTwo,
             style = MaterialTheme.typography.bodyLarge,
             color = Color(0xFF52667B).copy(alpha = 0.86f),
             textAlign = TextAlign.Center,

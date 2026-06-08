@@ -1,5 +1,6 @@
 package com.childai.companion.ui.chat.strangedoor
 
+import com.childai.companion.ui.showcase.XiaozhantaiPickCopy
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
@@ -42,7 +43,9 @@ class StrangeDoorForbiddenWordsTest {
         )
         val approvedCopy = StrangeDoorPhotoTransformMapper.approvedChildFacingCopy() +
             StrangeDoorRiddleEvaluator.approvedChildFacingCopy() +
-            StrangeDoorHomeEventCopy.approvedChildFacingCopy()
+            StrangeDoorHomeEventCopy.approvedChildFacingCopy() +
+            StrangeDoorShowcaseAssistMapper.approvedChildFacingCopy() +
+            XiaozhantaiPickCopy.approvedChildFacingCopy()
 
         approvedCopy.forEach { line ->
             forbiddenWords.forEach { forbidden ->

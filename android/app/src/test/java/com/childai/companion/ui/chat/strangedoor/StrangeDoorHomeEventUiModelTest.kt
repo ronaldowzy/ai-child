@@ -81,11 +81,12 @@ class StrangeDoorHomeEventUiModelTest {
             model.bubbleLines,
         )
         assertEquals(
-            listOf("拍给小白狐看", "先换个办法"),
+            listOf("拍给小白狐看", "用小展台里的", "先换个办法"),
             model.actions.map { it.label },
         )
         assertTrue(model.actions.first().enabled)
         assertEquals(StrangeDoorHomeEventActionId.OpenPhotoCapture, model.actions.first().id)
+        assertEquals(StrangeDoorHomeEventActionId.OpenShowcasePicker, model.actions[1].id)
     }
 
     @Test
@@ -185,6 +186,7 @@ class StrangeDoorHomeEventUiModelTest {
             listOf("再玩一次", "再找一个", "去小展台看看", "先聊别的"),
             model.actions.map { it.label },
         )
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.OpenShowcasePicker })
         assertEquals(
             listOf(
                 StrangeDoorHomeEventActionId.ReplayDemo,
@@ -196,6 +198,36 @@ class StrangeDoorHomeEventUiModelTest {
         )
         assertFalse(model.showPhotoResultCard)
         assertFalse(model.showDoorSuccessGlow)
+    }
+
+    @Test
+    fun showcaseItemResultUsesApprovedCopyAndDoesNotOfferSaveAgain() {
+        val snapshot = StrangeDoorDoorStateReducer.applyShowcaseAssist(
+            snapshot = StrangeDoorDemoSnapshot(),
+            result = StrangeDoorShowcaseAssistResult(
+                itemName = "蓝盖盖转轮",
+                doorEffect = "门上的圆锁轻轻转了一小下",
+            ),
+        )
+        val model = snapshot.toHomeEventUiModel()
+
+        assertEquals(StrangeDoorDemoState.ShowcaseItemResult, snapshot.demoState)
+        assertEquals(StrangeDoorHomeEventPanel.ToolCard, model.panel)
+        assertEquals(
+            listOf(
+                "蓝盖盖转轮 又来帮忙啦",
+                "",
+                "小白狐把它轻轻放到门前",
+                "门上的圆锁轻轻转了一小下",
+            ),
+            model.bubbleLines,
+        )
+        assertEquals(
+            listOf("再找一个", "动脑试试"),
+            model.actions.map { it.label },
+        )
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.SaveToShowcase })
+        assertTrue(model.showDoorSuccessGlow)
     }
 
     @Test

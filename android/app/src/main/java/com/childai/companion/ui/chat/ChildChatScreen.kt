@@ -145,6 +145,7 @@ fun ChildChatScreen(
     onOpenParentSettings: () -> Unit = {},
     onOpenParentReport: () -> Unit = {},
     onOpenXiaozhantai: () -> Unit = {},
+    onOpenXiaozhantaiPicker: () -> Unit = {},
     viewModel: ChatViewModel = viewModel(),
     requireParentCredential: Boolean = false,
     verifyParentCredential: suspend (String) -> Boolean = { false },
@@ -216,6 +217,7 @@ fun ChildChatScreen(
         onStrangeDoorReplayDemo = viewModel::replayStrangeDoorDemo,
         onStrangeDoorFindAnother = viewModel::requestAnotherStrangeDoorPhoto,
         onStrangeDoorOpenShowcase = onOpenXiaozhantai,
+        onStrangeDoorOpenShowcasePicker = onOpenXiaozhantaiPicker,
         onStrangeDoorSaveIntent = viewModel::requestStrangeDoorShowcaseSaveIntent,
         onStrangeDoorRetryRiddle = viewModel::retryStrangeDoorRiddle,
         onStrangeDoorExitDemo = viewModel::exitStrangeDoorDemoAndRequestOpening,
@@ -252,6 +254,7 @@ private fun ChildChatScreenContent(
     onStrangeDoorReplayDemo: () -> Unit,
     onStrangeDoorFindAnother: () -> Unit,
     onStrangeDoorOpenShowcase: () -> Unit,
+    onStrangeDoorOpenShowcasePicker: () -> Unit,
     onStrangeDoorSaveIntent: () -> Unit,
     onStrangeDoorRetryRiddle: () -> Unit,
     onStrangeDoorExitDemo: () -> Unit,
@@ -522,6 +525,7 @@ private fun ChildChatScreenContent(
                     onReplayDemo = onStrangeDoorReplayDemo,
                     onFindAnother = onStrangeDoorFindAnother,
                     onOpenShowcase = onStrangeDoorOpenShowcase,
+                    onOpenShowcasePicker = onStrangeDoorOpenShowcasePicker,
                     onSaveIntent = onStrangeDoorSaveIntent,
                     onRetryRiddle = onStrangeDoorRetryRiddle,
                     onExitDemo = onStrangeDoorExitDemo,
@@ -691,6 +695,7 @@ private fun StrangeDoorHomeEventScreen(
     onReplayDemo: () -> Unit,
     onFindAnother: () -> Unit,
     onOpenShowcase: () -> Unit,
+    onOpenShowcasePicker: () -> Unit,
     onSaveIntent: () -> Unit,
     onRetryRiddle: () -> Unit,
     onExitDemo: () -> Unit,
@@ -709,6 +714,7 @@ private fun StrangeDoorHomeEventScreen(
             StrangeDoorHomeEventActionId.ReplayDemo -> onReplayDemo()
             StrangeDoorHomeEventActionId.FindAnother -> onFindAnother()
             StrangeDoorHomeEventActionId.OpenShowcase -> onOpenShowcase()
+            StrangeDoorHomeEventActionId.OpenShowcasePicker -> onOpenShowcasePicker()
             StrangeDoorHomeEventActionId.SaveToShowcase -> onSaveIntent()
             StrangeDoorHomeEventActionId.RetryRiddle -> onRetryRiddle()
             StrangeDoorHomeEventActionId.ExitDemo -> onExitDemo()
@@ -3510,6 +3516,7 @@ private fun ChildChatScreenPortraitPreview() {
             onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorOpenShowcase = {},
+            onStrangeDoorOpenShowcasePicker = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
@@ -3555,6 +3562,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorOpenShowcase = {},
+            onStrangeDoorOpenShowcasePicker = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
@@ -3609,6 +3617,7 @@ private fun ChildChatScreenLandscapePreview() {
             onStrangeDoorReplayDemo = {},
             onStrangeDoorFindAnother = {},
             onStrangeDoorOpenShowcase = {},
+            onStrangeDoorOpenShowcasePicker = {},
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},

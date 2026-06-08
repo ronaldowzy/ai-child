@@ -4,6 +4,7 @@ enum class StrangeDoorHomeEventActionId {
     ChoosePhoto,
     ChooseRiddle,
     OpenPhotoCapture,
+    OpenShowcasePicker,
     SwitchMethod,
     FindAnother,
     SaveToShowcase,
@@ -46,6 +47,7 @@ object StrangeDoorHomeEventCopy {
     const val choosePhotoLabel = "找东西帮忙"
     const val chooseRiddleLabel = "动脑试试"
     const val openPhotoCaptureLabel = "拍给小白狐看"
+    const val openShowcasePickerLabel = "用小展台里的"
     const val switchMethodLabel = "先换个办法"
     const val replayDemoLabel = "再玩一次"
     const val findAnotherLabel = "再找一个"
@@ -102,6 +104,7 @@ object StrangeDoorHomeEventCopy {
             choosePhotoLabel,
             chooseRiddleLabel,
             openPhotoCaptureLabel,
+            openShowcasePickerLabel,
             switchMethodLabel,
             replayDemoLabel,
             findAnotherLabel,
@@ -126,6 +129,7 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
     return when (demoState) {
         StrangeDoorDemoState.Completed -> completedUiModel()
         StrangeDoorDemoState.PhotoResult -> resultUiModelOrChoosingMethod()
+        StrangeDoorDemoState.ShowcaseItemResult -> showcaseItemResultUiModelOrChoosingMethod()
         StrangeDoorDemoState.ShowcaseSaved -> showcaseSavedUiModelOrChoosingMethod()
 
         StrangeDoorDemoState.PhotoPrompt,
@@ -137,6 +141,11 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
                 StrangeDoorHomeEventAction(
                     id = StrangeDoorHomeEventActionId.OpenPhotoCapture,
                     label = StrangeDoorHomeEventCopy.openPhotoCaptureLabel,
+                    enabled = demoState != StrangeDoorDemoState.PhotoUploading,
+                ),
+                StrangeDoorHomeEventAction(
+                    id = StrangeDoorHomeEventActionId.OpenShowcasePicker,
+                    label = StrangeDoorHomeEventCopy.openShowcasePickerLabel,
                     enabled = demoState != StrangeDoorDemoState.PhotoUploading,
                 ),
                 StrangeDoorHomeEventAction(
@@ -190,6 +199,27 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
         StrangeDoorDemoState.NotStarted,
         StrangeDoorDemoState.ChoosingMethod -> choosingMethodUiModel()
     }
+}
+
+private fun StrangeDoorDemoSnapshot.showcaseItemResultUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {
+    val result = lastShowcaseAssistResult ?: return choosingMethodUiModel()
+    return StrangeDoorHomeEventUiModel(
+        title = StrangeDoorHomeEventCopy.title,
+        panel = StrangeDoorHomeEventPanel.ToolCard,
+        bubbleLines = StrangeDoorShowcaseAssistMapper.feedbackLines(result),
+        actions = listOf(
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.FindAnother,
+                label = StrangeDoorHomeEventCopy.findAnotherLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ChooseRiddle,
+                label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+            ),
+        ),
+        doorAssetKey = doorState.toAssetKey(),
+        showDoorSuccessGlow = doorState != StrangeDoorState.Closed,
+    )
 }
 
 private fun StrangeDoorDemoSnapshot.showcaseSavedUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {

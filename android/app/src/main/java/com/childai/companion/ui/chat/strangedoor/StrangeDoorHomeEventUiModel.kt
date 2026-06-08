@@ -42,20 +42,6 @@ data class StrangeDoorHomeEventUiModel(
 object StrangeDoorHomeEventCopy {
     const val title = "奇怪小门挡住了小白狐"
 
-    val choosingBubbleLines = listOf(
-        "你来得正好",
-        "我被这扇奇怪小门挡住了",
-        "它说：",
-        "找一个圆圆的东西",
-        "或者答对一个怪问题",
-    )
-
-    val photoPromptLines = listOf(
-        "找一个有点圆的东西就行",
-        "瓶盖、杯子、球、纽扣都可以",
-        "奇怪一点也可以",
-    )
-
     const val riddleQuestion = "什么东西越洗越脏？"
     const val choosePhotoLabel = "找东西帮忙"
     const val chooseRiddleLabel = "动脑试试"
@@ -76,7 +62,40 @@ object StrangeDoorHomeEventCopy {
         "我们先看到这里",
     )
 
+    fun choosingBubbleLines(mechanismType: StrangeDoorMechanismType): List<String> {
+        return listOf(
+            "你来得正好",
+            "我被这扇奇怪小门挡住了",
+            "它说：",
+            "找一个${mechanismType.doorNeedLabel()}的东西",
+            "或者答对一个怪问题",
+        )
+    }
+
+    fun photoPromptLines(mechanismType: StrangeDoorMechanismType): List<String> {
+        return when (mechanismType) {
+            StrangeDoorMechanismType.Round -> listOf(
+                "找一个有点圆的东西就行",
+                "瓶盖、杯子、球、纽扣都可以",
+                "奇怪一点也可以",
+            )
+            StrangeDoorMechanismType.Soft -> listOf(
+                "找一个软软的东西就行",
+                "毛巾、抱枕、布娃娃、纸巾都可以",
+                "奇怪一点也可以",
+            )
+            StrangeDoorMechanismType.Shiny -> listOf(
+                "找一个有点亮的东西就行",
+                "勺子、杯盖、小灯、亮亮的贴纸都可以",
+                "奇怪一点也可以",
+            )
+        }
+    }
+
     fun approvedChildFacingCopy(): List<String> {
+        val mechanismCopy = StrangeDoorMechanismType.entries.flatMap { mechanismType ->
+            choosingBubbleLines(mechanismType) + photoPromptLines(mechanismType)
+        }
         return listOf(
             title,
             riddleQuestion,
@@ -91,7 +110,15 @@ object StrangeDoorHomeEventCopy {
             exitDemoLabel,
             showcaseSavedSuffix,
             showcaseSavedSecondLine,
-        ) + choosingBubbleLines + photoPromptLines + completedLines
+        ) + mechanismCopy + completedLines
+    }
+
+    private fun StrangeDoorMechanismType.doorNeedLabel(): String {
+        return when (this) {
+            StrangeDoorMechanismType.Round -> "圆圆"
+            StrangeDoorMechanismType.Soft -> "软软"
+            StrangeDoorMechanismType.Shiny -> "亮亮"
+        }
     }
 }
 
@@ -105,7 +132,7 @@ fun StrangeDoorDemoSnapshot.toHomeEventUiModel(): StrangeDoorHomeEventUiModel {
         StrangeDoorDemoState.PhotoUploading -> StrangeDoorHomeEventUiModel(
             title = StrangeDoorHomeEventCopy.title,
             panel = StrangeDoorHomeEventPanel.ToolCard,
-            bubbleLines = StrangeDoorHomeEventCopy.photoPromptLines,
+            bubbleLines = StrangeDoorHomeEventCopy.photoPromptLines(mechanismType),
             actions = listOf(
                 StrangeDoorHomeEventAction(
                     id = StrangeDoorHomeEventActionId.OpenPhotoCapture,
@@ -270,7 +297,7 @@ private fun StrangeDoorDemoSnapshot.choosingMethodUiModel(): StrangeDoorHomeEven
     return StrangeDoorHomeEventUiModel(
         title = StrangeDoorHomeEventCopy.title,
         panel = StrangeDoorHomeEventPanel.SpeechBubble,
-        bubbleLines = StrangeDoorHomeEventCopy.choosingBubbleLines,
+        bubbleLines = StrangeDoorHomeEventCopy.choosingBubbleLines(mechanismType),
         actions = listOf(
             StrangeDoorHomeEventAction(
                 id = StrangeDoorHomeEventActionId.ChoosePhoto,

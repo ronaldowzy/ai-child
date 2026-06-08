@@ -9,6 +9,7 @@ import com.childai.companion.data.conversation.ConversationReply
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorMechanismType
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorShapeHint
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +70,34 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
     }
 
     @Test
+    fun recognizedContentUsesCurrentMechanismWhenMappingPhoto() {
+        val viewModel = viewModel(
+            attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
+                response = attachmentResponse(
+                    recognizedType = "image_observation",
+                    recognizedText = "图片里有一条毛巾",
+                    confidence = 0.92,
+                ),
+            ),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.replayStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        val transform = requireNotNull(snapshot.lastPhotoTransform)
+        assertEquals(StrangeDoorMechanismType.Soft, snapshot.mechanismType)
+        assertEquals(StrangeDoorDemoState.PhotoResult, snapshot.demoState)
+        assertEquals(StrangeDoorState.Cracked, snapshot.doorState)
+        assertEquals(StrangeDoorShapeHint.Soft, transform.shapeHint)
+        assertEquals("毛巾", transform.objectName)
+        assertEquals("轻轻擦门布", transform.transformedName)
+        assertTrue(transform.canSaveToShowcase)
+    }
+
+    @Test
     fun repeatedValidPhotosAdvanceToAlmostOpenThenOpen() {
         val viewModel = viewModel(
             attachmentRepository = ImmediateStrangeDoorAttachmentRepository(
@@ -118,6 +147,7 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
         assertEquals(StrangeDoorDemoState.PhotoPrompt, snapshot.demoState)
         assertEquals(StrangeDoorState.Cracked, snapshot.doorState)
+        assertEquals(StrangeDoorMechanismType.Round, snapshot.mechanismType)
     }
 
     @Test
@@ -145,6 +175,7 @@ class ChatViewModelStrangeDoorPhotoTransformTest {
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
         assertEquals(StrangeDoorDemoState.PhotoPrompt, snapshot.demoState)
         assertEquals(StrangeDoorState.Closed, snapshot.doorState)
+        assertEquals(StrangeDoorMechanismType.Round, snapshot.mechanismType)
         assertEquals(0, snapshot.attemptsCount)
         assertNull(snapshot.lastPhotoTransform)
         assertNull(snapshot.lastRiddleEvaluation)

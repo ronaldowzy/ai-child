@@ -24,6 +24,12 @@ enum class StrangeDoorDemoMethod {
     Riddle,
 }
 
+enum class StrangeDoorMechanismType {
+    Round,
+    Soft,
+    Shiny,
+}
+
 enum class StrangeDoorDoorAdvanceSignal {
     None,
     AdvanceOneStep,
@@ -33,6 +39,7 @@ enum class StrangeDoorDoorAdvanceSignal {
 data class StrangeDoorDemoSnapshot(
     val demoState: StrangeDoorDemoState = StrangeDoorDemoState.ChoosingMethod,
     val doorState: StrangeDoorState = StrangeDoorState.Closed,
+    val mechanismType: StrangeDoorMechanismType = StrangeDoorMechanismType.Round,
     val attemptsCount: Int = 0,
     val lastMethod: StrangeDoorDemoMethod? = null,
     val lastObjectName: String? = null,
@@ -116,7 +123,9 @@ object StrangeDoorDoorStateReducer {
 
     fun reset(): StrangeDoorDemoSnapshot = StrangeDoorDemoSnapshot()
 
-    fun replay(): StrangeDoorDemoSnapshot = reset()
+    fun replay(snapshot: StrangeDoorDemoSnapshot): StrangeDoorDemoSnapshot {
+        return reset().copy(mechanismType = snapshot.mechanismType.next())
+    }
 
     fun requestAnotherPhoto(snapshot: StrangeDoorDemoSnapshot): StrangeDoorDemoSnapshot {
         if (snapshot.doorState != StrangeDoorState.Open) {
@@ -130,7 +139,16 @@ object StrangeDoorDoorStateReducer {
         }
         return reset().copy(
             demoState = StrangeDoorDemoState.PhotoPrompt,
+            mechanismType = snapshot.mechanismType,
             lastMethod = StrangeDoorDemoMethod.Photo,
         )
+    }
+
+    private fun StrangeDoorMechanismType.next(): StrangeDoorMechanismType {
+        return when (this) {
+            StrangeDoorMechanismType.Round -> StrangeDoorMechanismType.Soft
+            StrangeDoorMechanismType.Soft -> StrangeDoorMechanismType.Shiny
+            StrangeDoorMechanismType.Shiny -> StrangeDoorMechanismType.Round
+        }
     }
 }

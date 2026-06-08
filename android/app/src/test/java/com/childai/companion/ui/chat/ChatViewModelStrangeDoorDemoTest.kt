@@ -7,6 +7,7 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorMechanismType
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
@@ -70,6 +71,7 @@ class ChatViewModelStrangeDoorDemoTest {
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
         assertEquals(StrangeDoorDemoState.ChoosingMethod, snapshot.demoState)
         assertEquals(StrangeDoorState.Closed, snapshot.doorState)
+        assertEquals(StrangeDoorMechanismType.Round, snapshot.mechanismType)
         assertFalse(strangeDoorShouldShowNormalInputBar(viewModel.uiState.value))
     }
 
@@ -119,6 +121,7 @@ class ChatViewModelStrangeDoorDemoTest {
         val replayed = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
         assertEquals(StrangeDoorDemoState.ChoosingMethod, replayed.demoState)
         assertEquals(StrangeDoorState.Closed, replayed.doorState)
+        assertEquals(StrangeDoorMechanismType.Soft, replayed.mechanismType)
         assertEquals(0, replayed.attemptsCount)
         assertNull(replayed.lastPhotoTransform)
         assertNull(replayed.lastRiddleEvaluation)

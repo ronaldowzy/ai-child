@@ -122,7 +122,50 @@ class StrangeDoorStateContractTest {
         assertFalse(reset.isCompleted)
         assertEquals(StrangeDoorDemoState.ChoosingMethod, reset.demoState)
         assertEquals(StrangeDoorState.Closed, reset.doorState)
+        assertEquals(StrangeDoorMechanismType.Round, reset.mechanismType)
         assertEquals(0, reset.attemptsCount)
+    }
+
+    @Test
+    fun replayRotatesRoundToSoftAndClearsProcessState() {
+        val snapshot = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.Completed,
+            doorState = StrangeDoorState.Open,
+            mechanismType = StrangeDoorMechanismType.Round,
+            attemptsCount = 3,
+            lastObjectName = "蓝色瓶盖",
+            lastTransformedName = "蓝盖盖转轮",
+            lastPhotoMessageId = "child-photo-3",
+            showcaseSaveIntentRequested = true,
+            showcaseSavedName = "蓝盖盖转轮",
+        )
+
+        val next = StrangeDoorDoorStateReducer.replay(snapshot)
+
+        assertEquals(StrangeDoorDemoState.ChoosingMethod, next.demoState)
+        assertEquals(StrangeDoorState.Closed, next.doorState)
+        assertEquals(StrangeDoorMechanismType.Soft, next.mechanismType)
+        assertEquals(0, next.attemptsCount)
+        assertEquals(null, next.lastObjectName)
+        assertEquals(null, next.lastTransformedName)
+        assertEquals(null, next.lastPhotoTransform)
+        assertEquals(null, next.lastRiddleEvaluation)
+        assertEquals(null, next.lastPhotoMessageId)
+        assertFalse(next.showcaseSaveIntentRequested)
+        assertEquals(null, next.showcaseSavedName)
+    }
+
+    @Test
+    fun replayRotatesSoftToShinyThenRound() {
+        val shiny = StrangeDoorDoorStateReducer.replay(
+            StrangeDoorDemoSnapshot(mechanismType = StrangeDoorMechanismType.Soft),
+        )
+        val round = StrangeDoorDoorStateReducer.replay(
+            StrangeDoorDemoSnapshot(mechanismType = StrangeDoorMechanismType.Shiny),
+        )
+
+        assertEquals(StrangeDoorMechanismType.Shiny, shiny.mechanismType)
+        assertEquals(StrangeDoorMechanismType.Round, round.mechanismType)
     }
 
     @Test
@@ -130,6 +173,7 @@ class StrangeDoorStateContractTest {
         val snapshot = StrangeDoorDemoSnapshot(
             demoState = StrangeDoorDemoState.PhotoResult,
             doorState = StrangeDoorState.AlmostOpen,
+            mechanismType = StrangeDoorMechanismType.Soft,
             attemptsCount = 2,
         )
 
@@ -137,6 +181,7 @@ class StrangeDoorStateContractTest {
 
         assertEquals(StrangeDoorDemoState.PhotoPrompt, next.demoState)
         assertEquals(StrangeDoorState.AlmostOpen, next.doorState)
+        assertEquals(StrangeDoorMechanismType.Soft, next.mechanismType)
         assertEquals(2, next.attemptsCount)
         assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
     }
@@ -146,6 +191,7 @@ class StrangeDoorStateContractTest {
         val snapshot = StrangeDoorDemoSnapshot(
             demoState = StrangeDoorDemoState.Completed,
             doorState = StrangeDoorState.Open,
+            mechanismType = StrangeDoorMechanismType.Shiny,
             attemptsCount = 3,
             lastPhotoMessageId = "child-photo-3",
         )
@@ -154,6 +200,7 @@ class StrangeDoorStateContractTest {
 
         assertEquals(StrangeDoorDemoState.PhotoPrompt, next.demoState)
         assertEquals(StrangeDoorState.Closed, next.doorState)
+        assertEquals(StrangeDoorMechanismType.Shiny, next.mechanismType)
         assertEquals(0, next.attemptsCount)
         assertEquals(StrangeDoorDemoMethod.Photo, next.lastMethod)
         assertEquals(null, next.lastPhotoMessageId)

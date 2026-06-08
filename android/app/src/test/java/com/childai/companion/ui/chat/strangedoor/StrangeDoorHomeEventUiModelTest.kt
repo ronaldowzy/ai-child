@@ -34,6 +34,37 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
+    fun choosingMethodSwitchesDoorNeedForSoftAndShinyMechanisms() {
+        val soft = StrangeDoorDemoSnapshot(
+            mechanismType = StrangeDoorMechanismType.Soft,
+        ).toHomeEventUiModel()
+        val shiny = StrangeDoorDemoSnapshot(
+            mechanismType = StrangeDoorMechanismType.Shiny,
+        ).toHomeEventUiModel()
+
+        assertEquals(
+            listOf(
+                "你来得正好",
+                "我被这扇奇怪小门挡住了",
+                "它说：",
+                "找一个软软的东西",
+                "或者答对一个怪问题",
+            ),
+            soft.bubbleLines,
+        )
+        assertEquals(
+            listOf(
+                "你来得正好",
+                "我被这扇奇怪小门挡住了",
+                "它说：",
+                "找一个亮亮的东西",
+                "或者答对一个怪问题",
+            ),
+            shiny.bubbleLines,
+        )
+    }
+
+    @Test
     fun photoPromptUsesApprovedCopyAndEnabledPhotoEntry() {
         val model = StrangeDoorDemoSnapshot(
             demoState = StrangeDoorDemoState.PhotoPrompt,
@@ -55,6 +86,35 @@ class StrangeDoorHomeEventUiModelTest {
         )
         assertTrue(model.actions.first().enabled)
         assertEquals(StrangeDoorHomeEventActionId.OpenPhotoCapture, model.actions.first().id)
+    }
+
+    @Test
+    fun photoPromptSwitchesPromptForSoftAndShinyMechanisms() {
+        val soft = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+            mechanismType = StrangeDoorMechanismType.Soft,
+        ).toHomeEventUiModel()
+        val shiny = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.PhotoPrompt,
+            mechanismType = StrangeDoorMechanismType.Shiny,
+        ).toHomeEventUiModel()
+
+        assertEquals(
+            listOf(
+                "找一个软软的东西就行",
+                "毛巾、抱枕、布娃娃、纸巾都可以",
+                "奇怪一点也可以",
+            ),
+            soft.bubbleLines,
+        )
+        assertEquals(
+            listOf(
+                "找一个有点亮的东西就行",
+                "勺子、杯盖、小灯、亮亮的贴纸都可以",
+                "奇怪一点也可以",
+            ),
+            shiny.bubbleLines,
+        )
     }
 
     @Test

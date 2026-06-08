@@ -10,7 +10,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：奇怪小门 Demo：S3 退出与重玩收口已落地；R1-C / S2 仍为 CODE PASS / 待合并真机验收，真机视觉验收延期到后续合并真机测试。
+当前阶段：奇怪小门 Demo：S4 三种小机关已落地；R1-C / S2 / S3 / S4 仍为 CODE PASS / 待合并真机验收，真机视觉验收延期到后续合并真机测试。
 
 下一阶段主方向：
 儿童端吸引力试玩原型：奇怪小门 Demo。
@@ -32,7 +32,7 @@
 6. 变身反馈先用确定性模板 + 少量映射，不先做复杂模型生成。
 7. 不新增复杂后端成长系统，不新增多关卡持久化。
 8. 小展台只做结果承接和只读回看，不做主玩法。
-9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看，S3 已完成 Demo 完成态、保存完成态、退出与重玩的 Android 本地收口。
+9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看，S3 已完成 Demo 完成态、保存完成态、退出与重玩的 Android 本地收口，S4 已完成 Round / Soft / Shiny 三种小机关本地轮换。
 10. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
 
 当前事实源：
@@ -48,6 +48,9 @@ docs/session_process/handoffs/20260604_D0_strange_door_demo_plan.md
 docs/session_process/handoffs/20260606_S2_xiaozhantai_gallery_plan.md
 docs/session_process/handoffs/20260606_S3_strange_door_finish_replay_plan.md
 docs/session_process/handoffs/20260606_S3_strange_door_finish_replay_handoff.md
+docs/奇怪小门多机关重玩变体设计_2026_06_07_V0_1.md
+docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_plan.md
+docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handoff.md
 ```
 
 ---
@@ -92,7 +95,8 @@ docs/session_process/handoffs/20260606_S3_strange_door_finish_replay_handoff.md
 | R1-B | 拍照结果视觉增强 | done | `7081bf9` | 拍照结果页展示刚拍缩略图、变身道具卡和门状态变化，未新增功能、素材、后端或文案 |
 | R1-C | 首屏视觉层级与“小白狐被门挡住”表现优化 | done / pending-device-visual | `ce73e6e` | 首屏事件感代码侧优化已完成；当前无真机测试条件，视觉验收延期到后续合并真机测试 |
 | S2 | 我的小展台列表与详情 | done | `2968009` | 已复用现有本地小展台数据能力，实现只读列表和详情；隐藏再聊、删除 / 收起入口，不新增后端或复杂展台系统 |
-| S3 | Demo 退出与重玩收口 | done | 本提交 | 已新增完成态 / 保存完成态按钮，支持再玩一次、再找一个、去小展台看看、先聊别的；仅改 Android 本地状态 |
+| S3 | Demo 退出与重玩收口 | done | `e29d088` | 已新增完成态 / 保存完成态按钮，支持再玩一次、再找一个、去小展台看看、先聊别的；仅改 Android 本地状态 |
+| S4 | 三种小机关 | done / pending-device-qa | 本提交 | 已新增 Round / Soft / Shiny 本地机制；“再玩一次”轮换机关，“再找一个”不轮换；soft / shiny 使用主控词池，不改后端、小展台或素材 |
 | Q1 / Q2 | 真机试玩与 R1 视觉验收 | deferred | 待后续合并真机测试 | Redmi K60 / Honor Pad 5 验证第一眼事件感、“再找一个”动机、小展台回看和 R1 视觉体感 |
 
 ---

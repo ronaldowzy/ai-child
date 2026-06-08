@@ -225,12 +225,12 @@ class ChatViewModel(
     }
 
     fun replayStrangeDoorDemo() {
-        if (_uiState.value.strangeDoorDemo == null) return
+        val snapshot = _uiState.value.strangeDoorDemo ?: return
         strangeDoorDemoDismissed = false
         openingDeferredByStrangeDoor = !openingRequested
         cancelNaturalWaitingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
-        val nextSnapshot = StrangeDoorDoorStateReducer.replay()
+        val nextSnapshot = StrangeDoorDoorStateReducer.replay(snapshot)
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = nextSnapshot,
@@ -1327,6 +1327,7 @@ class ChatViewModel(
         }
         val transform = StrangeDoorPhotoTransformMapper.map(
             attachmentResponse.recognizedContent.toStrangeDoorPhotoRecognition(),
+            mechanismType = snapshot.mechanismType,
         )
         val nextSnapshot = StrangeDoorDoorStateReducer.applyPhotoResult(
             snapshot = snapshot,

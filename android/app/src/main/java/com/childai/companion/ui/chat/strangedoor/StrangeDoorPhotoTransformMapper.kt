@@ -8,6 +8,8 @@ data class StrangeDoorPhotoRecognition(
 
 enum class StrangeDoorShapeHint {
     Round,
+    Soft,
+    Shiny,
     Partial,
     Unknown,
     Blocked,
@@ -24,7 +26,11 @@ data class StrangeDoorPhotoTransform(
     val advanceSignal: StrangeDoorDoorAdvanceSignal,
 ) {
     val isGoodMatch: Boolean
-        get() = shapeHint == StrangeDoorShapeHint.Round && isUsable
+        get() = shapeHint in setOf(
+            StrangeDoorShapeHint.Round,
+            StrangeDoorShapeHint.Soft,
+            StrangeDoorShapeHint.Shiny,
+        ) && isUsable
 }
 
 object StrangeDoorPhotoTransformMapper {
@@ -82,7 +88,35 @@ object StrangeDoorPhotoTransformMapper {
         "球",
         "纽扣",
         "圆盘",
+        "饼干",
         "圆形",
+    )
+    private val softKeywords = listOf(
+        "毛巾",
+        "抱枕",
+        "布娃娃",
+        "纸巾",
+        "衣服",
+        "毯子",
+        "软",
+        "布",
+        "棉",
+        "毛",
+        "抱",
+        "垫",
+    )
+    private val shinyKeywords = listOf(
+        "勺子",
+        "杯盖",
+        "灯",
+        "金属",
+        "小贴纸",
+        "反光物",
+        "亮",
+        "闪",
+        "光",
+        "反光",
+        "银色",
     )
     private val partialKeywords = listOf(
         "铅笔",
@@ -124,6 +158,22 @@ object StrangeDoorPhotoTransformMapper {
         "小小帮忙块",
         "糊糊门铃",
     )
+    private val softToolNames = listOf(
+        "软云开门垫",
+        "抱抱小推垫",
+        "毛毛门铃",
+        "轻轻擦门布",
+        "软软通行垫",
+        "棉花小按钮",
+    )
+    private val shinyToolNames = listOf(
+        "小闪光转轮",
+        "亮亮照门灯",
+        "星星反光片",
+        "银色小钥匙",
+        "闪闪门铃",
+        "小光斑按钮",
+    )
     private val lightDoorEffects = listOf(
         DOOR_EFFECT_LIGHT_TURN,
         DOOR_EFFECT_WARM_WIND,
@@ -145,7 +195,10 @@ object StrangeDoorPhotoTransformMapper {
         DOOR_EFFECT_OPEN_LIGHT,
     )
 
-    fun map(recognition: StrangeDoorPhotoRecognition): StrangeDoorPhotoTransform {
+    fun map(
+        recognition: StrangeDoorPhotoRecognition,
+        mechanismType: StrangeDoorMechanismType = StrangeDoorMechanismType.Round,
+    ): StrangeDoorPhotoTransform {
         val type = recognition.recognizedType.trim().lowercase()
         val text = recognition.recognizedText.orEmpty()
         if (type in blockedTypes || blockedTextKeywords.any(text::contains)) {
@@ -161,11 +214,19 @@ object StrangeDoorPhotoTransformMapper {
             )
         }
 
-        val objectName = extractObjectName(text)
-        val shapeHint = shapeHintFor(text)
+        val objectName = extractObjectName(text, mechanismType)
+        val shapeHint = shapeHintFor(text, mechanismType)
         val canSaveToShowcase = type !in unsaveableTypes && recognition.confidence >= 0.5
         return when (shapeHint) {
             StrangeDoorShapeHint.Round -> roundTransform(
+                objectName = objectName,
+                canSaveToShowcase = canSaveToShowcase,
+            )
+            StrangeDoorShapeHint.Soft -> softTransform(
+                objectName = objectName,
+                canSaveToShowcase = canSaveToShowcase,
+            )
+            StrangeDoorShapeHint.Shiny -> shinyTransform(
                 objectName = objectName,
                 canSaveToShowcase = canSaveToShowcase,
             )
@@ -219,7 +280,8 @@ object StrangeDoorPhotoTransformMapper {
             LINE_TRANSFORMED,
             TRANSFORM_ACTION_TURN,
             FOX_ACTION_TURN,
-        ) + roundToolNames + partialToolNames + unknownToolNames + lightDoorEffects + oddDoorEffects + openDoorEffects
+        ) + roundToolNames + softToolNames + shinyToolNames + partialToolNames + unknownToolNames +
+            lightDoorEffects + oddDoorEffects + openDoorEffects
     }
 
     private fun roundTransform(
@@ -263,6 +325,38 @@ object StrangeDoorPhotoTransformMapper {
         )
     }
 
+    private fun softTransform(
+        objectName: String,
+        canSaveToShowcase: Boolean,
+    ): StrangeDoorPhotoTransform {
+        return StrangeDoorPhotoTransform(
+            objectName = objectName,
+            shapeHint = StrangeDoorShapeHint.Soft,
+            isUsable = true,
+            transformedName = softToolNameFor(objectName),
+            transformedAction = null,
+            doorEffect = DOOR_EFFECT_WOBBLE,
+            canSaveToShowcase = canSaveToShowcase,
+            advanceSignal = StrangeDoorDoorAdvanceSignal.AdvanceOneStep,
+        )
+    }
+
+    private fun shinyTransform(
+        objectName: String,
+        canSaveToShowcase: Boolean,
+    ): StrangeDoorPhotoTransform {
+        return StrangeDoorPhotoTransform(
+            objectName = objectName,
+            shapeHint = StrangeDoorShapeHint.Shiny,
+            isUsable = true,
+            transformedName = shinyToolNameFor(objectName),
+            transformedAction = null,
+            doorEffect = DOOR_EFFECT_WARM_WIND,
+            canSaveToShowcase = canSaveToShowcase,
+            advanceSignal = StrangeDoorDoorAdvanceSignal.AdvanceOneStep,
+        )
+    }
+
     private fun unknownTransform(
         objectName: String,
         canSaveToShowcase: Boolean,
@@ -283,24 +377,37 @@ object StrangeDoorPhotoTransformMapper {
         )
     }
 
-    private fun shapeHintFor(text: String): StrangeDoorShapeHint {
+    private fun shapeHintFor(
+        text: String,
+        mechanismType: StrangeDoorMechanismType,
+    ): StrangeDoorShapeHint {
         val compact = text.trim()
-        if (roundKeywords.any(compact::contains)) return StrangeDoorShapeHint.Round
+        if (mechanismKeywords(mechanismType).any(compact::contains)) {
+            return when (mechanismType) {
+                StrangeDoorMechanismType.Round -> StrangeDoorShapeHint.Round
+                StrangeDoorMechanismType.Soft -> StrangeDoorShapeHint.Soft
+                StrangeDoorMechanismType.Shiny -> StrangeDoorShapeHint.Shiny
+            }
+        }
         if (partialKeywords.any(compact::contains)) return StrangeDoorShapeHint.Partial
         return StrangeDoorShapeHint.Unknown
     }
 
-    private fun extractObjectName(text: String): String {
+    private fun extractObjectName(
+        text: String,
+        mechanismType: StrangeDoorMechanismType,
+    ): String {
         val compact = text
             .replace(Regex("[\\r\\n\\t]+"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
         if (compact.isBlank()) return DEFAULT_OBJECT_NAME
 
-        roundKeywords.firstOrNull(compact::contains)?.let { keyword ->
-            if (keyword == "蓝色瓶盖") return keyword
-            if (keyword == "瓶盖" && compact.contains("蓝色瓶盖")) return "蓝色瓶盖"
-            return keyword
+        mechanismKeywords(mechanismType).firstOrNull(compact::contains)?.let { keyword ->
+            return normalizeKeywordName(keyword, compact)
+        }
+        allMechanismKeywords().firstOrNull(compact::contains)?.let { keyword ->
+            return normalizeKeywordName(keyword, compact)
         }
         partialKeywords.firstOrNull(compact::contains)?.let { keyword ->
             return if (keyword == "铅笔") "一支铅笔" else keyword
@@ -319,6 +426,17 @@ object StrangeDoorPhotoTransformMapper {
             ?: DEFAULT_OBJECT_NAME
     }
 
+    private fun normalizeKeywordName(
+        keyword: String,
+        compact: String,
+    ): String {
+        return when {
+            keyword == "蓝色瓶盖" -> keyword
+            keyword == "瓶盖" && compact.contains("蓝色瓶盖") -> "蓝色瓶盖"
+            else -> keyword
+        }
+    }
+
     private fun partialToolNameFor(objectName: String): String {
         return when {
             objectName.contains("铅笔") || objectName.contains("直直") || objectName.contains("棒") -> "直直敲门棒"
@@ -329,6 +447,43 @@ object StrangeDoorPhotoTransformMapper {
             objectName.contains("半圆") -> "半圆冲撞器"
             else -> pickFrom(partialToolNames, objectName)
         }
+    }
+
+    private fun softToolNameFor(objectName: String): String {
+        return when {
+            objectName.contains("抱枕") || objectName.contains("抱") -> "抱抱小推垫"
+            objectName.contains("毛巾") -> "轻轻擦门布"
+            objectName.contains("布娃娃") || objectName.contains("毛") -> "毛毛门铃"
+            objectName.contains("纸巾") -> "轻轻擦门布"
+            objectName.contains("衣服") || objectName.contains("布") -> "软软通行垫"
+            objectName.contains("毯子") || objectName.contains("棉") -> "棉花小按钮"
+            objectName.contains("垫") -> "软云开门垫"
+            else -> pickFrom(softToolNames, objectName)
+        }
+    }
+
+    private fun shinyToolNameFor(objectName: String): String {
+        return when {
+            objectName.contains("勺子") || objectName.contains("银色") -> "银色小钥匙"
+            objectName.contains("杯盖") -> "小闪光转轮"
+            objectName.contains("灯") -> "亮亮照门灯"
+            objectName.contains("小贴纸") -> "星星反光片"
+            objectName.contains("反光") || objectName.contains("光") -> "小光斑按钮"
+            objectName.contains("金属") || objectName.contains("闪") || objectName.contains("亮") -> "闪闪门铃"
+            else -> pickFrom(shinyToolNames, objectName)
+        }
+    }
+
+    private fun mechanismKeywords(mechanismType: StrangeDoorMechanismType): List<String> {
+        return when (mechanismType) {
+            StrangeDoorMechanismType.Round -> roundKeywords
+            StrangeDoorMechanismType.Soft -> softKeywords
+            StrangeDoorMechanismType.Shiny -> shinyKeywords
+        }
+    }
+
+    private fun allMechanismKeywords(): List<String> {
+        return roundKeywords + softKeywords + shinyKeywords
     }
 
     private fun pickFrom(pool: List<String>, seed: String): String {

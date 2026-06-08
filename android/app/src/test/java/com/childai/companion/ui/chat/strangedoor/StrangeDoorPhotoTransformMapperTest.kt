@@ -36,6 +36,86 @@ class StrangeDoorPhotoTransformMapperTest {
     }
 
     @Test
+    fun softMechanismMatchesExactAndGenericKeywords() {
+        val exact = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一条毛巾",
+                confidence = 0.91,
+            ),
+            mechanismType = StrangeDoorMechanismType.Soft,
+        )
+        val generic = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "画面里有一点棉",
+                confidence = 0.88,
+            ),
+            mechanismType = StrangeDoorMechanismType.Soft,
+        )
+
+        assertEquals("毛巾", exact.objectName)
+        assertEquals(StrangeDoorShapeHint.Soft, exact.shapeHint)
+        assertEquals("轻轻擦门布", exact.transformedName)
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, exact.advanceSignal)
+        assertTrue(exact.canSaveToShowcase)
+        assertTrue(exact.isGoodMatch)
+        assertEquals("棉", generic.objectName)
+        assertEquals(StrangeDoorShapeHint.Soft, generic.shapeHint)
+        assertEquals("棉花小按钮", generic.transformedName)
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, generic.advanceSignal)
+    }
+
+    @Test
+    fun shinyMechanismMatchesExactAndGenericKeywords() {
+        val exact = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个杯盖",
+                confidence = 0.91,
+            ),
+            mechanismType = StrangeDoorMechanismType.Shiny,
+        )
+        val generic = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "画面里有一点银色",
+                confidence = 0.88,
+            ),
+            mechanismType = StrangeDoorMechanismType.Shiny,
+        )
+
+        assertEquals("杯盖", exact.objectName)
+        assertEquals(StrangeDoorShapeHint.Shiny, exact.shapeHint)
+        assertEquals("小闪光转轮", exact.transformedName)
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, exact.advanceSignal)
+        assertTrue(exact.canSaveToShowcase)
+        assertTrue(exact.isGoodMatch)
+        assertEquals("银色", generic.objectName)
+        assertEquals(StrangeDoorShapeHint.Shiny, generic.shapeHint)
+        assertEquals("银色小钥匙", generic.transformedName)
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, generic.advanceSignal)
+    }
+
+    @Test
+    fun safeMismatchForCurrentMechanismStillAdvancesOneStep() {
+        val transform = StrangeDoorPhotoTransformMapper.map(
+            StrangeDoorPhotoRecognition(
+                recognizedType = "image_observation",
+                recognizedText = "图片里有一个蓝色瓶盖",
+                confidence = 0.91,
+            ),
+            mechanismType = StrangeDoorMechanismType.Soft,
+        )
+
+        assertEquals("蓝色瓶盖", transform.objectName)
+        assertEquals(StrangeDoorShapeHint.Unknown, transform.shapeHint)
+        assertTrue(transform.isUsable)
+        assertEquals(StrangeDoorDoorAdvanceSignal.AdvanceOneStep, transform.advanceSignal)
+        assertTrue(transform.canSaveToShowcase)
+    }
+
+    @Test
     fun partialObjectAdvancesOneStepWithoutFailing() {
         val transform = StrangeDoorPhotoTransformMapper.map(
             StrangeDoorPhotoRecognition(
@@ -145,6 +225,26 @@ class StrangeDoorPhotoTransformMapperTest {
         )
 
         assertTrue(StrangeDoorPhotoTransformMapper.approvedChildFacingCopy().containsAll(requiredR1Copy))
+    }
+
+    @Test
+    fun s4CopyPoolIsIncludedInApprovedChildFacingCopy() {
+        val requiredS4Copy = listOf(
+            "软云开门垫",
+            "抱抱小推垫",
+            "毛毛门铃",
+            "轻轻擦门布",
+            "软软通行垫",
+            "棉花小按钮",
+            "小闪光转轮",
+            "亮亮照门灯",
+            "星星反光片",
+            "银色小钥匙",
+            "闪闪门铃",
+            "小光斑按钮",
+        )
+
+        assertTrue(StrangeDoorPhotoTransformMapper.approvedChildFacingCopy().containsAll(requiredS4Copy))
     }
 
     @Test

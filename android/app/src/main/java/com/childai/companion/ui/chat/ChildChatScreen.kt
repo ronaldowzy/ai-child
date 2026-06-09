@@ -118,6 +118,7 @@ import com.childai.companion.mascot.MascotState
 import com.childai.companion.ui.chat.languagegame.LanguageGameAction
 import com.childai.companion.ui.chat.languagegame.LanguageGameActionId
 import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
+import com.childai.companion.ui.chat.languagegame.LanguageGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorAndroidResources
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorAssetKey
@@ -229,11 +230,27 @@ fun ChildChatScreen(
         onLanguageGameOpenMenu = viewModel::openLanguageGameMenu,
         onLanguageGameStartBrainTeaser = viewModel::startBrainTeaserGame,
         onLanguageGameStartWordChain = viewModel::startWordChainGame,
-        onLanguageGameShowHint = viewModel::requestBrainTeaserHint,
+        onLanguageGameStartRiddle = viewModel::startRiddleGame,
+        onLanguageGameShowHint = {
+            when (viewModel.uiState.value.languageGame?.state) {
+                LanguageGameState.Riddle -> viewModel.requestRiddleHint()
+                else -> viewModel.requestBrainTeaserHint()
+            }
+        },
         onLanguageGameChangeGame = viewModel::returnToLanguageGameMenu,
         onLanguageGameExit = viewModel::exitLanguageGame,
-        onLanguageGameNextQuestion = viewModel::nextBrainTeaserQuestion,
-        onLanguageGameRevealAnswer = viewModel::revealBrainTeaserAnswer,
+        onLanguageGameNextQuestion = {
+            when (viewModel.uiState.value.languageGame?.state) {
+                LanguageGameState.Riddle -> viewModel.nextRiddleQuestion()
+                else -> viewModel.nextBrainTeaserQuestion()
+            }
+        },
+        onLanguageGameRevealAnswer = {
+            when (viewModel.uiState.value.languageGame?.state) {
+                LanguageGameState.Riddle -> viewModel.revealRiddleAnswer()
+                else -> viewModel.revealBrainTeaserAnswer()
+            }
+        },
         onLanguageGameRestartWordChain = viewModel::restartWordChainGame,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
@@ -276,6 +293,7 @@ private fun ChildChatScreenContent(
     onLanguageGameOpenMenu: () -> Unit,
     onLanguageGameStartBrainTeaser: () -> Unit,
     onLanguageGameStartWordChain: () -> Unit,
+    onLanguageGameStartRiddle: () -> Unit,
     onLanguageGameShowHint: () -> Unit,
     onLanguageGameChangeGame: () -> Unit,
     onLanguageGameExit: () -> Unit,
@@ -494,6 +512,7 @@ private fun ChildChatScreenContent(
             LanguageGameActionId.OpenGameMenu -> onLanguageGameOpenMenu()
             LanguageGameActionId.StartBrainTeaser -> onLanguageGameStartBrainTeaser()
             LanguageGameActionId.StartWordChain -> onLanguageGameStartWordChain()
+            LanguageGameActionId.StartRiddle -> onLanguageGameStartRiddle()
             LanguageGameActionId.ShowHint -> onLanguageGameShowHint()
             LanguageGameActionId.ChangeGame -> onLanguageGameChangeGame()
             LanguageGameActionId.ExitToChat -> onLanguageGameExit()
@@ -3786,6 +3805,7 @@ private fun ChildChatScreenPortraitPreview() {
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
             onLanguageGameStartWordChain = {},
+            onLanguageGameStartRiddle = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},
@@ -3842,6 +3862,7 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
             onLanguageGameStartWordChain = {},
+            onLanguageGameStartRiddle = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},
@@ -3907,6 +3928,7 @@ private fun ChildChatScreenLandscapePreview() {
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
             onLanguageGameStartWordChain = {},
+            onLanguageGameStartRiddle = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},

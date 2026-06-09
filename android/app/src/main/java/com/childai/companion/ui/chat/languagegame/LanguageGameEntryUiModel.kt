@@ -5,6 +5,7 @@ enum class LanguageGameActionId {
     OpenGameMenu,
     StartBrainTeaser,
     StartWordChain,
+    StartRiddle,
     StartVoiceAnswer,
     ShowHint,
     ChangeGame,
@@ -58,6 +59,10 @@ fun LanguageGameSnapshot.toLanguageGameEntryUiModel(): LanguageGameEntryUiModel 
                     label = "词语接龙",
                 ),
                 LanguageGameAction(
+                    id = LanguageGameActionId.StartRiddle,
+                    label = "猜谜语",
+                ),
+                LanguageGameAction(
                     id = LanguageGameActionId.ExitToChat,
                     label = "先聊别的",
                 ),
@@ -65,6 +70,7 @@ fun LanguageGameSnapshot.toLanguageGameEntryUiModel(): LanguageGameEntryUiModel 
         )
         LanguageGameState.BrainTeaser -> brainTeaserUiModel(this)
         LanguageGameState.WordChain -> wordChainUiModel(this)
+        LanguageGameState.Riddle -> riddleUiModel(this)
     }
 }
 
@@ -78,6 +84,7 @@ object LanguageGameApprovedCopy {
             "想玩哪一个？",
             "脑筋急转弯",
             "词语接龙",
+            "猜谜语",
             "先聊别的",
             "对，就是{answer}",
             "这个答案有点绕",
@@ -110,8 +117,19 @@ object LanguageGameApprovedCopy {
             "先让它们排队休息一下",
             "我来接",
             "再玩一次",
+            "我们来猜一个小谜语",
+            "猜到啦",
+            "就是{answer}",
+            "小白狐把这个谜底轻轻收好",
+            "这个想法也挺像",
+            "我再给你一点提示",
+            "我悄悄告诉你",
+            "谜底是{answer}",
+            "是不是藏得有点好？",
+            "我来猜",
         ) + BrainTeaserQuestionBank.approvedChildFacingCopy() +
-            WordChainWordBank.approvedChildFacingCopy()
+            WordChainWordBank.approvedChildFacingCopy() +
+            RiddleQuestionBank.approvedChildFacingCopy()
     }
 }
 
@@ -298,6 +316,95 @@ private fun wordChainAnswerActions(): List<LanguageGameAction> {
         LanguageGameAction(
             id = LanguageGameActionId.StartVoiceAnswer,
             label = "我来接",
+            primary = true,
+        ),
+        LanguageGameAction(
+            id = LanguageGameActionId.ChangeGame,
+            label = "换个游戏",
+        ),
+        LanguageGameAction(
+            id = LanguageGameActionId.ExitToChat,
+            label = "先聊别的",
+        ),
+    )
+}
+
+private fun riddleUiModel(snapshot: LanguageGameSnapshot): LanguageGameEntryUiModel {
+    val riddle = snapshot.riddle ?: RiddleSnapshot()
+    val question = RiddleQuestionBank.questionAt(riddle.questionIndex)
+    return when (riddle.gameState) {
+        RiddleGameState.Question -> LanguageGameEntryUiModel(
+            lines = listOf("我们来猜一个小谜语") + question.lines,
+            actions = listOf(
+                LanguageGameAction(
+                    id = LanguageGameActionId.StartVoiceAnswer,
+                    label = "我来猜",
+                    primary = true,
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ShowHint,
+                    label = "给我提示",
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ChangeGame,
+                    label = "换个游戏",
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ExitToChat,
+                    label = "先聊别的",
+                ),
+            ),
+        )
+        RiddleGameState.Hint -> LanguageGameEntryUiModel(
+            lines = listOf(
+                "这个想法也挺像",
+                "我再给你一点提示",
+                question.hint,
+            ),
+            actions = listOf(
+                LanguageGameAction(
+                    id = LanguageGameActionId.StartVoiceAnswer,
+                    label = "我来猜",
+                    primary = true,
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.RevealAnswer,
+                    label = "告诉我答案",
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ChangeGame,
+                    label = "换个游戏",
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ExitToChat,
+                    label = "先聊别的",
+                ),
+            ),
+        )
+        RiddleGameState.Correct -> LanguageGameEntryUiModel(
+            lines = listOf(
+                "猜到啦",
+                "就是${question.answer}",
+                "小白狐把这个谜底轻轻收好",
+            ),
+            actions = riddleNextActions(),
+        )
+        RiddleGameState.Revealed -> LanguageGameEntryUiModel(
+            lines = listOf(
+                "我悄悄告诉你",
+                "谜底是${question.answer}",
+                "是不是藏得有点好？",
+            ),
+            actions = riddleNextActions(),
+        )
+    }
+}
+
+private fun riddleNextActions(): List<LanguageGameAction> {
+    return listOf(
+        LanguageGameAction(
+            id = LanguageGameActionId.NextQuestion,
+            label = "下一题",
             primary = true,
         ),
         LanguageGameAction(

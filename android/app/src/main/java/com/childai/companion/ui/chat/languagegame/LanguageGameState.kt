@@ -5,6 +5,7 @@ enum class LanguageGameState {
     GameMenu,
     BrainTeaser,
     WordChain,
+    Riddle,
 }
 
 enum class LanguageGameType {
@@ -29,6 +30,13 @@ enum class WordChainGameState {
     Finished,
 }
 
+enum class RiddleGameState {
+    Question,
+    Hint,
+    Correct,
+    Revealed,
+}
+
 data class BrainTeaserSnapshot(
     val questionIndex: Int = 0,
     val gameState: BrainTeaserGameState = BrainTeaserGameState.Question,
@@ -46,11 +54,17 @@ data class WordChainSnapshot(
     val foxWord: String? = null,
 )
 
+data class RiddleSnapshot(
+    val questionIndex: Int = 0,
+    val gameState: RiddleGameState = RiddleGameState.Question,
+)
+
 data class LanguageGameSnapshot(
     val state: LanguageGameState = LanguageGameState.EntryPrompt,
     val selectedType: LanguageGameType? = null,
     val brainTeaser: BrainTeaserSnapshot? = null,
     val wordChain: WordChainSnapshot? = null,
+    val riddle: RiddleSnapshot? = null,
     val autoPromptShown: Boolean = false,
     val dismissedForLifecycle: Boolean = false,
 )
@@ -93,6 +107,17 @@ object LanguageGameReducer {
         )
     }
 
+    fun startRiddle(questionIndex: Int = 0): LanguageGameSnapshot {
+        return LanguageGameSnapshot(
+            state = LanguageGameState.Riddle,
+            selectedType = LanguageGameType.Riddle,
+            riddle = RiddleSnapshot(
+                questionIndex = questionIndex.coerceInRiddleBank(),
+                gameState = RiddleGameState.Question,
+            ),
+        )
+    }
+
     fun showBrainTeaserHint(snapshot: LanguageGameSnapshot): LanguageGameSnapshot {
         return snapshot.withBrainTeaserState(BrainTeaserGameState.Hint)
     }
@@ -116,6 +141,21 @@ object LanguageGameReducer {
         )
     }
 
+    fun applyRiddleAnswer(
+        snapshot: LanguageGameSnapshot,
+        transcript: String,
+    ): LanguageGameSnapshot {
+        val riddle = snapshot.riddle ?: return snapshot
+        val question = RiddleQuestionBank.questionAt(riddle.questionIndex)
+        val result = RiddleEvaluator.evaluate(
+            transcript = transcript,
+            question = question,
+        )
+        return snapshot.withRiddleState(
+            if (result.isCorrect) RiddleGameState.Correct else RiddleGameState.Hint,
+        )
+    }
+
     fun nextBrainTeaserQuestion(snapshot: LanguageGameSnapshot): LanguageGameSnapshot {
         val brainTeaser = snapshot.brainTeaser ?: return startBrainTeaser()
         return startBrainTeaser(
@@ -127,6 +167,21 @@ object LanguageGameReducer {
         val wordChain = snapshot.wordChain ?: return startWordChain()
         return startWordChain(
             startIndex = WordChainWordBank.nextStartIndex(wordChain.startIndex),
+        )
+    }
+
+    fun showRiddleHint(snapshot: LanguageGameSnapshot): LanguageGameSnapshot {
+        return snapshot.withRiddleState(RiddleGameState.Hint)
+    }
+
+    fun revealRiddleAnswer(snapshot: LanguageGameSnapshot): LanguageGameSnapshot {
+        return snapshot.withRiddleState(RiddleGameState.Revealed)
+    }
+
+    fun nextRiddleQuestion(snapshot: LanguageGameSnapshot): LanguageGameSnapshot {
+        val riddle = snapshot.riddle ?: return startRiddle()
+        return startRiddle(
+            questionIndex = RiddleQuestionBank.nextIndex(riddle.questionIndex),
         )
     }
 
@@ -166,6 +221,17 @@ object LanguageGameReducer {
             state = LanguageGameState.BrainTeaser,
             selectedType = LanguageGameType.BrainTeaser,
             brainTeaser = brainTeaser.copy(gameState = gameState),
+        )
+    }
+
+    private fun LanguageGameSnapshot.withRiddleState(
+        gameState: RiddleGameState,
+    ): LanguageGameSnapshot {
+        val riddle = riddle ?: RiddleSnapshot()
+        return copy(
+            state = LanguageGameState.Riddle,
+            selectedType = LanguageGameType.Riddle,
+            riddle = riddle.copy(gameState = gameState),
         )
     }
 
@@ -245,6 +311,11 @@ object LanguageGameReducer {
 
     private fun Int.coerceInWordChainBank(): Int {
         val size = WordChainWordBank.chains.size
+        return if (size == 0) 0 else floorMod(size)
+    }
+
+    private fun Int.coerceInRiddleBank(): Int {
+        val size = RiddleQuestionBank.questions.size
         return if (size == 0) 0 else floorMod(size)
     }
 

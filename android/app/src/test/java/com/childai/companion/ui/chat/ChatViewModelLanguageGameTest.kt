@@ -7,6 +7,7 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
 import com.childai.companion.ui.chat.languagegame.LanguageGameState
+import com.childai.companion.ui.chat.languagegame.RiddleGameState
 import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.voice.SpeechInputController
@@ -54,7 +55,7 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
-    fun openGameMenuShowsBrainTeaserWordChainAndExit() {
+    fun openGameMenuShowsBrainTeaserWordChainRiddleAndExit() {
         val viewModel = viewModel()
 
         viewModel.openLanguageGameMenu()
@@ -63,10 +64,9 @@ class ChatViewModelLanguageGameTest {
             .toLanguageGameEntryUiModel()
         assertEquals(LanguageGameState.GameMenu, viewModel.uiState.value.languageGame?.state)
         assertEquals(
-            listOf("脑筋急转弯", "词语接龙", "先聊别的"),
+            listOf("脑筋急转弯", "词语接龙", "猜谜语", "先聊别的"),
             model.actions.map { it.label },
         )
-        assertTrue(model.actions.none { it.label == "猜谜语" })
     }
 
     @Test
@@ -282,6 +282,117 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
+    fun startRiddleShowsFirstQuestion() {
+        val viewModel = viewModel()
+
+        viewModel.startRiddleGame()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(LanguageGameState.Riddle, snapshot.state)
+        assertEquals(0, snapshot.riddle?.questionIndex)
+        assertEquals(RiddleGameState.Question, snapshot.riddle?.gameState)
+        assertEquals(
+            listOf(
+                "我们来猜一个小谜语",
+                "小小房子圆又圆",
+                "里面住着甜甜水",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+    }
+
+    @Test
+    fun riddleVoiceAnswerDoesNotSendConversationWhenCorrect() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(
+            sender = sender,
+            speech = FakeLanguageGameSpeechInputController(
+                result = SpeechInputResult.Transcript("我猜是橘子"),
+            ),
+        )
+        viewModel.startRiddleGame()
+
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(RiddleGameState.Correct, snapshot.riddle?.gameState)
+        assertEquals(
+            listOf(
+                "猜到啦",
+                "就是橘子",
+                "小白狐把这个谜底轻轻收好",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+        assertTrue(sender.sentTexts.isEmpty())
+    }
+
+    @Test
+    fun riddleNonMatchingAnswerEntersHintAndHintCanThenBecomeCorrect() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(sender = sender)
+        viewModel.startRiddleGame()
+
+        viewModel.sendText("水果")
+
+        var snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(RiddleGameState.Hint, snapshot.riddle?.gameState)
+        assertEquals(
+            listOf(
+                "这个想法也挺像",
+                "我再给你一点提示",
+                "它是一种水果，剥开以后可以一瓣一瓣吃",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+        assertTrue(sender.sentTexts.isEmpty())
+
+        viewModel.sendText("橘子")
+
+        snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(RiddleGameState.Correct, snapshot.riddle?.gameState)
+        assertTrue(sender.sentTexts.isEmpty())
+    }
+
+    @Test
+    fun riddleHintRevealAndNextQuestionWorkLocally() {
+        val viewModel = viewModel()
+        viewModel.startRiddleGame()
+
+        viewModel.requestRiddleHint()
+        assertEquals(
+            RiddleGameState.Hint,
+            viewModel.uiState.value.languageGame?.riddle?.gameState,
+        )
+
+        viewModel.revealRiddleAnswer()
+        assertEquals(
+            RiddleGameState.Revealed,
+            viewModel.uiState.value.languageGame?.riddle?.gameState,
+        )
+
+        viewModel.nextRiddleQuestion()
+        assertEquals(1, viewModel.uiState.value.languageGame?.riddle?.questionIndex)
+        assertEquals(
+            RiddleGameState.Question,
+            viewModel.uiState.value.languageGame?.riddle?.gameState,
+        )
+    }
+
+    @Test
+    fun fifthRiddleNextLoopsBackToFirst() {
+        val viewModel = viewModel()
+        viewModel.startRiddleGame()
+
+        repeat(5) {
+            viewModel.nextRiddleQuestion()
+        }
+
+        assertEquals(0, viewModel.uiState.value.languageGame?.riddle?.questionIndex)
+    }
+
+    @Test
     fun fifthQuestionNextLoopsBackToFirst() {
         val viewModel = viewModel()
         viewModel.startBrainTeaserGame()
@@ -341,7 +452,14 @@ class ChatViewModelLanguageGameTest {
         val fifthViewModel = viewModel(sender = sender)
         fifthViewModel.sendText("猜谜语")
 
-        assertEquals(LanguageGameState.GameMenu, fifthViewModel.uiState.value.languageGame?.state)
+        assertEquals(LanguageGameState.Riddle, fifthViewModel.uiState.value.languageGame?.state)
+        assertEquals(0, fifthViewModel.uiState.value.languageGame?.riddle?.questionIndex)
+        assertTrue(sender.sentTexts.isEmpty())
+
+        val sixthViewModel = viewModel(sender = sender)
+        sixthViewModel.sendText("谜语")
+
+        assertEquals(LanguageGameState.Riddle, sixthViewModel.uiState.value.languageGame?.state)
         assertTrue(sender.sentTexts.isEmpty())
     }
 
@@ -363,6 +481,14 @@ class ChatViewModelLanguageGameTest {
 
         assertNull(secondViewModel.uiState.value.languageGame)
         assertEquals(listOf("词语接龙"), secondSender.sentTexts)
+
+        val thirdSender = LanguageGameSender()
+        val thirdViewModel = viewModel(sender = thirdSender)
+        thirdViewModel.activateStrangeDoorDemo()
+        thirdViewModel.sendText("猜谜语")
+
+        assertNull(thirdViewModel.uiState.value.languageGame)
+        assertEquals(listOf("猜谜语"), thirdSender.sentTexts)
     }
 
     private fun viewModel(

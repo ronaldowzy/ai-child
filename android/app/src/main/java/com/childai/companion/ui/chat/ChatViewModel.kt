@@ -34,6 +34,7 @@ import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
 import com.childai.companion.ui.chat.languagegame.LanguageGameReducer
 import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
 import com.childai.companion.ui.chat.languagegame.LanguageGameState
+import com.childai.companion.ui.chat.languagegame.RiddleGameState
 import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
@@ -473,10 +474,25 @@ class ChatViewModel(
         )
     }
 
+    fun startRiddleGame() {
+        showLanguageGameSnapshot(
+            LanguageGameReducer.startRiddle(),
+            forceSpeak = true,
+        )
+    }
+
     fun requestBrainTeaserHint() {
         val snapshot = _uiState.value.languageGame ?: return
         showLanguageGameSnapshot(
             LanguageGameReducer.showBrainTeaserHint(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun requestRiddleHint() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.showRiddleHint(snapshot),
             forceSpeak = true,
         )
     }
@@ -489,10 +505,26 @@ class ChatViewModel(
         )
     }
 
+    fun revealRiddleAnswer() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.revealRiddleAnswer(snapshot),
+            forceSpeak = true,
+        )
+    }
+
     fun nextBrainTeaserQuestion() {
         val snapshot = _uiState.value.languageGame ?: return
         showLanguageGameSnapshot(
             LanguageGameReducer.nextBrainTeaserQuestion(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun nextRiddleQuestion() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.nextRiddleQuestion(snapshot),
             forceSpeak = true,
         )
     }
@@ -2230,6 +2262,23 @@ class ChatViewModel(
             }
             return true
         }
+        if (snapshot?.state == LanguageGameState.Riddle) {
+            val riddleState = snapshot.riddle?.gameState
+            if (riddleState == RiddleGameState.Question ||
+                riddleState == RiddleGameState.Hint
+            ) {
+                showLanguageGameSnapshot(
+                    LanguageGameReducer.applyRiddleAnswer(
+                        snapshot = snapshot,
+                        transcript = trimmed,
+                    ),
+                    forceSpeak = true,
+                )
+                return true
+            }
+            if (handleLanguageGameCommand(trimmed)) return true
+            return true
+        }
         if (handleLanguageGameCommand(trimmed)) return true
         return false
     }
@@ -2247,7 +2296,7 @@ class ChatViewModel(
             }
             text.contains("猜谜语") ||
                 text.contains("谜语") -> {
-                openLanguageGameMenu()
+                startRiddleGame()
                 true
             }
             text.contains("玩游戏") -> {
@@ -2264,8 +2313,11 @@ class ChatViewModel(
                 true
             }
             text.contains("下一题") -> {
-                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
-                nextBrainTeaserQuestion()
+                when (_uiState.value.languageGame?.state) {
+                    LanguageGameState.BrainTeaser -> nextBrainTeaserQuestion()
+                    LanguageGameState.Riddle -> nextRiddleQuestion()
+                    else -> return false
+                }
                 true
             }
             text.contains("再玩一次") &&
@@ -2274,13 +2326,19 @@ class ChatViewModel(
                 true
             }
             text.contains("告诉我答案") -> {
-                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
-                revealBrainTeaserAnswer()
+                when (_uiState.value.languageGame?.state) {
+                    LanguageGameState.BrainTeaser -> revealBrainTeaserAnswer()
+                    LanguageGameState.Riddle -> revealRiddleAnswer()
+                    else -> return false
+                }
                 true
             }
             text.contains("给我提示") -> {
-                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
-                requestBrainTeaserHint()
+                when (_uiState.value.languageGame?.state) {
+                    LanguageGameState.BrainTeaser -> requestBrainTeaserHint()
+                    LanguageGameState.Riddle -> requestRiddleHint()
+                    else -> return false
+                }
                 true
             }
             else -> false

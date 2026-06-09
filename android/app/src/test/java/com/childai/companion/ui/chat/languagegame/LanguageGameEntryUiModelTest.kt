@@ -22,15 +22,84 @@ class LanguageGameEntryUiModelTest {
     }
 
     @Test
-    fun gameMenuShowsBrainTeaserWordChainAndExitThisRound() {
+    fun gameMenuShowsBrainTeaserWordChainRiddleAndExitThisRound() {
         val model = LanguageGameReducer.gameMenu().toLanguageGameEntryUiModel()
 
         assertEquals(listOf("想玩哪一个？"), model.lines)
         assertEquals(
-            listOf("脑筋急转弯", "词语接龙", "先聊别的"),
+            listOf("脑筋急转弯", "词语接龙", "猜谜语", "先聊别的"),
             model.actions.map { it.label },
         )
-        assertFalse(model.actions.any { it.label == "猜谜语" })
+    }
+
+    @Test
+    fun riddleQuestionUsesApprovedCopyAndButtons() {
+        val model = LanguageGameReducer.startRiddle()
+            .toLanguageGameEntryUiModel()
+
+        assertEquals(
+            listOf(
+                "我们来猜一个小谜语",
+                "小小房子圆又圆",
+                "里面住着甜甜水",
+            ),
+            model.lines,
+        )
+        assertEquals(
+            listOf("我来猜", "给我提示", "换个游戏", "先聊别的"),
+            model.actions.map { it.label },
+        )
+    }
+
+    @Test
+    fun riddleHintCorrectAndRevealedButtonsMatchApprovedOrder() {
+        val hintModel = LanguageGameReducer.showRiddleHint(
+            LanguageGameReducer.startRiddle(),
+        ).toLanguageGameEntryUiModel()
+        val correctModel = LanguageGameReducer.applyRiddleAnswer(
+            snapshot = LanguageGameReducer.startRiddle(),
+            transcript = "我猜是橘子",
+        ).toLanguageGameEntryUiModel()
+        val revealedModel = LanguageGameReducer.revealRiddleAnswer(
+            LanguageGameReducer.startRiddle(),
+        ).toLanguageGameEntryUiModel()
+
+        assertEquals(
+            listOf(
+                "这个想法也挺像",
+                "我再给你一点提示",
+                "它是一种水果，剥开以后可以一瓣一瓣吃",
+            ),
+            hintModel.lines,
+        )
+        assertEquals(
+            listOf("我来猜", "告诉我答案", "换个游戏", "先聊别的"),
+            hintModel.actions.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                "猜到啦",
+                "就是橘子",
+                "小白狐把这个谜底轻轻收好",
+            ),
+            correctModel.lines,
+        )
+        assertEquals(
+            listOf("下一题", "换个游戏", "先聊别的"),
+            correctModel.actions.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                "我悄悄告诉你",
+                "谜底是橘子",
+                "是不是藏得有点好？",
+            ),
+            revealedModel.lines,
+        )
+        assertEquals(
+            listOf("下一题", "换个游戏", "先聊别的"),
+            revealedModel.actions.map { it.label },
+        )
     }
 
     @Test

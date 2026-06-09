@@ -75,11 +75,12 @@ deprecated：已废弃，不再作为实现依据。
 | PD-056 | confirmed | Task 07 closeout：家长设置隐藏 schedule 只保留后端兼容，不再校验或重写隐藏默认时间；topic seeds 必须是 reviewed/age-aware/expiring/static，不做实时热点；TTS 延迟必须用 backend request_id 与 Android logcat timing 分解；家长日报继续是摘要和现实桥接，不展示 raw transcript。 | ParentSettings、TopicSeedService、ChildChatScreen、Conversation/Stream/TTS timing、ParentReport、QA |
 | PD-057 | confirmed | Task 09 家庭内测账号和个性化基础：当前产品术语改用“家长”；账号体系只做一个孩子一个账号、家长代创建和管理，孩子不管理密码；密码 hash、服务端只存 token hash，Android 登录态持久化到手动退出或 token 失效；普通对话 continuation/shift 改为模型语义控制为主，程序规则保留 safety/boundary/fallback/metrics；opening v2 可用模型生成且不阻塞首屏，provider 失败时确定性 fallback；topic choices 由后端基于兴趣/历史/curated seeds 生成，Android 不再硬编码话题 chips。 | Auth、Android login/session、ParentPolicy/Report、ChildAgentRuntime、OpeningService、QuickAction/TopicSeed、docs/QA |
 | PD-058 | confirmed | 家庭内测运行时不得把 mock provider 或 mock 图片/语音路径当作产品能力；已进入测试范围的聊天、vision、TTS、ASR 必须显式配置正式 provider。自动化测试可以保留隔离的 test double，但测试替身不得作为默认运行配置、fallback 成功或验收通过依据。 | backend config/runtime guard、ModelRegistry fallback、Android image/voice paths、docs/QA |
+| PD-060 | confirmed | 语言游戏作为普通聊天中的轻选择入口，而不是首页大功能区或复杂游戏系统；首版只允许“脑筋急转弯 / 词语接龙 / 猜谜语”三个菜单项，奇怪小门进行中不触发语言游戏，具体游戏内容必须由主控后续确认。 | Android ChatViewModel、本地 UI 状态、儿童端文案、QA |
 
 新增执行依据：
 
 ```text
-PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/家长寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正；PD-057 修订 Task 09 之后的账号、家长术语、opening v2、model-driven conversation control 和后端生成 topic choices 方向；PD-058 是家庭内测运行配置和验收口径的最高优先级约束：正式功能不能以 mock 路径冒充通过。
+PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/家长寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正；PD-057 修订 Task 09 之后的账号、家长术语、opening v2、model-driven conversation control 和后端生成 topic choices 方向；PD-058 是家庭内测运行配置和验收口径的最高优先级约束：正式功能不能以 mock 路径冒充通过；PD-060 是语言游戏入口阶段的最高优先级约束：只做聊天里的轻选择，不做复杂游戏系统。
 不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
 ```
 
@@ -831,6 +832,19 @@ Rationale: 运行反馈显示注册资料和家长设置资料分散会导致家
 Affected modules: ParentPolicyRepository、AuthService/ParentPolicyService 读取链路、ParentReportService、ModelRegistry、Android ParentReportApiClient、Android/Backend docs/tests。
 Implementation notes: 旧 `parent_policies` 中的 child profile 字段仅作为兼容读取来源；后续保存会把 profile 写入 `children.nickname`、`children.age`、`children.grade` 和 `children.profile` JSON。ParentReport prompt 只传结构化主题、观察和建议线索，不传 raw transcript；模型失败仍返回可重试失败态，不把 deterministic fallback 冒充成功日报。
 Tests or QA needed: 后端 repository 单测覆盖 child profile 单表写入和 parent policy 兼容读取；ParentReportService / ModelRegistry 单测覆盖压缩 payload 与 90s/6000 默认配置；Android JVM 测试覆盖家长日报 100s read timeout。仍需 Redmi K60 / Honor Pad 5 真机验证家长设置资料显示、家长日报等待文案和长等待期间 UI 可用性。
+
+#### PD-060
+
+Decision ID: PD-060
+Date: 2026-06-09
+Status: confirmed
+Source: parent / product owner LG0 review
+Decision: 语言游戏作为普通聊天中的轻选择入口，而不是首页大功能区、学习入口或复杂游戏系统。EntryPrompt 每个 `ChatViewModel` 生命周期最多自动出现一次；孩子点“随便聊聊”后，本生命周期不再自动弹出游戏入口。孩子只说“玩游戏”时进入 GameMenu；孩子说“脑筋急转弯”直接进入 BrainTeaser 起始状态，说“词语接龙”或“接龙”直接进入 WordChain 起始状态，说“猜谜语”或“谜语”直接进入 Riddle 起始状态。奇怪小门进行中不触发语言游戏，奇怪小门退出后才允许语言游戏入口。首版游戏菜单只允许“脑筋急转弯 / 词语接龙 / 猜谜语 / 先聊别的”；具体游戏题库、提示、反馈和结束按钮由后续 LG1 / LG2 / LG3 分别确认，开发方不得自行补写游戏内容。
+Rationale: 语言游戏用于补充聊天中的轻玩法和可重复短回合，不应抢奇怪小门主线，也不应滑向课程、练习、挑战、任务、分数、等级、奖励、排行榜或 PK。
+Affected modules: Android `ChatViewModel`、儿童聊天 UI、本地语言游戏状态、儿童端文案测试、QA。
+Implementation notes: 首版优先 Android 本地状态；不改后端、不新增 endpoint、不新增家长端、不接小展台、不新增 GrowthEvent。入口允许文案仅限主控确认文本；如本轮只实现入口和菜单，三个游戏按钮可保持 disabled，避免出现未确认游戏内文案。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/session_process/handoffs/20260609_LG0A_language_game_entry_decision_plan.md`。
+Tests or QA needed: 后续实现测试覆盖 EntryPrompt 单生命周期触发、点“随便聊聊”后不再自动弹出、GameMenu 菜单项、具体游戏名触发占位起始状态、奇怪小门优先、退出恢复普通 conversation、禁止词扫描和 Android 构建。
 
 ---
 

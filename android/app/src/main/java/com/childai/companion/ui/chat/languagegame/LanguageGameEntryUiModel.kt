@@ -4,6 +4,7 @@ enum class LanguageGameActionId {
     CasualChat,
     OpenGameMenu,
     StartBrainTeaser,
+    StartWordChain,
     StartVoiceAnswer,
     ShowHint,
     ChangeGame,
@@ -11,6 +12,7 @@ enum class LanguageGameActionId {
     NextQuestion,
     GuessAgain,
     RevealAnswer,
+    RestartWordChain,
 }
 
 data class LanguageGameAction(
@@ -52,12 +54,17 @@ fun LanguageGameSnapshot.toLanguageGameEntryUiModel(): LanguageGameEntryUiModel 
                     primary = true,
                 ),
                 LanguageGameAction(
+                    id = LanguageGameActionId.StartWordChain,
+                    label = "词语接龙",
+                ),
+                LanguageGameAction(
                     id = LanguageGameActionId.ExitToChat,
                     label = "先聊别的",
                 ),
             ),
         )
         LanguageGameState.BrainTeaser -> brainTeaserUiModel(this)
+        LanguageGameState.WordChain -> wordChainUiModel(this)
     }
 }
 
@@ -70,6 +77,7 @@ object LanguageGameApprovedCopy {
             "玩个小游戏",
             "想玩哪一个？",
             "脑筋急转弯",
+            "词语接龙",
             "先聊别的",
             "对，就是{answer}",
             "这个答案有点绕",
@@ -87,7 +95,23 @@ object LanguageGameApprovedCopy {
             "下一题",
             "我再猜",
             "告诉我答案",
-        ) + BrainTeaserQuestionBank.approvedChildFacingCopy()
+            "我们玩词语接龙",
+            "我先说一个词",
+            "你接一个从“{lastChar}”开始的词就行",
+            "接上啦",
+            "“{previous}”接“{childWord}”",
+            "这个小词跑得还挺快",
+            "这个词也可以玩",
+            "不过这次要从“{lastChar}”开始",
+            "我给你换个容易的",
+            "我来接一个",
+            "“{previous}”接“{foxWord}”",
+            "我们已经接了好多小词",
+            "先让它们排队休息一下",
+            "我来接",
+            "再玩一次",
+        ) + BrainTeaserQuestionBank.approvedChildFacingCopy() +
+            WordChainWordBank.approvedChildFacingCopy()
     }
 }
 
@@ -189,4 +213,100 @@ private fun brainTeaserUiModel(snapshot: LanguageGameSnapshot): LanguageGameEntr
             ),
         )
     }
+}
+
+private fun wordChainUiModel(snapshot: LanguageGameSnapshot): LanguageGameEntryUiModel {
+    val wordChain = snapshot.wordChain ?: WordChainSnapshot()
+    return when (wordChain.gameState) {
+        WordChainGameState.Start,
+        WordChainGameState.ChildTurn -> LanguageGameEntryUiModel(
+            lines = wordChainStartLines(wordChain.previousWord),
+            actions = wordChainAnswerActions(),
+        )
+        WordChainGameState.Correct,
+        WordChainGameState.FoxTurn -> LanguageGameEntryUiModel(
+            lines = wordChainCorrectLines(wordChain),
+            actions = wordChainAnswerActions(),
+        )
+        WordChainGameState.Hint -> LanguageGameEntryUiModel(
+            lines = wordChainHintLines(wordChain),
+            actions = wordChainAnswerActions(),
+        )
+        WordChainGameState.Finished -> LanguageGameEntryUiModel(
+            lines = listOf(
+                "我们已经接了好多小词",
+                "先让它们排队休息一下",
+            ),
+            actions = listOf(
+                LanguageGameAction(
+                    id = LanguageGameActionId.RestartWordChain,
+                    label = "再玩一次",
+                    primary = true,
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ChangeGame,
+                    label = "换个游戏",
+                ),
+                LanguageGameAction(
+                    id = LanguageGameActionId.ExitToChat,
+                    label = "先聊别的",
+                ),
+            ),
+        )
+    }
+}
+
+private fun wordChainStartLines(previousWord: String): List<String> {
+    return listOf(
+        "我们玩词语接龙",
+        "我先说一个词",
+        previousWord,
+        "你接一个从“${WordChainWordBank.lastCharOf(previousWord)}”开始的词就行",
+    )
+}
+
+private fun wordChainCorrectLines(wordChain: WordChainSnapshot): List<String> {
+    val promptWord = wordChain.promptWord ?: wordChain.previousWord
+    val childWord = wordChain.childWord.orEmpty()
+    return listOf(
+        "接上啦",
+        "“$promptWord”接“$childWord”",
+        "这个小词跑得还挺快",
+    ) + wordChainFoxLines(wordChain)
+}
+
+private fun wordChainHintLines(wordChain: WordChainSnapshot): List<String> {
+    val promptWord = wordChain.promptWord ?: wordChain.previousWord
+    return listOf(
+        "这个词也可以玩",
+        "不过这次要从“${WordChainWordBank.lastCharOf(promptWord)}”开始",
+        "我给你换个容易的",
+    ) + wordChainFoxLines(wordChain)
+}
+
+private fun wordChainFoxLines(wordChain: WordChainSnapshot): List<String> {
+    val promptWord = wordChain.foxPromptWord ?: return emptyList()
+    val foxWord = wordChain.foxWord ?: return emptyList()
+    return listOf(
+        "我来接一个",
+        "“$promptWord”接“$foxWord”",
+    )
+}
+
+private fun wordChainAnswerActions(): List<LanguageGameAction> {
+    return listOf(
+        LanguageGameAction(
+            id = LanguageGameActionId.StartVoiceAnswer,
+            label = "我来接",
+            primary = true,
+        ),
+        LanguageGameAction(
+            id = LanguageGameActionId.ChangeGame,
+            label = "换个游戏",
+        ),
+        LanguageGameAction(
+            id = LanguageGameActionId.ExitToChat,
+            label = "先聊别的",
+        ),
+    )
 }

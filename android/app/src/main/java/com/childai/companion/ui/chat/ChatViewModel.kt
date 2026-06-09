@@ -34,6 +34,7 @@ import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
 import com.childai.companion.ui.chat.languagegame.LanguageGameReducer
 import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
 import com.childai.companion.ui.chat.languagegame.LanguageGameState
+import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
@@ -465,6 +466,13 @@ class ChatViewModel(
         )
     }
 
+    fun startWordChainGame() {
+        showLanguageGameSnapshot(
+            LanguageGameReducer.startWordChain(),
+            forceSpeak = true,
+        )
+    }
+
     fun requestBrainTeaserHint() {
         val snapshot = _uiState.value.languageGame ?: return
         showLanguageGameSnapshot(
@@ -485,6 +493,14 @@ class ChatViewModel(
         val snapshot = _uiState.value.languageGame ?: return
         showLanguageGameSnapshot(
             LanguageGameReducer.nextBrainTeaserQuestion(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun restartWordChainGame() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.restartWordChain(snapshot),
             forceSpeak = true,
         )
     }
@@ -2200,6 +2216,20 @@ class ChatViewModel(
             if (handleLanguageGameCommand(trimmed)) return true
             return true
         }
+        if (snapshot?.state == LanguageGameState.WordChain) {
+            if (handleLanguageGameCommand(trimmed)) return true
+            val wordChainState = snapshot.wordChain?.gameState
+            if (wordChainState != WordChainGameState.Finished) {
+                showLanguageGameSnapshot(
+                    LanguageGameReducer.applyWordChainAnswer(
+                        snapshot = snapshot,
+                        transcript = trimmed,
+                    ),
+                    forceSpeak = true,
+                )
+            }
+            return true
+        }
         if (handleLanguageGameCommand(trimmed)) return true
         return false
     }
@@ -2210,14 +2240,17 @@ class ChatViewModel(
                 startBrainTeaserGame()
                 true
             }
-            text.contains("玩游戏") -> {
+            text.contains("词语接龙") ||
+                text.contains("接龙") -> {
+                startWordChainGame()
+                true
+            }
+            text.contains("猜谜语") ||
+                text.contains("谜语") -> {
                 openLanguageGameMenu()
                 true
             }
-            text.contains("词语接龙") ||
-                text.contains("接龙") ||
-                text.contains("猜谜语") ||
-                text.contains("谜语") -> {
+            text.contains("玩游戏") -> {
                 openLanguageGameMenu()
                 true
             }
@@ -2231,14 +2264,22 @@ class ChatViewModel(
                 true
             }
             text.contains("下一题") -> {
+                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
                 nextBrainTeaserQuestion()
                 true
             }
+            text.contains("再玩一次") &&
+                _uiState.value.languageGame?.state == LanguageGameState.WordChain -> {
+                restartWordChainGame()
+                true
+            }
             text.contains("告诉我答案") -> {
+                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
                 revealBrainTeaserAnswer()
                 true
             }
             text.contains("给我提示") -> {
+                if (_uiState.value.languageGame?.state != LanguageGameState.BrainTeaser) return false
                 requestBrainTeaserHint()
                 true
             }

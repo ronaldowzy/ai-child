@@ -22,16 +22,82 @@ class LanguageGameEntryUiModelTest {
     }
 
     @Test
-    fun gameMenuOnlyShowsBrainTeaserAndExitThisRound() {
+    fun gameMenuShowsBrainTeaserWordChainAndExitThisRound() {
         val model = LanguageGameReducer.gameMenu().toLanguageGameEntryUiModel()
 
         assertEquals(listOf("想玩哪一个？"), model.lines)
         assertEquals(
-            listOf("脑筋急转弯", "先聊别的"),
+            listOf("脑筋急转弯", "词语接龙", "先聊别的"),
             model.actions.map { it.label },
         )
-        assertFalse(model.actions.any { it.label == "词语接龙" })
         assertFalse(model.actions.any { it.label == "猜谜语" })
+    }
+
+    @Test
+    fun wordChainStartUsesApprovedCopyAndButtons() {
+        val model = LanguageGameReducer.startWordChain()
+            .toLanguageGameEntryUiModel()
+
+        assertEquals(
+            listOf(
+                "我们玩词语接龙",
+                "我先说一个词",
+                "苹果",
+                "你接一个从“果”开始的词就行",
+            ),
+            model.lines,
+        )
+        assertEquals(
+            listOf("我来接", "换个游戏", "先聊别的"),
+            model.actions.map { it.label },
+        )
+    }
+
+    @Test
+    fun wordChainResultAndFinishedButtonsMatchApprovedOrder() {
+        val correctModel = LanguageGameReducer.applyWordChainAnswer(
+            snapshot = LanguageGameReducer.startWordChain(),
+            transcript = "果汁",
+        ).toLanguageGameEntryUiModel()
+
+        assertEquals(
+            listOf(
+                "接上啦",
+                "“苹果”接“果汁”",
+                "这个小词跑得还挺快",
+                "我来接一个",
+                "“果汁”接“汁水”",
+            ),
+            correctModel.lines,
+        )
+        assertEquals(
+            listOf("我来接", "换个游戏", "先聊别的"),
+            correctModel.actions.map { it.label },
+        )
+
+        var snapshot = LanguageGameReducer.startWordChain()
+        repeat(5) {
+            snapshot = LanguageGameReducer.applyWordChainAnswer(
+                snapshot = snapshot,
+                transcript = snapshot.wordChain?.previousWord
+                    ?.last()
+                    ?.let { "$it" }
+                    .orEmpty(),
+            )
+        }
+        val finishedModel = snapshot.toLanguageGameEntryUiModel()
+
+        assertEquals(
+            listOf(
+                "我们已经接了好多小词",
+                "先让它们排队休息一下",
+            ),
+            finishedModel.lines,
+        )
+        assertEquals(
+            listOf("再玩一次", "换个游戏", "先聊别的"),
+            finishedModel.actions.map { it.label },
+        )
     }
 
     @Test

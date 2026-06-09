@@ -228,11 +228,13 @@ fun ChildChatScreen(
         onLanguageGameCasualChat = viewModel::dismissLanguageGameEntry,
         onLanguageGameOpenMenu = viewModel::openLanguageGameMenu,
         onLanguageGameStartBrainTeaser = viewModel::startBrainTeaserGame,
+        onLanguageGameStartWordChain = viewModel::startWordChainGame,
         onLanguageGameShowHint = viewModel::requestBrainTeaserHint,
         onLanguageGameChangeGame = viewModel::returnToLanguageGameMenu,
         onLanguageGameExit = viewModel::exitLanguageGame,
         onLanguageGameNextQuestion = viewModel::nextBrainTeaserQuestion,
         onLanguageGameRevealAnswer = viewModel::revealBrainTeaserAnswer,
+        onLanguageGameRestartWordChain = viewModel::restartWordChainGame,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -273,11 +275,13 @@ private fun ChildChatScreenContent(
     onLanguageGameCasualChat: () -> Unit,
     onLanguageGameOpenMenu: () -> Unit,
     onLanguageGameStartBrainTeaser: () -> Unit,
+    onLanguageGameStartWordChain: () -> Unit,
     onLanguageGameShowHint: () -> Unit,
     onLanguageGameChangeGame: () -> Unit,
     onLanguageGameExit: () -> Unit,
     onLanguageGameNextQuestion: () -> Unit,
     onLanguageGameRevealAnswer: () -> Unit,
+    onLanguageGameRestartWordChain: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -489,11 +493,13 @@ private fun ChildChatScreenContent(
             LanguageGameActionId.CasualChat -> onLanguageGameCasualChat()
             LanguageGameActionId.OpenGameMenu -> onLanguageGameOpenMenu()
             LanguageGameActionId.StartBrainTeaser -> onLanguageGameStartBrainTeaser()
+            LanguageGameActionId.StartWordChain -> onLanguageGameStartWordChain()
             LanguageGameActionId.ShowHint -> onLanguageGameShowHint()
             LanguageGameActionId.ChangeGame -> onLanguageGameChangeGame()
             LanguageGameActionId.ExitToChat -> onLanguageGameExit()
             LanguageGameActionId.NextQuestion -> onLanguageGameNextQuestion()
             LanguageGameActionId.RevealAnswer -> onLanguageGameRevealAnswer()
+            LanguageGameActionId.RestartWordChain -> onLanguageGameRestartWordChain()
             LanguageGameActionId.GuessAgain,
             LanguageGameActionId.StartVoiceAnswer -> Unit
         }
@@ -3779,11 +3785,13 @@ private fun ChildChatScreenPortraitPreview() {
             onLanguageGameCasualChat = {},
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
+            onLanguageGameStartWordChain = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},
             onLanguageGameNextQuestion = {},
             onLanguageGameRevealAnswer = {},
+            onLanguageGameRestartWordChain = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -3833,11 +3841,13 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onLanguageGameCasualChat = {},
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
+            onLanguageGameStartWordChain = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},
             onLanguageGameNextQuestion = {},
             onLanguageGameRevealAnswer = {},
+            onLanguageGameRestartWordChain = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -3896,11 +3906,13 @@ private fun ChildChatScreenLandscapePreview() {
             onLanguageGameCasualChat = {},
             onLanguageGameOpenMenu = {},
             onLanguageGameStartBrainTeaser = {},
+            onLanguageGameStartWordChain = {},
             onLanguageGameShowHint = {},
             onLanguageGameChangeGame = {},
             onLanguageGameExit = {},
             onLanguageGameNextQuestion = {},
             onLanguageGameRevealAnswer = {},
+            onLanguageGameRestartWordChain = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

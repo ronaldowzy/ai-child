@@ -7,6 +7,7 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
 import com.childai.companion.ui.chat.languagegame.LanguageGameState
+import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.voice.SpeechInputController
 import com.childai.companion.voice.SpeechInputResult
@@ -53,7 +54,7 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
-    fun openGameMenuOnlyShowsBrainTeaserAndExit() {
+    fun openGameMenuShowsBrainTeaserWordChainAndExit() {
         val viewModel = viewModel()
 
         viewModel.openLanguageGameMenu()
@@ -62,10 +63,9 @@ class ChatViewModelLanguageGameTest {
             .toLanguageGameEntryUiModel()
         assertEquals(LanguageGameState.GameMenu, viewModel.uiState.value.languageGame?.state)
         assertEquals(
-            listOf("脑筋急转弯", "先聊别的"),
+            listOf("脑筋急转弯", "词语接龙", "先聊别的"),
             model.actions.map { it.label },
         )
-        assertTrue(model.actions.none { it.label == "词语接龙" })
         assertTrue(model.actions.none { it.label == "猜谜语" })
     }
 
@@ -157,6 +157,131 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
+    fun startWordChainShowsFixedFirstWord() {
+        val viewModel = viewModel()
+
+        viewModel.startWordChainGame()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(LanguageGameState.WordChain, snapshot.state)
+        assertEquals(WordChainGameState.Start, snapshot.wordChain?.gameState)
+        assertEquals("苹果", snapshot.wordChain?.previousWord)
+        assertEquals(
+            listOf(
+                "我们玩词语接龙",
+                "我先说一个词",
+                "苹果",
+                "你接一个从“果”开始的词就行",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+    }
+
+    @Test
+    fun wordChainVoiceAnswerDoesNotSendConversationWhenConnected() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(
+            sender = sender,
+            speech = FakeLanguageGameSpeechInputController(
+                result = SpeechInputResult.Transcript("果汁"),
+            ),
+        )
+        viewModel.startWordChainGame()
+
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(WordChainGameState.Correct, snapshot.wordChain?.gameState)
+        assertEquals("汁水", snapshot.wordChain?.previousWord)
+        assertEquals(
+            listOf(
+                "接上啦",
+                "“苹果”接“果汁”",
+                "这个小词跑得还挺快",
+                "我来接一个",
+                "“果汁”接“汁水”",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+        assertTrue(sender.sentTexts.isEmpty())
+    }
+
+    @Test
+    fun wordChainNonMatchingAnswerEntersHintWithoutConversation() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(sender = sender)
+        viewModel.startWordChainGame()
+
+        viewModel.sendText("毛巾")
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(WordChainGameState.Hint, snapshot.wordChain?.gameState)
+        assertEquals(
+            listOf(
+                "这个词也可以玩",
+                "不过这次要从“果”开始",
+                "我给你换个容易的",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+        assertTrue(sender.sentTexts.isEmpty())
+    }
+
+    @Test
+    fun wordChainSecondMissAutoAssistsAndLowersDifficulty() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(sender = sender)
+        viewModel.startWordChainGame()
+
+        viewModel.sendText("毛巾")
+        viewModel.sendText("毛巾")
+
+        val snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(WordChainGameState.Hint, snapshot.wordChain?.gameState)
+        assertEquals(1, snapshot.wordChain?.roundIndex)
+        assertEquals("果汁", snapshot.wordChain?.previousWord)
+        assertEquals(
+            listOf(
+                "这个词也可以玩",
+                "不过这次要从“果”开始",
+                "我给你换个容易的",
+                "我来接一个",
+                "“苹果”接“果汁”",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+        assertTrue(sender.sentTexts.isEmpty())
+    }
+
+    @Test
+    fun wordChainFinishesAfterFiveEffectiveRoundsAndReplayRotatesStartWord() {
+        val viewModel = viewModel()
+        viewModel.startWordChainGame()
+
+        repeat(5) {
+            val previous = requireNotNull(viewModel.uiState.value.languageGame?.wordChain?.previousWord)
+            viewModel.sendText(previous.last().toString())
+        }
+
+        var snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(WordChainGameState.Finished, snapshot.wordChain?.gameState)
+        assertEquals(
+            listOf(
+                "我们已经接了好多小词",
+                "先让它们排队休息一下",
+            ),
+            snapshot.toLanguageGameEntryUiModel().lines,
+        )
+
+        viewModel.restartWordChainGame()
+
+        snapshot = requireNotNull(viewModel.uiState.value.languageGame)
+        assertEquals(WordChainGameState.Start, snapshot.wordChain?.gameState)
+        assertEquals("月亮", snapshot.wordChain?.previousWord)
+    }
+
+    @Test
     fun fifthQuestionNextLoopsBackToFirst() {
         val viewModel = viewModel()
         viewModel.startBrainTeaserGame()
@@ -203,7 +328,20 @@ class ChatViewModelLanguageGameTest {
         val thirdViewModel = viewModel(sender = sender)
         thirdViewModel.sendText("词语接龙")
 
-        assertEquals(LanguageGameState.GameMenu, thirdViewModel.uiState.value.languageGame?.state)
+        assertEquals(LanguageGameState.WordChain, thirdViewModel.uiState.value.languageGame?.state)
+        assertEquals("苹果", thirdViewModel.uiState.value.languageGame?.wordChain?.previousWord)
+        assertTrue(sender.sentTexts.isEmpty())
+
+        val fourthViewModel = viewModel(sender = sender)
+        fourthViewModel.sendText("接龙")
+
+        assertEquals(LanguageGameState.WordChain, fourthViewModel.uiState.value.languageGame?.state)
+        assertTrue(sender.sentTexts.isEmpty())
+
+        val fifthViewModel = viewModel(sender = sender)
+        fifthViewModel.sendText("猜谜语")
+
+        assertEquals(LanguageGameState.GameMenu, fifthViewModel.uiState.value.languageGame?.state)
         assertTrue(sender.sentTexts.isEmpty())
     }
 
@@ -217,6 +355,14 @@ class ChatViewModelLanguageGameTest {
 
         assertNull(viewModel.uiState.value.languageGame)
         assertEquals(listOf("脑筋急转弯"), sender.sentTexts)
+
+        val secondSender = LanguageGameSender()
+        val secondViewModel = viewModel(sender = secondSender)
+        secondViewModel.activateStrangeDoorDemo()
+        secondViewModel.sendText("词语接龙")
+
+        assertNull(secondViewModel.uiState.value.languageGame)
+        assertEquals(listOf("词语接龙"), secondSender.sentTexts)
     }
 
     private fun viewModel(

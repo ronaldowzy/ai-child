@@ -30,6 +30,11 @@ import com.childai.companion.data.growth.showcaseItemRecalledGrowthSummary
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.data.attachment.RecognizedContent
+import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
+import com.childai.companion.ui.chat.languagegame.LanguageGameReducer
+import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
+import com.childai.companion.ui.chat.languagegame.LanguageGameState
+import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
@@ -116,6 +121,9 @@ class ChatViewModel(
     private var openingDeferredByStrangeDoor = false
     private var strangeDoorDemoDismissed = false
     private var lastStrangeDoorNarrationText: String? = null
+    private var languageGameAutoPromptShown = false
+    private var languageGameDismissedForLifecycle = false
+    private var lastLanguageGameNarrationText: String? = null
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
@@ -212,6 +220,7 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = StrangeDoorDoorStateReducer.reset(),
+                languageGame = null,
                 quickActions = emptyList(),
                 childTurnPhaseHint = null,
                 pendingImageContext = null,
@@ -434,6 +443,76 @@ class ChatViewModel(
         }
     }
 
+    fun dismissLanguageGameEntry() {
+        languageGameDismissedForLifecycle = true
+        lastLanguageGameNarrationText = null
+        _uiState.update { state ->
+            state.copy(languageGame = null)
+        }
+    }
+
+    fun openLanguageGameMenu() {
+        showLanguageGameSnapshot(
+            LanguageGameReducer.gameMenu(),
+            forceSpeak = true,
+        )
+    }
+
+    fun startBrainTeaserGame() {
+        showLanguageGameSnapshot(
+            LanguageGameReducer.startBrainTeaser(),
+            forceSpeak = true,
+        )
+    }
+
+    fun requestBrainTeaserHint() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.showBrainTeaserHint(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun revealBrainTeaserAnswer() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.revealBrainTeaserAnswer(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun nextBrainTeaserQuestion() {
+        val snapshot = _uiState.value.languageGame ?: return
+        showLanguageGameSnapshot(
+            LanguageGameReducer.nextBrainTeaserQuestion(snapshot),
+            forceSpeak = true,
+        )
+    }
+
+    fun returnToLanguageGameMenu() {
+        showLanguageGameSnapshot(
+            LanguageGameReducer.gameMenu(),
+            forceSpeak = true,
+        )
+    }
+
+    fun exitLanguageGame() {
+        languageGameDismissedForLifecycle = true
+        lastLanguageGameNarrationText = null
+        _uiState.update { state ->
+            state.copy(
+                languageGame = null,
+                childTurnPhaseHint = null,
+                isSending = false,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+    }
+
     private fun updateStrangeDoorDemoState(
         demoState: StrangeDoorDemoState,
         method: StrangeDoorDemoMethod?,
@@ -477,6 +556,7 @@ class ChatViewModel(
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
         if (submitStrangeDoorShowcaseName(trimmedText)) return
         if (answerStrangeDoorRiddle(trimmedText)) return
+        if (handleLanguageGameText(trimmedText)) return
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
@@ -689,6 +769,7 @@ class ChatViewModel(
         }
         if (submitStrangeDoorShowcaseName(transcript)) return
         if (answerStrangeDoorRiddle(transcript)) return
+        if (handleLanguageGameText(transcript)) return
         clearVoiceInputState()
         sendText(transcript)
     }
@@ -1541,6 +1622,7 @@ class ChatViewModel(
                     if (transcript.isNotEmpty()) {
                         if (submitStrangeDoorShowcaseName(transcript)) return
                         if (answerStrangeDoorRiddle(transcript)) return
+                        if (handleLanguageGameText(transcript)) return
                         _uiState.update { state ->
                             state.copy(
                                 isSending = false,
@@ -2082,6 +2164,127 @@ class ChatViewModel(
         speakAgentFeedback(text)
     }
 
+    private fun maybeShowLanguageGameEntryPromptAfterOpening() {
+        if (languageGameAutoPromptShown || languageGameDismissedForLifecycle) return
+        if (_uiState.value.strangeDoorDemo != null) return
+        if (_uiState.value.languageGame != null) return
+        if (_uiState.value.messages.any { it.author == MessageAuthor.Child }) return
+        languageGameAutoPromptShown = true
+        _uiState.update { state ->
+            state.copy(
+                languageGame = LanguageGameReducer.entryPrompt(autoPromptShown = true),
+                quickActions = emptyList(),
+            )
+        }
+    }
+
+    private fun handleLanguageGameText(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return false
+        if (_uiState.value.strangeDoorDemo != null) return false
+        val snapshot = _uiState.value.languageGame
+        if (snapshot?.state == LanguageGameState.BrainTeaser) {
+            val brainTeaser = snapshot.brainTeaser
+            if (brainTeaser?.gameState == BrainTeaserGameState.Question ||
+                brainTeaser?.gameState == BrainTeaserGameState.Hint
+            ) {
+                showLanguageGameSnapshot(
+                    LanguageGameReducer.applyBrainTeaserAnswer(
+                        snapshot = snapshot,
+                        transcript = trimmed,
+                    ),
+                    forceSpeak = true,
+                )
+                return true
+            }
+            if (handleLanguageGameCommand(trimmed)) return true
+            return true
+        }
+        if (handleLanguageGameCommand(trimmed)) return true
+        return false
+    }
+
+    private fun handleLanguageGameCommand(text: String): Boolean {
+        return when {
+            text.contains("脑筋急转弯") -> {
+                startBrainTeaserGame()
+                true
+            }
+            text.contains("玩游戏") -> {
+                openLanguageGameMenu()
+                true
+            }
+            text.contains("词语接龙") ||
+                text.contains("接龙") ||
+                text.contains("猜谜语") ||
+                text.contains("谜语") -> {
+                openLanguageGameMenu()
+                true
+            }
+            text.contains("随便聊聊") ||
+                text.contains("先聊别的") -> {
+                exitLanguageGame()
+                true
+            }
+            text.contains("换个游戏") -> {
+                returnToLanguageGameMenu()
+                true
+            }
+            text.contains("下一题") -> {
+                nextBrainTeaserQuestion()
+                true
+            }
+            text.contains("告诉我答案") -> {
+                revealBrainTeaserAnswer()
+                true
+            }
+            text.contains("给我提示") -> {
+                requestBrainTeaserHint()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun showLanguageGameSnapshot(
+        snapshot: LanguageGameSnapshot,
+        forceSpeak: Boolean = false,
+    ) {
+        if (_uiState.value.strangeDoorDemo != null) return
+        childInteractionStarted = true
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update { state ->
+            state.copy(
+                languageGame = snapshot,
+                quickActions = emptyList(),
+                childTurnPhaseHint = null,
+                pendingImageContext = null,
+                isSending = false,
+                voice = state.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        speakLanguageGameSnapshot(snapshot, force = forceSpeak)
+    }
+
+    private fun speakLanguageGameSnapshot(
+        snapshot: LanguageGameSnapshot,
+        force: Boolean = false,
+    ) {
+        val text = snapshot.toLanguageGameEntryUiModel()
+            .lines
+            .joinToString(separator = "\n")
+            .trim()
+        if (text.isBlank()) return
+        if (!force && lastLanguageGameNarrationText == text) return
+        lastLanguageGameNarrationText = text
+        speakAgentFeedback(text)
+    }
+
     private fun nextMessageId(prefix: String): String {
         nextMessageIndex += 1
         return "$prefix-$nextMessageIndex"
@@ -2283,6 +2486,7 @@ class ChatViewModel(
                     response = response,
                     replaceMessageId = "agent-welcome",
                 )
+                maybeShowLanguageGameEntryPromptAfterOpening()
             }.onFailure {
                 openingFallbackJob.cancel()
                 Log.d(TAG, "[LatencyTrace] stage=opening_failed")
@@ -2436,6 +2640,7 @@ data class ChatUiState(
     val xiaozhantaiSaveDraft: XiaozhantaiSaveDraftUiState? = null,
     val xiaozhantaiSavedItemIdForNavigation: String? = null,
     val strangeDoorDemo: StrangeDoorDemoSnapshot? = null,
+    val languageGame: LanguageGameSnapshot? = null,
 ) {
     val interactionPresentation: ChildInteractionPresentation
         get() = childInteractionPresentation(

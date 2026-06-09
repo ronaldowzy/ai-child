@@ -115,6 +115,10 @@ import com.childai.companion.data.conversation.CompanionObjectMeta
 import com.childai.companion.data.conversation.ConversationSessionState
 import com.childai.companion.data.debug.HouseObjectDebugRepository
 import com.childai.companion.mascot.MascotState
+import com.childai.companion.ui.chat.languagegame.LanguageGameAction
+import com.childai.companion.ui.chat.languagegame.LanguageGameActionId
+import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
+import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorAndroidResources
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorAssetKey
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
@@ -221,6 +225,14 @@ fun ChildChatScreen(
         onStrangeDoorSaveIntent = viewModel::requestStrangeDoorShowcaseSaveIntent,
         onStrangeDoorRetryRiddle = viewModel::retryStrangeDoorRiddle,
         onStrangeDoorExitDemo = viewModel::exitStrangeDoorDemoAndRequestOpening,
+        onLanguageGameCasualChat = viewModel::dismissLanguageGameEntry,
+        onLanguageGameOpenMenu = viewModel::openLanguageGameMenu,
+        onLanguageGameStartBrainTeaser = viewModel::startBrainTeaserGame,
+        onLanguageGameShowHint = viewModel::requestBrainTeaserHint,
+        onLanguageGameChangeGame = viewModel::returnToLanguageGameMenu,
+        onLanguageGameExit = viewModel::exitLanguageGame,
+        onLanguageGameNextQuestion = viewModel::nextBrainTeaserQuestion,
+        onLanguageGameRevealAnswer = viewModel::revealBrainTeaserAnswer,
         requireParentCredential = requireParentCredential,
         verifyParentCredential = verifyParentCredential,
         houseObjectDebugRepository = houseObjectDebugRepository,
@@ -258,6 +270,14 @@ private fun ChildChatScreenContent(
     onStrangeDoorSaveIntent: () -> Unit,
     onStrangeDoorRetryRiddle: () -> Unit,
     onStrangeDoorExitDemo: () -> Unit,
+    onLanguageGameCasualChat: () -> Unit,
+    onLanguageGameOpenMenu: () -> Unit,
+    onLanguageGameStartBrainTeaser: () -> Unit,
+    onLanguageGameShowHint: () -> Unit,
+    onLanguageGameChangeGame: () -> Unit,
+    onLanguageGameExit: () -> Unit,
+    onLanguageGameNextQuestion: () -> Unit,
+    onLanguageGameRevealAnswer: () -> Unit,
     requireParentCredential: Boolean,
     verifyParentCredential: suspend (String) -> Boolean,
     houseObjectDebugRepository: HouseObjectDebugRepository?,
@@ -464,6 +484,21 @@ private fun ChildChatScreenContent(
         }
     }
 
+    fun handleLanguageGameAction(action: LanguageGameAction) {
+        when (action.id) {
+            LanguageGameActionId.CasualChat -> onLanguageGameCasualChat()
+            LanguageGameActionId.OpenGameMenu -> onLanguageGameOpenMenu()
+            LanguageGameActionId.StartBrainTeaser -> onLanguageGameStartBrainTeaser()
+            LanguageGameActionId.ShowHint -> onLanguageGameShowHint()
+            LanguageGameActionId.ChangeGame -> onLanguageGameChangeGame()
+            LanguageGameActionId.ExitToChat -> onLanguageGameExit()
+            LanguageGameActionId.NextQuestion -> onLanguageGameNextQuestion()
+            LanguageGameActionId.RevealAnswer -> onLanguageGameRevealAnswer()
+            LanguageGameActionId.GuessAgain,
+            LanguageGameActionId.StartVoiceAnswer -> Unit
+        }
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -588,6 +623,7 @@ private fun ChildChatScreenContent(
                         onOpenTtsSettings = onOpenTtsSettings,
                         onInstallTtsData = onInstallTtsData,
                         onOpenImageInput = { pendingImageSourcePurpose = it },
+                        onLanguageGameAction = ::handleLanguageGameAction,
                         viewportClass = viewportClass,
                         modifier = Modifier
                             .weight(layoutWeights.conversation)
@@ -648,6 +684,19 @@ private fun ChildChatScreenContent(
                             actions = visibleQuickActions,
                             enabled = !uiState.isSending,
                             onQuickAction = ::handleQuickAction,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    uiState.languageGame?.let { languageGame ->
+                        LanguageGamePanel(
+                            snapshot = languageGame,
+                            voice = uiState.voice,
+                            presentation = uiState.interactionPresentation,
+                            enabled = !uiState.isSending,
+                            onAction = ::handleLanguageGameAction,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 520.dp),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -1796,6 +1845,200 @@ internal fun strangeDoorWeakEntryAlpha(homeIntro: Boolean): Float {
 }
 
 @Composable
+private fun LanguageGamePanel(
+    snapshot: LanguageGameSnapshot,
+    voice: VoiceUiState,
+    presentation: ChildInteractionPresentation,
+    enabled: Boolean,
+    onAction: (LanguageGameAction) -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val model = remember(snapshot) {
+        snapshot.toLanguageGameEntryUiModel()
+    }
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            voice.actions.onPermissionDenied()
+        }
+    }
+
+    fun startVoiceRecordingWithPermission() {
+        val isGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (isGranted) {
+            voice.actions.onStartRecording(context.cacheDir)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    fun handleAction(action: LanguageGameAction) {
+        when (action.id) {
+            LanguageGameActionId.StartVoiceAnswer,
+            LanguageGameActionId.GuessAgain -> {
+                if (voice.isRecording) {
+                    voice.actions.onStopRecordingAndUpload()
+                } else {
+                    startVoiceRecordingWithPermission()
+                }
+            }
+
+            else -> onAction(action)
+        }
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
+        color = Color.White.copy(alpha = 0.84f),
+        border = BorderStroke(1.dp, companionSoftBorderColor(alpha = 0.50f)),
+        shadowElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = if (compact) 12.dp else 16.dp,
+                vertical = if (compact) 10.dp else 14.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+        ) {
+            model.lines.forEach { line ->
+                Text(
+                    text = line,
+                    style = if (compact) {
+                        MaterialTheme.typography.bodyMedium
+                    } else {
+                        MaterialTheme.typography.titleMedium
+                    },
+                    color = Color(0xFF3F4A3F),
+                    fontWeight = if (model.lines.size == 1) FontWeight.SemiBold else FontWeight.Normal,
+                    textAlign = TextAlign.Start,
+                )
+            }
+            LanguageGameActionColumn(
+                actions = model.actions,
+                voice = voice,
+                presentation = presentation,
+                enabled = enabled,
+                compact = compact,
+                onAction = ::handleAction,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageGameActionColumn(
+    actions: List<LanguageGameAction>,
+    voice: VoiceUiState,
+    presentation: ChildInteractionPresentation,
+    enabled: Boolean,
+    compact: Boolean,
+    onAction: (LanguageGameAction) -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+    ) {
+        actions.forEach { action ->
+            LanguageGameActionButton(
+                action = action,
+                voice = voice,
+                presentation = presentation,
+                enabled = enabled,
+                compact = compact,
+                onClick = { onAction(action) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageGameActionButton(
+    action: LanguageGameAction,
+    voice: VoiceUiState,
+    presentation: ChildInteractionPresentation,
+    enabled: Boolean,
+    compact: Boolean,
+    onClick: () -> Unit,
+) {
+    val buttonEnabled = if (action.id == LanguageGameActionId.StartVoiceAnswer ||
+        action.id == LanguageGameActionId.GuessAgain
+    ) {
+        inputBarPrimaryVoiceButtonEnabled(
+            enabled = enabled,
+            presentation = presentation,
+        )
+    } else {
+        enabled
+    }
+    val minHeight = if (compact) 42.dp else 48.dp
+    if (action.primary) {
+        Button(
+            onClick = onClick,
+            enabled = buttonEnabled,
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight),
+        ) {
+            LanguageGameButtonContent(
+                action = action,
+                voice = voice,
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = buttonEnabled,
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight),
+        ) {
+            LanguageGameButtonContent(
+                action = action,
+                voice = voice,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageGameButtonContent(
+    action: LanguageGameAction,
+    voice: VoiceUiState,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (action.id == LanguageGameActionId.StartVoiceAnswer ||
+            action.id == LanguageGameActionId.GuessAgain
+        ) {
+            StrangeDoorVoiceGlyph(
+                isRecording = voice.isRecording,
+                isUploading = voice.isUploading,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Text(
+            text = action.label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (action.primary) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
 private fun CompanionImageSourceDialog(
     showGalleryEntry: Boolean,
     onCapturePhoto: () -> Unit,
@@ -2591,6 +2834,7 @@ private fun LandscapeOperationPanel(
     onOpenTtsSettings: () -> Unit,
     onInstallTtsData: () -> Unit,
     onOpenImageInput: (String) -> Unit,
+    onLanguageGameAction: (LanguageGameAction) -> Unit,
     viewportClass: CompanionRoomViewportClass,
     modifier: Modifier = Modifier,
 ) {
@@ -2634,6 +2878,18 @@ private fun LandscapeOperationPanel(
                     actions = visibleQuickActions,
                     enabled = !uiState.isSending,
                     onQuickAction = onQuickAction,
+                )
+                Spacer(modifier = Modifier.height(panelGap))
+            }
+            uiState.languageGame?.let { languageGame ->
+                LanguageGamePanel(
+                    snapshot = languageGame,
+                    voice = uiState.voice,
+                    presentation = presentation,
+                    enabled = !uiState.isSending,
+                    compact = compactLandscape || tabletLandscape,
+                    onAction = onLanguageGameAction,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(panelGap))
             }
@@ -3520,6 +3776,14 @@ private fun ChildChatScreenPortraitPreview() {
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
+            onLanguageGameCasualChat = {},
+            onLanguageGameOpenMenu = {},
+            onLanguageGameStartBrainTeaser = {},
+            onLanguageGameShowHint = {},
+            onLanguageGameChangeGame = {},
+            onLanguageGameExit = {},
+            onLanguageGameNextQuestion = {},
+            onLanguageGameRevealAnswer = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -3566,6 +3830,14 @@ private fun ChildChatScreenPortraitListeningPreview() {
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
+            onLanguageGameCasualChat = {},
+            onLanguageGameOpenMenu = {},
+            onLanguageGameStartBrainTeaser = {},
+            onLanguageGameShowHint = {},
+            onLanguageGameChangeGame = {},
+            onLanguageGameExit = {},
+            onLanguageGameNextQuestion = {},
+            onLanguageGameRevealAnswer = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,
@@ -3621,6 +3893,14 @@ private fun ChildChatScreenLandscapePreview() {
             onStrangeDoorSaveIntent = {},
             onStrangeDoorRetryRiddle = {},
             onStrangeDoorExitDemo = {},
+            onLanguageGameCasualChat = {},
+            onLanguageGameOpenMenu = {},
+            onLanguageGameStartBrainTeaser = {},
+            onLanguageGameShowHint = {},
+            onLanguageGameChangeGame = {},
+            onLanguageGameExit = {},
+            onLanguageGameNextQuestion = {},
+            onLanguageGameRevealAnswer = {},
             requireParentCredential = false,
             verifyParentCredential = { false },
             houseObjectDebugRepository = null,

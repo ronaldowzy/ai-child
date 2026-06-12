@@ -76,11 +76,12 @@ deprecated：已废弃，不再作为实现依据。
 | PD-057 | confirmed | Task 09 家庭内测账号和个性化基础：当前产品术语改用“家长”；账号体系只做一个孩子一个账号、家长代创建和管理，孩子不管理密码；密码 hash、服务端只存 token hash，Android 登录态持久化到手动退出或 token 失效；普通对话 continuation/shift 改为模型语义控制为主，程序规则保留 safety/boundary/fallback/metrics；opening v2 可用模型生成且不阻塞首屏，provider 失败时确定性 fallback；topic choices 由后端基于兴趣/历史/curated seeds 生成，Android 不再硬编码话题 chips。 | Auth、Android login/session、ParentPolicy/Report、ChildAgentRuntime、OpeningService、QuickAction/TopicSeed、docs/QA |
 | PD-058 | confirmed | 家庭内测运行时不得把 mock provider 或 mock 图片/语音路径当作产品能力；已进入测试范围的聊天、vision、TTS、ASR 必须显式配置正式 provider。自动化测试可以保留隔离的 test double，但测试替身不得作为默认运行配置、fallback 成功或验收通过依据。 | backend config/runtime guard、ModelRegistry fallback、Android image/voice paths、docs/QA |
 | PD-060 | confirmed | 语言游戏作为普通聊天中的轻选择入口，而不是首页大功能区或复杂游戏系统；首版只允许“脑筋急转弯 / 词语接龙 / 猜谜语”三个菜单项，奇怪小门进行中不触发语言游戏，具体游戏内容必须由主控后续确认。 | Android ChatViewModel、本地 UI 状态、儿童端文案、QA |
+| PD-061 | confirmed | 小白狐轻记忆确认为下一阶段产品方向：先做轻量、低敏、可放下的连续陪伴，不做学习画像、隐私档案、成绩记录或复杂成长档案。MVP 采用两阶段，M1 仅做 Android 本地轻状态 + 既有小展台数据；后端白名单轻摘要、家长端开关、语言游戏偏好和孩子端“不要再提这个”均暂缓到后续评估。 | Android 本地状态、小展台读取、奇怪小门摘要、opening/普通聊天策略、QA、docs |
 
 新增执行依据：
 
 ```text
-PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/家长寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正；PD-057 修订 Task 09 之后的账号、家长术语、opening v2、model-driven conversation control 和后端生成 topic choices 方向；PD-058 是家庭内测运行配置和验收口径的最高优先级约束：正式功能不能以 mock 路径冒充通过；PD-060 是语言游戏入口阶段的最高优先级约束：只做聊天里的轻选择，不做复杂游戏系统。
+PD-028 / PD-029 / PD-030 / PD-039 是 freedom-first 与图片/家长寄语方向的最高优先级产品修正；PD-048 是当前 ASR 第一选择，PD-034 / PD-035 保留为 MiMo fallback 的约束，PD-036 / PD-037 是 voice-first 和开场白体验的最高优先级语音输入修正；PD-057 修订 Task 09 之后的账号、家长术语、opening v2、model-driven conversation control 和后端生成 topic choices 方向；PD-058 是家庭内测运行配置和验收口径的最高优先级约束：正式功能不能以 mock 路径冒充通过；PD-060 是语言游戏入口阶段的最高优先级约束：只做聊天里的轻选择，不做复杂游戏系统；PD-061 是轻记忆阶段的最高优先级约束：M1 只做本地轻状态和既有小展台数据，不新增后端、数据表、endpoint、image_purpose、家长报告项或儿童端最终文案。
 不要继续把 after_school、homework、bedtime、photo 做成默认硬模式。
 ```
 
@@ -845,6 +846,19 @@ Affected modules: Android `ChatViewModel`、儿童聊天 UI、本地语言游戏
 Implementation notes: 首版优先 Android 本地状态；不改后端、不新增 endpoint、不新增家长端、不接小展台、不新增 GrowthEvent。入口允许文案仅限主控确认文本；如本轮只实现入口和菜单，三个游戏按钮可保持 disabled，避免出现未确认游戏内文案。
 Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/session_process/handoffs/20260609_LG0A_language_game_entry_decision_plan.md`。
 Tests or QA needed: 后续实现测试覆盖 EntryPrompt 单生命周期触发、点“随便聊聊”后不再自动弹出、GameMenu 菜单项、具体游戏名触发占位起始状态、奇怪小门优先、退出恢复普通 conversation、禁止词扫描和 Android 构建。
+
+#### PD-061
+
+Decision ID: PD-061
+Date: 2026-06-12
+Status: confirmed
+Source: parent / product owner M0 review
+Decision: 小白狐轻记忆确认为新的产品方向。轻记忆只服务“孩子感觉小白狐轻轻记得一点点”的连续陪伴体验，不做学习画像、隐私档案、聊天记录检索、语言游戏成绩、家长监控或复杂成长档案。MVP 采用两阶段：第一阶段只做 Android 本地轻状态 + 既有小展台数据；第二阶段再评估后端白名单轻摘要。M1 不新增后端跨天轻摘要、不新增 memory endpoint、不新增数据表、不新增 image_purpose、不保存原始语音、原始照片、原始聊天全文、孩子原始回答、错误答案、分数、等级或排名。M1 优先来源仅限奇怪小门完成摘要、最近安全机关类型、最近安全道具名、小展台小发现名称、小展台小发现是否回来帮过门。语言游戏偏好、普通聊天自由抽取、后端长期记忆摘要、家长端逐条管理和孩子端显式“忘掉这个”入口暂缓。
+Rationale: 奇怪小门、小展台和语言游戏第一组已经形成孩子可感知能力，下一阶段重点不是继续新增玩法，而是把功能集合收束为有一点连续性的陪伴体验。轻记忆必须保持低频、低敏、可放下，避免监控感、依赖感、学习评价和游戏化留存。
+Affected modules: Android `ChatViewModel` 本地状态、奇怪小门本地摘要、小展台只读数据、opening/普通聊天策略、儿童端文案测试、QA、docs。M1 不影响 backend、家长端、语言游戏题库/词库、小展台数据模型或素材。
+Implementation notes: M1 先做数据合同与本地状态计划；禁止新增后端接口、数据表、GrowthEvent、image_purpose、家长报告项、儿童端最终文案、积分、奖励、打卡、排行榜。public repo 测试材料必须继续禁止真实儿童音频、照片、聊天转录、私有截图、家庭信息、prompt trace、本地数据库、模型权重和 TTS cache。
+Docs updated: `docs/PRODUCT_DECISIONS_V0_1.md`、`docs/小白狐轻记忆产品方向设计_2026_06_12_V0_1.md`、`docs/session_process/handoffs/20260612_M0_light_memory_product_direction_plan.md`、`docs/session_process/handoffs/20260612_M0A_light_memory_decision_and_M1_boundary_plan.md`。
+Tests or QA needed: 后续 M1 计划需覆盖本地轻状态合同、来源白名单、禁止来源、低频 opening 召回、孩子主动相关时普通聊天接住、奇怪小门读取最近小展台小发现、public repo 数据扫描、真机验收清单和禁止词 / 禁存规则。
 
 ---
 

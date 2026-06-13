@@ -37,6 +37,8 @@ import com.childai.companion.ui.chat.languagegame.LanguageGameState
 import com.childai.companion.ui.chat.languagegame.RiddleGameState
 import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
+import com.childai.companion.ui.chat.lightmemory.LightMemoryReducer
+import com.childai.companion.ui.chat.lightmemory.LightMemorySnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
@@ -223,6 +225,11 @@ class ChatViewModel(
             state.copy(
                 strangeDoorDemo = StrangeDoorDoorStateReducer.reset(),
                 languageGame = null,
+                lightMemory = LightMemoryReducer.withOpeningRecallEligibility(
+                    snapshot = state.lightMemory,
+                    strangeDoorActive = true,
+                    languageGameActive = false,
+                ),
                 quickActions = emptyList(),
                 childTurnPhaseHint = null,
                 pendingImageContext = null,
@@ -330,6 +337,12 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = nextSnapshot,
+                lightMemory = LightMemoryReducer.rememberShowcaseAssist(
+                    snapshot = state.lightMemory,
+                    item = item,
+                    doorSnapshot = nextSnapshot,
+                    nowMillis = nowMillis(),
+                ),
                 quickActions = emptyList(),
                 childTurnPhaseHint = null,
                 pendingImageContext = null,
@@ -390,6 +403,11 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = nextSnapshot,
+                lightMemory = LightMemoryReducer.rememberStrangeDoorCompleted(
+                    snapshot = state.lightMemory,
+                    doorSnapshot = nextSnapshot,
+                    nowMillis = nowMillis(),
+                ),
                 quickActions = emptyList(),
                 childTurnPhaseHint = null,
                 isSending = false,
@@ -436,6 +454,7 @@ class ChatViewModel(
             state.copy(
                 strangeDoorDemo = null,
                 xiaozhantaiSaveDraft = null,
+                lightMemory = LightMemoryReducer.muteForCurrentLifecycle(state.lightMemory),
             )
         }
         lastStrangeDoorNarrationText = null
@@ -445,11 +464,30 @@ class ChatViewModel(
         }
     }
 
+    fun markLightMemoryOpeningRecalled() {
+        _uiState.update { state ->
+            state.copy(
+                lightMemory = LightMemoryReducer.markOpeningRecalled(state.lightMemory),
+            )
+        }
+    }
+
+    fun muteLightMemoryForLifecycle() {
+        _uiState.update { state ->
+            state.copy(
+                lightMemory = LightMemoryReducer.muteForCurrentLifecycle(state.lightMemory),
+            )
+        }
+    }
+
     fun dismissLanguageGameEntry() {
         languageGameDismissedForLifecycle = true
         lastLanguageGameNarrationText = null
         _uiState.update { state ->
-            state.copy(languageGame = null)
+            state.copy(
+                languageGame = null,
+                lightMemory = LightMemoryReducer.muteForCurrentLifecycle(state.lightMemory),
+            )
         }
     }
 
@@ -552,6 +590,7 @@ class ChatViewModel(
                 languageGame = null,
                 childTurnPhaseHint = null,
                 isSending = false,
+                lightMemory = LightMemoryReducer.muteForCurrentLifecycle(state.lightMemory),
                 voice = state.voice.copy(
                     inputMode = VoiceInputMode.Idle,
                     pendingTranscript = "",
@@ -605,6 +644,7 @@ class ChatViewModel(
         if (submitStrangeDoorShowcaseName(trimmedText)) return
         if (answerStrangeDoorRiddle(trimmedText)) return
         if (handleLanguageGameText(trimmedText)) return
+        updateLightMemoryRelatedChatEligibility(trimmedText)
 
         val imageContext = _uiState.value.pendingImageContext
         if (imageContext != null) {
@@ -618,6 +658,19 @@ class ChatViewModel(
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
             quickActionId = quickActionId,
         )
+    }
+
+    private fun updateLightMemoryRelatedChatEligibility(text: String) {
+        _uiState.update { state ->
+            state.copy(
+                lightMemory = LightMemoryReducer.withRelatedChatEligibility(
+                    snapshot = state.lightMemory,
+                    childText = text,
+                    strangeDoorActive = state.strangeDoorDemo != null,
+                    languageGameActive = state.languageGame != null,
+                ),
+            )
+        }
     }
 
     fun recallXiaozhantaiItem(context: XiaozhantaiRecallContext) {
@@ -1423,6 +1476,11 @@ class ChatViewModel(
                         xiaozhantaiSavePromptMessageId = state.xiaozhantaiSavePromptMessageId
                             ?.takeUnless { it == draft.messageId },
                         imagePreviewCards = updatedPreviewCards,
+                        lightMemory = LightMemoryReducer.rememberShowcaseItem(
+                            snapshot = state.lightMemory,
+                            item = item,
+                            nowMillis = nowMillis(),
+                        ),
                     )
                 }
                 if (draft.source == XiaozhantaiSaveDraftSource.StrangeDoor) {
@@ -1507,6 +1565,12 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = nextSnapshot,
+                lightMemory = LightMemoryReducer.rememberStrangeDoorPhotoResult(
+                    snapshot = state.lightMemory,
+                    doorSnapshot = nextSnapshot,
+                    transform = transform,
+                    nowMillis = nowMillis(),
+                ),
                 isSending = false,
                 childTurnPhaseHint = null,
                 quickActions = emptyList(),
@@ -2222,6 +2286,11 @@ class ChatViewModel(
             state.copy(
                 languageGame = LanguageGameReducer.entryPrompt(autoPromptShown = true),
                 quickActions = emptyList(),
+                lightMemory = LightMemoryReducer.withOpeningRecallEligibility(
+                    snapshot = state.lightMemory,
+                    strangeDoorActive = false,
+                    languageGameActive = true,
+                ),
             )
         }
     }
@@ -2360,6 +2429,11 @@ class ChatViewModel(
                 childTurnPhaseHint = null,
                 pendingImageContext = null,
                 isSending = false,
+                lightMemory = LightMemoryReducer.withOpeningRecallEligibility(
+                    snapshot = state.lightMemory,
+                    strangeDoorActive = state.strangeDoorDemo != null,
+                    languageGameActive = true,
+                ),
                 voice = state.voice.copy(
                     inputMode = VoiceInputMode.Idle,
                     pendingTranscript = "",
@@ -2545,6 +2619,11 @@ class ChatViewModel(
         _uiState.update { state ->
             state.copy(
                 childTurnPhaseHint = null,
+                lightMemory = LightMemoryReducer.withOpeningRecallEligibility(
+                    snapshot = state.lightMemory,
+                    strangeDoorActive = state.strangeDoorDemo != null,
+                    languageGameActive = state.languageGame != null,
+                ),
                 agent = FoxAgentUiState(
                     mood = FoxMood.Warm,
                     motion = FoxMotion.GentleIdle,
@@ -2740,6 +2819,7 @@ data class ChatUiState(
     val xiaozhantaiSavedItemIdForNavigation: String? = null,
     val strangeDoorDemo: StrangeDoorDemoSnapshot? = null,
     val languageGame: LanguageGameSnapshot? = null,
+    val lightMemory: LightMemorySnapshot = LightMemorySnapshot(),
 ) {
     val interactionPresentation: ChildInteractionPresentation
         get() = childInteractionPresentation(

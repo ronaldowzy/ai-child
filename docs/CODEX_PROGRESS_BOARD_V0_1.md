@@ -10,18 +10,17 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：奇怪小门 Demo：S4 三种小机关已落地；R1-C / S2 / S3 / S4 仍为 CODE PASS / 待合并真机验收，真机视觉验收延期到后续合并真机测试。
+当前阶段：小白狐轻记忆 M1：Android 本地轻状态与数据合同实现；奇怪小门、小展台、语言游戏第一组已进入合并真机验收队列。
 
 下一阶段主方向：
-儿童端吸引力试玩原型：奇怪小门 Demo。
+从“功能集合”收束为低敏、低频、可放下的连续陪伴体验。
 
 本版核心机制：
-奇怪小门今日事件。
+奇怪小门今日事件 + 小展台只读回看 / 回到小门 + 语言游戏第一组 + 小白狐轻记忆本地状态。
 
 本版目标：
-孩子打开 App 后，第一眼看到小白狐遇到一个可参与的小麻烦；
-孩子可以用现实物品或一个怪问题，马上帮小白狐推动小门变化；
-核心验收题是：孩子玩完第一轮后，会不会主动说“我再找一个给它看看”。
+孩子能感到小白狐遇到事、能一起玩，也能轻轻记得一点点共同经历；
+轻记忆不做画像、不做学习记录、不保存原始材料、不变成任务或奖励。
 
 当前主控判断：
 1. 下一阶段不继续扩展后台成长系统。
@@ -32,8 +31,9 @@
 6. 变身反馈先用确定性模板 + 少量映射，不先做复杂模型生成。
 7. 不新增复杂后端成长系统，不新增多关卡持久化。
 8. 小展台只做结果承接和只读回看，不做主玩法。
-9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看，S3 已完成 Demo 完成态、保存完成态、退出与重玩的 Android 本地收口，S4 已完成 Round / Soft / Shiny 三种小机关本地轮换。
-10. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
+9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看，S3 已完成 Demo 完成态、保存完成态、退出与重玩的 Android 本地收口，S4 已完成 Round / Soft / Shiny 三种小机关本地轮换，S5 已接通“小展台的小发现回到小门帮忙”路径，语言游戏第一组已完成脑筋急转弯、词语接龙、猜谜语。
+10. 轻记忆 M1 只做 Android 本地轻状态和既有小展台安全字段读取，不新增后端 endpoint、数据表、GrowthEvent、image_purpose、儿童端最终文案、语言游戏偏好或普通聊天自由抽取。
+11. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
 
 当前事实源：
 README.md
@@ -51,6 +51,11 @@ docs/session_process/handoffs/20260606_S3_strange_door_finish_replay_handoff.md
 docs/奇怪小门多机关重玩变体设计_2026_06_07_V0_1.md
 docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_plan.md
 docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handoff.md
+docs/session_process/handoffs/20260608_S5_showcase_item_back_to_door_handoff.md
+docs/session_process/handoffs/20260609_LG_review_language_game_suite_handoff.md
+docs/小白狐轻记忆产品方向设计_2026_06_12_V0_1.md
+docs/session_process/handoffs/20260612_M0A_light_memory_decision_and_M1_boundary_plan.md
+docs/session_process/handoffs/20260612_M1_light_memory_local_state_contract_plan.md
 ```
 
 ---
@@ -101,7 +106,17 @@ docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handof
 
 ---
 
-## 4. 当前已定口径
+## 4. 小白狐轻记忆记录
+
+| 轮次 | 目标 | 状态 | 远程提交 | 说明 |
+|---|---|---|---|---|
+| M0 | 产品方向设计 | done | 已提交 | 已确认轻记忆只做低敏、低频、可放下的连续陪伴，不做学习画像、隐私档案或成绩记录 |
+| M0-A | 产品决策落档与 M1 边界计划 | done | 已提交 | 已写入 PD-061，确认 M1 只做 Android 本地轻状态 + 既有小展台数据，不新增后端或儿童端最终文案 |
+| M1 | 本地状态与数据合同 | in_progress | 本提交 | 新增 `lightmemory` 本地合同和纯函数，接入 `ChatUiState` 与 `ChatViewModel` 安全写入点，保留 public repo 数据扫描和真机验收清单 |
+
+---
+
+## 5. 当前已定口径
 
 ```text
 1. 当前阶段统一称为“奇怪小门 Demo”。
@@ -120,7 +135,7 @@ docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handof
 
 ---
 
-## 5. 当前不要推进的大方向
+## 6. 当前不要推进的大方向
 
 ```text
 1. 不继续开笼统的新一轮体验大改。
@@ -142,19 +157,15 @@ docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handof
 
 ---
 
-## 6. 当前只接受的任务入口
+## 7. 当前只接受的任务入口
 
 当前只接受以下任务：
 
 ```text
-1. S1 素材整理与接入准备：检查尺寸、透明背景、命名、manifest、预览图。
-2. D2 Android 首页事件 UI：必须等 S1 素材确认后启动。
-3. D3 拍照变身路径：复用现有 attachment 链路。
-4. D4 怪问题路径：本地 evaluator + voice-first 回答。
-5. D5 小展台承接：只复用现有小展台保存。
-6. S2 我的小展台列表与详情：只复用现有本地小展台数据能力做只读回看。
-7. Q1 / Q2 合并真机测试：验证孩子是否愿意再找一个给小白狐看，并补做 R1-C / S2 / S3 合并真机验收。
-8. 明显 bug 修复：只修可复现问题。
+1. M1 小白狐轻记忆本地状态与数据合同：只做 Android 本地轻状态、既有小展台安全字段读取、奇怪小门低敏摘要。
+2. 合并真机验收：验证奇怪小门、小展台、语言游戏第一组和轻记忆不会互相抢主线。
+3. public repo 数据扫描与测试材料清理：禁止提交真实儿童照片、音频、聊天转录、私有截图、家庭信息、prompt trace、本地数据库、模型权重和 TTS cache。
+4. 明显 bug 修复：只修可复现问题，不借 bug 修复新增玩法、奖励、积分、后端记忆或家长端功能。
 ```
 
 每个开发任务必须写清楚：
@@ -172,7 +183,7 @@ docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handof
 
 ---
 
-## 7. Q1 真机试玩检查重点
+## 8. Q1 真机试玩检查重点
 
 ```text
 1. 第一眼是否有“小白狐遇到事了”的事件感。
@@ -194,7 +205,7 @@ docs/session_process/handoffs/20260607_S4_strange_door_mechanism_variants_handof
 
 ---
 
-## 8. 旧 Milestone 状态摘要
+## 9. 旧 Milestone 状态摘要
 
 以下旧里程碑仅作为历史摘要，不再作为当前执行顺序。
 

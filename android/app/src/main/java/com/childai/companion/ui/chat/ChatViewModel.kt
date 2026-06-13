@@ -37,6 +37,7 @@ import com.childai.companion.ui.chat.languagegame.LanguageGameState
 import com.childai.companion.ui.chat.languagegame.RiddleGameState
 import com.childai.companion.ui.chat.languagegame.WordChainGameState
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
+import com.childai.companion.ui.chat.lightmemory.LightMemoryCopyMapper
 import com.childai.companion.ui.chat.lightmemory.LightMemoryReducer
 import com.childai.companion.ui.chat.lightmemory.LightMemorySnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
@@ -110,6 +111,7 @@ class ChatViewModel(
     private val childId: String = DevSettings.CHILD_ID,
     private val naturalWaitingEnabled: Boolean = DevSettings.NATURAL_WAITING_ENABLED,
     private val naturalWaitingTimeoutMs: Long = DevSettings.NATURAL_WAITING_TIMEOUT_MS,
+    private val initialLightMemory: LightMemorySnapshot = LightMemorySnapshot(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val sessionId = "android-${UUID.randomUUID()}"
@@ -151,6 +153,7 @@ class ChatViewModel(
                 agentReplyText = initialMessages.lastOrNull { it.author == MessageAuthor.Agent }
                     ?.text
                     .orEmpty(),
+                lightMemory = initialLightMemory,
                 voice = createVoiceUiState(),
                 tts = initialTtsUiState,
             )
@@ -2664,7 +2667,10 @@ class ChatViewModel(
                     response = response,
                     replaceMessageId = "agent-welcome",
                 )
-                maybeShowLanguageGameEntryPromptAfterOpening()
+                val lightMemoryShown = appendOpeningLightMemoryMessageIfAvailable()
+                if (!lightMemoryShown) {
+                    maybeShowLanguageGameEntryPromptAfterOpening()
+                }
             }.onFailure {
                 openingFallbackJob.cancel()
                 Log.d(TAG, "[LatencyTrace] stage=opening_failed")
@@ -2678,6 +2684,30 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    private fun appendOpeningLightMemoryMessageIfAvailable(): Boolean {
+        val uiModel = LightMemoryCopyMapper.toOpeningUiModel(_uiState.value.lightMemory)
+            ?: return false
+        val message = ChatMessage(
+            id = nextMessageId("light-memory"),
+            author = MessageAuthor.Agent,
+            text = uiModel.text,
+        )
+        var appended = false
+        _uiState.update { state ->
+            if (state.strangeDoorDemo != null || state.languageGame != null) {
+                state
+            } else {
+                appended = true
+                state.copy(
+                    messages = state.messages + message,
+                    agentReplyText = message.text,
+                    lightMemory = LightMemoryReducer.markOpeningRecalled(state.lightMemory),
+                )
+            }
+        }
+        return appended
     }
 
     private fun scheduleVoiceRecordingAutoStop() {

@@ -245,6 +245,36 @@ class LightMemoryReducerTest {
     }
 
     @Test
+    fun openingRecallEligibilityUsesM3PriorityInsteadOfOnlyLatestTime() {
+        val mechanism = LightMemoryCandidate(
+            id = "mechanism_recent",
+            source = LightMemorySource.StrangeDoorMechanism,
+            safeLabel = "round",
+            mechanismType = StrangeDoorMechanismType.Round,
+            lastTouchedAtMillis = 300L,
+        )
+        val showcase = LightMemoryCandidate(
+            id = "showcase_older",
+            source = LightMemorySource.ShowcaseItem,
+            safeLabel = "showcase_item",
+            displayName = "小石头",
+            showcaseItemId = "stand_item_1",
+            showcaseItemName = "小石头",
+            showcaseCreatedAtMillis = 100L,
+            showcaseFoxQuote = "门上的圆锁轻轻转了一小下",
+            lastTouchedAtMillis = 100L,
+        )
+
+        val snapshot = LightMemoryReducer.withOpeningRecallEligibility(
+            snapshot = LightMemorySnapshot(candidates = listOf(mechanism, showcase)),
+            strangeDoorActive = false,
+            languageGameActive = false,
+        )
+
+        assertEquals("showcase_older", snapshot.openingRecallCandidateId)
+    }
+
+    @Test
     fun relatedChatEligibilityRequiresApprovedKeywordAndActiveCandidate() {
         val snapshot = LightMemoryReducer.rememberShowcaseItem(
             snapshot = LightMemorySnapshot(),

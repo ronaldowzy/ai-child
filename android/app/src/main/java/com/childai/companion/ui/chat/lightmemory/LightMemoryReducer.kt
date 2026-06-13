@@ -190,8 +190,8 @@ object LightMemoryReducer {
             return snapshot.copy(openingRecallCandidateId = null)
         }
         return snapshot.copy(
-            openingRecallCandidateId = snapshot.activeCandidates
-                .maxByOrNull { it.lastTouchedAtMillis }
+            openingRecallCandidateId = LightMemoryCopyMapper
+                .selectOpeningCandidate(snapshot.activeCandidates)
                 ?.id,
         )
     }

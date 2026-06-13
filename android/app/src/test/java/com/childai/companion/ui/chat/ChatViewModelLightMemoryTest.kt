@@ -11,9 +11,14 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.showcase.XiaozhantaiItem
 import com.childai.companion.data.showcase.XiaozhantaiRepository
 import com.childai.companion.data.showcase.XiaozhantaiSaveRequest
+import com.childai.companion.ui.chat.lightmemory.LightMemoryCandidate
+import com.childai.companion.ui.chat.lightmemory.LightMemorySnapshot
 import com.childai.companion.ui.chat.lightmemory.LightMemorySource
 import com.childai.companion.ui.chat.lightmemory.LightMemoryStatus
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorMechanismType
+import com.childai.companion.voice.TtsCallbacks
+import com.childai.companion.voice.TtsController
+import com.childai.companion.voice.TtsRequest
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -180,32 +185,122 @@ class ChatViewModelLightMemoryTest {
     }
 
     @Test
-    fun openingRecallIsLifecycleLocalAndCanBeMuted() {
+    fun openingSuccessAppendsLightMemoryMessageAndMarksRecalled() {
         val viewModel = viewModel(
-            attachmentRepository = ImmediateLightMemoryAttachmentRepository(
-                response = attachmentResponse(recognizedText = "图片里有一个小石头"),
-            ),
-            showcaseRepository = CapturingLightMemoryShowcaseRepository(),
+            initialLightMemory = showcaseLightMemorySnapshot(),
             conversationSender = CapturingLightMemoryConversationSender(),
         )
 
-        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
-        val messageId = viewModel.uiState.value.imagePreviewCards.keys.single()
-        viewModel.requestSavePhotoToXiaozhantai(messageId)
-        viewModel.updateXiaozhantaiSaveName("小石头")
-        viewModel.confirmXiaozhantaiSave()
         viewModel.requestOpeningGreeting()
 
-        assertTrue(viewModel.uiState.value.lightMemory.openingRecallCandidateId != null)
-
-        viewModel.markLightMemoryOpeningRecalled()
+        val memoryText = showcaseOpeningCopy("小石头")
+        val messages = viewModel.uiState.value.messages.map { it.text }
+        assertTrue(messages.contains("今天想聊什么都可以"))
+        assertEquals(1, messages.count { it == memoryText })
         assertTrue(viewModel.uiState.value.lightMemory.recalledInCurrentLifecycle)
         assertNull(viewModel.uiState.value.lightMemory.openingRecallCandidateId)
+        assertNull(viewModel.uiState.value.languageGame)
+        assertTrue(viewModel.uiState.value.quickActions.isEmpty())
+    }
+
+    @Test
+    fun openingLightMemoryIsShownAtMostOncePerLifecycle() {
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+        )
+
+        viewModel.requestOpeningGreeting()
+        viewModel.requestOpeningGreeting()
+
+        val memoryText = showcaseOpeningCopy("小石头")
+        assertEquals(1, viewModel.uiState.value.messages.count { it.text == memoryText })
+    }
+
+    @Test
+    fun openingFailureDoesNotAppendLightMemoryMessage() {
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+            conversationSender = CapturingLightMemoryConversationSender(failOpening = true),
+        )
+
+        viewModel.requestOpeningGreeting()
+
+        assertTrue(viewModel.uiState.value.messages.none { it.text == showcaseOpeningCopy("小石头") })
+        assertFalse(viewModel.uiState.value.lightMemory.recalledInCurrentLifecycle)
+    }
+
+    @Test
+    fun childInputBeforeOpeningDoesNotAppendLightMemoryMessage() {
+        val sender = CapturingLightMemoryConversationSender()
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+            conversationSender = sender,
+        )
+
+        viewModel.sendText("我先说")
+        viewModel.requestOpeningGreeting()
+
+        assertTrue(sender.sentTexts.contains("我先说"))
+        assertTrue(viewModel.uiState.value.messages.none { it.text == showcaseOpeningCopy("小石头") })
+        assertFalse(viewModel.uiState.value.lightMemory.recalledInCurrentLifecycle)
+    }
+
+    @Test
+    fun mutedLightMemoryDoesNotAppendOpeningMessage() {
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+        )
 
         viewModel.muteLightMemoryForLifecycle()
+        viewModel.requestOpeningGreeting()
+
         val lightMemory = viewModel.uiState.value.lightMemory
         assertTrue(lightMemory.mutedForCurrentLifecycle)
         assertTrue(lightMemory.candidates.all { it.status != LightMemoryStatus.Active })
+        assertTrue(viewModel.uiState.value.messages.none { it.text == showcaseOpeningCopy("小石头") })
+    }
+
+    @Test
+    fun strangeDoorDemoActiveDoesNotAppendOpeningLightMemory() {
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.requestOpeningGreeting()
+
+        assertTrue(viewModel.uiState.value.messages.none { it.text == showcaseOpeningCopy("小石头") })
+    }
+
+    @Test
+    fun languageGameActiveDoesNotAppendOpeningLightMemory() {
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+        )
+
+        viewModel.startBrainTeaserGame()
+        viewModel.requestOpeningGreeting()
+
+        assertTrue(viewModel.uiState.value.messages.none { it.text == showcaseOpeningCopy("小石头") })
+        assertFalse(viewModel.uiState.value.lightMemory.recalledInCurrentLifecycle)
+    }
+
+    @Test
+    fun openingLightMemoryDoesNotAutoReadTts() {
+        val tts = RecordingLightMemoryTtsController()
+        val viewModel = viewModel(
+            initialLightMemory = showcaseLightMemorySnapshot(),
+            conversationSender = CapturingLightMemoryConversationSender(
+                openingAudioUrl = "/media/tts/opening.wav",
+            ),
+            ttsController = tts,
+        )
+
+        viewModel.requestOpeningGreeting()
+
+        assertEquals(1, tts.requests.size)
+        assertEquals("/media/tts/opening.wav", tts.requests.single().audioUrl)
+        assertFalse(tts.requests.any { it.text == showcaseOpeningCopy("小石头") })
     }
 
     @Test
@@ -224,14 +319,56 @@ class ChatViewModelLightMemoryTest {
         ),
         showcaseRepository: XiaozhantaiRepository? = null,
         conversationSender: ConversationMessageSender = CapturingLightMemoryConversationSender(),
+        ttsController: TtsController = com.childai.companion.voice.NoOpTtsController,
+        initialLightMemory: LightMemorySnapshot = LightMemorySnapshot(),
     ): ChatViewModel {
         return ChatViewModel(
             conversationSender = conversationSender,
             attachmentRepository = attachmentRepository,
             xiaozhantaiRepository = showcaseRepository,
+            ttsController = ttsController,
             sendDispatcher = Dispatchers.Unconfined,
             requestOpeningOnInit = false,
+            initialLightMemory = initialLightMemory,
             nowMillis = { 1_700_000_000L },
+        )
+    }
+
+    private fun saveShowcaseMemory(
+        viewModel: ChatViewModel,
+        name: String = "小石头",
+    ) {
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        val messageId = viewModel.uiState.value.imagePreviewCards.keys.single()
+        viewModel.requestSavePhotoToXiaozhantai(messageId)
+        viewModel.updateXiaozhantaiSaveName(name)
+        viewModel.confirmXiaozhantaiSave()
+    }
+
+    private fun showcaseOpeningCopy(name: String): String {
+        return """
+            我想起了小展台里的 $name
+            它好像轻轻动了一下
+
+            不过今天想聊新的也可以
+        """.trimIndent()
+    }
+
+    private fun showcaseLightMemorySnapshot(name: String = "小石头"): LightMemorySnapshot {
+        return LightMemorySnapshot(
+            candidates = listOf(
+                LightMemoryCandidate(
+                    id = "showcase_item_$name",
+                    source = LightMemorySource.ShowcaseItem,
+                    safeLabel = "showcase_item",
+                    displayName = name,
+                    showcaseItemId = "stand_item_$name",
+                    showcaseItemName = name,
+                    showcaseCreatedAtMillis = 1_700_000_000L,
+                    showcaseFoxQuote = "门上的圆锁轻轻转了一小下",
+                    lastTouchedAtMillis = 1_700_000_000L,
+                ),
+            ),
         )
     }
 
@@ -333,7 +470,10 @@ private class CapturingLightMemoryShowcaseRepository(
     }
 }
 
-private class CapturingLightMemoryConversationSender : ConversationMessageSender {
+private class CapturingLightMemoryConversationSender(
+    private val openingAudioUrl: String? = null,
+    private val failOpening: Boolean = false,
+) : ConversationMessageSender {
     val sentTexts = mutableListOf<String>()
 
     override suspend fun requestOpening(
@@ -341,7 +481,11 @@ private class CapturingLightMemoryConversationSender : ConversationMessageSender
         sessionId: String,
         timezone: String,
     ): ConversationMessageResponse {
-        return response("今天想聊什么都可以")
+        if (failOpening) error("opening failed")
+        return response(
+            text = "今天想聊什么都可以",
+            audioUrl = openingAudioUrl,
+        )
     }
 
     override suspend fun sendTextMessage(
@@ -367,13 +511,16 @@ private class CapturingLightMemoryConversationSender : ConversationMessageSender
         onEvent: (ConversationStreamEvent) -> Unit,
     ) = Unit
 
-    private fun response(text: String): ConversationMessageResponse {
+    private fun response(
+        text: String,
+        audioUrl: String? = null,
+    ): ConversationMessageResponse {
         return ConversationMessageResponse(
             reply = ConversationReply(
                 type = "agent_message",
                 text = text,
-                voiceEnabled = false,
-                audioUrl = null,
+                voiceEnabled = audioUrl != null,
+                audioUrl = audioUrl,
                 emotion = "warm",
                 agentMotion = "gentle_idle",
             ),
@@ -386,4 +533,19 @@ private class CapturingLightMemoryConversationSender : ConversationMessageSender
             uiActions = emptyList(),
         )
     }
+}
+
+private class RecordingLightMemoryTtsController : TtsController {
+    val requests = mutableListOf<TtsRequest>()
+
+    override fun speak(request: TtsRequest, callbacks: TtsCallbacks): Boolean {
+        requests += request
+        callbacks.onStart()
+        callbacks.onDone()
+        return true
+    }
+
+    override fun stop() = Unit
+
+    override fun shutdown() = Unit
 }

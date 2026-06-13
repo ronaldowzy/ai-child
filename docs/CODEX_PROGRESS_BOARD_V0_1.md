@@ -10,7 +10,7 @@
 
 ```text
 当前版本：v0.1-dev
-当前阶段：小白狐轻记忆 M1：Android 本地轻状态与数据合同实现；奇怪小门、小展台、语言游戏第一组已进入合并真机验收队列。
+当前阶段：小白狐轻记忆 M3：Android opening 展示实现；奇怪小门、小展台、语言游戏第一组已进入合并真机验收队列。
 
 下一阶段主方向：
 从“功能集合”收束为低敏、低频、可放下的连续陪伴体验。
@@ -32,7 +32,7 @@
 7. 不新增复杂后端成长系统，不新增多关卡持久化。
 8. 小展台只做结果承接和只读回看，不做主玩法。
 9. S1 素材已确认并接入 Android 资源；D2 已使用正式素材实现首页事件 UI，D3 已接通现有 attachment 图片上传到本地变身反馈，D4 已接通本地怪问题语音回答路径，D5 已复用现有小展台保存能力承接可保存的拍照变身结果，S2 已复用现有本地小展台数据能力实现列表与详情只读回看，S3 已完成 Demo 完成态、保存完成态、退出与重玩的 Android 本地收口，S4 已完成 Round / Soft / Shiny 三种小机关本地轮换，S5 已接通“小展台的小发现回到小门帮忙”路径，语言游戏第一组已完成脑筋急转弯、词语接龙、猜谜语。
-10. 轻记忆 M1 只做 Android 本地轻状态和既有小展台安全字段读取，不新增后端 endpoint、数据表、GrowthEvent、image_purpose、儿童端最终文案、语言游戏偏好或普通聊天自由抽取。
+10. 轻记忆 M1 已完成 Android 本地轻状态和既有小展台安全字段读取；M2 已落档儿童端 master-copy；M3 首版只接 opening 展示，不接普通聊天 relatedChatCandidate，不新增后端 endpoint、数据表、GrowthEvent、image_purpose、语言游戏偏好或普通聊天自由抽取。
 11. 开发方只负责实现，不负责设计儿童端文案、角色话术、玩法机制、奖励机制或产品体验。
 
 当前事实源：
@@ -56,6 +56,10 @@ docs/session_process/handoffs/20260609_LG_review_language_game_suite_handoff.md
 docs/小白狐轻记忆产品方向设计_2026_06_12_V0_1.md
 docs/session_process/handoffs/20260612_M0A_light_memory_decision_and_M1_boundary_plan.md
 docs/session_process/handoffs/20260612_M1_light_memory_local_state_contract_plan.md
+docs/session_process/handoffs/20260612_M1_light_memory_local_state_contract_handoff.md
+docs/小白狐轻记忆儿童端文案_2026_06_13_V0_1.md
+docs/session_process/handoffs/20260613_M2_light_memory_copy_and_display_strategy_handoff.md
+docs/session_process/handoffs/20260613_M3_light_memory_android_display_plan.md
 ```
 
 ---
@@ -112,7 +116,9 @@ docs/session_process/handoffs/20260612_M1_light_memory_local_state_contract_plan
 |---|---|---|---|---|
 | M0 | 产品方向设计 | done | 已提交 | 已确认轻记忆只做低敏、低频、可放下的连续陪伴，不做学习画像、隐私档案或成绩记录 |
 | M0-A | 产品决策落档与 M1 边界计划 | done | 已提交 | 已写入 PD-061，确认 M1 只做 Android 本地轻状态 + 既有小展台数据，不新增后端或儿童端最终文案 |
-| M1 | 本地状态与数据合同 | in_progress | 本提交 | 新增 `lightmemory` 本地合同和纯函数，接入 `ChatUiState` 与 `ChatViewModel` 安全写入点，保留 public repo 数据扫描和真机验收清单 |
+| M1 | 本地状态与数据合同 | done / pending-device-qa | `b0e75eb` | 新增 `lightmemory` 本地合同和纯函数，接入 `ChatUiState` 与 `ChatViewModel` 安全写入点，保留 public repo 数据扫描和真机验收清单 |
+| M2 | 儿童端文案与展示策略 | done | `6595bf5` | 已落档 opening、小展台、小门完成、机关类型和普通聊天主动相关 master-copy；未改代码 |
+| M3 | Android opening 展示实现 | in_progress | 本提交 | 首版只接 opening，普通 opening 后追加一段本地轻记忆 Agent 消息；不自动 TTS，不新增按钮，不接普通聊天 |
 
 ---
 
@@ -162,7 +168,7 @@ docs/session_process/handoffs/20260612_M1_light_memory_local_state_contract_plan
 当前只接受以下任务：
 
 ```text
-1. M1 小白狐轻记忆本地状态与数据合同：只做 Android 本地轻状态、既有小展台安全字段读取、奇怪小门低敏摘要。
+1. M3 小白狐轻记忆 Android opening 展示：只接 M1 本地状态和 M2 master-copy，不接普通聊天 relatedChatCandidate，不新增后端或持久化。
 2. 合并真机验收：验证奇怪小门、小展台、语言游戏第一组和轻记忆不会互相抢主线。
 3. public repo 数据扫描与测试材料清理：禁止提交真实儿童照片、音频、聊天转录、私有截图、家庭信息、prompt trace、本地数据库、模型权重和 TTS cache。
 4. 明显 bug 修复：只修可复现问题，不借 bug 修复新增玩法、奖励、积分、后端记忆或家长端功能。

@@ -26,6 +26,15 @@ class StrangeDoorRiddleEvaluatorTest {
     }
 
     @Test
+    fun pinyinWaterFromAsrAlsoOpensDoor() {
+        val result = StrangeDoorRiddleEvaluator.evaluate("Shui。")
+
+        assertTrue(result.isCorrect)
+        assertEquals(StrangeDoorDemoState.Completed, result.nextDemoState)
+        assertEquals(StrangeDoorDoorAdvanceSignal.Open, result.advanceSignal)
+    }
+
+    @Test
     fun wrongAnswerReturnsHintWithoutDoorAdvance() {
         val result = StrangeDoorRiddleEvaluator.evaluate("毛巾")
 

@@ -6,7 +6,12 @@ import com.childai.companion.data.asr.AsrRepository
 import com.childai.companion.data.asr.AsrTranscriber
 
 sealed interface SpeechInputResult {
-    data class Transcript(val text: String) : SpeechInputResult
+    data class Transcript(
+        val text: String,
+        val provider: String? = null,
+        val model: String? = null,
+        val durationMs: Int? = null,
+    ) : SpeechInputResult
     data class NeedsRetry(val message: String) : SpeechInputResult
     data class PolicyBlocked(val message: String) : SpeechInputResult
     data class Failed(val message: String) : SpeechInputResult
@@ -50,7 +55,12 @@ class BackendSpeechInputController(
                     if (transcript.isBlank()) {
                         SpeechInputResult.NeedsRetry(NEEDS_RETRY_MESSAGE)
                     } else {
-                        SpeechInputResult.Transcript(transcript)
+                        SpeechInputResult.Transcript(
+                            text = transcript,
+                            provider = response.provider,
+                            model = response.model,
+                            durationMs = response.durationMs,
+                        )
                     }
                 }
                 "needs_retry" -> SpeechInputResult.NeedsRetry(NEEDS_RETRY_MESSAGE)

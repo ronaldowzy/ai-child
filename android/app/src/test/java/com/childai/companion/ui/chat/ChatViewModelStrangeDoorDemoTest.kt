@@ -118,9 +118,49 @@ class ChatViewModelStrangeDoorDemoTest {
     }
 
     @Test
+    fun storyRequestDuringRiddlePromptExitsDemoAndSendsConversation() {
+        val sender = StrangeDoorDemoSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorRiddleMethod()
+        viewModel.sendText("你给我讲个故事")
+
+        assertNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(listOf("你给我讲个故事"), sender.sentTexts)
+    }
+
+    @Test
     fun strangeDoorAutoEntryIsOneShotByLocalFlag() {
-        assertTrue(shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = false))
-        assertFalse(shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = true))
+        assertTrue(
+            shouldAutoActivateStrangeDoorOnChatEntry(
+                hasShownBefore = false,
+                autoEntryEnabled = true,
+            ),
+        )
+        assertFalse(
+            shouldAutoActivateStrangeDoorOnChatEntry(
+                hasShownBefore = true,
+                autoEntryEnabled = true,
+            ),
+        )
+        assertFalse(
+            shouldAutoActivateStrangeDoorOnChatEntry(
+                hasShownBefore = false,
+                autoEntryEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun strangeDoorActionLayoutUsesTwoColumnsForFourButtonsOnPhoneWidth() {
+        assertEquals(2, strangeDoorActionColumnCount(actionCount = 4, availableWidthDp = 390f))
+        assertEquals(2, strangeDoorActionColumnCount(actionCount = 3, availableWidthDp = 390f))
+        assertEquals(2, strangeDoorActionColumnCount(actionCount = 2, availableWidthDp = 390f))
+        assertEquals(1, strangeDoorActionColumnCount(actionCount = 4, availableWidthDp = 320f))
     }
 
     @Test

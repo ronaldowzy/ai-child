@@ -19,6 +19,18 @@ class WordChainEvaluatorTest {
     }
 
     @Test
+    fun pinyinScriptForExpectedFirstHanziConnects() {
+        val result = WordChainEvaluator.evaluate(
+            transcript = "guozhi",
+            previousWord = "苹果",
+        )
+
+        assertTrue(result.isConnected)
+        assertEquals("果", result.expectedChar)
+        assertEquals("guozhi", result.childWord)
+    }
+
+    @Test
     fun transcriptUsesFirstEffectiveHanziOnly() {
         val result = WordChainEvaluator.evaluate(
             transcript = "嗯，果冻也可以",

@@ -22,32 +22,34 @@ import org.junit.Test
 
 class ChatViewModelLanguageGameTest {
     @Test
-    fun entryPromptAppearsOnceAfterOpening() {
+    fun entryPromptDoesNotAppearAutomaticallyAfterOpeningByDefault() {
         val viewModel = viewModel()
 
         viewModel.requestOpeningGreeting()
 
-        val model = requireNotNull(viewModel.uiState.value.languageGame)
-            .toLanguageGameEntryUiModel()
-        assertEquals(
-            listOf("我们随便聊聊天", "还是玩一个小游戏？"),
-            model.lines,
-        )
-        assertEquals(
-            listOf("随便聊聊", "玩个小游戏"),
-            model.actions.map { it.label },
-        )
-
-        viewModel.requestOpeningGreeting()
-
-        assertTrue(requireNotNull(viewModel.uiState.value.languageGame).autoPromptShown)
+        assertNull(viewModel.uiState.value.languageGame)
     }
 
     @Test
-    fun casualChatDismissesEntryPromptForCurrentLifecycle() {
+    fun explicitGameMenuStillShowsLanguageGameChoices() {
         val viewModel = viewModel()
 
-        viewModel.requestOpeningGreeting()
+        viewModel.sendText("玩游戏")
+
+        val model = requireNotNull(viewModel.uiState.value.languageGame)
+            .toLanguageGameEntryUiModel()
+        assertEquals(LanguageGameState.GameMenu, viewModel.uiState.value.languageGame?.state)
+        assertEquals(
+            listOf("脑筋急转弯", "词语接龙", "猜谜语", "先聊别的"),
+            model.actions.map { it.label },
+        )
+    }
+
+    @Test
+    fun casualChatDismissesLanguageGameForCurrentLifecycle() {
+        val viewModel = viewModel()
+
+        viewModel.openLanguageGameMenu()
         viewModel.dismissLanguageGameEntry()
         viewModel.requestOpeningGreeting()
 
@@ -83,6 +85,20 @@ class ChatViewModelLanguageGameTest {
             listOf("什么东西越洗越脏？"),
             snapshot.toLanguageGameEntryUiModel().lines,
         )
+    }
+
+    @Test
+    fun repeatedBrainTeaserStartsRotateStartingQuestion() {
+        val viewModel = viewModel()
+
+        viewModel.startBrainTeaserGame()
+        val firstIndex = viewModel.uiState.value.languageGame?.brainTeaser?.questionIndex
+
+        viewModel.startBrainTeaserGame()
+        val secondIndex = viewModel.uiState.value.languageGame?.brainTeaser?.questionIndex
+
+        assertEquals(0, firstIndex)
+        assertEquals(1, secondIndex)
     }
 
     @Test
@@ -175,6 +191,20 @@ class ChatViewModelLanguageGameTest {
             ),
             snapshot.toLanguageGameEntryUiModel().lines,
         )
+    }
+
+    @Test
+    fun repeatedWordChainStartsRotateStartingWord() {
+        val viewModel = viewModel()
+
+        viewModel.startWordChainGame()
+        val firstWord = viewModel.uiState.value.languageGame?.wordChain?.previousWord
+
+        viewModel.startWordChainGame()
+        val secondWord = viewModel.uiState.value.languageGame?.wordChain?.previousWord
+
+        assertEquals("苹果", firstWord)
+        assertEquals("月亮", secondWord)
     }
 
     @Test
@@ -299,6 +329,20 @@ class ChatViewModelLanguageGameTest {
             ),
             snapshot.toLanguageGameEntryUiModel().lines,
         )
+    }
+
+    @Test
+    fun repeatedRiddleStartsRotateStartingQuestion() {
+        val viewModel = viewModel()
+
+        viewModel.startRiddleGame()
+        val firstIndex = viewModel.uiState.value.languageGame?.riddle?.questionIndex
+
+        viewModel.startRiddleGame()
+        val secondIndex = viewModel.uiState.value.languageGame?.riddle?.questionIndex
+
+        assertEquals(0, firstIndex)
+        assertEquals(1, secondIndex)
     }
 
     @Test
@@ -433,6 +477,18 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
+    fun storyRequestDuringGameExitsAndSendsConversation() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(sender = sender)
+
+        viewModel.startRiddleGame()
+        viewModel.sendText("你给我讲个故事")
+
+        assertNull(viewModel.uiState.value.languageGame)
+        assertEquals(listOf("你给我讲个故事"), sender.sentTexts)
+    }
+
+    @Test
     fun gameKeywordsRouteLocallyWithoutConversation() {
         val sender = LanguageGameSender()
         val viewModel = viewModel(sender = sender)
@@ -512,6 +568,7 @@ class ChatViewModelLanguageGameTest {
             speechInputController = speech,
             feedbackTtsAudioGenerator = NoOpLanguageGameFeedbackTts,
             sendDispatcher = Dispatchers.Unconfined,
+            nowMillis = { 0L },
         )
     }
 

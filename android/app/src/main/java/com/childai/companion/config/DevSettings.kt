@@ -22,6 +22,9 @@ object DevSettings {
     const val SHOW_TEXT_INPUT_FOR_CHILD = false
     const val NATURAL_WAITING_ENABLED = true
     const val NATURAL_WAITING_TIMEOUT_MS = 5_000L
+    const val STRANGE_DOOR_AUTO_ENTRY_ENABLED = false
+    const val LANGUAGE_GAME_AUTO_PROMPT_ENABLED = false
+    const val INTERACTION_TRACE_ENABLED = true
 
     val conversationApiBaseUrl: String = BuildConfig.CONVERSATION_API_BASE_URL
     val debugToolsToken: String = BuildConfig.DEBUG_TOOLS_TOKEN

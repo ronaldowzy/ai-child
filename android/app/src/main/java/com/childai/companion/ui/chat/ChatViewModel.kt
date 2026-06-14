@@ -31,11 +31,14 @@ import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.data.tts.XiaobaohuTtsRepository
 import com.childai.companion.data.attachment.RecognizedContent
 import com.childai.companion.ui.chat.languagegame.BrainTeaserGameState
+import com.childai.companion.ui.chat.languagegame.BrainTeaserQuestionBank
 import com.childai.companion.ui.chat.languagegame.LanguageGameReducer
 import com.childai.companion.ui.chat.languagegame.LanguageGameSnapshot
 import com.childai.companion.ui.chat.languagegame.LanguageGameState
 import com.childai.companion.ui.chat.languagegame.RiddleGameState
+import com.childai.companion.ui.chat.languagegame.RiddleQuestionBank
 import com.childai.companion.ui.chat.languagegame.WordChainGameState
+import com.childai.companion.ui.chat.languagegame.WordChainWordBank
 import com.childai.companion.ui.chat.languagegame.toLanguageGameEntryUiModel
 import com.childai.companion.ui.chat.lightmemory.LightMemoryCopyMapper
 import com.childai.companion.ui.chat.lightmemory.LightMemoryReducer
@@ -81,6 +84,8 @@ import org.json.JSONObject
 
 private const val TAG = "ChatViewModel"
 private const val XIAOZHANTAI_RECALL_EVENT_DEDUPE_MS = 10_000L
+private const val VOICE_RECORD_TTS_STOP_SETTLE_MS = 280L
+private const val LANGUAGE_GAME_START_ROTATION_MS = 1000L
 
 private val SCENES_NO_WAITING = setOf(
     "daily.bedtime_reflection",
@@ -130,6 +135,9 @@ class ChatViewModel(
     private var languageGameAutoPromptShown = false
     private var languageGameDismissedForLifecycle = false
     private var lastLanguageGameNarrationText: String? = null
+    private var nextBrainTeaserStartIndex = languageGameStartIndexFor(BrainTeaserQuestionBank.questions.size)
+    private var nextRiddleStartIndex = languageGameStartIndexFor(RiddleQuestionBank.questions.size)
+    private var nextWordChainStartIndex = languageGameStartIndexFor(WordChainWordBank.startWords.size)
     private var childInteractionStarted = false
     private var lastCacheDirectory: File? = null
     private var lastRecorder: AndroidWavAudioRecorder? = null
@@ -160,6 +168,12 @@ class ChatViewModel(
         },
     )
     val uiState: StateFlow<ChatUiState> = _uiState
+
+    private fun languageGameStartIndexFor(size: Int): Int {
+        if (size <= 0) return 0
+        return ((nowMillis() / LANGUAGE_GAME_START_ROTATION_MS) % size).toInt()
+    }
+
     private val audioSegmentQueuePlayer = AudioSegmentQueuePlayer(
         ttsController = ttsController,
         backendBaseUrl = DevSettings.conversationApiBaseUrl,
@@ -213,20 +227,48 @@ class ChatViewModel(
     )
 
     init {
+        trace(
+            "view_model_created",
+            "requestOpeningOnInit" to requestOpeningOnInit,
+            "voiceConfirmBeforeSend" to voiceConfirmBeforeSend,
+        )
         if (requestOpeningOnInit) {
             requestOpeningGreeting()
         }
     }
 
+    private fun trace(
+        event: String,
+        vararg fields: Pair<String, Any?>,
+    ) {
+        val state = _uiState.value
+        InteractionTraceLogger.log(
+            event,
+            "sessionId" to sessionId,
+            "isSending" to state.isSending,
+            "voiceMode" to state.voice.inputMode,
+            "strangeDoor" to state.strangeDoorDemo?.shortTrace(),
+            "languageGame" to state.languageGame?.shortTrace(),
+            *fields,
+        )
+    }
+
     fun activateStrangeDoorDemo() {
-        if (_uiState.value.strangeDoorDemo != null) return
-        if (strangeDoorDemoDismissed) return
+        if (_uiState.value.strangeDoorDemo != null) {
+            trace("strange_door_activate_ignored", "reason" to "already_active")
+            return
+        }
+        if (strangeDoorDemoDismissed) {
+            trace("strange_door_activate_ignored", "reason" to "dismissed_for_lifecycle")
+            return
+        }
         openingDeferredByStrangeDoor = !openingRequested
         cancelNaturalWaitingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
+        val nextSnapshot = StrangeDoorDoorStateReducer.reset()
         _uiState.update { state ->
             state.copy(
-                strangeDoorDemo = StrangeDoorDoorStateReducer.reset(),
+                strangeDoorDemo = nextSnapshot,
                 languageGame = null,
                 lightMemory = LightMemoryReducer.withOpeningRecallEligibility(
                     snapshot = state.lightMemory,
@@ -244,6 +286,11 @@ class ChatViewModel(
                 ),
             )
         }
+        trace(
+            "strange_door_activated",
+            "openingDeferred" to openingDeferredByStrangeDoor,
+            "snapshot" to nextSnapshot.shortTrace(),
+        )
         speakCurrentStrangeDoorState(force = true)
     }
 
@@ -270,10 +317,16 @@ class ChatViewModel(
             )
         }
         lastStrangeDoorNarrationText = null
+        trace(
+            "strange_door_replay",
+            "from" to snapshot.shortTrace(),
+            "to" to nextSnapshot.shortTrace(),
+        )
         speakStrangeDoorSnapshot(nextSnapshot, force = true)
     }
 
     fun chooseStrangeDoorPhotoMethod() {
+        trace("strange_door_action", "action" to "choose_photo")
         updateStrangeDoorDemoState(
             demoState = StrangeDoorDemoState.PhotoPrompt,
             method = StrangeDoorDemoMethod.Photo,
@@ -281,6 +334,7 @@ class ChatViewModel(
     }
 
     fun chooseStrangeDoorRiddleMethod() {
+        trace("strange_door_action", "action" to "choose_riddle")
         updateStrangeDoorDemoState(
             demoState = StrangeDoorDemoState.RiddlePrompt,
             method = StrangeDoorDemoMethod.Riddle,
@@ -288,6 +342,7 @@ class ChatViewModel(
     }
 
     fun retryStrangeDoorRiddle() {
+        trace("strange_door_action", "action" to "retry_riddle")
         updateStrangeDoorDemoState(
             demoState = StrangeDoorDemoState.RiddlePrompt,
             method = StrangeDoorDemoMethod.Riddle,
@@ -295,6 +350,7 @@ class ChatViewModel(
     }
 
     fun returnToStrangeDoorMethodChoice() {
+        trace("strange_door_action", "action" to "return_to_method_choice")
         updateStrangeDoorDemoState(
             demoState = StrangeDoorDemoState.ChoosingMethod,
             method = null,
@@ -322,6 +378,11 @@ class ChatViewModel(
                 ),
             )
         }
+        trace(
+            "strange_door_request_another_photo",
+            "from" to snapshot.shortTrace(),
+            "to" to nextSnapshot.shortTrace(),
+        )
         speakStrangeDoorSnapshot(nextSnapshot)
     }
 
@@ -358,6 +419,14 @@ class ChatViewModel(
                 ),
             )
         }
+        trace(
+            "strange_door_showcase_assist",
+            "itemId" to item.id,
+            "itemName" to item.name,
+            "from" to snapshot.shortTrace(),
+            "to" to nextSnapshot.shortTrace(),
+            "doorEffect" to result.doorEffect,
+        )
         speakStrangeDoorSnapshot(nextSnapshot)
     }
 
@@ -392,13 +461,43 @@ class ChatViewModel(
 
     fun answerStrangeDoorRiddle(answerText: String): Boolean {
         val transcript = answerText.trim()
-        if (transcript.isBlank()) return false
-        val snapshot = _uiState.value.strangeDoorDemo ?: return false
-        if (snapshot.demoState != StrangeDoorDemoState.RiddlePrompt) return false
+        if (transcript.isBlank()) {
+            trace("strange_door_riddle_not_consumed", "reason" to "blank_input")
+            return false
+        }
+        val snapshot = _uiState.value.strangeDoorDemo
+        if (snapshot == null) {
+            trace(
+                "strange_door_riddle_not_consumed",
+                "reason" to "demo_inactive",
+                "input" to transcript,
+            )
+            return false
+        }
+        if (snapshot.demoState != StrangeDoorDemoState.RiddlePrompt) {
+            trace(
+                "strange_door_riddle_not_consumed",
+                "reason" to "state_not_riddle_prompt",
+                "input" to transcript,
+                "snapshot" to snapshot.shortTrace(),
+            )
+            return false
+        }
         val evaluation = StrangeDoorRiddleEvaluator.evaluate(transcript)
         val nextSnapshot = StrangeDoorDoorStateReducer.applyRiddleResult(
             snapshot = snapshot,
             evaluation = evaluation,
+        )
+        val normalized = transcript.normalizedForStrangeDoorRiddleTrace()
+        trace(
+            "strange_door_riddle_answer",
+            "input" to transcript,
+            "normalized" to normalized,
+            "containsWater" to StrangeDoorRiddleEvaluator.isCorrectAnswer(transcript),
+            "isCorrect" to evaluation.isCorrect,
+            "from" to snapshot.shortTrace(),
+            "to" to nextSnapshot.shortTrace(),
+            "feedback" to evaluation.feedbackLines,
         )
         childInteractionStarted = true
         cancelNaturalWaitingTimeout()
@@ -453,6 +552,7 @@ class ChatViewModel(
     fun exitStrangeDoorDemoAndRequestOpening() {
         if (_uiState.value.strangeDoorDemo == null) return
         strangeDoorDemoDismissed = true
+        trace("strange_door_exit_to_chat")
         _uiState.update { state ->
             state.copy(
                 strangeDoorDemo = null,
@@ -484,6 +584,7 @@ class ChatViewModel(
     }
 
     fun dismissLanguageGameEntry() {
+        trace("language_game_action", "action" to "casual_chat")
         languageGameDismissedForLifecycle = true
         lastLanguageGameNarrationText = null
         _uiState.update { state ->
@@ -495,6 +596,7 @@ class ChatViewModel(
     }
 
     fun openLanguageGameMenu() {
+        trace("language_game_action", "action" to "open_menu")
         showLanguageGameSnapshot(
             LanguageGameReducer.gameMenu(),
             forceSpeak = true,
@@ -502,28 +604,53 @@ class ChatViewModel(
     }
 
     fun startBrainTeaserGame() {
+        val startIndex = nextBrainTeaserStartIndex
+        nextBrainTeaserStartIndex = BrainTeaserQuestionBank.nextIndex(startIndex)
+        trace(
+            "language_game_action",
+            "action" to "start_brain_teaser",
+            "startIndex" to startIndex,
+            "nextStartIndex" to nextBrainTeaserStartIndex,
+        )
         showLanguageGameSnapshot(
-            LanguageGameReducer.startBrainTeaser(),
+            LanguageGameReducer.startBrainTeaser(questionIndex = startIndex),
             forceSpeak = true,
         )
     }
 
     fun startWordChainGame() {
+        val startIndex = nextWordChainStartIndex
+        nextWordChainStartIndex = WordChainWordBank.nextStartIndex(startIndex)
+        trace(
+            "language_game_action",
+            "action" to "start_word_chain",
+            "startIndex" to startIndex,
+            "nextStartIndex" to nextWordChainStartIndex,
+        )
         showLanguageGameSnapshot(
-            LanguageGameReducer.startWordChain(),
+            LanguageGameReducer.startWordChain(startIndex = startIndex),
             forceSpeak = true,
         )
     }
 
     fun startRiddleGame() {
+        val startIndex = nextRiddleStartIndex
+        nextRiddleStartIndex = RiddleQuestionBank.nextIndex(startIndex)
+        trace(
+            "language_game_action",
+            "action" to "start_riddle",
+            "startIndex" to startIndex,
+            "nextStartIndex" to nextRiddleStartIndex,
+        )
         showLanguageGameSnapshot(
-            LanguageGameReducer.startRiddle(),
+            LanguageGameReducer.startRiddle(questionIndex = startIndex),
             forceSpeak = true,
         )
     }
 
     fun requestBrainTeaserHint() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "brain_teaser_hint", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.showBrainTeaserHint(snapshot),
             forceSpeak = true,
@@ -532,6 +659,7 @@ class ChatViewModel(
 
     fun requestRiddleHint() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "riddle_hint", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.showRiddleHint(snapshot),
             forceSpeak = true,
@@ -540,6 +668,7 @@ class ChatViewModel(
 
     fun revealBrainTeaserAnswer() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "brain_teaser_reveal", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.revealBrainTeaserAnswer(snapshot),
             forceSpeak = true,
@@ -548,6 +677,7 @@ class ChatViewModel(
 
     fun revealRiddleAnswer() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "riddle_reveal", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.revealRiddleAnswer(snapshot),
             forceSpeak = true,
@@ -556,6 +686,7 @@ class ChatViewModel(
 
     fun nextBrainTeaserQuestion() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "brain_teaser_next", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.nextBrainTeaserQuestion(snapshot),
             forceSpeak = true,
@@ -564,6 +695,7 @@ class ChatViewModel(
 
     fun nextRiddleQuestion() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "riddle_next", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.nextRiddleQuestion(snapshot),
             forceSpeak = true,
@@ -572,6 +704,7 @@ class ChatViewModel(
 
     fun restartWordChainGame() {
         val snapshot = _uiState.value.languageGame ?: return
+        trace("language_game_action", "action" to "word_chain_restart", "from" to snapshot.shortTrace())
         showLanguageGameSnapshot(
             LanguageGameReducer.restartWordChain(snapshot),
             forceSpeak = true,
@@ -579,6 +712,7 @@ class ChatViewModel(
     }
 
     fun returnToLanguageGameMenu() {
+        trace("language_game_action", "action" to "return_to_menu")
         showLanguageGameSnapshot(
             LanguageGameReducer.gameMenu(),
             forceSpeak = true,
@@ -586,6 +720,7 @@ class ChatViewModel(
     }
 
     fun exitLanguageGame() {
+        trace("language_game_action", "action" to "exit_to_chat")
         languageGameDismissedForLifecycle = true
         lastLanguageGameNarrationText = null
         _uiState.update { state ->
@@ -643,12 +778,38 @@ class ChatViewModel(
 
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
-        if (trimmedText.isEmpty() || _uiState.value.isSending) return
+        if (trimmedText.isEmpty()) {
+            trace("child_text_ignored", "reason" to "blank", "quickActionId" to quickActionId)
+            return
+        }
+        if (_uiState.value.isSending) {
+            trace(
+                "child_text_ignored",
+                "reason" to "is_sending",
+                "text" to trimmedText,
+                "quickActionId" to quickActionId,
+            )
+            return
+        }
+        trace(
+            "child_text_received",
+            "text" to trimmedText,
+            "quickActionId" to quickActionId,
+        )
         val routedBackToConversation = routeLocalExperienceToConversationIfNeeded(trimmedText)
         if (!routedBackToConversation) {
-            if (submitStrangeDoorShowcaseName(trimmedText)) return
-            if (answerStrangeDoorRiddle(trimmedText)) return
-            if (handleLanguageGameText(trimmedText)) return
+            if (submitStrangeDoorShowcaseName(trimmedText)) {
+                trace("child_text_consumed", "consumer" to "strange_door_showcase_name", "text" to trimmedText)
+                return
+            }
+            if (answerStrangeDoorRiddle(trimmedText)) {
+                trace("child_text_consumed", "consumer" to "strange_door_riddle", "text" to trimmedText)
+                return
+            }
+            if (handleLanguageGameText(trimmedText)) {
+                trace("child_text_consumed", "consumer" to "language_game", "text" to trimmedText)
+                return
+            }
         }
         updateLightMemoryRelatedChatEligibility(trimmedText)
 
@@ -671,6 +832,12 @@ class ChatViewModel(
         if (state.strangeDoorDemo == null && state.languageGame == null) return false
         if (!looksLikeConversationResumeIntent(text)) return false
 
+        trace(
+            "local_experience_exit_to_conversation",
+            "text" to text,
+            "fromStrangeDoor" to state.strangeDoorDemo?.shortTrace(),
+            "fromLanguageGame" to state.languageGame?.shortTrace(),
+        )
         strangeDoorDemoDismissed = true
         languageGameDismissedForLifecycle = true
         openingDeferredByStrangeDoor = false
@@ -707,6 +874,15 @@ class ChatViewModel(
             normalized.contains("不玩游戏") ||
             normalized.contains("不想猜") ||
             normalized.contains("不想答") ||
+            normalized.contains("讲故事") ||
+            normalized.contains("讲个故事") ||
+            normalized.contains("讲一个故事") ||
+            normalized.contains("说故事") ||
+            normalized.contains("说个故事") ||
+            normalized.contains("给我讲") ||
+            normalized.contains("我想听") ||
+            normalized.contains("想听") ||
+            normalized.contains("故事") ||
             normalized.contains("聊")
     }
 
@@ -791,9 +967,19 @@ class ChatViewModel(
 
     fun startVoiceRecording(cacheDirectory: File) {
         val state = _uiState.value
-        if (state.isSending || state.voice.isUploading || state.voice.isRecording) return
+        if (state.isSending || state.voice.isUploading || state.voice.isRecording) {
+            trace(
+                "voice_record_start_ignored",
+                "reason" to "busy",
+                "isSending" to state.isSending,
+                "isUploading" to state.voice.isUploading,
+                "isRecording" to state.voice.isRecording,
+            )
+            return
+        }
 
         val wasSpeaking = state.tts.isSpeaking || state.tts.isSpeakingPending
+        val wasAudiblySpeaking = state.tts.isSpeaking
         childInteractionStarted = true
         lastCacheDirectory = cacheDirectory
         lastRecorder?.onSilenceDetected = null
@@ -808,6 +994,7 @@ class ChatViewModel(
             }
         }
         Log.d(TAG, "[LatencyTrace] stage=asr_start")
+        trace("voice_record_started", "interruptedTts" to wasSpeaking)
         _uiState.update {
             it.copy(
                 quickActions = emptyList(),
@@ -825,9 +1012,21 @@ class ChatViewModel(
 
         viewModelScope.launch(sendDispatcher) {
             runCatching {
+                if (wasAudiblySpeaking) {
+                    trace(
+                        "voice_record_start_wait_tts_stop",
+                        "delayMs" to VOICE_RECORD_TTS_STOP_SETTLE_MS,
+                    )
+                    delay(VOICE_RECORD_TTS_STOP_SETTLE_MS)
+                }
                 activeSpeechInputController(cacheDirectory).startRecording()
                 scheduleVoiceRecordingAutoStop()
             }.onFailure {
+                trace(
+                    "voice_record_start_failed",
+                    "error" to it::class.simpleName,
+                    "message" to it.message,
+                )
                 voiceRecordingAutoStopJob?.cancel()
                 _uiState.update { current ->
                     current.copy(
@@ -846,9 +1045,13 @@ class ChatViewModel(
     }
 
     fun stopVoiceRecordingAndUpload() {
-        if (!_uiState.value.voice.isRecording) return
+        if (!_uiState.value.voice.isRecording) {
+            trace("voice_record_stop_ignored", "reason" to "not_recording")
+            return
+        }
 
         voiceRecordingAutoStopJob?.cancel()
+        trace("voice_record_stop_upload_started")
         _uiState.update {
             it.copy(
                 isSending = true,
@@ -873,6 +1076,11 @@ class ChatViewModel(
                     timezone = DevSettings.TIMEZONE,
                 )
             }.getOrElse {
+                trace(
+                    "asr_upload_failed_before_result",
+                    "error" to it::class.simpleName,
+                    "message" to it.message,
+                )
                 SpeechInputResult.Failed("刚才没听清。请家长帮忙看一下麦克风")
             }
             Log.d(TAG, "[LatencyTrace] stage=asr_done result=${result::class.simpleName}")
@@ -882,6 +1090,7 @@ class ChatViewModel(
 
     fun onVoicePermissionDenied() {
         childInteractionStarted = true
+        trace("voice_permission_denied")
         _uiState.update {
             it.copy(
                 childTurnPhaseHint = ChildTurnUiPhase.PermissionNeeded,
@@ -895,6 +1104,7 @@ class ChatViewModel(
     }
 
     fun updatePendingVoiceTranscript(text: String) {
+        trace("pending_voice_transcript_updated", "text" to text)
         _uiState.update { state ->
             if (!state.voice.hasPendingTranscript) return@update state
             state.copy(
@@ -909,6 +1119,7 @@ class ChatViewModel(
     fun sendPendingVoiceTranscript() {
         val transcript = _uiState.value.voice.pendingTranscript.trim()
         if (transcript.isBlank()) {
+            trace("pending_voice_transcript_send_ignored", "reason" to "blank")
             _uiState.update {
                 it.copy(
                     voice = it.voice.copy(
@@ -918,6 +1129,7 @@ class ChatViewModel(
             }
             return
         }
+        trace("pending_voice_transcript_send", "text" to transcript)
         if (routeLocalExperienceToConversationIfNeeded(transcript)) {
             clearVoiceInputState()
             sendText(transcript)
@@ -932,6 +1144,7 @@ class ChatViewModel(
 
     fun cancelVoiceInput() {
         val wasRecording = _uiState.value.voice.isRecording
+        trace("voice_input_cancelled", "wasRecording" to wasRecording)
         voiceRecordingAutoStopJob?.cancel()
         cancelNaturalWaitingTimeout()
         _uiState.update {
@@ -957,7 +1170,16 @@ class ChatViewModel(
         attachments: List<String>,
         quickActionId: String? = null,
     ) {
-        if (_uiState.value.isSending) return
+        if (_uiState.value.isSending) {
+            trace(
+                "conversation_request_ignored",
+                "reason" to "is_sending",
+                "text" to text,
+                "attachmentsCount" to attachments.size,
+                "quickActionId" to quickActionId,
+            )
+            return
+        }
 
         Log.d(TAG, "[LatencyTrace] stage=request_send textLen=${text.length}")
         val requestText = consumeXiaozhantaiRecallRequestText(
@@ -973,6 +1195,14 @@ class ChatViewModel(
                 it.copy(agent = baseAgentState.copy(statusText = "好，我先停下"))
             }
         }
+        trace(
+            "conversation_request_send",
+            "childText" to text,
+            "requestText" to requestText,
+            "attachmentsCount" to attachments.size,
+            "quickActionId" to quickActionId,
+            "useStreaming" to DevSettings.USE_STREAMING_CONVERSATION,
+        )
         recordChildMessage(text)
         _uiState.update {
             it.copy(
@@ -1004,12 +1234,24 @@ class ChatViewModel(
                 )
             }.onSuccess { response ->
                 Log.d(TAG, "sendTextWithAttachments: success, replyLength=${response.reply.text.length}")
+                trace(
+                    "conversation_response_received",
+                    "replyText" to response.reply.text,
+                    "activeScene" to response.sessionState.activeScene,
+                    "quickActions" to response.uiActions.flatMap { group -> group.actions.map { it.label } },
+                    "streamingFallback" to true,
+                )
                 renderAgentReply(
                     response = response,
                     replaceMessageId = streamingAgentMessageId,
                 )
             }.onFailure { error ->
                 Log.e(TAG, "sendTextWithAttachments: failed", error)
+                trace(
+                    "conversation_request_failed",
+                    "error" to error::class.simpleName,
+                    "message" to error.message,
+                )
                 appendMessage(
                     ChatMessage(
                         id = nextMessageId("agent-error"),
@@ -1059,6 +1301,7 @@ class ChatViewModel(
 
     fun onQuickAction(action: QuickActionUi) {
         Log.d(TAG, "onQuickAction: id=${action.id}, label=${action.label}")
+        trace("quick_action_clicked", "id" to action.id, "label" to action.label)
         when (action.id) {
             "take_photo", "share_photo" -> {
                 stopCurrentTts(restoreBaseAgent = true)
@@ -1093,7 +1336,15 @@ class ChatViewModel(
         payload: PhotoUploadPayload,
         imagePurpose: String = IMAGE_PURPOSE_SHARE,
     ) {
-        if (_uiState.value.isSending || payload.bytes.isEmpty()) return
+        if (_uiState.value.isSending || payload.bytes.isEmpty()) {
+            trace(
+                "photo_submit_ignored",
+                "reason" to if (_uiState.value.isSending) "is_sending" else "empty_payload",
+                "purpose" to imagePurpose,
+                "sizeBytes" to payload.bytes.size,
+            )
+            return
+        }
         Log.d(TAG, "[LatencyTrace] stage=image_local_selected purpose=$imagePurpose size=${payload.bytes.size}")
         Log.d(TAG, "submitCapturedPhoto: purpose=$imagePurpose, size=${payload.bytes.size}bytes, mime=${payload.mimeType}")
         pendingXiaozhantaiRecallContext = null
@@ -1110,6 +1361,14 @@ class ChatViewModel(
         pendingUploadPayloads[childPhotoMessageId] = payload to imagePurpose
         val isStrangeDoorPhoto = _uiState.value.strangeDoorDemo != null &&
             imagePurpose == IMAGE_PURPOSE_SHARE
+        trace(
+            "photo_submit_started",
+            "purpose" to imagePurpose,
+            "mimeType" to payload.mimeType,
+            "sizeBytes" to payload.bytes.size,
+            "isStrangeDoorPhoto" to isStrangeDoorPhoto,
+            "messageId" to childPhotoMessageId,
+        )
         _uiState.update {
             it.copy(
                 isSending = true,
@@ -1160,6 +1419,15 @@ class ChatViewModel(
                 )
             }.onSuccess { attachmentResponse ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_done status=ok")
+                trace(
+                    "photo_upload_success",
+                    "messageId" to childPhotoMessageId,
+                    "attachmentId" to attachmentResponse.attachmentId,
+                    "recognizedType" to attachmentResponse.recognizedContent.type,
+                    "recognizedText" to attachmentResponse.recognizedContent.text,
+                    "imagePurpose" to attachmentResponse.recognizedContent.imagePurpose,
+                    "confidence" to attachmentResponse.recognizedContent.confidence,
+                )
                 pendingUploadPayloads.remove(childPhotoMessageId)
                 if (handleStrangeDoorAttachmentResponseIfActive(
                         attachmentResponse = attachmentResponse,
@@ -1198,6 +1466,12 @@ class ChatViewModel(
                 }
             }.onFailure { error ->
                 Log.d(TAG, "[LatencyTrace] stage=image_upload_failed error=${error::class.simpleName}")
+                trace(
+                    "photo_upload_failed",
+                    "messageId" to childPhotoMessageId,
+                    "error" to error::class.simpleName,
+                    "message" to error.message,
+                )
                 appendAgentMessage(uploadFailureMessage(imagePurpose))
                 _uiState.update {
                     it.copy(
@@ -1611,6 +1885,22 @@ class ChatViewModel(
             transform = transform,
             photoMessageId = photoMessageId,
         )
+        trace(
+            "strange_door_photo_transform",
+            "photoMessageId" to photoMessageId,
+            "recognizedType" to attachmentResponse.recognizedContent.type,
+            "recognizedText" to attachmentResponse.recognizedContent.text,
+            "confidence" to attachmentResponse.recognizedContent.confidence,
+            "mechanism" to snapshot.mechanismType,
+            "objectName" to transform.objectName,
+            "shapeHint" to transform.shapeHint,
+            "transformedName" to transform.transformedName,
+            "advanceSignal" to transform.advanceSignal,
+            "canSaveToShowcase" to transform.canSaveToShowcase,
+            "isUsable" to transform.isUsable,
+            "from" to snapshot.shortTrace(),
+            "to" to nextSnapshot.shortTrace(),
+        )
         registerStrangeDoorShowcaseCandidate(
             photoMessageId = photoMessageId,
             payload = payload,
@@ -1785,10 +2075,20 @@ class ChatViewModel(
     private fun applySpeechInputResult(result: SpeechInputResult) {
         when (result) {
             is SpeechInputResult.Transcript -> {
+                trace(
+                    "asr_transcript_received",
+                    "text" to result.text,
+                    "trimmed" to result.text.trim(),
+                    "voiceConfirmBeforeSend" to voiceConfirmBeforeSend,
+                    "provider" to result.provider,
+                    "model" to result.model,
+                    "durationMs" to result.durationMs,
+                )
                 if (!voiceConfirmBeforeSend) {
                     val transcript = result.text.trim()
                     if (transcript.isNotEmpty()) {
                         if (routeLocalExperienceToConversationIfNeeded(transcript)) {
+                            trace("asr_transcript_route", "route" to "conversation_after_local_exit", "text" to transcript)
                             _uiState.update { state ->
                                 state.copy(
                                     isSending = false,
@@ -1806,9 +2106,19 @@ class ChatViewModel(
                             sendText(transcript)
                             return
                         }
-                        if (submitStrangeDoorShowcaseName(transcript)) return
-                        if (answerStrangeDoorRiddle(transcript)) return
-                        if (handleLanguageGameText(transcript)) return
+                        if (submitStrangeDoorShowcaseName(transcript)) {
+                            trace("asr_transcript_route", "route" to "strange_door_showcase_name", "text" to transcript)
+                            return
+                        }
+                        if (answerStrangeDoorRiddle(transcript)) {
+                            trace("asr_transcript_route", "route" to "strange_door_riddle", "text" to transcript)
+                            return
+                        }
+                        if (handleLanguageGameText(transcript)) {
+                            trace("asr_transcript_route", "route" to "language_game", "text" to transcript)
+                            return
+                        }
+                        trace("asr_transcript_route", "route" to "conversation", "text" to transcript)
                         _uiState.update { state ->
                             state.copy(
                                 isSending = false,
@@ -1826,7 +2136,9 @@ class ChatViewModel(
                         sendText(transcript)
                         return
                     }
+                    trace("asr_transcript_empty_after_trim", "raw" to result.text)
                 }
+                trace("asr_transcript_pending_confirmation", "text" to result.text)
                 _uiState.update { state ->
                     state.copy(
                         isSending = false,
@@ -1845,6 +2157,7 @@ class ChatViewModel(
                 }
             }
             is SpeechInputResult.NeedsRetry -> {
+                trace("asr_needs_retry", "message" to result.message)
                 appendAgentMessage(result.message)
                 _uiState.update { state ->
                     state.copy(
@@ -1863,6 +2176,7 @@ class ChatViewModel(
                 speakAgentFeedback(result.message)
             }
             is SpeechInputResult.PolicyBlocked -> {
+                trace("asr_policy_blocked", "message" to result.message)
                 appendAgentMessage(result.message)
                 _uiState.update { state ->
                     state.copy(
@@ -1878,6 +2192,7 @@ class ChatViewModel(
                 }
             }
             is SpeechInputResult.Failed -> {
+                trace("asr_failed", "message" to result.message)
                 appendAgentMessage(result.message)
                 _uiState.update { state ->
                     state.copy(
@@ -1957,6 +2272,7 @@ class ChatViewModel(
     }
 
     internal fun recordChildMessage(text: String) {
+        trace("child_message_recorded", "text" to text)
         appendMessage(
             ChatMessage(
                 id = nextMessageId("child"),
@@ -1986,6 +2302,17 @@ class ChatViewModel(
         pendingImageContext: PendingImageContextUiState? = _uiState.value.pendingImageContext,
         replaceMessageId: String? = null,
     ) {
+        trace(
+            "agent_reply_render",
+            "text" to reply.text,
+            "voiceEnabled" to reply.voiceEnabled,
+            "audioUrlPresent" to !reply.audioUrl.isNullOrBlank(),
+            "emotion" to reply.emotion,
+            "agentMotion" to reply.agentMotion,
+            "activeScene" to sessionState.activeScene,
+            "quickActions" to uiActions.flatMap { group -> group.actions.map { it.label } },
+            "replaceMessageId" to replaceMessageId,
+        )
         rememberXiaozhantaiCompanionName(sessionState.companionObject)
         if (replaceMessageId.isNullOrBlank()) {
             appendAgentMessage(reply.text)
@@ -2025,6 +2352,13 @@ class ChatViewModel(
         quickActionId: String? = null,
     ): Boolean {
         var doneReceived = false
+        trace(
+            "conversation_stream_start",
+            "text" to text,
+            "attachmentsCount" to attachments.size,
+            "quickActionId" to quickActionId,
+            "includeTts" to (_uiState.value.tts.isAutoReadEnabled && !_uiState.value.tts.isMuted),
+        )
         conversationSender.streamTextMessage(
             childId = childId,
             sessionId = sessionId,
@@ -2046,6 +2380,47 @@ class ChatViewModel(
     private var slowHint8sJob: Job? = null
 
     internal fun applyStreamEvent(event: ConversationStreamEvent) {
+        when (event.type) {
+            "text_delta" -> Unit
+            "audio_ready" -> trace(
+                "conversation_stream_event",
+                "type" to event.type,
+                "requestId" to event.requestId,
+                "seq" to event.seq,
+                "audioText" to event.audioText,
+                "audioUrlPresent" to !event.audioUrl.isNullOrBlank(),
+            )
+            "text_final" -> trace(
+                "conversation_stream_event",
+                "type" to event.type,
+                "requestId" to event.requestId,
+                "seq" to event.seq,
+                "finalText" to event.finalText,
+            )
+            "route_decision" -> trace(
+                "conversation_stream_event",
+                "type" to event.type,
+                "requestId" to event.requestId,
+                "seq" to event.seq,
+                "activeScene" to event.activeScene,
+                "riskLevel" to event.riskLevel,
+                "requiresParentAttention" to event.requiresParentAttention,
+                "quickActions" to event.payload.toStreamQuickActionUi().map { it.label },
+            )
+            "error" -> trace(
+                "conversation_stream_event",
+                "type" to event.type,
+                "requestId" to event.requestId,
+                "seq" to event.seq,
+                "safeMessage" to event.safeMessage,
+            )
+            else -> trace(
+                "conversation_stream_event",
+                "type" to event.type,
+                "requestId" to event.requestId,
+                "seq" to event.seq,
+            )
+        }
         when (event.type) {
             "session_started" -> {
                 Log.d(TAG, "[LatencyTrace] stage=session_started request=${event.requestId}")
@@ -2137,6 +2512,11 @@ class ChatViewModel(
             appendMessage(newMessage)
             return
         }
+        trace(
+            "message_stream_delta_appended",
+            "messageId" to messageId,
+            "delta" to delta,
+        )
         _uiState.update { state ->
             val nextAgentReplyText = state.messages
                 .firstOrNull { it.id == messageId }
@@ -2233,6 +2613,7 @@ class ChatViewModel(
     }
 
     private fun appendAgentMessage(text: String) {
+        trace("agent_message_recorded", "text" to text)
         appendMessage(
             ChatMessage(
                 id = nextMessageId("agent"),
@@ -2243,6 +2624,12 @@ class ChatViewModel(
     }
 
     private fun appendMessage(message: ChatMessage) {
+        trace(
+            "message_appended",
+            "messageId" to message.id,
+            "author" to message.author,
+            "text" to message.text,
+        )
         _uiState.update { state ->
             state.copy(
                 messages = state.messages + message,
@@ -2256,6 +2643,11 @@ class ChatViewModel(
     }
 
     private fun replaceMessageText(messageId: String, text: String) {
+        trace(
+            "message_replaced",
+            "messageId" to messageId,
+            "text" to text,
+        )
         _uiState.update { state ->
             val replacedMessage = state.messages.firstOrNull { it.id == messageId }
             state.copy(
@@ -2283,14 +2675,31 @@ class ChatViewModel(
             !currentTts.isAutoReadEnabled ||
             currentTts.isMuted
         ) {
+            trace(
+                "local_tts_feedback_skipped",
+                "reason" to when {
+                    trimmedText.isBlank() -> "blank"
+                    !currentTts.isAutoReadEnabled -> "auto_read_disabled"
+                    currentTts.isMuted -> "muted"
+                    else -> "unknown"
+                },
+                "text" to trimmedText,
+            )
             return
         }
+        trace("local_tts_feedback_request", "text" to trimmedText)
         viewModelScope.launch(sendDispatcher) {
             val audioUrl = generateFeedbackAudioUrlWithRetry(trimmedText)
             if (audioUrl.isNullOrBlank()) {
                 Log.w(TAG, "speakAgentFeedback: audioUrl missing after retry")
+                trace("local_tts_feedback_audio_missing", "text" to trimmedText)
                 return@launch
             }
+            trace(
+                "local_tts_feedback_audio_ready",
+                "text" to trimmedText,
+                "audioUrlPresent" to true,
+            )
             maybeAutoReadReply(
                 ConversationReply(
                     type = "agent_message",
@@ -2306,6 +2715,11 @@ class ChatViewModel(
 
     private suspend fun generateFeedbackAudioUrlWithRetry(text: String): String? {
         repeat(2) { attemptIndex ->
+            trace(
+                "local_tts_feedback_generate_attempt",
+                "attempt" to attemptIndex + 1,
+                "text" to text,
+            )
             val audioUrl = runCatching {
                 feedbackTtsAudioGenerator.generateAudioUrl(
                     text = text,
@@ -2316,6 +2730,13 @@ class ChatViewModel(
                     TAG,
                     "generateFeedbackAudioUrl failed attempt=${attemptIndex + 1}",
                     error,
+                )
+                trace(
+                    "local_tts_feedback_generate_failed",
+                    "attempt" to attemptIndex + 1,
+                    "error" to error::class.simpleName,
+                    "message" to error.message,
+                    "text" to text,
                 )
             }.getOrNull()
             if (!audioUrl.isNullOrBlank()) return audioUrl
@@ -2345,17 +2766,51 @@ class ChatViewModel(
         }
         val text = lines.joinToString(separator = "\n").trim()
         if (text.isBlank()) return
-        if (!force && lastStrangeDoorNarrationText == text) return
+        if (!force && lastStrangeDoorNarrationText == text) {
+            trace(
+                "strange_door_speak_skipped",
+                "reason" to "duplicate",
+                "snapshot" to snapshot.shortTrace(),
+                "text" to text,
+            )
+            return
+        }
         lastStrangeDoorNarrationText = text
+        trace(
+            "strange_door_speak",
+            "force" to force,
+            "snapshot" to snapshot.shortTrace(),
+            "text" to text,
+        )
         speakAgentFeedback(text)
     }
 
     private fun maybeShowLanguageGameEntryPromptAfterOpening() {
-        if (languageGameAutoPromptShown || languageGameDismissedForLifecycle) return
-        if (_uiState.value.strangeDoorDemo != null) return
-        if (_uiState.value.languageGame != null) return
-        if (_uiState.value.messages.any { it.author == MessageAuthor.Child }) return
+        if (!DevSettings.LANGUAGE_GAME_AUTO_PROMPT_ENABLED) {
+            trace("language_game_auto_prompt_skipped", "reason" to "disabled")
+            return
+        }
+        if (languageGameAutoPromptShown || languageGameDismissedForLifecycle) {
+            trace(
+                "language_game_auto_prompt_skipped",
+                "reason" to if (languageGameAutoPromptShown) "already_shown" else "dismissed_for_lifecycle",
+            )
+            return
+        }
+        if (_uiState.value.strangeDoorDemo != null) {
+            trace("language_game_auto_prompt_skipped", "reason" to "strange_door_active")
+            return
+        }
+        if (_uiState.value.languageGame != null) {
+            trace("language_game_auto_prompt_skipped", "reason" to "language_game_active")
+            return
+        }
+        if (_uiState.value.messages.any { it.author == MessageAuthor.Child }) {
+            trace("language_game_auto_prompt_skipped", "reason" to "child_already_spoke")
+            return
+        }
         languageGameAutoPromptShown = true
+        trace("language_game_auto_prompt_show")
         _uiState.update { state ->
             state.copy(
                 languageGame = LanguageGameReducer.entryPrompt(autoPromptShown = true),
@@ -2371,19 +2826,38 @@ class ChatViewModel(
 
     private fun handleLanguageGameText(text: String): Boolean {
         val trimmed = text.trim()
-        if (trimmed.isBlank()) return false
-        if (_uiState.value.strangeDoorDemo != null) return false
+        if (trimmed.isBlank()) {
+            trace("language_game_text_not_consumed", "reason" to "blank_input")
+            return false
+        }
+        if (_uiState.value.strangeDoorDemo != null) {
+            trace("language_game_text_not_consumed", "reason" to "strange_door_active", "text" to trimmed)
+            return false
+        }
         val snapshot = _uiState.value.languageGame
+        trace(
+            "language_game_text_received",
+            "text" to trimmed,
+            "snapshot" to snapshot?.shortTrace(),
+        )
         if (snapshot?.state == LanguageGameState.BrainTeaser) {
             val brainTeaser = snapshot.brainTeaser
             if (brainTeaser?.gameState == BrainTeaserGameState.Question ||
                 brainTeaser?.gameState == BrainTeaserGameState.Hint
             ) {
+                val nextSnapshot = LanguageGameReducer.applyBrainTeaserAnswer(
+                    snapshot = snapshot,
+                    transcript = trimmed,
+                )
+                trace(
+                    "language_game_answer",
+                    "game" to "BrainTeaser",
+                    "input" to trimmed,
+                    "from" to snapshot.shortTrace(),
+                    "to" to nextSnapshot.shortTrace(),
+                )
                 showLanguageGameSnapshot(
-                    LanguageGameReducer.applyBrainTeaserAnswer(
-                        snapshot = snapshot,
-                        transcript = trimmed,
-                    ),
+                    nextSnapshot,
                     forceSpeak = true,
                 )
                 return true
@@ -2395,12 +2869,27 @@ class ChatViewModel(
             if (handleLanguageGameCommand(trimmed)) return true
             val wordChainState = snapshot.wordChain?.gameState
             if (wordChainState != WordChainGameState.Finished) {
+                val nextSnapshot = LanguageGameReducer.applyWordChainAnswer(
+                    snapshot = snapshot,
+                    transcript = trimmed,
+                )
+                trace(
+                    "language_game_answer",
+                    "game" to "WordChain",
+                    "input" to trimmed,
+                    "from" to snapshot.shortTrace(),
+                    "to" to nextSnapshot.shortTrace(),
+                )
                 showLanguageGameSnapshot(
-                    LanguageGameReducer.applyWordChainAnswer(
-                        snapshot = snapshot,
-                        transcript = trimmed,
-                    ),
+                    nextSnapshot,
                     forceSpeak = true,
+                )
+            } else {
+                trace(
+                    "language_game_answer_ignored",
+                    "reason" to "word_chain_finished",
+                    "input" to trimmed,
+                    "snapshot" to snapshot.shortTrace(),
                 )
             }
             return true
@@ -2410,11 +2899,19 @@ class ChatViewModel(
             if (riddleState == RiddleGameState.Question ||
                 riddleState == RiddleGameState.Hint
             ) {
+                val nextSnapshot = LanguageGameReducer.applyRiddleAnswer(
+                    snapshot = snapshot,
+                    transcript = trimmed,
+                )
+                trace(
+                    "language_game_answer",
+                    "game" to "Riddle",
+                    "input" to trimmed,
+                    "from" to snapshot.shortTrace(),
+                    "to" to nextSnapshot.shortTrace(),
+                )
                 showLanguageGameSnapshot(
-                    LanguageGameReducer.applyRiddleAnswer(
-                        snapshot = snapshot,
-                        transcript = trimmed,
-                    ),
+                    nextSnapshot,
                     forceSpeak = true,
                 )
                 return true
@@ -2429,33 +2926,40 @@ class ChatViewModel(
     private fun handleLanguageGameCommand(text: String): Boolean {
         return when {
             text.contains("脑筋急转弯") -> {
+                trace("language_game_command", "command" to "start_brain_teaser", "text" to text)
                 startBrainTeaserGame()
                 true
             }
             text.contains("词语接龙") ||
                 text.contains("接龙") -> {
+                trace("language_game_command", "command" to "start_word_chain", "text" to text)
                 startWordChainGame()
                 true
             }
             text.contains("猜谜语") ||
                 text.contains("谜语") -> {
+                trace("language_game_command", "command" to "start_riddle", "text" to text)
                 startRiddleGame()
                 true
             }
             text.contains("玩游戏") -> {
+                trace("language_game_command", "command" to "open_menu", "text" to text)
                 openLanguageGameMenu()
                 true
             }
             text.contains("随便聊聊") ||
                 text.contains("先聊别的") -> {
+                trace("language_game_command", "command" to "exit_to_chat", "text" to text)
                 exitLanguageGame()
                 true
             }
             text.contains("换个游戏") -> {
+                trace("language_game_command", "command" to "change_game", "text" to text)
                 returnToLanguageGameMenu()
                 true
             }
             text.contains("下一题") -> {
+                trace("language_game_command", "command" to "next_question", "text" to text)
                 when (_uiState.value.languageGame?.state) {
                     LanguageGameState.BrainTeaser -> nextBrainTeaserQuestion()
                     LanguageGameState.Riddle -> nextRiddleQuestion()
@@ -2465,10 +2969,12 @@ class ChatViewModel(
             }
             text.contains("再玩一次") &&
                 _uiState.value.languageGame?.state == LanguageGameState.WordChain -> {
+                trace("language_game_command", "command" to "restart_word_chain", "text" to text)
                 restartWordChainGame()
                 true
             }
             text.contains("告诉我答案") -> {
+                trace("language_game_command", "command" to "reveal_answer", "text" to text)
                 when (_uiState.value.languageGame?.state) {
                     LanguageGameState.BrainTeaser -> revealBrainTeaserAnswer()
                     LanguageGameState.Riddle -> revealRiddleAnswer()
@@ -2477,6 +2983,7 @@ class ChatViewModel(
                 true
             }
             text.contains("给我提示") -> {
+                trace("language_game_command", "command" to "show_hint", "text" to text)
                 when (_uiState.value.languageGame?.state) {
                     LanguageGameState.BrainTeaser -> requestBrainTeaserHint()
                     LanguageGameState.Riddle -> requestRiddleHint()
@@ -2492,7 +2999,19 @@ class ChatViewModel(
         snapshot: LanguageGameSnapshot,
         forceSpeak: Boolean = false,
     ) {
-        if (_uiState.value.strangeDoorDemo != null) return
+        if (_uiState.value.strangeDoorDemo != null) {
+            trace(
+                "language_game_show_ignored",
+                "reason" to "strange_door_active",
+                "target" to snapshot.shortTrace(),
+            )
+            return
+        }
+        trace(
+            "language_game_show",
+            "target" to snapshot.shortTrace(),
+            "forceSpeak" to forceSpeak,
+        )
         childInteractionStarted = true
         cancelNaturalWaitingTimeout()
         stopCurrentTts(restoreBaseAgent = true)
@@ -2527,8 +3046,22 @@ class ChatViewModel(
             .joinToString(separator = "\n")
             .trim()
         if (text.isBlank()) return
-        if (!force && lastLanguageGameNarrationText == text) return
+        if (!force && lastLanguageGameNarrationText == text) {
+            trace(
+                "language_game_speak_skipped",
+                "reason" to "duplicate",
+                "snapshot" to snapshot.shortTrace(),
+                "text" to text,
+            )
+            return
+        }
         lastLanguageGameNarrationText = text
+        trace(
+            "language_game_speak",
+            "force" to force,
+            "snapshot" to snapshot.shortTrace(),
+            "text" to text,
+        )
         speakAgentFeedback(text)
     }
 
@@ -2545,10 +3078,28 @@ class ChatViewModel(
             !currentTts.isAutoReadEnabled ||
             currentTts.isMuted
         ) {
+            trace(
+                "auto_tts_skipped",
+                "reason" to when {
+                    !reply.voiceEnabled -> "voice_disabled"
+                    reply.text.isBlank() -> "blank_text"
+                    !currentTts.isAutoReadEnabled -> "auto_read_disabled"
+                    currentTts.isMuted -> "muted"
+                    else -> "unknown"
+                },
+                "text" to reply.text,
+                "audioUrlPresent" to !reply.audioUrl.isNullOrBlank(),
+            )
             return
         }
 
         val token = nextTtsToken()
+        trace(
+            "auto_tts_speak_request",
+            "turnId" to "local_tts_$token",
+            "text" to reply.text,
+            "audioUrlPresent" to !reply.audioUrl.isNullOrBlank(),
+        )
         val accepted = ttsController.speak(
             request = TtsRequest(
                 text = reply.text,
@@ -2567,6 +3118,7 @@ class ChatViewModel(
                 },
                 onStart = {
                     if (token == ttsToken) {
+                        trace("auto_tts_playback_started", "turnId" to "local_tts_$token", "text" to reply.text)
                         _uiState.update { state ->
                             state.copy(
                                 agent = baseAgentState.asSpeaking(),
@@ -2582,6 +3134,7 @@ class ChatViewModel(
                 },
                 onDone = {
                     if (token == ttsToken) {
+                        trace("auto_tts_playback_done", "turnId" to "local_tts_$token", "text" to reply.text)
                         _uiState.update { state ->
                             state.copy(
                                 agent = baseAgentState,
@@ -2596,6 +3149,12 @@ class ChatViewModel(
                 },
                 onError = { message ->
                     if (token == ttsToken) {
+                        trace(
+                            "auto_tts_playback_error",
+                            "turnId" to "local_tts_$token",
+                            "text" to reply.text,
+                            "message" to message,
+                        )
                         _uiState.update { state ->
                             state.copy(
                                 agent = baseAgentState,
@@ -2615,6 +3174,11 @@ class ChatViewModel(
         )
 
         if (!accepted) {
+            trace(
+                "auto_tts_speak_rejected",
+                "turnId" to "local_tts_$token",
+                "text" to reply.text,
+            )
             _uiState.update { state ->
                 state.copy(
                     agent = baseAgentState,
@@ -2684,11 +3248,16 @@ class ChatViewModel(
         if (_uiState.value.strangeDoorDemo != null) {
             openingDeferredByStrangeDoor = true
             Log.d(TAG, "[LatencyTrace] stage=opening_deferred reason=strange_door_demo")
+            trace("opening_deferred", "reason" to "strange_door_demo")
             return
         }
-        if (openingRequested) return
+        if (openingRequested) {
+            trace("opening_ignored", "reason" to "already_requested")
+            return
+        }
         openingRequested = true
         Log.d(TAG, "[LatencyTrace] stage=opening_start")
+        trace("opening_request_start")
         // 0-1 秒：立即显示本地确定性状态 "我在这儿"
         _uiState.update { state ->
             state.copy(
@@ -2711,6 +3280,7 @@ class ChatViewModel(
             if (!childInteractionStarted && !_uiState.value.messages.any { it.author == MessageAuthor.Child }) {
                 // 个性化 opening 尚未返回，且孩子未开始输入
                 if (_uiState.value.agent.statusText == "我在这儿") {
+                    trace("opening_local_fallback_status", "statusText" to "想聊什么都可以")
                     _uiState.update { state ->
                         state.copy(
                             agent = state.agent.copy(statusText = "想聊什么都可以"),
@@ -2729,9 +3299,15 @@ class ChatViewModel(
             }.onSuccess { response ->
                 openingFallbackJob.cancel()
                 Log.d(TAG, "[LatencyTrace] stage=opening_model_done")
+                trace(
+                    "opening_response_received",
+                    "replyText" to response.reply.text,
+                    "activeScene" to response.sessionState.activeScene,
+                )
                 // 只有孩子尚未输入、仍处于 opening 状态时才展示个性化 opening
                 if (childInteractionStarted || _uiState.value.messages.any { it.author == MessageAuthor.Child }) {
                     Log.d(TAG, "[LatencyTrace] stage=opening_discarded reason=child_already_interacted")
+                    trace("opening_discarded", "reason" to "child_already_interacted")
                     return@onSuccess
                 }
                 renderAgentReply(
@@ -2745,6 +3321,7 @@ class ChatViewModel(
             }.onFailure {
                 openingFallbackJob.cancel()
                 Log.d(TAG, "[LatencyTrace] stage=opening_failed")
+                trace("opening_failed", "error" to it::class.simpleName, "message" to it.message)
                 // opening 失败：进入普通 ready 状态，不显示错误
                 _uiState.update { state ->
                     state.copy(
@@ -2771,6 +3348,7 @@ class ChatViewModel(
                 state
             } else {
                 appended = true
+                trace("opening_light_memory_appended", "text" to message.text)
                 state.copy(
                     messages = state.messages + message,
                     agentReplyText = message.text,
@@ -2901,6 +3479,39 @@ class ChatViewModel(
             ),
         )
     }
+}
+
+private fun StrangeDoorDemoSnapshot.shortTrace(): String {
+    return "state=$demoState door=$doorState mechanism=$mechanismType attempts=$attemptsCount " +
+        "lastMethod=$lastMethod riddleAttempts=$riddleAttempts lastObject=$lastObjectName " +
+        "lastTool=$lastTransformedName canSave=${lastPhotoTransform?.canSaveToShowcase} " +
+        "photoMessageId=$lastPhotoMessageId"
+}
+
+private fun LanguageGameSnapshot.shortTrace(): String {
+    return when (state) {
+        LanguageGameState.EntryPrompt,
+        LanguageGameState.GameMenu -> "state=$state"
+        LanguageGameState.BrainTeaser -> {
+            val game = brainTeaser
+            "state=$state questionIndex=${game?.questionIndex} gameState=${game?.gameState}"
+        }
+        LanguageGameState.WordChain -> {
+            val game = wordChain
+            "state=$state startIndex=${game?.startIndex} previous=${game?.previousWord} " +
+                "round=${game?.roundIndex} miss=${game?.missCount} gameState=${game?.gameState} " +
+                "childWord=${game?.childWord} foxWord=${game?.foxWord}"
+        }
+        LanguageGameState.Riddle -> {
+            val game = riddle
+            "state=$state questionIndex=${game?.questionIndex} gameState=${game?.gameState}"
+        }
+    }
+}
+
+private fun String.normalizedForStrangeDoorRiddleTrace(): String {
+    return replace(Regex("[\\s，。！？、,.!?]+"), "")
+        .trim()
 }
 
 data class ChatUiState(

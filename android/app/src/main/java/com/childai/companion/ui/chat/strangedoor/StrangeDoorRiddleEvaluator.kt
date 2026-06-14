@@ -1,5 +1,7 @@
 package com.childai.companion.ui.chat.strangedoor
 
+import com.childai.companion.ui.chat.localanswer.LocalAnswerMatcher
+
 data class StrangeDoorRiddleEvaluation(
     val isCorrect: Boolean,
     val feedbackLines: List<String>,
@@ -13,6 +15,7 @@ object StrangeDoorRiddleEvaluator {
     const val ANSWER = "水"
     const val ACTION_RETRY = "再答一次"
     const val ACTION_PHOTO = "找东西帮忙"
+    private val answerAliases = setOf("shui")
 
     private val correctFeedbackLines = listOf(
         "对，是水",
@@ -56,10 +59,11 @@ object StrangeDoorRiddleEvaluator {
             wrongFeedbackLines
     }
 
-    private fun isCorrectAnswer(answerText: String): Boolean {
-        val normalized = answerText
-            .replace(Regex("[\\s，。！？、,.!?]+"), "")
-            .trim()
-        return normalized.contains(ANSWER)
+    fun isCorrectAnswer(answerText: String): Boolean {
+        return LocalAnswerMatcher.containsAnswer(
+            transcript = answerText,
+            answer = ANSWER,
+            aliases = answerAliases,
+        )
     }
 }

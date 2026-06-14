@@ -18,6 +18,26 @@ class BrainTeaserEvaluatorTest {
     }
 
     @Test
+    fun pinyinScriptForApprovedAnswerIsCorrect() {
+        val result = BrainTeaserEvaluator.evaluate(
+            transcript = "Shui。",
+            question = BrainTeaserQuestionBank.questions.first(),
+        )
+
+        assertTrue(result.isCorrect)
+    }
+
+    @Test
+    fun pinyinScriptForTwoCharacterApprovedAnswerIsCorrect() {
+        val result = BrainTeaserEvaluator.evaluate(
+            transcript = "qiumen",
+            question = BrainTeaserQuestionBank.questions[1],
+        )
+
+        assertTrue(result.isCorrect)
+    }
+
+    @Test
     fun nonMatchingAnswerIsNotCorrect() {
         val question = BrainTeaserQuestionBank.questions.first()
 

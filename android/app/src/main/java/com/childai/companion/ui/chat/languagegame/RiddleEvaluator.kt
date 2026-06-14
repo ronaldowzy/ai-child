@@ -1,5 +1,7 @@
 package com.childai.companion.ui.chat.languagegame
 
+import com.childai.companion.ui.chat.localanswer.LocalAnswerMatcher
+
 data class RiddleEvaluation(
     val isCorrect: Boolean,
 )
@@ -9,39 +11,20 @@ object RiddleEvaluator {
         transcript: String,
         question: RiddleQuestion,
     ): RiddleEvaluation {
-        val normalizedTranscript = transcript.normalizedForRiddle()
-        val normalizedAnswer = question.answer.normalizedForRiddle()
         return RiddleEvaluation(
-            isCorrect = normalizedAnswer.isNotBlank() &&
-                normalizedTranscript.contains(normalizedAnswer),
+            isCorrect = LocalAnswerMatcher.containsAnswer(
+                transcript = transcript,
+                answer = question.answer,
+                aliases = answerAliases[question.answer].orEmpty(),
+            ),
         )
     }
 
-    private fun String.normalizedForRiddle(): String {
-        return filterNot { it.isWhitespace() || it.isCommonPunctuation() }
-    }
-
-    private fun Char.isCommonPunctuation(): Boolean {
-        return this in listOf(
-            '，',
-            '。',
-            '！',
-            '？',
-            '、',
-            '；',
-            '：',
-            '“',
-            '”',
-            '‘',
-            '’',
-            ',',
-            '.',
-            '!',
-            '?',
-            ';',
-            ':',
-            '"',
-            '\'',
-        )
-    }
+    private val answerAliases = mapOf(
+        "橘子" to setOf("juzi", "ju zi"),
+        "云" to setOf("yun"),
+        "书包" to setOf("shubao", "shu bao"),
+        "铅笔" to setOf("qianbi", "qian bi"),
+        "星星" to setOf("xingxing", "xing xing"),
+    )
 }

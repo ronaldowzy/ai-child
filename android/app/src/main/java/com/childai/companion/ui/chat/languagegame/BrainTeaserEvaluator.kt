@@ -1,5 +1,7 @@
 package com.childai.companion.ui.chat.languagegame
 
+import com.childai.companion.ui.chat.localanswer.LocalAnswerMatcher
+
 data class BrainTeaserEvaluation(
     val isCorrect: Boolean,
 )
@@ -9,16 +11,20 @@ object BrainTeaserEvaluator {
         transcript: String,
         question: BrainTeaserQuestion,
     ): BrainTeaserEvaluation {
-        val normalizedTranscript = transcript.normalizedForBrainTeaser()
-        val normalizedAnswer = question.answer.normalizedForBrainTeaser()
         return BrainTeaserEvaluation(
-            isCorrect = normalizedAnswer.isNotBlank() &&
-                normalizedTranscript.contains(normalizedAnswer),
+            isCorrect = LocalAnswerMatcher.containsAnswer(
+                transcript = transcript,
+                answer = question.answer,
+                aliases = answerAliases[question.answer].orEmpty(),
+            ),
         )
     }
 
-    private fun String.normalizedForBrainTeaser(): String {
-        return trim()
-            .replace(Regex("[\\s，。！？、,.!?：:；;“”\"'（）()《》<>【】\\[\\]{}]"), "")
-    }
+    private val answerAliases = mapOf(
+        "水" to setOf("shui"),
+        "球门" to setOf("qiumen", "qiu men"),
+        "路" to setOf("lu"),
+        "傻瓜" to setOf("shagua", "sha gua"),
+        "瀑布" to setOf("pubu", "pu bu"),
+    )
 }

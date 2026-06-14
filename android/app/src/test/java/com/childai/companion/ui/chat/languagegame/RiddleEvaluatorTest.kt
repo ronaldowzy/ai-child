@@ -26,6 +26,16 @@ class RiddleEvaluatorTest {
     }
 
     @Test
+    fun pinyinScriptForApprovedAnswerIsCorrect() {
+        val result = RiddleEvaluator.evaluate(
+            transcript = "juzi",
+            question = RiddleQuestionBank.questions[0],
+        )
+
+        assertTrue(result.isCorrect)
+    }
+
+    @Test
     fun synonymOrFeatureWordDoesNotCountAsCorrect() {
         val result = RiddleEvaluator.evaluate(
             transcript = "我觉得是水果",

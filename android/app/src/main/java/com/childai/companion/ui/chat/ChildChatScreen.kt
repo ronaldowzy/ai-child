@@ -110,6 +110,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
@@ -192,7 +193,11 @@ fun ChildChatScreen(
     LaunchedEffect(viewModel, context) {
         val prefs = context.getSharedPreferences(STRANGE_DOOR_ENTRY_PREFS, Context.MODE_PRIVATE)
         val hasShownStrangeDoor = prefs.getBoolean(STRANGE_DOOR_AUTO_SHOWN_KEY, false)
-        if (shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = hasShownStrangeDoor)) {
+        if (shouldAutoActivateStrangeDoorOnChatEntry(
+                hasShownBefore = hasShownStrangeDoor,
+                autoEntryEnabled = DevSettings.STRANGE_DOOR_AUTO_ENTRY_ENABLED,
+            )
+        ) {
             prefs.edit().putBoolean(STRANGE_DOOR_AUTO_SHOWN_KEY, true).apply()
             viewModel.activateStrangeDoorDemo()
         } else {
@@ -1654,22 +1659,25 @@ private fun StrangeDoorRiddleVoiceControl(
         ),
         shape = RoundedCornerShape(26.dp),
         modifier = modifier.heightIn(min = 52.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             StrangeDoorVoiceGlyph(
                 isRecording = voice.isRecording,
                 isUploading = voice.isUploading,
                 modifier = Modifier.size(28.dp),
             )
-            Text(
+            AdaptiveButtonText(
                 text = presentation.primaryButtonText,
                 style = MaterialTheme.typography.titleMedium,
+                baseFontSize = 18.sp,
+                minFontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -1798,7 +1806,12 @@ private fun StrangeDoorActionRow(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
-        val useColumn = maxWidth < 360.dp
+        val columnCount = strangeDoorActionColumnCount(
+            actionCount = actions.size,
+            availableWidthDp = maxWidth.value,
+        )
+        val useColumn = columnCount == 1
+        val useTwoColumn = columnCount == 2 && actions.size > 2
         val gap = if (compact) 8.dp else 10.dp
         if (useColumn) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -1810,6 +1823,26 @@ private fun StrangeDoorActionRow(
                         onClick = { onAction(action) },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
+            }
+        } else if (useTwoColumn) {
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                actions.chunked(2).forEach { rowActions ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                        rowActions.forEach { action ->
+                            val index = actions.indexOf(action)
+                            StrangeDoorActionButton(
+                                action = action,
+                                primary = index == 0,
+                                homeIntro = homeIntro,
+                                onClick = { onAction(action) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowActions.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         } else {
@@ -1843,8 +1876,9 @@ private fun StrangeDoorActionButton(
             enabled = action.enabled,
             shape = RoundedCornerShape(26.dp),
             modifier = modifier.heightIn(min = minHeight),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            AdaptiveSingleLineButtonText(
+            AdaptiveButtonText(
                 text = action.label,
                 style = if (homeIntro) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                 baseFontSize = if (homeIntro) 22.sp else 18.sp,
@@ -1858,8 +1892,9 @@ private fun StrangeDoorActionButton(
             enabled = action.enabled,
             shape = RoundedCornerShape(26.dp),
             modifier = modifier.heightIn(min = minHeight),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            AdaptiveSingleLineButtonText(
+            AdaptiveButtonText(
                 text = action.label,
                 style = MaterialTheme.typography.titleMedium,
                 baseFontSize = 18.sp,
@@ -1870,7 +1905,7 @@ private fun StrangeDoorActionButton(
 }
 
 @Composable
-private fun AdaptiveSingleLineButtonText(
+private fun AdaptiveButtonText(
     text: String,
     style: TextStyle,
     baseFontSize: TextUnit,
@@ -1901,9 +1936,13 @@ private fun AdaptiveSingleLineButtonText(
                         fontSize = fontSize,
                         fontWeight = fontWeight ?: style.fontWeight,
                     ),
-                    maxLines = 1,
-                    softWrap = false,
-                ).size.width <= maxWidthPx
+                    constraints = Constraints(maxWidth = maxWidthPx.toInt().coerceAtLeast(1)),
+                    maxLines = 2,
+                    softWrap = true,
+                ).let { layoutResult ->
+                    layoutResult.size.width <= maxWidthPx &&
+                        !layoutResult.hasVisualOverflow
+                }
             } ?: minFontSize
         }
 
@@ -1912,9 +1951,10 @@ private fun AdaptiveSingleLineButtonText(
             style = style.copy(
                 fontSize = selectedFontSize,
                 fontWeight = fontWeight ?: style.fontWeight,
+                lineHeight = selectedFontSize * 1.12f,
             ),
-            maxLines = 1,
-            softWrap = false,
+            maxLines = 2,
+            softWrap = true,
             overflow = TextOverflow.Clip,
             textAlign = TextAlign.Center,
         )
@@ -1929,6 +1969,18 @@ internal fun strangeDoorActionButtonMinHeight(
         homeIntro && primary -> 62.dp
         homeIntro -> 52.dp
         else -> 54.dp
+    }
+}
+
+internal fun strangeDoorActionColumnCount(
+    actionCount: Int,
+    availableWidthDp: Float,
+): Int {
+    return when {
+        actionCount <= 1 -> 1
+        availableWidthDp < 360f -> 1
+        actionCount > 2 -> 2
+        else -> actionCount
     }
 }
 
@@ -2079,6 +2131,7 @@ private fun LanguageGameActionButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
         ) {
             LanguageGameButtonContent(
                 action = action,
@@ -2093,6 +2146,7 @@ private fun LanguageGameActionButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
         ) {
             LanguageGameButtonContent(
                 action = action,
@@ -2121,7 +2175,7 @@ private fun LanguageGameButtonContent(
                 modifier = Modifier.size(24.dp),
             )
         }
-        AdaptiveSingleLineButtonText(
+        AdaptiveButtonText(
             text = action.label,
             style = MaterialTheme.typography.labelLarge,
             baseFontSize = 14.sp,
@@ -2896,8 +2950,10 @@ private fun LocalImagePreviewActionButton(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = if (primary) MaterialTheme.colorScheme.primary else Color(0xFF42546A).copy(alpha = 0.72f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            maxLines = 2,
+            softWrap = true,
+            overflow = TextOverflow.Clip,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
         )
     }
@@ -3491,8 +3547,10 @@ private fun ParentEntryButton(
             text = label,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            maxLines = 2,
+            softWrap = true,
+            overflow = TextOverflow.Clip,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
         )
     }
@@ -3586,8 +3644,10 @@ private fun XiaozhantaiEntranceButton(
                 text = "小展台",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFF52667B),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = 2,
+                softWrap = true,
+                overflow = TextOverflow.Clip,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -4015,6 +4075,9 @@ private const val TTS_SETTINGS_ACTION = "com.android.settings.TTS_SETTINGS"
 private const val STRANGE_DOOR_ENTRY_PREFS = "child_chat_local_flags"
 private const val STRANGE_DOOR_AUTO_SHOWN_KEY = "strange_door_auto_shown_v1"
 
-internal fun shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore: Boolean): Boolean {
-    return !hasShownBefore
+internal fun shouldAutoActivateStrangeDoorOnChatEntry(
+    hasShownBefore: Boolean,
+    autoEntryEnabled: Boolean,
+): Boolean {
+    return autoEntryEnabled && !hasShownBefore
 }

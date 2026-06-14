@@ -421,6 +421,18 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
+    fun casualChatTextDuringGameExitsAndSendsConversation() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(sender = sender)
+
+        viewModel.startRiddleGame()
+        viewModel.sendText("聊变形金刚")
+
+        assertNull(viewModel.uiState.value.languageGame)
+        assertEquals(listOf("聊变形金刚"), sender.sentTexts)
+    }
+
+    @Test
     fun gameKeywordsRouteLocallyWithoutConversation() {
         val sender = LanguageGameSender()
         val viewModel = viewModel(sender = sender)

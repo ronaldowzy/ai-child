@@ -365,7 +365,7 @@ class ChatViewModel(
         val snapshot = _uiState.value.strangeDoorDemo ?: return
         val transform = snapshot.lastPhotoTransform ?: return
         val messageId = snapshot.lastPhotoMessageId ?: return
-        if (!transform.canSaveToShowcase || snapshot.showcaseSaveIntentRequested) return
+        if (!transform.isUsable || !transform.canSaveToShowcase || snapshot.showcaseSaveIntentRequested) return
         val candidate = xiaozhantaiSaveCandidates[messageId]
         if (candidate == null ||
             saveXiaozhantaiItemUseCase == null
@@ -644,9 +644,12 @@ class ChatViewModel(
     fun sendText(text: String, quickActionId: String? = null) {
         val trimmedText = text.trim()
         if (trimmedText.isEmpty() || _uiState.value.isSending) return
-        if (submitStrangeDoorShowcaseName(trimmedText)) return
-        if (answerStrangeDoorRiddle(trimmedText)) return
-        if (handleLanguageGameText(trimmedText)) return
+        val routedBackToConversation = routeLocalExperienceToConversationIfNeeded(trimmedText)
+        if (!routedBackToConversation) {
+            if (submitStrangeDoorShowcaseName(trimmedText)) return
+            if (answerStrangeDoorRiddle(trimmedText)) return
+            if (handleLanguageGameText(trimmedText)) return
+        }
         updateLightMemoryRelatedChatEligibility(trimmedText)
 
         val imageContext = _uiState.value.pendingImageContext
@@ -661,6 +664,50 @@ class ChatViewModel(
             imageContext?.let { listOf(it.attachmentId) } ?: emptyList(),
             quickActionId = quickActionId,
         )
+    }
+
+    private fun routeLocalExperienceToConversationIfNeeded(text: String): Boolean {
+        val state = _uiState.value
+        if (state.strangeDoorDemo == null && state.languageGame == null) return false
+        if (!looksLikeConversationResumeIntent(text)) return false
+
+        strangeDoorDemoDismissed = true
+        languageGameDismissedForLifecycle = true
+        openingDeferredByStrangeDoor = false
+        lastStrangeDoorNarrationText = null
+        lastLanguageGameNarrationText = null
+        cancelNaturalWaitingTimeout()
+        stopCurrentTts(restoreBaseAgent = true)
+        _uiState.update { current ->
+            current.copy(
+                strangeDoorDemo = null,
+                languageGame = null,
+                xiaozhantaiSaveDraft = null,
+                childTurnPhaseHint = null,
+                pendingImageContext = current.pendingImageContext,
+                isSending = false,
+                lightMemory = LightMemoryReducer.muteForCurrentLifecycle(current.lightMemory),
+                voice = current.voice.copy(
+                    inputMode = VoiceInputMode.Idle,
+                    pendingTranscript = "",
+                    errorMessage = null,
+                ),
+            )
+        }
+        return true
+    }
+
+    private fun looksLikeConversationResumeIntent(text: String): Boolean {
+        val normalized = text
+            .filterNot { it.isWhitespace() || it in "，。！？,.!?；;：:" }
+        return normalized.contains("先聊别的") ||
+            normalized.contains("随便聊聊") ||
+            normalized.contains("不想玩") ||
+            normalized.contains("不玩了") ||
+            normalized.contains("不玩游戏") ||
+            normalized.contains("不想猜") ||
+            normalized.contains("不想答") ||
+            normalized.contains("聊")
     }
 
     private fun updateLightMemoryRelatedChatEligibility(text: String) {
@@ -869,6 +916,11 @@ class ChatViewModel(
                     ),
                 )
             }
+            return
+        }
+        if (routeLocalExperienceToConversationIfNeeded(transcript)) {
+            clearVoiceInputState()
+            sendText(transcript)
             return
         }
         if (submitStrangeDoorShowcaseName(transcript)) return
@@ -1597,7 +1649,7 @@ class ChatViewModel(
         transform: StrangeDoorPhotoTransform,
         doorState: StrangeDoorState,
     ) {
-        if (!transform.canSaveToShowcase || xiaozhantaiRepository == null) return
+        if (!transform.isUsable || !transform.canSaveToShowcase || xiaozhantaiRepository == null) return
         xiaozhantaiSaveCandidates[photoMessageId] = XiaozhantaiSaveCandidate(
             payload = payload,
             defaultName = transform.transformedName ?: transform.objectName,
@@ -1609,6 +1661,7 @@ class ChatViewModel(
     private fun strangeDoorPhotoCanSaveToShowcase(photoMessageId: String): Boolean {
         val snapshot = _uiState.value.strangeDoorDemo ?: return false
         return snapshot.lastPhotoMessageId == photoMessageId &&
+            snapshot.lastPhotoTransform?.isUsable == true &&
             snapshot.lastPhotoTransform?.canSaveToShowcase == true &&
             xiaozhantaiRepository != null
     }
@@ -1735,6 +1788,24 @@ class ChatViewModel(
                 if (!voiceConfirmBeforeSend) {
                     val transcript = result.text.trim()
                     if (transcript.isNotEmpty()) {
+                        if (routeLocalExperienceToConversationIfNeeded(transcript)) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    isSending = false,
+                                    childTurnPhaseHint = ChildTurnUiPhase.Sending,
+                                    voice = state.voice.copy(
+                                        inputMode = VoiceInputMode.Idle,
+                                        pendingTranscript = "",
+                                        errorMessage = null,
+                                    ),
+                                    agent = childInteractionPresentation(
+                                        phaseHint = ChildTurnUiPhase.Sending,
+                                    ).agent,
+                                )
+                            }
+                            sendText(transcript)
+                            return
+                        }
                         if (submitStrangeDoorShowcaseName(transcript)) return
                         if (answerStrangeDoorRiddle(transcript)) return
                         if (handleLanguageGameText(transcript)) return

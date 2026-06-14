@@ -53,6 +53,14 @@ fun UpdateDialog(viewModel: UpdateViewModel) {
             )
         }
 
+        is UpdateState.InstallPermissionRequired -> {
+            InstallPermissionDialog(
+                onOpenSettings = { viewModel.openInstallPermissionSettings() },
+                onInstall = { viewModel.installApk() },
+                onDismiss = { viewModel.dismiss() },
+            )
+        }
+
         is UpdateState.Error -> {
             ErrorDialog(
                 message = currentState.message,
@@ -211,6 +219,70 @@ private fun DownloadedDialog(
 
                     Button(onClick = onInstall) {
                         Text("立即安装")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstallPermissionDialog(
+    onOpenSettings: () -> Unit,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+            ) {
+                Text(
+                    text = "需要安装授权",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "请在系统设置里允许小白狐安装未知应用，授权后返回这里继续安装。",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp,
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("去系统设置授权")
+                    }
+
+                    OutlinedButton(
+                        onClick = onInstall,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("授权后继续安装")
+                    }
+
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("稍后处理")
                     }
                 }
             }

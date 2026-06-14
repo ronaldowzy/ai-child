@@ -102,6 +102,28 @@ class ChatViewModelStrangeDoorDemoTest {
     }
 
     @Test
+    fun casualChatTextDuringRiddlePromptExitsDemoAndSendsConversation() {
+        val sender = StrangeDoorDemoSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorRiddleMethod()
+        viewModel.sendText("聊变形金刚")
+
+        assertNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(listOf("聊变形金刚"), sender.sentTexts)
+    }
+
+    @Test
+    fun strangeDoorAutoEntryIsOneShotByLocalFlag() {
+        assertTrue(shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = false))
+        assertFalse(shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = true))
+    }
+
+    @Test
     fun replayDemoResetsToChoosingMethodAndClosedDoor() {
         val viewModel = ChatViewModel(
             conversationSender = StrangeDoorDemoSender(),

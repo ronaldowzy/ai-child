@@ -1,8 +1,11 @@
 package com.childai.companion.ui.update
 
 import android.app.Application
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +25,7 @@ sealed class UpdateState {
     data class Available(val info: VersionCheckResult) : UpdateState()
     data class Downloading(val progress: Float) : UpdateState()
     data class Downloaded(val apkFile: File) : UpdateState()
+    data class InstallPermissionRequired(val apkFile: File) : UpdateState()
     data class Error(val message: String) : UpdateState()
     data object NoUpdate : UpdateState()
 }
@@ -88,13 +92,23 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
 
     fun installApk() {
         val state = _state.value
-        if (state !is UpdateState.Downloaded) return
+        val apkFile = when (state) {
+            is UpdateState.Downloaded -> state.apkFile
+            is UpdateState.InstallPermissionRequired -> state.apkFile
+            else -> return
+        }
 
         val context = getApplication<Application>()
+        if (!canRequestPackageInstalls()) {
+            _state.value = UpdateState.InstallPermissionRequired(apkFile)
+            openInstallPermissionSettings()
+            return
+        }
+
         val apkUri: Uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
-            state.apkFile,
+            apkFile,
         )
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -104,6 +118,33 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         context.startActivity(intent)
+    }
+
+    fun openInstallPermissionSettings() {
+        val context = getApplication<Application>()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+
+        val packageUri = Uri.parse("package:${context.packageName}")
+        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, packageUri).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(fallbackIntent)
+        }
+    }
+
+    private fun canRequestPackageInstalls(): Boolean {
+        val context = getApplication<Application>()
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+            context.packageManager.canRequestPackageInstalls()
     }
 
     fun dismiss() {

@@ -231,7 +231,7 @@ class StrangeDoorHomeEventUiModelTest {
     }
 
     @Test
-    fun blockedPhotoResultKeepsSaveActionDisabled() {
+    fun blockedPhotoResultDoesNotOfferShowcaseSaveAction() {
         val transform = StrangeDoorPhotoTransformMapper.map(
             StrangeDoorPhotoRecognition(
                 recognizedType = "privacy_sensitive",
@@ -255,7 +255,7 @@ class StrangeDoorHomeEventUiModelTest {
         )
         assertFalse(model.showPhotoResultCard)
         assertFalse(model.showDoorSuccessGlow)
-        assertFalse(model.actions.first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }.enabled)
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.SaveToShowcase })
     }
 
     @Test

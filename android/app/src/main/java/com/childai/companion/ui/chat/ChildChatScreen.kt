@@ -1,6 +1,7 @@
 package com.childai.companion.ui.chat
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -99,13 +100,19 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import com.childai.companion.R
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -182,8 +189,15 @@ fun ChildChatScreen(
             viewModel.shutdownTts()
         }
     }
-    LaunchedEffect(viewModel) {
-        viewModel.activateStrangeDoorDemo()
+    LaunchedEffect(viewModel, context) {
+        val prefs = context.getSharedPreferences(STRANGE_DOOR_ENTRY_PREFS, Context.MODE_PRIVATE)
+        val hasShownStrangeDoor = prefs.getBoolean(STRANGE_DOOR_AUTO_SHOWN_KEY, false)
+        if (shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore = hasShownStrangeDoor)) {
+            prefs.edit().putBoolean(STRANGE_DOOR_AUTO_SHOWN_KEY, true).apply()
+            viewModel.activateStrangeDoorDemo()
+        } else {
+            viewModel.requestOpeningGreeting()
+        }
     }
     LaunchedEffect(uiState.xiaozhantaiSavedItemIdForNavigation) {
         val savedItemId = uiState.xiaozhantaiSavedItemIdForNavigation
@@ -780,6 +794,7 @@ private fun StrangeDoorHomeEventScreen(
     }
 
     fun handleAction(action: StrangeDoorHomeEventAction) {
+        if (!action.enabled) return
         when (action.id) {
             StrangeDoorHomeEventActionId.ChoosePhoto -> onChoosePhoto()
             StrangeDoorHomeEventActionId.ChooseRiddle -> onChooseRiddle()
@@ -1829,12 +1844,12 @@ private fun StrangeDoorActionButton(
             shape = RoundedCornerShape(26.dp),
             modifier = modifier.heightIn(min = minHeight),
         ) {
-            Text(
+            AdaptiveSingleLineButtonText(
                 text = action.label,
                 style = if (homeIntro) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                baseFontSize = if (homeIntro) 22.sp else 18.sp,
+                minFontSize = 11.sp,
                 fontWeight = if (homeIntro) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     } else {
@@ -1844,13 +1859,65 @@ private fun StrangeDoorActionButton(
             shape = RoundedCornerShape(26.dp),
             modifier = modifier.heightIn(min = minHeight),
         ) {
-            Text(
+            AdaptiveSingleLineButtonText(
                 text = action.label,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                baseFontSize = 18.sp,
+                minFontSize = 11.sp,
             )
         }
+    }
+}
+
+@Composable
+private fun AdaptiveSingleLineButtonText(
+    text: String,
+    style: TextStyle,
+    baseFontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    minFontSize: TextUnit = 11.sp,
+    fontWeight: FontWeight? = null,
+) {
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val textMeasurer = rememberTextMeasurer()
+        val maxWidthPx = with(LocalDensity.current) {
+            maxWidth.toPx()
+        }
+        val candidateFontSizes = remember(baseFontSize, minFontSize) {
+            val base = baseFontSize.value
+            val min = minFontSize.value
+            generateSequence(base) { current ->
+                (current - 1f).takeIf { next -> next >= min }
+            }.map { it.sp }.toList()
+        }
+        val selectedFontSize = remember(text, maxWidthPx, candidateFontSizes, fontWeight) {
+            candidateFontSizes.firstOrNull { fontSize ->
+                textMeasurer.measure(
+                    text = AnnotatedString(text),
+                    style = TextStyle(
+                        fontSize = fontSize,
+                        fontWeight = fontWeight ?: style.fontWeight,
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                ).size.width <= maxWidthPx
+            } ?: minFontSize
+        }
+
+        Text(
+            text = text,
+            style = style.copy(
+                fontSize = selectedFontSize,
+                fontWeight = fontWeight ?: style.fontWeight,
+            ),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -2041,6 +2108,7 @@ private fun LanguageGameButtonContent(
     voice: VoiceUiState,
 ) {
     Row(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -2053,12 +2121,13 @@ private fun LanguageGameButtonContent(
                 modifier = Modifier.size(24.dp),
             )
         }
-        Text(
+        AdaptiveSingleLineButtonText(
             text = action.label,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelLarge,
+            baseFontSize = 14.sp,
+            minFontSize = 11.sp,
             fontWeight = if (action.primary) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -3308,7 +3377,7 @@ private fun QuickActionsRow(
                     style = MaterialTheme.typography.labelLarge,
                     color = Color(0xFF42546A).copy(alpha = if (enabled) 0.92f else 0.45f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Clip,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
             }
@@ -3943,3 +4012,9 @@ private fun ChildChatScreenLandscapePreview() {
 }
 
 private const val TTS_SETTINGS_ACTION = "com.android.settings.TTS_SETTINGS"
+private const val STRANGE_DOOR_ENTRY_PREFS = "child_chat_local_flags"
+private const val STRANGE_DOOR_AUTO_SHOWN_KEY = "strange_door_auto_shown_v1"
+
+internal fun shouldAutoActivateStrangeDoorOnChatEntry(hasShownBefore: Boolean): Boolean {
+    return !hasShownBefore
+}

@@ -278,25 +278,28 @@ private fun StrangeDoorDemoSnapshot.completedUiModel(): StrangeDoorHomeEventUiMo
 
 private fun StrangeDoorDemoSnapshot.resultUiModelOrChoosingMethod(): StrangeDoorHomeEventUiModel {
     lastPhotoTransform?.let { transform ->
+        val actions = mutableListOf(
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.FindAnother,
+                label = StrangeDoorHomeEventCopy.findAnotherLabel,
+            ),
+            StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.ChooseRiddle,
+                label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
+            ),
+        )
+        if (transform.canSaveToShowcase) {
+            actions += StrangeDoorHomeEventAction(
+                id = StrangeDoorHomeEventActionId.SaveToShowcase,
+                label = StrangeDoorHomeEventCopy.saveToShowcaseLabel,
+                enabled = !showcaseSaveIntentRequested,
+            )
+        }
         return StrangeDoorHomeEventUiModel(
             title = StrangeDoorHomeEventCopy.title,
             panel = StrangeDoorHomeEventPanel.ToolCard,
             bubbleLines = StrangeDoorPhotoTransformMapper.feedbackLines(transform, doorState = doorState),
-            actions = listOf(
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.FindAnother,
-                    label = StrangeDoorHomeEventCopy.findAnotherLabel,
-                ),
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.ChooseRiddle,
-                    label = StrangeDoorHomeEventCopy.chooseRiddleLabel,
-                ),
-                StrangeDoorHomeEventAction(
-                    id = StrangeDoorHomeEventActionId.SaveToShowcase,
-                    label = StrangeDoorHomeEventCopy.saveToShowcaseLabel,
-                    enabled = transform.canSaveToShowcase && !showcaseSaveIntentRequested,
-                ),
-            ),
+            actions = actions,
             doorAssetKey = doorState.toAssetKey(),
             showPhotoResultCard = transform.isUsable,
             showDoorSuccessGlow = transform.isUsable && doorState != StrangeDoorState.Closed,

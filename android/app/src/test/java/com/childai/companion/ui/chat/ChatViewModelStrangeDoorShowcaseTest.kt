@@ -50,11 +50,9 @@ class ChatViewModelStrangeDoorShowcaseTest {
         viewModel.requestStrangeDoorShowcaseSaveIntent()
 
         val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
-        val saveAction = snapshot.toHomeEventUiModel()
-            .actions
-            .first { it.id == StrangeDoorHomeEventActionId.SaveToShowcase }
+        val model = snapshot.toHomeEventUiModel()
         assertEquals(StrangeDoorShapeHint.Blocked, snapshot.lastPhotoTransform?.shapeHint)
-        assertFalse(saveAction.enabled)
+        assertFalse(model.actions.any { it.id == StrangeDoorHomeEventActionId.SaveToShowcase })
         assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
         assertNull(showcaseRepository.savedRequest)
     }
@@ -79,6 +77,28 @@ class ChatViewModelStrangeDoorShowcaseTest {
         assertEquals(XiaozhantaiSaveDraftStage.Naming, namingDraft.stage)
         assertEquals(XiaozhantaiSaveDraftSource.StrangeDoor, namingDraft.source)
         assertEquals("蓝盖盖转轮", namingDraft.name)
+    }
+
+    @Test
+    fun cancelSaveIntentDoesNotSaveOrAdvanceToNamingState() {
+        val showcaseRepository = CapturingStrangeDoorShowcaseRepository()
+        val viewModel = saveablePhotoViewModel(showcaseRepository = showcaseRepository)
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorPhotoMethod()
+        viewModel.submitCapturedPhoto(photoPayload(), imagePurpose = IMAGE_PURPOSE_SHARE)
+        viewModel.requestStrangeDoorShowcaseSaveIntent()
+
+        val confirmDraft = requireNotNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
+        assertEquals(XiaozhantaiSaveDraftStage.Confirm, confirmDraft.stage)
+        assertTrue(requireNotNull(viewModel.uiState.value.strangeDoorDemo).showcaseSaveIntentRequested)
+
+        viewModel.cancelXiaozhantaiSave()
+
+        val snapshot = requireNotNull(viewModel.uiState.value.strangeDoorDemo)
+        assertNull(viewModel.uiState.value.xiaozhantaiSaveDraft)
+        assertFalse(snapshot.showcaseSaveIntentRequested)
+        assertNull(showcaseRepository.savedRequest)
     }
 
     @Test

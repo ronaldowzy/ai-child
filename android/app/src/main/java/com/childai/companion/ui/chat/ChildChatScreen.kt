@@ -2195,15 +2195,27 @@ private fun CompanionImageSourceDialog(
                 Button(
                     onClick = onCapturePhoto,
                     modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                 ) {
-                    Text(text = "拍一张照片")
+                    AdaptiveButtonText(
+                        text = "拍一张照片",
+                        style = MaterialTheme.typography.labelLarge,
+                        baseFontSize = 14.sp,
+                        minFontSize = 11.sp,
+                    )
                 }
                 if (showGalleryEntry) {
                     OutlinedButton(
                         onClick = onPickFromGallery,
                         modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     ) {
-                        Text(text = "从相册选")
+                        AdaptiveButtonText(
+                            text = "从相册选",
+                            style = MaterialTheme.typography.labelLarge,
+                            baseFontSize = 14.sp,
+                            minFontSize = 11.sp,
+                        )
                     }
                 }
             }
@@ -2762,17 +2774,20 @@ private fun LocalImagePreviewCard(
         )
         if (preview.status == LocalImagePreviewStatus.Failed) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 LocalImagePreviewActionButton(
                     text = "我们可以再试一次",
                     primary = true,
                     onClick = { onRetry?.invoke() },
+                    modifier = Modifier.weight(1f),
                 )
                 LocalImagePreviewActionButton(
                     text = "先不看也可以",
                     primary = false,
                     onClick = { onDismiss?.invoke() },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -2921,10 +2936,12 @@ private fun LocalImagePreviewActionButton(
     text: String,
     primary: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(14.dp)
     Surface(
-        modifier = Modifier
+        modifier = modifier
+            .heightIn(min = 36.dp)
             .clip(shape)
             .clickable { onClick() },
         shape = shape,
@@ -2946,7 +2963,9 @@ private fun LocalImagePreviewActionButton(
             softWrap = true,
             overflow = TextOverflow.Clip,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 5.dp),
         )
     }
 }
@@ -3409,6 +3428,7 @@ private fun QuickActionsRow(
             val shape = RoundedCornerShape(22.dp)
             Surface(
                 modifier = Modifier
+                    .widthIn(min = 92.dp, max = 184.dp)
                     .heightIn(min = 44.dp)
                     .clip(shape)
                     .clickable(enabled = enabled) { onQuickAction(action) },
@@ -3424,9 +3444,13 @@ private fun QuickActionsRow(
                     text = action.label,
                     style = MaterialTheme.typography.labelLarge,
                     color = Color(0xFF42546A).copy(alpha = if (enabled) 0.92f else 0.45f),
-                    maxLines = 1,
+                    maxLines = 2,
+                    softWrap = true,
                     overflow = TextOverflow.Clip,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
                 )
             }
         }

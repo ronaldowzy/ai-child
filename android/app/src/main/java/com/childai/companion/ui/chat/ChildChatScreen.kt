@@ -1806,16 +1806,16 @@ private fun StrangeDoorActionRow(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
-        val columnCount = strangeDoorActionColumnCount(
-            actionCount = actions.size,
+        val actionRows = strangeDoorActionRows(
+            actions = actions,
             availableWidthDp = maxWidth.value,
         )
-        val useColumn = columnCount == 1
-        val useTwoColumn = columnCount == 2 && actions.size > 2
         val gap = if (compact) 8.dp else 10.dp
-        if (useColumn) {
-            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                actions.forEachIndexed { index, action ->
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            actionRows.forEach { rowActions ->
+                if (rowActions.size == 1) {
+                    val action = rowActions.first()
+                    val index = actions.indexOf(action)
                     StrangeDoorActionButton(
                         action = action,
                         primary = index == 0,
@@ -1823,11 +1823,7 @@ private fun StrangeDoorActionRow(
                         onClick = { onAction(action) },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                }
-            }
-        } else if (useTwoColumn) {
-            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                actions.chunked(2).forEach { rowActions ->
+                } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                         rowActions.forEach { action ->
                             val index = actions.indexOf(action)
@@ -1839,22 +1835,7 @@ private fun StrangeDoorActionRow(
                                 modifier = Modifier.weight(1f),
                             )
                         }
-                        if (rowActions.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
                     }
-                }
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                actions.forEachIndexed { index, action ->
-                    StrangeDoorActionButton(
-                        action = action,
-                        primary = index == 0,
-                        homeIntro = homeIntro,
-                        onClick = { onAction(action) },
-                        modifier = Modifier.weight(1f),
-                    )
                 }
             }
         }
@@ -1982,6 +1963,17 @@ internal fun strangeDoorActionColumnCount(
         actionCount > 2 -> 2
         else -> actionCount
     }
+}
+
+internal fun strangeDoorActionRows(
+    actions: List<StrangeDoorHomeEventAction>,
+    availableWidthDp: Float,
+): List<List<StrangeDoorHomeEventAction>> {
+    val columnCount = strangeDoorActionColumnCount(
+        actionCount = actions.size,
+        availableWidthDp = availableWidthDp,
+    )
+    return actions.chunked(columnCount.coerceAtLeast(1))
 }
 
 internal fun strangeDoorWeakEntryAlpha(homeIntro: Boolean): Float {

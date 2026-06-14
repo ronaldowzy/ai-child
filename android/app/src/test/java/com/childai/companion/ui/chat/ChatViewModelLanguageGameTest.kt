@@ -489,6 +489,24 @@ class ChatViewModelLanguageGameTest {
     }
 
     @Test
+    fun storyAsrDuringGameExitsAndSendsConversation() {
+        val sender = LanguageGameSender()
+        val viewModel = viewModel(
+            sender = sender,
+            speech = FakeLanguageGameSpeechInputController(
+                result = SpeechInputResult.Transcript("你给我讲个故事"),
+            ),
+        )
+
+        viewModel.startRiddleGame()
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
+        assertNull(viewModel.uiState.value.languageGame)
+        assertEquals(listOf("你给我讲个故事"), sender.sentTexts)
+    }
+
+    @Test
     fun gameKeywordsRouteLocallyWithoutConversation() {
         val sender = LanguageGameSender()
         val viewModel = viewModel(sender = sender)

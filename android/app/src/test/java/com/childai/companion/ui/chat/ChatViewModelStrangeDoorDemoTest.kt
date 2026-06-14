@@ -7,11 +7,17 @@ import com.childai.companion.data.conversation.ConversationStreamEvent
 import com.childai.companion.data.tts.XiaobaohuTtsAudioGenerator
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoMethod
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoState
+import com.childai.companion.ui.chat.strangedoor.StrangeDoorDemoSnapshot
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorMechanismType
 import com.childai.companion.ui.chat.strangedoor.StrangeDoorState
+import com.childai.companion.ui.chat.strangedoor.toHomeEventUiModel
 import com.childai.companion.voice.TtsCallbacks
 import com.childai.companion.voice.TtsController
 import com.childai.companion.voice.TtsRequest
+import com.childai.companion.voice.SpeechInputController
+import com.childai.companion.voice.SpeechInputResult
+import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -134,6 +140,26 @@ class ChatViewModelStrangeDoorDemoTest {
     }
 
     @Test
+    fun storyAsrDuringRiddlePromptExitsDemoAndSendsConversation() {
+        val sender = StrangeDoorDemoSender()
+        val viewModel = ChatViewModel(
+            conversationSender = sender,
+            speechInputController = StrangeDoorDemoSpeechInputController(
+                SpeechInputResult.Transcript("你给我讲个故事"),
+            ),
+            sendDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.activateStrangeDoorDemo()
+        viewModel.chooseStrangeDoorRiddleMethod()
+        viewModel.startVoiceRecording(tempDir())
+        viewModel.stopVoiceRecordingAndUpload()
+
+        assertNull(viewModel.uiState.value.strangeDoorDemo)
+        assertEquals(listOf("你给我讲个故事"), sender.sentTexts)
+    }
+
+    @Test
     fun strangeDoorAutoEntryIsOneShotByLocalFlag() {
         assertTrue(
             shouldAutoActivateStrangeDoorOnChatEntry(
@@ -161,6 +187,24 @@ class ChatViewModelStrangeDoorDemoTest {
         assertEquals(2, strangeDoorActionColumnCount(actionCount = 3, availableWidthDp = 390f))
         assertEquals(2, strangeDoorActionColumnCount(actionCount = 2, availableWidthDp = 390f))
         assertEquals(1, strangeDoorActionColumnCount(actionCount = 4, availableWidthDp = 320f))
+    }
+
+    @Test
+    fun completedActionLabelsAreSplitAcrossRowsOnPhoneWidth() {
+        val actions = StrangeDoorDemoSnapshot(
+            demoState = StrangeDoorDemoState.Completed,
+            doorState = StrangeDoorState.Open,
+        ).toHomeEventUiModel().actions
+
+        val rows = strangeDoorActionRows(actions = actions, availableWidthDp = 390f)
+
+        assertEquals(
+            listOf(
+                listOf("再玩一次", "再找一个"),
+                listOf("去小展台看看", "先聊别的"),
+            ),
+            rows.map { row -> row.map { it.label } },
+        )
     }
 
     @Test
@@ -230,6 +274,28 @@ class ChatViewModelStrangeDoorDemoTest {
         assertEquals(1, tts.requests.size)
         assertTrue(tts.requests.first().text.contains("我被这扇奇怪小门挡住了"))
     }
+}
+
+private fun tempDir(): File {
+    return Files.createTempDirectory("strange-door-demo-test").toFile()
+}
+
+private class StrangeDoorDemoSpeechInputController(
+    private val result: SpeechInputResult,
+) : SpeechInputController {
+    override suspend fun startRecording() = Unit
+
+    override suspend fun stopAndTranscribe(
+        childId: String,
+        sessionId: String,
+        timezone: String,
+    ): SpeechInputResult {
+        return result
+    }
+
+    override suspend fun cancel() = Unit
+
+    override fun shutdown() = Unit
 }
 
 private class StrangeDoorDemoSender : ConversationMessageSender {
